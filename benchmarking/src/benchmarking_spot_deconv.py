@@ -36,8 +36,7 @@ def benchmark_performance(test_spots_metadata_mtrx, spot_composition_mtrx, colum
         # Sum of squared differences for the current cell type
         mse = np.sum((test_spots_metadata_mtrx[:, i] - spot_composition_mtrx[:, i]) ** 2)
         all_rmse += mse  # Accumulate the MSE for the overall RMSE calculation
-        RMSE[i] = np.sqrt(mse / test_spots_metadata_mtrx.shape[0])  # RMSE for each cell type
-
+        RMSE[column_names[i]] = np.sqrt(mse / test_spots_metadata_mtrx.shape[0])  # RMSE for each cell type
 
         mae = mean_absolute_error(test_spots_metadata_mtrx[:, i], spot_composition_mtrx[:, i])
         all_mae += mae
@@ -65,9 +64,17 @@ def benchmark_performance(test_spots_metadata_mtrx, spot_composition_mtrx, colum
     }
 
 def main(test_spots_file, spot_composition_file):
-    # Load data from CSV files
+    # Load data from CSV files & sort row names (spot IDs)
     test_spots_df = pd.read_csv(test_spots_file, index_col=0).sort_index()
     spot_composition_df = pd.read_csv(spot_composition_file, index_col=0).sort_index()
+
+    # Drop "spot_x" and "spot_y" columns from both dataframes (if present)
+    test_spots_df = test_spots_df.drop(columns=['spot_x', 'spot_y'], errors='ignore')
+    spot_composition_df = spot_composition_df.drop(columns=['spot_x', 'spot_y'], errors='ignore')
+
+    # Sort column names (cell types)
+    test_spots_df = test_spots_df.sort_index(axis=1)
+    spot_composition_df = spot_composition_df.sort_index(axis=1)
 
     # Check if columns match
     if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
@@ -98,6 +105,7 @@ def main(test_spots_file, spot_composition_file):
     print(f"Sum MAE: {results['Sum_MAE']:.4f}")
     print(f"Correlation: {results['corr']:.4f}")
 
+    return(results)
 if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: python benchmarking.py <test_spots_file> <spot_composition_file>")
