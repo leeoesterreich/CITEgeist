@@ -1,0 +1,154 @@
+---
+title: "Seurat Benchmarking"
+author: "bts76"
+date: "2024-11-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# set current working directory
+setwd("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Seurat/high_seg")
+
+# load required packages
+library(Seurat)
+library(tidyverse)
+library(harmony)
+library(ggplot2)
+library(SeuratDisk)
+```
+
+# load reference object
+```{r load scRNA}
+# load the pre-processed ER+ single-cell reference
+# see /bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Seurat/Seurat_deconvolution.Rmd for processing details 
+Wu_scRNA_ref <- LoadH5Seurat("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat")
+
+# plot the subset reference
+DimPlot(Wu_scRNA_ref, group.by = "celltype") +
+  ggtitle("Wu et al: ER+ Reference",
+          "38,241 cells; 10X scRNA-seq")
+```
+
+# load in the query objects:
+```{r}
+# Set the directory containing the h5ad files
+input_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/replicates/high_seg/h5ad_objects"
+
+# List all h5ad files in the directory
+h5ad_files <- list.files(input_dir, pattern = "\\.h5ad$", full.names = TRUE)
+
+# Loop through each file and convert it
+for (file in h5ad_files) {
+  # Construct the output file name (replace .h5ad with .h5Seurat)
+  dest_file <- sub("\\.h5ad$", ".h5Seurat", file)
+
+  # Perform the conversion
+  Convert(file, dest = "h5Seurat", overwrite = TRUE, verbose = TRUE)
+
+  cat("Converted:", file, "to", dest_file, "\n")
+}
+```
+
+```{r}
+# Set the directory containing the h5Seurat files
+input_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/replicates/high_seg/h5seurat"
+
+# List all h5Seurat files in the directory
+h5seurat_files <- list.files(input_dir, pattern = "\\GEX.h5seurat$", full.names = TRUE)
+
+# Add names to the list based on the file names
+names(h5seurat_files) <- gsub("_GEX\\.h5seurat$", "", basename(h5seurat_files))
+
+# Verify the named list
+print(h5seurat_files)
+
+# Load the list of Visium datasets with the names applied
+query_objs <- lapply(h5seurat_files, FUN = function(x) {
+  LoadH5Seurat(x)
+})
+```
+
+```{r}
+run_spatial_deconvolution <- function(query_objs, reference_obj, output_dir) {
+  # Ensure output directory exists
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir, recursive = TRUE)
+  }
+  
+  # Loop through each spatial GEX object in the query list
+  for (rep_name in names(query_objs)) {
+    # Access the current spatial GEX object
+    Wu_spatial_GEX_query <- query_objs[[rep_name]]
+    
+    # Step 1: Find PCA-based transfer anchors
+    anchors <- FindTransferAnchors(
+      reference = reference_obj,
+      #features = rownames(Wu_scRNA_ref),
+      query = Wu_spatial_GEX_query,
+      scale = TRUE,
+      reduction = "pcaproject",
+      normalization.method = "LogNormalize"
+    )
+    
+    # Step 2: Predict query cell-type labels from reference
+    predictions.assay <- TransferData(
+      anchorset = anchors,
+      refdata = reference_obj$celltype,
+      prediction.assay = TRUE
+    )
+    
+    # Step 3: Save predictions to CSV
+    seurat_predictions <- predictions.assay@data %>%
+      t() %>%
+      data.frame(check.names = FALSE)
+    seurat_predictions$max <- NULL
+    seurat_predictions <- seurat_predictions[, c(
+      "B-cells", "CAFs", "Cancer Epithelial", "Endothelial", "Myeloid",
+      "Normal Epithelial", "PVL", "Plasmablasts", "T-cells"
+    )]
+    output_file <- file.path(output_dir, paste0(rep_name, "_Seurat_deconv_predictions.csv"))
+    write.csv(seurat_predictions, output_file, row.names = TRUE)
+    
+    # Step 4: Add predictions to the Seurat object
+    Wu_spatial_GEX_query[["predictions"]] <- predictions.assay
+    Wu_spatial_GEX_query@meta.data$prediction <- apply(seurat_predictions, 1, function(row) {
+      colnames(seurat_predictions)[which.max(row)]
+    })
+    
+    # Optional: Save the updated Seurat object (if needed)
+    updated_file <- file.path(output_dir, paste0(rep_name, "_updated_query.h5Seurat"))
+    SaveH5Seurat(Wu_spatial_GEX_query, filename = updated_file, overwrite = TRUE)
+    
+    # Step 5: Visualization (optional)
+    plot_file <- file.path(output_dir, paste0(rep_name, "_Seurat_Prediction.pdf"))
+    pdf(plot_file)
+    print(DimPlot(Wu_spatial_GEX_query, group.by = "prediction", reduction = "spatial") +
+      ggtitle("Seurat Prediction", subtitle = paste("Replicate:", rep_name)))
+    dev.off()
+    
+    # Display prediction summary
+    cat("Predictions for", rep_name, ":\n")
+    print(table(Wu_spatial_GEX_query$prediction))
+  }
+}
+```
+
+```{r}
+# Define the output directory
+output_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Seurat/high_seg"
+
+Wu_scRNA_ref <- FindVariableFeatures(Wu_scRNA_ref)
+
+# Run the function for all loaded spatial GEX objects
+run_spatial_deconvolution(query_objs, Wu_scRNA_ref, output_dir)
+```
+
+```{r}
+# save the environment
+save.image("Seurat_bench_reps_high_seg.RData")
+```
+
