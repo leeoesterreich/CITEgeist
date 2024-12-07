@@ -96,7 +96,7 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
     print(f"\tAverage MAE: {average_mae:.4f}")
     print(f"\tMedian MAE:  {median_mae:.4f}")
 
-    return metrics_per_cell_type, average_rmse, median_rmse, average_nrmse, median_nrmse, average_mae, median_mae
+    return { "metrics_per_cell_type" : metrics_per_cell_type, "average_rmse" : average_rmse, "median_rmse" : median_rmse, "average_nrmse" : average_nrmse, "median_nrmse" : median_nrmse, "average_mae" : average_mae, "median_mae" : median_mae }
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate RMSE and NRMSE for gene count predictions.')
