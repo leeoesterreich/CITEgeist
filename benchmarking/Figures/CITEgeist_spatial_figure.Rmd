@@ -1,0 +1,392 @@
+---
+title: "CITEgeist_spatial_figure"
+author: "bts76"
+date: "2024-11-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required libraries
+library(jsonlite)
+library(ggplot2)
+library(tidyverse)
+library(ggpubr)
+```
+
+```{r}
+# Read the dataframes
+cell2loc_res0 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Cell2Location/replicates/cell2location_map_0/cell2loc_deconv_predictions.csv", check.names = F)
+seurat_res0 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Seurat/replicates/Wu_rep_0_Seurat_deconv_predictions.csv", check.names = F)
+citegeist_res0 <- read.csv("/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/Wu_rep_0_celltype_proportions_EM.csv", check.names = F)
+ground_truth_res0 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/results/replicates/ST_sim/Wu_ST_0_prop.csv", check.names = F)
+
+# Ensure the first column is named "Spot"
+colnames(cell2loc_res0)[1] <- "Spot"
+colnames(seurat_res0)[1] <- "Spot"
+colnames(citegeist_res0)[1] <- "Spot"
+colnames(ground_truth_res0)[1] <- "Spot"
+
+# Set row names to "Spot"
+rownames(cell2loc_res0) <- cell2loc_res0$Spot
+rownames(seurat_res0) <- seurat_res0$Spot
+rownames(citegeist_res0) <- citegeist_res0$Spot
+rownames(ground_truth_res0) <- ground_truth_res0$Spot
+
+# Remove the "Spot" column as it is now the rownames
+cell2loc_res0 <- cell2loc_res0[ , -1]
+seurat_res0 <- seurat_res0[ , -1]
+citegeist_res0 <- citegeist_res0[ , -1]
+ground_truth_res0 <- ground_truth_res0[ , -1]
+
+# Function to sort the rows based on the numeric component of "Spot"
+sort_spots <- function(df) {
+  # Extract numeric component from Spot and convert to numeric
+  df$Spot_numeric <- as.numeric(gsub("spot_", "", rownames(df)))
+  
+  # Sort by the numeric component of Spot
+  df_sorted <- df[order(df$Spot_numeric), ]
+  
+  # Optionally remove the helper column (Spot_numeric)
+  df_sorted$Spot_numeric <- NULL
+  
+  return(df_sorted)
+}
+
+# Sort each dataframe based on the numeric part of "Spot"
+cell2loc_res0 <- sort_spots(cell2loc_res0)
+seurat_res0 <- sort_spots(seurat_res0)
+citegeist_res0 <- sort_spots(citegeist_res0)
+ground_truth_res0 <- sort_spots(ground_truth_res0)
+
+# Optionally, you can check the column order if necessary:
+# Sort columns to make sure the order of columns matches
+cell2loc_res0 <- cell2loc_res0[ , order(colnames(cell2loc_res0))]
+seurat_res0 <- seurat_res0[ , order(colnames(seurat_res0))]
+citegeist_res0 <- citegeist_res0[ , order(colnames(citegeist_res0))]
+ground_truth_res0 <- ground_truth_res0[ , order(colnames(ground_truth_res0))]
+
+# extract spatial coords:
+spatial_coords <- ground_truth_res0[,c("spot_x", "spot_y")]
+ground_truth_res0[,c("spot_x", "spot_y")] <- NULL
+
+cell2loc_res0  <- cbind(cell2loc_res0, spatial_coords)
+seurat_res0    <- cbind(seurat_res0, spatial_coords)
+citegeist_res0 <- cbind(citegeist_res0, spatial_coords)
+ground_truth_res0 <- cbind(ground_truth_res0, spatial_coords)
+```
+
+```{r}
+library(scatterpie)
+
+# Define a function to create scatterpies for each method
+create_scatterpie_plot <- function(df, title) {
+  # Define a fixed color palette for cell types (adjust colors as needed)
+  cell_type_colors <- c(
+    "Cancer Epithelial" = "#E41A1C",  # Red
+    "Normal Epithelial" = "#377EB8",  # Blue
+    "T-cells" = "#4DAF4A",  # Green
+    "PVL"     = "#FF7F00",  # Orange
+    "Myeloid" = "#F781BF",  # Pink
+    "B-cells" = "#A65628",  # Brown
+    "Plasmablasts" = "#984EA3",  # Purple
+    "Endothelial" = "#FF00FF",  # Magenta
+    "CAFs" = "#FFFF33"  # Yellow
+  )
+  
+  # Create the scatterpie plot
+  scatterpie_plot <- ggplot() + 
+    geom_scatterpie(aes(x = spot_x, y = spot_y), data = df, 
+                    cols = names(cell_type_colors)) + 
+    coord_equal() +
+    scale_fill_manual(values = cell_type_colors) +  # Apply fixed colors
+    ggtitle(title) +  # Set the title of the plot
+    theme_minimal(base_size = 16) # Set base text size
+  
+  return(scatterpie_plot)
+}
+# Create scatterpie plots for each method and the ground truth
+plot_ground_truth <- create_scatterpie_plot(ground_truth_res0, "Ground Truth")
+plot_cell2loc <- create_scatterpie_plot(cell2loc_res0, "Cell2Location")
+plot_seurat <- create_scatterpie_plot(seurat_res0, "Seurat")
+plot_citegeist <- create_scatterpie_plot(citegeist_res0, "CITEgeist")
+
+# Arrange the plots into a 2x2 grid with a common legend
+final_plot_rep0 <- ggarrange(plot_ground_truth, plot_cell2loc, plot_seurat, plot_citegeist, 
+                        ncol = 2, nrow = 2, 
+                        labels = c("A", "B", "C", "D"),
+                        common.legend = TRUE,  # Use common legend across all plots
+                        legend = "right" # Position the legend on the right
+                        ) # Set the label size to 20 
+
+ggsave("spatial_proportion_rep0.png", final_plot_rep0, dpi = 300, width = 10.5, height = 10, units = "in", bg = "white")
+```
+```{r}
+final_plot_rep0
+```
+```{r}
+# Read the dataframes
+cell2loc_rep1 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Cell2Location/replicates/cell2location_map_1/cell2loc_deconv_predictions.csv", check.names = F)
+seurat_rep1 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Seurat/replicates/Wu_rep_1_Seurat_deconv_predictions.csv", check.names = F)
+citegeist_rep1 <- read.csv("/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/Wu_rep_1_celltype_proportions_EM.csv", check.names = F)
+ground_truth_rep1 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/results/replicates/ST_sim/Wu_ST_1_prop.csv", check.names = F)
+
+# Ensure the first column is named "Spot"
+colnames(cell2loc_rep1)[1] <- "Spot"
+colnames(seurat_rep1)[1] <- "Spot"
+colnames(citegeist_rep1)[1] <- "Spot"
+colnames(ground_truth_rep1)[1] <- "Spot"
+
+# Set row names to "Spot"
+rownames(cell2loc_rep1) <- cell2loc_rep1$Spot
+rownames(seurat_rep1) <- seurat_rep1$Spot
+rownames(citegeist_rep1) <- citegeist_rep1$Spot
+rownames(ground_truth_rep1) <- ground_truth_rep1$Spot
+
+# Remove the "Spot" column as it is now the rownames
+cell2loc_rep1 <- cell2loc_rep1[ , -1]
+seurat_rep1 <- seurat_rep1[ , -1]
+citegeist_rep1 <- citegeist_rep1[ , -1]
+ground_truth_rep1 <- ground_truth_rep1[ , -1]
+
+# Sort each dataframe based on the numeric part of "Spot"
+cell2loc_rep1 <- sort_spots(cell2loc_rep1)
+seurat_rep1 <- sort_spots(seurat_rep1)
+citegeist_rep1 <- sort_spots(citegeist_rep1)
+ground_truth_rep1 <- sort_spots(ground_truth_rep1)
+
+# Optionally, you can check the column order if necessary:
+# Sort columns to make sure the order of columns matches
+cell2loc_rep1 <- cell2loc_rep1[ , order(colnames(cell2loc_rep1))]
+seurat_rep1 <- seurat_rep1[ , order(colnames(seurat_rep1))]
+citegeist_rep1 <- citegeist_rep1[ , order(colnames(citegeist_rep1))]
+ground_truth_rep1 <- ground_truth_rep1[ , order(colnames(ground_truth_rep1))]
+
+# extract spatial coords:
+spatial_coords <- ground_truth_rep1[,c("spot_x", "spot_y")]
+ground_truth_rep1[,c("spot_x", "spot_y")] <- NULL
+
+cell2loc_rep1  <- cbind(cell2loc_rep1, spatial_coords)
+seurat_rep1    <- cbind(seurat_rep1, spatial_coords)
+citegeist_rep1 <- cbind(citegeist_rep1, spatial_coords)
+ground_truth_rep1 <- cbind(ground_truth_rep1, spatial_coords)
+
+# Create scatterpie plots for each method and the ground truth
+plot_ground_truth <- create_scatterpie_plot(ground_truth_rep1, "Ground Truth")
+plot_cell2loc <- create_scatterpie_plot(cell2loc_rep1, "Cell2Location")
+plot_seurat <- create_scatterpie_plot(seurat_rep1, "Seurat")
+plot_citegeist <- create_scatterpie_plot(citegeist_rep1, "CITEgeist")
+
+# Arrange the plots into a 2x2 grid with a common legend
+final_plot_rep1 <- ggarrange(plot_ground_truth, plot_cell2loc, plot_seurat, plot_citegeist, 
+                        ncol = 2, nrow = 2, 
+                        labels = c("A", "B", "C", "D"),
+                        common.legend = TRUE,  # Use common legend across all plots
+                        legend = "right" # Position the legend on the right
+                        ) # Set the label size to 20 
+
+ggsave("spatial_proportion_rep1.png", final_plot_rep1, dpi = 300, width = 10.5, height = 10, units = "in", bg = "white")
+final_plot_rep1
+```
+
+```{r}
+# Read the dataframes
+cell2loc_rep2 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Cell2Location/replicates/cell2location_map_2/cell2loc_deconv_predictions.csv", check.names = F)
+seurat_rep2 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Seurat/replicates/Wu_rep_2_Seurat_deconv_predictions.csv", check.names = F)
+citegeist_rep2 <- read.csv("/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/Wu_rep_2_celltype_proportions_EM.csv", check.names = F)
+ground_truth_rep2 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/results/replicates/ST_sim/Wu_ST_2_prop.csv", check.names = F)
+
+# Ensure the first column is named "Spot"
+colnames(cell2loc_rep2)[1] <- "Spot"
+colnames(seurat_rep2)[1] <- "Spot"
+colnames(citegeist_rep2)[1] <- "Spot"
+colnames(ground_truth_rep2)[1] <- "Spot"
+
+# Set row names to "Spot"
+rownames(cell2loc_rep2) <- cell2loc_rep2$Spot
+rownames(seurat_rep2) <- seurat_rep2$Spot
+rownames(citegeist_rep2) <- citegeist_rep2$Spot
+rownames(ground_truth_rep2) <- ground_truth_rep2$Spot
+
+# Remove the "Spot" column as it is now the rownames
+cell2loc_rep2 <- cell2loc_rep2[ , -1]
+seurat_rep2 <- seurat_rep2[ , -1]
+citegeist_rep2 <- citegeist_rep2[ , -1]
+ground_truth_rep2 <- ground_truth_rep2[ , -1]
+
+# Sort each dataframe based on the numeric part of "Spot"
+cell2loc_rep2 <- sort_spots(cell2loc_rep2)
+seurat_rep2 <- sort_spots(seurat_rep2)
+citegeist_rep2 <- sort_spots(citegeist_rep2)
+ground_truth_rep2 <- sort_spots(ground_truth_rep2)
+
+# Optionally, you can check the column order if necessary:
+# Sort columns to make sure the order of columns matches
+cell2loc_rep2 <- cell2loc_rep2[ , order(colnames(cell2loc_rep2))]
+seurat_rep2 <- seurat_rep2[ , order(colnames(seurat_rep2))]
+citegeist_rep2 <- citegeist_rep2[ , order(colnames(citegeist_rep2))]
+ground_truth_rep2 <- ground_truth_rep2[ , order(colnames(ground_truth_rep2))]
+
+# extract spatial coords:
+spatial_coords <- ground_truth_rep2[,c("spot_x", "spot_y")]
+ground_truth_rep2[,c("spot_x", "spot_y")] <- NULL
+
+cell2loc_rep2  <- cbind(cell2loc_rep2, spatial_coords)
+seurat_rep2    <- cbind(seurat_rep2, spatial_coords)
+citegeist_rep2 <- cbind(citegeist_rep2, spatial_coords)
+ground_truth_rep2 <- cbind(ground_truth_rep2, spatial_coords)
+
+# Create scatterpie plots for each method and the ground truth
+plot_ground_truth <- create_scatterpie_plot(ground_truth_rep2, "Ground Truth")
+plot_cell2loc <- create_scatterpie_plot(cell2loc_rep2, "Cell2Location")
+plot_seurat <- create_scatterpie_plot(seurat_rep2, "Seurat")
+plot_citegeist <- create_scatterpie_plot(citegeist_rep2, "CITEgeist")
+
+# Arrange the plots into a 2x2 grid with a common legend
+final_plot_rep2 <- ggarrange(plot_ground_truth, plot_cell2loc, plot_seurat, plot_citegeist, 
+                        ncol = 2, nrow = 2, 
+                        labels = c("A", "B", "C", "D"),
+                        common.legend = TRUE,  # Use common legend across all plots
+                        legend = "right" # Position the legend on the right
+                        ) # Set the label size to 20 
+
+ggsave("spatial_proportion_rep2.png", final_plot_rep2, dpi = 300, width = 10.5, height = 10, units = "in", bg = "white")
+final_plot_rep2
+```
+
+```{r}
+# Read the dataframes
+cell2loc_rep3 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Cell2Location/replicates/cell2location_map_3/cell2loc_deconv_predictions.csv", check.names = F)
+seurat_rep3 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Seurat/replicates/Wu_rep_3_Seurat_deconv_predictions.csv", check.names = F)
+citegeist_rep3 <- read.csv("/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/Wu_rep_3_celltype_proportions_EM.csv", check.names = F)
+ground_truth_rep3 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/results/replicates/ST_sim/Wu_ST_3_prop.csv", check.names = F)
+
+# Ensure the first column is named "Spot"
+colnames(cell2loc_rep3)[1] <- "Spot"
+colnames(seurat_rep3)[1] <- "Spot"
+colnames(citegeist_rep3)[1] <- "Spot"
+colnames(ground_truth_rep3)[1] <- "Spot"
+
+# Set row names to "Spot"
+rownames(cell2loc_rep3) <- cell2loc_rep3$Spot
+rownames(seurat_rep3) <- seurat_rep3$Spot
+rownames(citegeist_rep3) <- citegeist_rep3$Spot
+rownames(ground_truth_rep3) <- ground_truth_rep3$Spot
+
+# Remove the "Spot" column as it is now the rownames
+cell2loc_rep3 <- cell2loc_rep3[ , -1]
+seurat_rep3 <- seurat_rep3[ , -1]
+citegeist_rep3 <- citegeist_rep3[ , -1]
+ground_truth_rep3 <- ground_truth_rep3[ , -1]
+
+# Sort each dataframe based on the numeric part of "Spot"
+cell2loc_rep3 <- sort_spots(cell2loc_rep3)
+seurat_rep3 <- sort_spots(seurat_rep3)
+citegeist_rep3 <- sort_spots(citegeist_rep3)
+ground_truth_rep3 <- sort_spots(ground_truth_rep3)
+
+# Optionally, you can check the column order if necessary:
+# Sort columns to make sure the order of columns matches
+cell2loc_rep3 <- cell2loc_rep3[ , order(colnames(cell2loc_rep3))]
+seurat_rep3 <- seurat_rep3[ , order(colnames(seurat_rep3))]
+citegeist_rep3 <- citegeist_rep3[ , order(colnames(citegeist_rep3))]
+ground_truth_rep3 <- ground_truth_rep3[ , order(colnames(ground_truth_rep3))]
+
+# extract spatial coords:
+spatial_coords <- ground_truth_rep3[,c("spot_x", "spot_y")]
+ground_truth_rep3[,c("spot_x", "spot_y")] <- NULL
+
+cell2loc_rep3  <- cbind(cell2loc_rep3, spatial_coords)
+seurat_rep3    <- cbind(seurat_rep3, spatial_coords)
+citegeist_rep3 <- cbind(citegeist_rep3, spatial_coords)
+ground_truth_rep3 <- cbind(ground_truth_rep3, spatial_coords)
+
+# Create scatterpie plots for each method and the ground truth
+plot_ground_truth <- create_scatterpie_plot(ground_truth_rep3, "Ground Truth")
+plot_cell2loc <- create_scatterpie_plot(cell2loc_rep3, "Cell2Location")
+plot_seurat <- create_scatterpie_plot(seurat_rep3, "Seurat")
+plot_citegeist <- create_scatterpie_plot(citegeist_rep3, "CITEgeist")
+
+# Arrange the plots into a 2x2 grid with a common legend
+final_plot_rep3 <- ggarrange(plot_ground_truth, plot_cell2loc, plot_seurat, plot_citegeist, 
+                        ncol = 2, nrow = 2, 
+                        labels = c("A", "B", "C", "D"),
+                        common.legend = TRUE,  # Use common legend across all plots
+                        legend = "right" # Position the legend on the right
+                        ) # Set the label size to 20 
+
+ggsave("spatial_proportion_rep3.png", final_plot_rep3, dpi = 300, width = 10.5, height = 10, units = "in", bg = "white")
+final_plot_rep3
+```
+
+```{r}
+# Read the dataframes
+cell2loc_rep4 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Cell2Location/replicates/cell2location_map_4/cell2loc_deconv_predictions.csv", check.names = F)
+seurat_rep4 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/Benchmarking/Seurat/replicates/Wu_rep_4_Seurat_deconv_predictions.csv", check.names = F)
+citegeist_rep4 <- read.csv("/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/Wu_rep_4_celltype_proportions_EM.csv", check.names = F)
+ground_truth_rep4 <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/results/replicates/ST_sim/Wu_ST_4_prop.csv", check.names = F)
+
+# Ensure the first column is named "Spot"
+colnames(cell2loc_rep4)[1] <- "Spot"
+colnames(seurat_rep4)[1] <- "Spot"
+colnames(citegeist_rep4)[1] <- "Spot"
+colnames(ground_truth_rep4)[1] <- "Spot"
+
+# Set row names to "Spot"
+rownames(cell2loc_rep4) <- cell2loc_rep4$Spot
+rownames(seurat_rep4) <- seurat_rep4$Spot
+rownames(citegeist_rep4) <- citegeist_rep4$Spot
+rownames(ground_truth_rep4) <- ground_truth_rep4$Spot
+
+# Remove the "Spot" column as it is now the rownames
+cell2loc_rep4 <- cell2loc_rep4[ , -1]
+seurat_rep4 <- seurat_rep4[ , -1]
+citegeist_rep4 <- citegeist_rep4[ , -1]
+ground_truth_rep4 <- ground_truth_rep4[ , -1]
+
+# Sort each dataframe based on the numeric part of "Spot"
+cell2loc_rep4 <- sort_spots(cell2loc_rep4)
+seurat_rep4 <- sort_spots(seurat_rep4)
+citegeist_rep4 <- sort_spots(citegeist_rep4)
+ground_truth_rep4 <- sort_spots(ground_truth_rep4)
+
+# Optionally, you can check the column order if necessary:
+# Sort columns to make sure the order of columns matches
+cell2loc_rep4 <- cell2loc_rep4[ , order(colnames(cell2loc_rep4))]
+seurat_rep4 <- seurat_rep4[ , order(colnames(seurat_rep4))]
+citegeist_rep4 <- citegeist_rep4[ , order(colnames(citegeist_rep4))]
+ground_truth_rep4 <- ground_truth_rep4[ , order(colnames(ground_truth_rep4))]
+
+# extract spatial coords:
+spatial_coords <- ground_truth_rep4[,c("spot_x", "spot_y")]
+ground_truth_rep4[,c("spot_x", "spot_y")] <- NULL
+
+cell2loc_rep4  <- cbind(cell2loc_rep4, spatial_coords)
+seurat_rep4    <- cbind(seurat_rep4, spatial_coords)
+citegeist_rep4 <- cbind(citegeist_rep4, spatial_coords)
+ground_truth_rep4 <- cbind(ground_truth_rep4, spatial_coords)
+
+# Create scatterpie plots for each method and the ground truth
+plot_ground_truth <- create_scatterpie_plot(ground_truth_rep4, "Ground Truth")
+plot_cell2loc <- create_scatterpie_plot(cell2loc_rep4, "Cell2Location")
+plot_seurat <- create_scatterpie_plot(seurat_rep4, "Seurat")
+plot_citegeist <- create_scatterpie_plot(citegeist_rep4, "CITEgeist")
+
+# Arrange the plots into a 2x2 grid with a common legend
+final_plot_rep4 <- ggarrange(plot_ground_truth, plot_cell2loc, plot_seurat, plot_citegeist, 
+                        ncol = 2, nrow = 2, 
+                        labels = c("A", "B", "C", "D"),
+                        common.legend = TRUE,  # Use common legend across all plots
+                        legend = "right" # Position the legend on the right
+                        ) # Set the label size to 20 
+
+ggsave("spatial_proportion_rep4.png", final_plot_rep4, dpi = 300, width = 10.5, height = 10, units = "in", bg = "white")
+final_plot_rep4
+```
+```{r}
+save.image("spatial_proportions.RData")
+```
+
