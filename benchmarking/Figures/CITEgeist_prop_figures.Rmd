@@ -1,0 +1,433 @@
+---
+title: "CITEgeist Figures"
+author: "bts76"
+date: "2024-11-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load required libraries
+library(jsonlite)
+library(ggplot2)
+library(tidyverse)
+library(emmeans)
+library(ggpubr)
+
+# Adjust text size for publication-quality figures
+theme_set(theme_classic(base_size = 16)) # Set base text size to 16
+```
+
+# Highly Segmented Replicates:
+```{r}
+# Define paths to directories
+citegeist_dir <- "/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/replicates/high_seg/HighSegCITEgeistOutput"
+cell2location_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/cell2location/high_seg"
+seurat_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Seurat/high_seg"
+
+# Read all CITEgeist results
+citegeist_files <- list.files(citegeist_dir, pattern = "Wu_rep_\\d+_cellprop_results_summary_HighSeg.csv", full.names = TRUE)
+citegeist_data <- lapply(citegeist_files, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(basename(file), "(?<=Wu_rep_)\\d+")) %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Read all Cell2Location results
+cell2location_files <- list.files(cell2location_dir, pattern = "Prop_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
+cell2location_data <- lapply(cell2location_files, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(file, "(?<=cell2location_map_)\\d+")) %>%  # Extract the number after 'cell2location_map_' %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Read all Seurat results
+seurat_files <- list.files(seurat_dir, pattern = "Seurat_benchmarking_metrics_rep_\\d+.csv", full.names = TRUE)
+seurat_data <- lapply(seurat_files, function(file) {
+  read_csv(file) %>%
+    mutate(Replicate = str_extract(file, "\\d+")) %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Combine all results into a single dataframe
+all_metrics <- bind_rows(
+  citegeist_data %>% mutate(Method = "CITEgeist"),
+  cell2location_data %>% mutate(Method = "Cell2Location"),
+  seurat_data %>% mutate(Method = "Seurat")
+)
+
+# View combined dataframe
+print(all_metrics)
+```
+
+```{r}
+# Save combined dataframe
+write_csv(all_metrics, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/prop_all_metrics_highseg_combined.csv")
+```
+
+```{r}
+# Collapse data: Average metrics across replicates for each method
+collapsed_metrics <- all_metrics %>%
+  group_by(Method, Replicate) %>%
+  summarize(
+    JSD = mean(JSD, na.rm = TRUE),
+    RMSE = mean(as.numeric(RMSE_Value), na.rm = TRUE),
+    MAE = mean(as.numeric(MAE_Value), na.rm = TRUE),
+    Sum_RMSE = mean(Sum_RMSE, na.rm = TRUE),
+    Sum_MAE = mean(Sum_MAE, na.rm = TRUE),
+    Corr = mean(corr, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+```
+
+
+```{r}
+plot_with_pvalues <- function(metric) {
+  # Check if there are multiple levels in the Method column for the given metric
+  if (length(unique(collapsed_metrics$Method)) <= 1) {
+    stop("There must be more than one group in 'Method' for this metric")
+  }
+  
+  # Perform ANOVA test for multiple groups
+  anova_test <- aov(collapsed_metrics[[metric]] ~ collapsed_metrics$Method)
+  print(summary(anova_test))
+  
+  # If ANOVA test is significant, perform pairwise t-tests for post-hoc analysis
+  if (summary(anova_test)[[1]]$`Pr(>F)`[1] < 0.05) {
+    # Perform pairwise comparisons using emmeans
+    pairwise_tests <- emmeans(anova_test, pairwise ~ Method)
+    
+    # Extract the pairwise comparisons and p-values
+    p_values <- as.data.frame(pairwise_tests$contrasts)
+    
+    # Add group1 and group2 columns for pairwise comparisons
+    p_values <- p_values %>%
+      mutate(
+        group1 = sub(" -.*", "", contrast),
+        group2 = sub(".*- ", "", contrast)
+      ) %>%
+      select(group1, group2, p.value)
+    
+    # Add significance labels based on p-value thresholds
+    p_values$p.signif <- cut(
+      p_values$p.value, 
+      breaks = c(0, 0.001, 0.01, 0.05, 1), 
+      labels = c("***", "**", "*", "ns")
+    )
+    
+    # Manually add y.position based on the maximum values of the metric
+    max_value <- max(collapsed_metrics[[metric]], na.rm = TRUE)
+    p_values$y.position <- max_value + seq(0.1, by = 0.05, length.out = nrow(p_values)) # Adjust position incrementally
+  }
+  else {
+    # If ANOVA test is not significant, no pairwise comparisons
+    p_values <- data.frame(group1 = 1, group2 = 1, p.value = 1, p.signif = NA)
+    max_value <- max(collapsed_metrics[[metric]], na.rm = TRUE)
+    p_values$y.position <- max_value + seq(0.1, by = 0.05, length.out = nrow(p_values)) # Adjust position incrementally
+  }
+    
+  # Plot the boxplot with error bars
+  p <- ggplot(collapsed_metrics, aes(x = Method, y = pull(collapsed_metrics, metric), color = Method)) +
+    geom_boxplot() +  # Boxplot layer
+    scale_color_manual(values = c("CITEgeist" = "green", "Cell2Location" = "blue", "Seurat" = "red")) + 
+    stat_summary(fun = mean, geom = "point", size = 3, shape = 18) +  # Add mean points
+    stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +  # Add error bars
+    labs(
+      title = paste("Comparison of", metric),subtitle = ("Highly Segmented Simulation"),
+      x = NULL,
+      y = metric
+    ) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),           # Increase plot title size
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Increase x-axis text size
+      axis.text.y = element_text(size = 12),                         # Increase y-axis text size
+      axis.title.y = element_text(size = 14),                        # Increase y-axis title size
+      axis.title.x = element_text(size = 14),                        # Increase x-axis title size
+      legend.text = element_text(size = 12)                          # Increase legend text size
+    ) +
+    stat_pvalue_manual(
+      p_values,
+      label = "p.signif",
+      y.position = "y.position",  # Use the manually added y.position column
+      step.increase = 0.1
+    ) 
+    # Save plot as TIFF with 300 DPI
+    ggsave(
+      filename = paste0("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/high_seg/", metric, "_Prop_boxplot_with_pvalues.tiff"),
+      plot = p,
+      device = "tiff",
+      dpi = 300,
+      width = 5, height = 5.5, units = "in", bg = "white"
+    )
+    return(p)
+}
+collapsed_metrics$"Global RMSE" <- collapsed_metrics$Sum_RMSE
+collapsed_metrics$"Global MAE"  <- collapsed_metrics$Sum_MAE
+collapsed_metrics$Method <- factor(collapsed_metrics$Method, levels = c("Seurat", "Cell2Location", "CITEgeist")) 
+
+# List of metrics to analyze
+metrics_to_plot <- c("JSD","Global RMSE", "Global MAE", "Corr")
+plots <- lapply(metrics_to_plot, plot_with_pvalues)
+```
+```{r}
+plots
+```
+
+```{r}
+library(patchwork)
+
+# Create a 2x2 grid layout for the plots
+# Ensure the text, legends, and dimensions are consistent
+grid_plot <- wrap_plots(plots, ncol = 2) +
+  plot_annotation(
+    tag_levels = 'A', # Add letter annotations starting from 'A'
+  ) & theme(
+      plot.tag = element_text(size = 20, face = "bold")  # Make tags larger and bold
+    )
+
+# Display the grid plot
+grid_plot
+```
+```{r}
+# Save the combined grid as a high-resolution TIFF
+ggsave(
+  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/high_seg/Prop_Metrics_high_seg.png",
+  plot = grid_plot,
+  device = "png",
+  dpi = 300,
+  width = 9, height = 9, units = "in", bg = "white"
+)
+```
+
+# Highly Mixed Replicates:
+```{r}
+# Define paths to directories
+citegeist_dir <- "/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/replicates/mixed/MixedCITEgeistOutput"
+cell2location_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/cell2location/mixed"
+seurat_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Seurat/mixed"
+
+# Read all CITEgeist results
+citegeist_files <- list.files(citegeist_dir, pattern = "Wu_rep_\\d+_cellprop_results_summary_Mixed.csv", full.names = TRUE)
+citegeist_data <- lapply(citegeist_files, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(basename(file), "(?<=Wu_rep_)\\d+")) %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Read all Cell2Location results
+cell2location_files <- list.files(cell2location_dir, pattern = "Prop_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
+cell2location_data <- lapply(cell2location_files, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(file, "(?<=cell2location_map_)\\d+")) %>%  # Extract the number after 'cell2location_map_' %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Read all Seurat results
+seurat_files <- list.files(seurat_dir, pattern = "Seurat_benchmarking_metrics_rep_\\d+.csv", full.names = TRUE)
+seurat_data <- lapply(seurat_files, function(file) {
+  read_csv(file) %>%
+    mutate(Replicate = str_extract(file, "\\d+")) %>%
+    # Split RMSE and MAE dictionaries into separate columns
+    mutate(RMSE = str_replace_all(RMSE, "[{}]", ""),
+           MAE = str_replace_all(MAE, "[{}]", "")) %>%
+    separate_rows(RMSE, sep = ", ") %>%
+    separate_rows(MAE, sep = ", ") %>%
+    separate(RMSE, into = c("CellType", "RMSE_Value"), sep = ": ", convert = TRUE) %>%
+    separate(MAE, into = c("CellType", "MAE_Value"), sep = ": ", convert = TRUE)
+}) %>%
+  bind_rows()
+
+# Combine all results into a single dataframe
+all_metrics <- bind_rows(
+  citegeist_data %>% mutate(Method = "CITEgeist"),
+  cell2location_data %>% mutate(Method = "Cell2Location"),
+  seurat_data %>% mutate(Method = "Seurat")
+)
+
+# View combined dataframe
+print(all_metrics)
+```
+
+```{r}
+# Save combined dataframe
+write_csv(all_metrics, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/prop_all_metrics_mixed_combined.csv")
+```
+
+```{r}
+# Collapse data: Average metrics across replicates for each method
+collapsed_metrics <- all_metrics %>%
+  group_by(Method, Replicate) %>%
+  summarize(
+    JSD = mean(JSD, na.rm = TRUE),
+    RMSE = mean(as.numeric(RMSE_Value), na.rm = TRUE),
+    MAE = mean(as.numeric(MAE_Value), na.rm = TRUE),
+    Sum_RMSE = mean(Sum_RMSE, na.rm = TRUE),
+    Sum_MAE = mean(Sum_MAE, na.rm = TRUE),
+    Corr = mean(corr, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+```
+
+```{r}
+plot_with_pvalues <- function(metric) {
+  # Check if there are multiple levels in the Method column for the given metric
+  if (length(unique(collapsed_metrics$Method)) <= 1) {
+    stop("There must be more than one group in 'Method' for this metric")
+  }
+  
+  # Perform ANOVA test for multiple groups
+  anova_test <- aov(collapsed_metrics[[metric]] ~ collapsed_metrics$Method)
+  print(summary(anova_test))
+  
+  # If ANOVA test is significant, perform pairwise t-tests for post-hoc analysis
+  if (summary(anova_test)[[1]]$`Pr(>F)`[1] < 0.05) {
+    # Perform pairwise comparisons using emmeans
+    pairwise_tests <- emmeans(anova_test, pairwise ~ Method)
+    
+    # Extract the pairwise comparisons and p-values
+    p_values <- as.data.frame(pairwise_tests$contrasts)
+    
+    # Add group1 and group2 columns for pairwise comparisons
+    p_values <- p_values %>%
+      mutate(
+        group1 = sub(" -.*", "", contrast),
+        group2 = sub(".*- ", "", contrast)
+      ) %>%
+      select(group1, group2, p.value)
+    
+    # Add significance labels based on p-value thresholds
+    p_values$p.signif <- cut(
+      p_values$p.value, 
+      breaks = c(0, 0.001, 0.01, 0.05, 1), 
+      labels = c("***", "**", "*", "ns")
+    )
+    
+    # Manually add y.position based on the maximum values of the metric
+    max_value <- max(collapsed_metrics[[metric]], na.rm = TRUE)
+    p_values$y.position <- max_value + seq(0.1, by = 0.05, length.out = nrow(p_values)) # Adjust position incrementally
+  }
+  else {
+    # If ANOVA test is not significant, no pairwise comparisons
+    p_values <- data.frame(group1 = 1, group2 = 1, p.value = 1, p.signif = NA)
+    max_value <- max(collapsed_metrics[[metric]], na.rm = TRUE)
+    p_values$y.position <- max_value + seq(0.1, by = 0.05, length.out = nrow(p_values)) # Adjust position incrementally
+  }
+    
+  # Plot the boxplot with error bars
+  p <- ggplot(collapsed_metrics, aes(x = Method, y = pull(collapsed_metrics, metric), color = Method)) +
+    geom_boxplot() +  # Boxplot layer
+    scale_color_manual(values = c("CITEgeist" = "green", "Cell2Location" = "blue", "Seurat" = "red")) + 
+    stat_summary(fun = mean, geom = "point", size = 3, shape = 18) +  # Add mean points
+    stat_summary(fun.data = mean_cl_boot, geom = "errorbar", width = 0.2) +  # Add error bars
+    labs(
+      title = paste("Comparison of", metric),subtitle = ("Highly Mixed Simulation"),
+      x = NULL,
+      y = metric
+    ) +
+    theme_classic() +
+    theme(
+      plot.title = element_text(size = 16, face = "bold"),           # Increase plot title size
+      axis.text.x = element_text(angle = 45, hjust = 1, size = 12),  # Increase x-axis text size
+      axis.text.y = element_text(size = 12),                         # Increase y-axis text size
+      axis.title.y = element_text(size = 14),                        # Increase y-axis title size
+      axis.title.x = element_text(size = 14),                        # Increase x-axis title size
+      legend.text = element_text(size = 12)                          # Increase legend text size
+    ) +
+    stat_pvalue_manual(
+      p_values,
+      label = "p.signif",
+      y.position = "y.position",  # Use the manually added y.position column
+      step.increase = 0.1
+    ) 
+    # Save plot as TIFF with 300 DPI
+    ggsave(
+      filename = paste0("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/mixed/", metric, "_Prop_boxplot_with_pvalues.tiff"),
+      plot = p,
+      device = "tiff",
+      dpi = 300,
+      width = 5, height = 5.5, units = "in", bg = "white"
+    )
+    return(p)
+}
+collapsed_metrics$"Global RMSE" <- collapsed_metrics$Sum_RMSE
+collapsed_metrics$"Global MAE"  <- collapsed_metrics$Sum_MAE
+collapsed_metrics$Method <- factor(collapsed_metrics$Method, levels = c("Seurat", "Cell2Location", "CITEgeist")) 
+
+# List of metrics to analyze
+metrics_to_plot <- c("JSD","Global RMSE", "Global MAE", "Corr")
+plots <- lapply(metrics_to_plot, plot_with_pvalues)
+```
+
+```{r}
+library(patchwork)
+
+# Create a 2x2 grid layout for the plots
+# Ensure the text, legends, and dimensions are consistent
+grid_plot <- wrap_plots(plots, ncol = 2) +
+  plot_annotation(
+    tag_levels = 'A', # Add letter annotations starting from 'A'
+  ) & theme(
+      plot.tag = element_text(size = 20, face = "bold")  # Make tags larger and bold
+    )
+
+# Display the grid plot
+grid_plot
+```
+
+```{r}
+# Save the combined grid as a high-resolution TIFF
+ggsave(
+  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/mixed/Prop_Metrics_mixed.png",
+  plot = grid_plot,
+  device = "png",
+  dpi = 300,
+  width = 9, height = 9, units = "in", bg = "white"
+)
+```
+
+```{r}
+# Export the environment
+save.image("Prop_figure.RData")
+```
+
