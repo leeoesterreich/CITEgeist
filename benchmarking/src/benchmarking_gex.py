@@ -46,9 +46,20 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
                 continue
             
             # Log1p normalization
-            gt_df   = np.log1p(gt_df)    # Apply log1p to ground truth
-            pred_df = np.log1p(pred_df)  # Apply log1p to predictions
-
+            assert (gt_df.values >= 0).all(), "Ground truth contains negative values, cannot apply log1p."
+            if (gt_df.values - 1).max() > 0:
+                print(f"Ground truth for {cell_type} not log1p-transformed. Applying transformation.")
+                gt_df = np.log1p(gt_df)
+            else:
+                print(f"Ground truth for {cell_type} already log1p-transformed. Skipping transformation.")
+            
+            assert (pred_df.values >= 0).all(), "Predictions contain negative values, cannot apply log1p."
+            if (pred_df.values - 1).max() > 0:
+                print(f"Predictions for {cell_type} not log1p-transformed. Applying transformation.")
+                pred_df = np.log1p(pred_df)
+            else:
+                print(f"Predictions for {cell_type} already log1p-transformed. Skipping transformation.")
+                
             # Calculate RMSE for this cell type
             mse  = mean_squared_error(gt_df.values, pred_df.values)
             rmse = np.sqrt(mse)
