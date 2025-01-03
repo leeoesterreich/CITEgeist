@@ -14,6 +14,8 @@ from .utils import get_neighbors_with_fixed_radius
 import os
 from pathlib import Path
 from scipy.stats import spearmanr
+import scipy.sparse as sp
+from statsmodels.stats.multitest import multipletests
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
@@ -156,21 +158,21 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
     return Y_values
 
 
-def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, radius, alpha=0.5, lambda_reg_gex=0.0001):
+def deconvolute_spot_with_neighbors(
+    i, 
+    filtered_adata, 
+    cell_type_numbers_array, 
+    radius, 
+    alpha=0.5, 
+    lambda_reg_gex=0.0001,
+    global_correlations=None,
+    global_confidence=None
+):
     """
     Deconvolute gene expression for a single spot using neighborhood data and Gurobi optimization.
-
-    Args:
-        i (int): Spot index.
-        filtered_adata (AnnData): AnnData object with filtered gene expression data.
-        radius (float): Radius for neighborhood selection.
-        alpha (float): Regularization parameter for Elastic Net (L1-L2 tradeoff).
-        lambda_reg_gex (float): Regularization strength.
-
-    Returns:
-        np.ndarray: Deconvoluted gene expression matrix for the spot.
+    Now uses pre-calculated global correlations with p-value-based weighting.
     """
-    model = None  # Ensure model is defined to avoid uninitialized reference in the `except` block.
+    model = None
     try:
         logging.info(f"Starting deconvolution for spot {i}")
 
@@ -253,7 +255,7 @@ def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, 
             model.setParam('OutputFlag', 0)
             model.setParam('Threads', 1)
             model.setParam('NodefileStart', 0.5)
-            model.setParam('MIPGap', 0.05)
+            model.setParam('MIPGap', 0.01)
             model.setParam('TimeLimit', 600)
             model.setParam('NodeLimit', 1000000)
             
@@ -289,60 +291,27 @@ def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, 
             l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
             l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
 
-            correlation_weight = 10
-            min_proportion_threshold = 0.1  # Minimum total proportion across neighborhood to consider reliable
+            correlation_weight = 1
+            min_proportion_threshold = 0.2  # Minimum proportion per spot
+            min_expression_threshold = 5.0   # Minimum expression level
             
-            correlations = np.zeros((T, M))
-            correlation_confidence = np.zeros((T, M))
-            
-            for j in range(T):
-                for k in range(M):
-                    cell_type_props = neighborhood_cell_type_numbers[:, j]
-                    gene_expr = neighborhood_expression_data[:, k]
-                    
-                    # Remove any NaN values
-                    valid_mask = ~(np.isnan(cell_type_props) | np.isnan(gene_expr))
-                    filtered_props = cell_type_props[valid_mask]
-                    filtered_expr = gene_expr[valid_mask]
-                    
-                    # Calculate total proportion of this cell type in neighborhood
-                    total_proportion = np.sum(filtered_props)
-                    
-                    # Skip if cell type is too rare in this neighborhood or no variation in gene
-                    if (total_proportion < min_proportion_threshold or 
-                        np.std(filtered_expr) == 0):
-                        correlations[j, k] = 0
-                        correlation_confidence[j, k] = 0
-                    else:
-                        # Calculate Spearman correlation
-                        corr, pval = spearmanr(filtered_props, filtered_expr)
-                        
-                        # Weight correlation by total proportion of cell type
-                        confidence = total_proportion
-                        
-                        correlations[j, k] = 0 if np.isnan(corr) else corr
-                        correlation_confidence[j, k] = confidence
-                        
-                        # Log some notable correlations (strong positive or negative)
-                        if abs(corr) > 0.5 and pval < 0.05:
-                            cell_type_name = filtered_adata.var_names[k]  # Get gene name
-                            logging.info(f"Strong correlation found for spot {i}:")
-                            logging.info(f"Cell type {j} with gene {cell_type_name}:")
-                            logging.info(f"Correlation: {corr:.3f}, p-value: {pval:.3e}")
-                            logging.info(f"Total proportion in neighborhood: {total_proportion:.3f}")
-
-            # Separate positive and negative correlations
+            # Modified correlation terms that:
+            # 1. Uses all correlations (not just significant ones)
+            # 2. Weights impact by statistical significance
+            # 3. Handles positive and negative correlations differently
             correlation_terms = gp.quicksum(
-                correlation_confidence[j, k] * (
-                    -correlations[j, k] * P[j, k] +  # Maximize positive correlations
-                    max(0, -correlations[j, k]) * P[j, k] * 2  # Extra penalty for negative correlations
+                global_confidence[j, k] * (  # global_confidence already includes (1 - adj_pval)
+                    # For positive correlations
+                    (max(0, global_correlations[j, k]) * P[j, k] * -1) +  # Encourage assignment
+                    # For negative correlations (with reduced penalty for less significant ones)
+                    (min(0, global_correlations[j, k]) * P[j, k])  # Discourage assignment
                 )
                 for j in range(T) for k in range(M)
             )
 
             alpha = 0.8
             
-            # Update objective function with correlation term
+            # Update objective function with weighted correlation term
             model.setObjective(
                 gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M)) +
                 lambda_reg * (alpha * l1_term + (1 - alpha) * l2_term) +
@@ -383,7 +352,8 @@ def optimize_gene_expression(
     lambda_reg_gex=0.0001,
     max_workers=None,
     checkpoint_interval=100,
-    output_dir="checkpoints"
+    output_dir="checkpoints",
+    rerun=False
 ):
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     
@@ -391,35 +361,171 @@ def optimize_gene_expression(
     M = deconvolution_expression_data.shape[1]
     T = cell_type_numbers_array.shape[1]
 
-    # Look for most recent checkpoint
-    checkpoint_files = sorted(
-        [f for f in os.listdir(output_dir) if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")],
-        key=lambda x: int(x.split("_")[-1].split(".")[0])
-    )
+    # If rerun is True, delete all existing files for this sample
+    if rerun:
+        existing_files = [
+            f for f in os.listdir(output_dir) 
+            if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
+        ]
+        print("Found existing files: ", existing_files)
+        for file in existing_files:
+            try:
+                os.remove(os.path.join(output_dir, file))
+                logging.info(f"Deleted existing file: {file}")
+            except Exception as e:
+                logging.warning(f"Failed to delete {file}: {e}")
+        logging.info(f"Starting fresh analysis for {sample_name} (rerun=True)")
+    
+    # If not rerunning, check for completed run
+    else:
+        complete_file = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
+        if os.path.exists(complete_file):
+            try:
+                # Try to load the complete file to verify it's valid
+                complete_data = np.load(complete_file)
+                if 'profiles' in complete_data and 'completed_spots' in complete_data:
+                    logging.info(f"Found completed analysis for {sample_name}")
+                    profiles = complete_data['profiles']
+                    if profiles.shape == (N, T, M):  # Verify correct dimensions
+                        return {i: profiles[i] for i in range(N)}
+            except Exception as e:
+                logging.error(f"Error loading complete file: {e}")
+                # If complete file is corrupt, delete all checkpoints
+                existing_files = [
+                    f for f in os.listdir(output_dir) 
+                    if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
+                ]
+                for file in existing_files:
+                    try:
+                        os.remove(os.path.join(output_dir, file))
+                        logging.info(f"Deleted corrupted checkpoint: {file}")
+                    except Exception as e:
+                        logging.warning(f"Failed to delete {file}: {e}")
+        else:
+            # Look for the latest checkpoint
+            checkpoints = [
+                f for f in os.listdir(output_dir)
+                if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")
+            ]
+            
+            if checkpoints:
+                # Extract checkpoint numbers and find the latest
+                checkpoint_numbers = [
+                    int(f.replace(f"{sample_name}_gene_expression_checkpoint_", "").replace(".npz", ""))
+                    for f in checkpoints
+                ]
+                latest_number = max(checkpoint_numbers)
+                latest_checkpoint = os.path.join(
+                    output_dir, 
+                    f"{sample_name}_gene_expression_checkpoint_{latest_number}.npz"
+                )
+                
+                try:
+                    checkpoint_data = np.load(latest_checkpoint)
+                    if 'profiles' in checkpoint_data and 'completed_spots' in checkpoint_data:
+                        logging.info(f"Found latest checkpoint with {latest_number} completed spots")
+                        profiles = checkpoint_data['profiles']
+                        if profiles.shape == (N, T, M):
+                            return {i: profiles[i] for i in range(N)}
+                except Exception as e:
+                    logging.error(f"Error loading checkpoint file: {e}")
+                    # If checkpoint is corrupt, delete all checkpoints
+                    for file in checkpoints:
+                        try:
+                            os.remove(os.path.join(output_dir, file))
+                            logging.info(f"Deleted corrupted checkpoint: {file}")
+                        except Exception as e:
+                            logging.warning(f"Failed to delete {file}: {e}")
+    
+    logging.info(f"Starting analysis for {sample_name}")
+    
+    def calculate_global_correlations(filtered_adata, cell_type_numbers_array, min_proportion_threshold=0.2, min_expression_threshold=5.0):
+        """
+        Calculate global correlations with confidence weighted by adjusted p-values.
+        """
+        T = cell_type_numbers_array.shape[1]
+        M = filtered_adata.shape[1]
+        
+        correlations = np.zeros((T, M))
+        correlation_confidence = np.zeros((T, M))
+        
+        expression_data = filtered_adata.X.toarray() if sp.issparse(filtered_adata.X) else filtered_adata.X
+        
+        for j in range(T):
+            # Store all p-values for this cell type
+            all_pvals = []
+            all_corrs = []
+            valid_indices = []
+            
+            # First pass: calculate all correlations and p-values
+            for k in range(M):
+                cell_type_props = cell_type_numbers_array[:, j]
+                gene_expr = expression_data[:, k]
+                
+                valid_mask = (
+                    ~(np.isnan(cell_type_props) | np.isnan(gene_expr)) & 
+                    (cell_type_props >= min_proportion_threshold) &
+                    (gene_expr >= min_expression_threshold)
+                )
+                filtered_props = cell_type_props[valid_mask]
+                filtered_expr = gene_expr[valid_mask]
+                
+                if len(filtered_props) < 3 or np.std(filtered_expr) == 0:
+                    correlations[j, k] = 0
+                    correlation_confidence[j, k] = 0
+                else:
+                    corr, pval = spearmanr(filtered_props, filtered_expr)
+                    if not np.isnan(corr) and not np.isnan(pval):
+                        all_corrs.append(corr)
+                        all_pvals.append(pval)
+                        valid_indices.append(k)
+                    else:
+                        correlations[j, k] = 0
+                        correlation_confidence[j, k] = 0
+            
+            # Adjust p-values using Benjamini-Hochberg FDR
+            if all_pvals:
+                adjusted_pvals = multipletests(all_pvals, method='fdr_bh')[1]
+                
+                # Second pass: store results using adjusted p-values
+                for idx, k in enumerate(valid_indices):
+                    corr = all_corrs[idx]
+                    adj_pval = adjusted_pvals[idx]
+                    
+                    # Store correlation as is
+                    correlations[j, k] = corr
+                    
+                    # Calculate confidence based on:
+                    # 1. Statistical significance (1 - adj_pval)
+                    # 2. Number of valid observations
+                    # 3. Strength of correlation
+                    confidence = (
+                        #(len(filtered_props) / len(cell_type_props)) *  # Data coverage
+                        (1 - adj_pval) *                                # Statistical significance
+                        abs(corr)                                       # Correlation strength
+                    )
+                    correlation_confidence[j, k] = confidence
+                    
+                    # Log correlations with their weights
+                    if abs(corr) > 0.3:  # Lower threshold to see more correlations
+                        gene_name = filtered_adata.var_names[k]
+                        logging.info(f"Global correlation found:")
+                        logging.info(f"Cell type {j} with gene {gene_name}:")
+                        logging.info(f"Correlation: {corr:.3f}, adj. p-value: {adj_pval:.3e}")
+                        logging.info(f"Confidence weight: {confidence:.3f}")
+                        logging.info(f"Valid spots: {len(filtered_props)} of {len(cell_type_props)}")
+        
+        return correlations, correlation_confidence
+
+    # Calculate global correlations once before parallel processing
+    logging.info("Calculating global correlations...")
+    global_correlations, global_confidence = calculate_global_correlations(filtered_adata, cell_type_numbers_array)
+    logging.info("Global correlations calculated.")
 
     spotwise_gene_expression_profiles = {}
-    completed_spots = set()  # Track which spots have been completed
-
-    if checkpoint_files:
-        latest_checkpoint = checkpoint_files[-1]
-        logging.info(f"Found checkpoint file: {latest_checkpoint}")
-        checkpoint_data = np.load(os.path.join(output_dir, latest_checkpoint))
-        profiles = checkpoint_data['profiles']
-        
-        # Load completed spots from checkpoint
-        for i in range(profiles.shape[0]):
-            if not np.all(np.isnan(profiles[i])):
-                spotwise_gene_expression_profiles[i] = profiles[i]
-                completed_spots.add(i)
-        
-        logging.info(f"Loaded {len(completed_spots)} completed spots from checkpoint")
-
-    # Create list of spots that still need processing
-    spots_to_process = [i for i in range(N) if i not in completed_spots]
-    logging.info(f"Remaining spots to process: {len(spots_to_process)}")
+    completed_spots = set()
 
     try:
-        # Use max available CPUs if max_workers not specified
         workers = max_workers if max_workers is not None else os.cpu_count()
         logging.info(f"Using {workers} workers")
         with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -431,11 +537,13 @@ def optimize_gene_expression(
                     cell_type_numbers_array,
                     radius,
                     alpha,
-                    lambda_reg_gex
-                ): i for i in spots_to_process
+                    lambda_reg_gex,
+                    global_correlations,  # Pass pre-calculated correlations
+                    global_confidence     # Pass pre-calculated confidence
+                ): i for i in range(N)
             }
 
-            with tqdm(total=len(spots_to_process), desc="Deconvoluting Spots") as pbar:
+            with tqdm(total=N, desc="Deconvoluting Spots") as pbar:
                 spots_since_last_save = 0
                 
                 for future in as_completed(futures):
