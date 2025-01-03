@@ -322,13 +322,15 @@ class CitegeistModel:
         filtered_adata = self.gene_expression_adata
         # Run optimization
         spotwise_gene_expression_profiles = optimize_gene_expression(
+            sample_name=self.sample_name,
             deconvolution_expression_data=deconvolution_expression_data,
             cell_type_numbers_array=cell_type_numbers_array,
             filtered_adata=self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            max_workers=max_workers
+            max_workers=max_workers,
+            rerun=True
         )
 
         # Save results
