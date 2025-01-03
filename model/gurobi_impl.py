@@ -11,6 +11,9 @@ import logging
 import traceback
 import gc
 from .utils import get_neighbors_with_fixed_radius
+import os
+from pathlib import Path
+from scipy.stats import spearmanr
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
@@ -192,6 +195,8 @@ def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, 
         # ✅ Step 2: Extract Gene Expression Data
         try:
             deconvolution_expression_data = filtered_adata.X
+
+            
             if hasattr(deconvolution_expression_data, 'toarray'):
                 deconvolution_expression_data = deconvolution_expression_data.toarray()
             
@@ -284,38 +289,64 @@ def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, 
             l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
             l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
 
-            correlation_weight = 1
-
+            correlation_weight = 10
+            min_proportion_threshold = 0.1  # Minimum total proportion across neighborhood to consider reliable
+            
             correlations = np.zeros((T, M))
+            correlation_confidence = np.zeros((T, M))
+            
             for j in range(T):
                 for k in range(M):
                     cell_type_props = neighborhood_cell_type_numbers[:, j]
                     gene_expr = neighborhood_expression_data[:, k]
                     
-                    # Remove any NaN values while preserving corresponding indices
+                    # Remove any NaN values
                     valid_mask = ~(np.isnan(cell_type_props) | np.isnan(gene_expr))
                     filtered_props = cell_type_props[valid_mask]
                     filtered_expr = gene_expr[valid_mask]
                     
-                    # Only skip if filtered data is constant or empty
-                    if len(filtered_props) == 0 or np.std(filtered_props) == 0 or np.std(filtered_expr) == 0:
+                    # Calculate total proportion of this cell type in neighborhood
+                    total_proportion = np.sum(filtered_props)
+                    
+                    # Skip if cell type is too rare in this neighborhood or no variation in gene
+                    if (total_proportion < min_proportion_threshold or 
+                        np.std(filtered_expr) == 0):
                         correlations[j, k] = 0
+                        correlation_confidence[j, k] = 0
                     else:
-                        corr = np.corrcoef(filtered_props, filtered_expr)[0,1]
+                        # Calculate Spearman correlation
+                        corr, pval = spearmanr(filtered_props, filtered_expr)
+                        
+                        # Weight correlation by total proportion of cell type
+                        confidence = total_proportion
+                        
                         correlations[j, k] = 0 if np.isnan(corr) else corr
+                        correlation_confidence[j, k] = confidence
+                        
+                        # Log some notable correlations (strong positive or negative)
+                        if abs(corr) > 0.5 and pval < 0.05:
+                            cell_type_name = filtered_adata.var_names[k]  # Get gene name
+                            logging.info(f"Strong correlation found for spot {i}:")
+                            logging.info(f"Cell type {j} with gene {cell_type_name}:")
+                            logging.info(f"Correlation: {corr:.3f}, p-value: {pval:.3e}")
+                            logging.info(f"Total proportion in neighborhood: {total_proportion:.3f}")
 
-            # Add correlation-weighted terms to objective
+            # Separate positive and negative correlations
             correlation_terms = gp.quicksum(
-                (1 - correlations[j, k]) * P[j, k]  # Penalize assignments that don't match correlation patterns
+                correlation_confidence[j, k] * (
+                    -correlations[j, k] * P[j, k] +  # Maximize positive correlations
+                    max(0, -correlations[j, k]) * P[j, k] * 2  # Extra penalty for negative correlations
+                )
                 for j in range(T) for k in range(M)
             )
 
-
+            alpha = 0.8
+            
             # Update objective function with correlation term
             model.setObjective(
                 gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M)) +
                 lambda_reg * (alpha * l1_term + (1 - alpha) * l2_term) +
-                correlation_weight * correlation_terms,  # New hyperparameter to control correlation importance
+                correlation_weight * correlation_terms,
                 GRB.MINIMIZE
             )
 
@@ -343,37 +374,55 @@ def deconvolute_spot_with_neighbors(i, filtered_adata, cell_type_numbers_array, 
 
 
 def optimize_gene_expression(
+    sample_name,
     deconvolution_expression_data,
     cell_type_numbers_array,
     filtered_adata,
     radius=2,
     alpha=0.5,
     lambda_reg_gex=0.0001,
-    max_workers=16
+    max_workers=None,
+    checkpoint_interval=100,
+    output_dir="checkpoints"
 ):
-    """
-    Perform Gurobi optimization for gene expression deconvolution across spots in parallel.
-
-    Args:
-        deconvolution_expression_data (np.ndarray): Gene expression data matrix (spots x genes).
-        cell_type_numbers_array (np.ndarray): Cell type proportions matrix (spots x cell types).
-        filtered_adata (AnnData): AnnData object for spatial information.
-        radius (int): Neighborhood radius for neighboring spot selection.
-        alpha (float): L1-L2 Elastic Net regularization parameter.
-        lambda_reg_gex (float): Regularization strength for gene expression model.
-        max_workers (int): Number of parallel workers.
-
-    Returns:
-        dict: Dictionary of spotwise gene expression profiles.
-    """
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
     N = deconvolution_expression_data.shape[0]
     M = deconvolution_expression_data.shape[1]
     T = cell_type_numbers_array.shape[1]
 
+    # Look for most recent checkpoint
+    checkpoint_files = sorted(
+        [f for f in os.listdir(output_dir) if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")],
+        key=lambda x: int(x.split("_")[-1].split(".")[0])
+    )
+
     spotwise_gene_expression_profiles = {}
+    completed_spots = set()  # Track which spots have been completed
+
+    if checkpoint_files:
+        latest_checkpoint = checkpoint_files[-1]
+        logging.info(f"Found checkpoint file: {latest_checkpoint}")
+        checkpoint_data = np.load(os.path.join(output_dir, latest_checkpoint))
+        profiles = checkpoint_data['profiles']
+        
+        # Load completed spots from checkpoint
+        for i in range(profiles.shape[0]):
+            if not np.all(np.isnan(profiles[i])):
+                spotwise_gene_expression_profiles[i] = profiles[i]
+                completed_spots.add(i)
+        
+        logging.info(f"Loaded {len(completed_spots)} completed spots from checkpoint")
+
+    # Create list of spots that still need processing
+    spots_to_process = [i for i in range(N) if i not in completed_spots]
+    logging.info(f"Remaining spots to process: {len(spots_to_process)}")
 
     try:
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        # Use max available CPUs if max_workers not specified
+        workers = max_workers if max_workers is not None else os.cpu_count()
+        logging.info(f"Using {workers} workers")
+        with ProcessPoolExecutor(max_workers=workers) as executor:
             futures = {
                 executor.submit(
                     deconvolute_spot_with_neighbors,
@@ -383,18 +432,75 @@ def optimize_gene_expression(
                     radius,
                     alpha,
                     lambda_reg_gex
-                ): i for i in range(N)
+                ): i for i in spots_to_process
             }
 
-            with tqdm(total=N, desc="Deconvoluting Spots") as pbar:
+            with tqdm(total=len(spots_to_process), desc="Deconvoluting Spots") as pbar:
+                spots_since_last_save = 0
+                
                 for future in as_completed(futures):
                     i = futures[future]
                     try:
                         result = future.result()
                         if result is not None:
-                            spotwise_gene_expression_profiles[i] = result
+                            # Verify result shape before storing
+                            if result.ndim != 2:
+                                logging.error(f"Unexpected result shape for spot {i}: {result.shape}")
+                                continue
+                                
+                            spotwise_gene_expression_profiles[i] = result.copy()
+                            completed_spots.add(i)
+                            spots_since_last_save += 1
+
+                            # Save checkpoint every checkpoint_interval spots
+                            if spots_since_last_save >= checkpoint_interval:
+                                # Use number of completed spots instead of current spot index
+                                n_completed = len(completed_spots)
+                                checkpoint_path = os.path.join(
+                                    output_dir, 
+                                    f"{sample_name}_gene_expression_checkpoint_{n_completed}.npz"
+                                )
+                                
+                                # Convert dictionary to numpy array for saving
+                                max_spot = max(spotwise_gene_expression_profiles.keys())
+                                profiles_array = np.full((max_spot + 1, T, M), np.nan)
+                                
+                                for spot_idx, profile in spotwise_gene_expression_profiles.items():
+                                    if profile.shape != (T, M):
+                                        logging.error(f"Invalid profile shape at spot {spot_idx}: {profile.shape}")
+                                        continue
+                                    profiles_array[spot_idx] = profile
+                                
+                                try:
+                                    # Save as compressed numpy array with completed spots info
+                                    np.savez_compressed(
+                                        checkpoint_path,
+                                        profiles=profiles_array,
+                                        completed_spots=np.array(list(completed_spots)),
+                                        n_completed=n_completed
+                                    )
+                                    
+                                    # Only delete old checkpoints if new one saved successfully
+                                    existing_checkpoints = [
+                                        f for f in os.listdir(output_dir) 
+                                        if f.startswith(f"{sample_name}_gene_expression_checkpoint_") 
+                                        and f.endswith(".npz")
+                                        and f != os.path.basename(checkpoint_path)  # Don't delete the one we just created
+                                    ]
+                                    for old_checkpoint in existing_checkpoints:
+                                        try:
+                                            os.remove(os.path.join(output_dir, old_checkpoint))
+                                        except Exception as e:
+                                            logging.warning(f"Failed to delete old checkpoint {old_checkpoint}: {e}")
+                                    
+                                    logging.info(f"Saved checkpoint after {n_completed} completed spots")
+                                    spots_since_last_save = 0
+                                except Exception as e:
+                                    logging.error(f"Failed to save checkpoint: {e}")
+
                     except Exception as e:
                         logging.error(f"Error in spot {i}: {str(e)}")
+                        logging.error(traceback.format_exc())
                     pbar.update(1)
 
     except Exception as e:
@@ -404,5 +510,18 @@ def optimize_gene_expression(
         futures.clear()
         gc.collect()
         
+        # Save final results
+        final_path = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
+        max_spot = max(spotwise_gene_expression_profiles.keys())
+        final_profiles = np.full((max_spot + 1, T, M), np.nan)
+        for spot_idx, profile in spotwise_gene_expression_profiles.items():
+            final_profiles[spot_idx] = profile
+            
+        np.savez_compressed(
+            final_path, 
+            profiles=final_profiles, 
+            completed_spots=np.array(list(completed_spots))
+        )
+        logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     return spotwise_gene_expression_profiles
