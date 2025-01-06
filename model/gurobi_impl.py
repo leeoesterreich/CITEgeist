@@ -340,106 +340,7 @@ def deconvolute_spot_with_neighbors(
         gc.collect()
         return None
 
-
-
-def optimize_gene_expression(
-    sample_name,
-    deconvolution_expression_data,
-    cell_type_numbers_array,
-    filtered_adata,
-    radius=2,
-    alpha=0.5,
-    lambda_reg_gex=0.0001,
-    max_workers=None,
-    checkpoint_interval=100,
-    output_dir="checkpoints",
-    rerun=False
-):
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    
-    N = deconvolution_expression_data.shape[0]
-    M = deconvolution_expression_data.shape[1]
-    T = cell_type_numbers_array.shape[1]
-
-    # If rerun is True, delete all existing files for this sample
-    if rerun:
-        existing_files = [
-            f for f in os.listdir(output_dir) 
-            if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
-        ]
-        print("Found existing files: ", existing_files)
-        for file in existing_files:
-            try:
-                os.remove(os.path.join(output_dir, file))
-                logging.info(f"Deleted existing file: {file}")
-            except Exception as e:
-                logging.warning(f"Failed to delete {file}: {e}")
-        logging.info(f"Starting fresh analysis for {sample_name} (rerun=True)")
-    
-    # If not rerunning, check for completed run
-    else:
-        complete_file = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
-        if os.path.exists(complete_file):
-            try:
-                # Try to load the complete file to verify it's valid
-                complete_data = np.load(complete_file)
-                if 'profiles' in complete_data and 'completed_spots' in complete_data:
-                    logging.info(f"Found completed analysis for {sample_name}")
-                    profiles = complete_data['profiles']
-                    if profiles.shape == (N, T, M):  # Verify correct dimensions
-                        return {i: profiles[i] for i in range(N)}
-            except Exception as e:
-                logging.error(f"Error loading complete file: {e}")
-                # If complete file is corrupt, delete all checkpoints
-                existing_files = [
-                    f for f in os.listdir(output_dir) 
-                    if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
-                ]
-                for file in existing_files:
-                    try:
-                        os.remove(os.path.join(output_dir, file))
-                        logging.info(f"Deleted corrupted checkpoint: {file}")
-                    except Exception as e:
-                        logging.warning(f"Failed to delete {file}: {e}")
-        else:
-            # Look for the latest checkpoint
-            checkpoints = [
-                f for f in os.listdir(output_dir)
-                if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")
-            ]
-            
-            if checkpoints:
-                # Extract checkpoint numbers and find the latest
-                checkpoint_numbers = [
-                    int(f.replace(f"{sample_name}_gene_expression_checkpoint_", "").replace(".npz", ""))
-                    for f in checkpoints
-                ]
-                latest_number = max(checkpoint_numbers)
-                latest_checkpoint = os.path.join(
-                    output_dir, 
-                    f"{sample_name}_gene_expression_checkpoint_{latest_number}.npz"
-                )
-                
-                try:
-                    checkpoint_data = np.load(latest_checkpoint)
-                    if 'profiles' in checkpoint_data and 'completed_spots' in checkpoint_data:
-                        logging.info(f"Found latest checkpoint with {latest_number} completed spots")
-                        profiles = checkpoint_data['profiles']
-                        if profiles.shape == (N, T, M):
-                            return {i: profiles[i] for i in range(N)}
-                except Exception as e:
-                    logging.error(f"Error loading checkpoint file: {e}")
-                    # If checkpoint is corrupt, delete all checkpoints
-                    for file in checkpoints:
-                        try:
-                            os.remove(os.path.join(output_dir, file))
-                            logging.info(f"Deleted corrupted checkpoint: {file}")
-                        except Exception as e:
-                            logging.warning(f"Failed to delete {file}: {e}")
-    
-    logging.info(f"Starting analysis for {sample_name}")
-    
-    def calculate_global_correlations(filtered_adata, cell_type_numbers_array, min_proportion_threshold=0.2, min_expression_threshold=5.0):
+def calculate_global_correlations(filtered_adata, cell_type_numbers_array, min_proportion_threshold=0.2, min_expression_threshold=5.0):
         """
         Calculate global correlations with confidence weighted by adjusted p-values.
         """
@@ -517,17 +418,136 @@ def optimize_gene_expression(
         
         return correlations, correlation_confidence
 
+def optimize_gene_expression(
+    sample_name,
+    deconvolution_expression_data,
+    cell_type_numbers_array,
+    filtered_adata,
+    radius=2,
+    alpha=0.5,
+    lambda_reg_gex=0.0001,
+    max_workers=None,
+    checkpoint_interval=100,
+    output_dir="checkpoints",
+    rerun=False
+):
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    N = deconvolution_expression_data.shape[0]
+    M = deconvolution_expression_data.shape[1]
+    T = cell_type_numbers_array.shape[1]
+
+    # If rerun is True, delete all existing files for this sample
+    if rerun:
+        existing_files = [
+            f for f in os.listdir(output_dir) 
+            if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
+        ]
+        print("Found existing files: ", existing_files)
+        for file in existing_files:
+            try:
+                os.remove(os.path.join(output_dir, file))
+                logging.info(f"Deleted existing file: {file}")
+            except Exception as e:
+                logging.warning(f"Failed to delete {file}: {e}")
+        logging.info(f"Starting fresh analysis for {sample_name} (rerun=True)")
+    
+    # If not rerunning, check for completed run
+    else:
+        complete_file = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
+        if os.path.exists(complete_file):
+            try:
+                # Try to load the complete file to verify it's valid
+                complete_data = np.load(complete_file)
+                if 'profiles' in complete_data and 'completed_spots' in complete_data:
+                    logging.info(f"Found completed analysis for {sample_name}")
+                    profiles = complete_data['profiles']
+                    if profiles.shape == (N, T, M):  # Verify correct dimensions
+                        return {i: profiles[i] for i in range(N)}
+            except Exception as e:
+                logging.error(f"Error loading complete file: {e}")
+                # If complete file is corrupt, delete all checkpoints
+                existing_files = [
+                    f for f in os.listdir(output_dir) 
+                    if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
+                ]
+                for file in existing_files:
+                    try:
+                        os.remove(os.path.join(output_dir, file))
+                        logging.info(f"Deleted corrupted checkpoint: {file}")
+                    except Exception as e:
+                        logging.warning(f"Failed to delete {file}: {e}")
+        else:
+            # Look for the latest checkpoint
+            checkpoints = [
+                f for f in os.listdir(output_dir)
+                if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")
+            ]
+            
+            if checkpoints:
+                checkpoint_numbers = [
+                    int(f.replace(f"{sample_name}_gene_expression_checkpoint_", "").replace(".npz", ""))
+                    for f in checkpoints
+                ]
+                latest_number = max(checkpoint_numbers)
+                latest_checkpoint = os.path.join(
+                    output_dir, 
+                    f"{sample_name}_gene_expression_checkpoint_{latest_number}.npz"
+                )
+                
+                try:
+                    checkpoint_data = np.load(latest_checkpoint)
+                    if 'profiles' in checkpoint_data and 'completed_spots' in checkpoint_data:
+                        logging.info(f"Found latest checkpoint with {latest_number} completed spots")
+                        profiles = checkpoint_data['profiles']
+                        completed_spots = set(checkpoint_data['completed_spots'].tolist())
+                        
+                        if profiles.shape == (N, T, M):
+                            logging.info(f"Loading checkpoint data with shape {profiles.shape}")
+                            # Initialize with checkpoint data
+                            spotwise_gene_expression_profiles = {
+                                i: profiles[i] 
+                                for i in completed_spots 
+                                if not np.any(np.isnan(profiles[i]))
+                            }
+                            # Update completed_spots to only include valid profiles
+                            completed_spots = set(spotwise_gene_expression_profiles.keys())
+                            logging.info(f"Loaded {len(completed_spots)} valid profiles from checkpoint")
+                        else:
+                            logging.warning(f"Invalid profile shape in checkpoint: {profiles.shape}, expected ({N}, {T}, {M})")
+                            completed_spots = set()
+                            spotwise_gene_expression_profiles = {}
+                except Exception as e:
+                    logging.error(f"Error loading checkpoint file: {e}")
+                    # If checkpoint is corrupt, delete all checkpoints
+                    for file in checkpoints:
+                        try:
+                            os.remove(os.path.join(output_dir, file))
+                            logging.info(f"Deleted corrupted checkpoint: {file}")
+                        except Exception as e:
+                            logging.warning(f"Failed to delete {file}: {e}")
+                    completed_spots = set()
+                    spotwise_gene_expression_profiles = {}
+            else:
+                completed_spots = set()
+                spotwise_gene_expression_profiles = {}
+
+    logging.info(f"Starting analysis for {sample_name}")
+    logging.info(f"Already completed spots: {len(completed_spots)}")
+
     # Calculate global correlations once before parallel processing
     logging.info("Calculating global correlations...")
     global_correlations, global_confidence = calculate_global_correlations(filtered_adata, cell_type_numbers_array)
     logging.info("Global correlations calculated.")
 
-    spotwise_gene_expression_profiles = {}
-    completed_spots = set()
-
     try:
         workers = max_workers if max_workers is not None else os.cpu_count()
         logging.info(f"Using {workers} workers")
+        
+        # Only process spots that haven't been completed
+        remaining_spots = [i for i in range(N) if i not in completed_spots]
+        logging.info(f"Processing {len(remaining_spots)} remaining spots")
+        
         with ProcessPoolExecutor(max_workers=workers) as executor:
             futures = {
                 executor.submit(
@@ -538,12 +558,12 @@ def optimize_gene_expression(
                     radius,
                     alpha,
                     lambda_reg_gex,
-                    global_correlations,  # Pass pre-calculated correlations
-                    global_confidence     # Pass pre-calculated confidence
-                ): i for i in range(N)
+                    global_correlations,
+                    global_confidence
+                ): i for i in remaining_spots
             }
 
-            with tqdm(total=N, desc="Deconvoluting Spots") as pbar:
+            with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
                 spots_since_last_save = 0
                 
                 for future in as_completed(futures):
