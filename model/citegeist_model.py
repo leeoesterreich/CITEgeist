@@ -297,7 +297,7 @@ class CitegeistModel:
             
             print(f"Cell type proportions saved to '{output_file}'.")
             
-    def run_cell_expression_model(self, radius=2, alpha=0.5, lambda_reg_gex=0.0001, max_workers=16):
+    def run_cell_expression_model(self, radius=2, alpha=0.5, lambda_reg_gex=0.0001, max_workers=None, rerun=False):
         """
         Run the gene expression deconvolution model using neighborhood-based Gurobi optimization.
 
@@ -330,7 +330,7 @@ class CitegeistModel:
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
             max_workers=max_workers,
-            rerun=True
+            rerun=rerun
         )
 
         # Save results
