@@ -320,6 +320,8 @@ class CitegeistModel:
         deconvolution_expression_data = filtered_data
         cell_type_numbers_array = self.results.get('cell_prop').values
         filtered_adata = self.gene_expression_adata
+
+        
         # Run optimization
         spotwise_gene_expression_profiles = optimize_gene_expression(
             sample_name=self.sample_name,
