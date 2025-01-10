@@ -180,19 +180,17 @@ class CitegeistModel:
     # Preprocessing Functions
     # -----------------------------------------
     
-    def filter_gex(self, row_cutoff=10, value_cutoff=1):
+    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
 
+        Filters genes that have:
+        1. A count > 0 in at least `nonzero_percentage` of spots
+        2. Mean expression > `mean_expression_threshold` in nonzero spots
+
         Args:
-            row_cutoff (int): Minimum number of spots where a gene must meet the value threshold.
-            value_cutoff (float): Minimum value threshold for gene expression.
-
-        Raises:
-            ValueError: If gene expression data has not been split or initialized.
-
-        Returns:
-            None: Updates `self.gene_expression_adata` in place.
+            nonzero_percentage (float): Minimum percentage of spots where a gene must have a count > 0 (default: 1%)
+            mean_expression_threshold (float): Minimum mean expression value in nonzero spots
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
@@ -201,11 +199,23 @@ class CitegeistModel:
         matrix = self.gene_expression_adata.X.toarray() if hasattr(self.gene_expression_adata.X, 'toarray') else self.gene_expression_adata.X
         matrix = np.asarray(matrix)  # Ensure dense matrix
 
-        # Compute boolean filter: Genes with at least `row_cutoff` spots having `value_cutoff` expression
-        col_filter = (matrix >= value_cutoff).sum(axis=0) >= row_cutoff
+        # Calculate the number of spots
+        num_spots = matrix.shape[0]
 
-        # Convert to 1D array if it's sparse
-        col_filter = col_filter.A1 if hasattr(col_filter, "A1") else col_filter
+        # First filter: minimum percentage of nonzero spots
+        count_filter = (matrix > 0).sum(axis=0) >= (nonzero_percentage * num_spots)
+
+        # Calculate mean expression in nonzero spots for each gene
+        nonzero_means = np.zeros(matrix.shape[1])
+        for j in range(matrix.shape[1]):
+            nonzero_vals = matrix[:, j][matrix[:, j] > 0]
+            nonzero_means[j] = np.mean(nonzero_vals) if len(nonzero_vals) > 0 else 0
+
+        # Second filter: mean expression in nonzero spots
+        mean_filter = nonzero_means > mean_expression_threshold
+
+        # Combine filters
+        col_filter = count_filter & mean_filter
 
         # Apply the filter and subset the AnnData object
         filtered_gene_count = np.sum(col_filter)
@@ -214,7 +224,8 @@ class CitegeistModel:
         self.gene_expression_adata = self.gene_expression_adata[:, col_filter].copy()
 
         print(f"Filtered gene expression data: {initial_gene_count} → {filtered_gene_count} genes "
-              f"(row_cutoff={row_cutoff}, value_cutoff={value_cutoff}).")
+              f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
+              f"in nonzero spots).")
     
     def preprocess_gex(self):
         """
@@ -224,7 +235,7 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
-        sc.pp.normalize_total(self.gene_expression_adata, target_sum=1e4)
+        #sc.pp.normalize_total(self.gene_expression_adata, target_sum=1e4)
         
         self.preprocessed_gex = True
 
