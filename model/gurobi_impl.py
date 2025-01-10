@@ -165,258 +165,231 @@ def deconvolute_spot_with_neighbors(
     radius, 
     alpha=0.5, 
     lambda_reg_gex=0.0001,
-    global_correlations=None,
-    global_confidence=None
+    spatial_smoothing_weight=0.1
 ):
     """
-    Deconvolute gene expression for a single spot using neighborhood data and Gurobi optimization.
-    Now uses pre-calculated global correlations with p-value-based weighting.
+    Deconvolute gene expression incorporating negative binomial characteristics
+    and spatial smoothing between neighboring spots.
     """
+    # Validate parameters
+    if not (0 <= alpha <= 1):
+        raise ValueError("alpha must be between 0 and 1")
+    if lambda_reg_gex < 0:
+        raise ValueError("lambda_reg_gex must be non-negative")
+    if spatial_smoothing_weight < 0:
+        raise ValueError("spatial_smoothing_weight must be non-negative")
+
     model = None
     try:
         logging.info(f"Starting deconvolution for spot {i}")
 
-        # ✅ Step 1: Get Neighborhood Indices
-        try:
-            neighborhood_indices = get_neighbors_with_fixed_radius(i, filtered_adata, radius=radius, include_center=True)
-            if not neighborhood_indices:
-                logging.error(f"No valid neighbors found for spot {i}.")
-                return None
-
-            # Ensure indices are integers
-            neighborhood_indices = [
-                int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))
-            ]
-            neighborhood_indices = np.array(neighborhood_indices, dtype=int)
-        except Exception as e:
-            logging.error(f"Failed to retrieve or validate neighborhood indices for spot {i}: {str(e)}")
+        # Get Neighborhood Indices
+        neighborhood_indices = get_neighbors_with_fixed_radius(i, filtered_adata, radius=radius, include_center=True)
+        if not neighborhood_indices:
+            logging.error(f"No valid neighbors found for spot {i}.")
             return None
 
+        # Ensure indices are integers
+        neighborhood_indices = [int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))]
+        neighborhood_indices = np.array(neighborhood_indices, dtype=int)
+        
         logging.debug(f"Neighborhood indices for spot {i}: {neighborhood_indices}")
 
-        # ✅ Step 2: Extract Gene Expression Data
-        try:
-            deconvolution_expression_data = filtered_adata.X
+        # Extract Gene Expression Data
+        deconvolution_expression_data = filtered_adata.X
+        if hasattr(deconvolution_expression_data, 'toarray'):
+            deconvolution_expression_data = deconvolution_expression_data.toarray()
+        
+        # Get neighborhood data
+        neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
+        neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
+        
+        # Calculate size factors and normalize
+        size_factors = np.sum(neighborhood_expression_data, axis=1, keepdims=True)
+        epsilon = 1e-10
+        size_factors = np.maximum(size_factors, epsilon)
+        local_median_umi = np.median(size_factors)
+        if local_median_umi < epsilon:
+            local_median_umi = epsilon
+        size_factor_normalized = neighborhood_expression_data / size_factors * local_median_umi
 
-            
-            if hasattr(deconvolution_expression_data, 'toarray'):
-                deconvolution_expression_data = deconvolution_expression_data.toarray()
-            
-            # 1. Get neighborhood data
-            neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
-            neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
-            
-            # 2. Calculate size factors with safety checks
-            size_factors = np.sum(neighborhood_expression_data, axis=1, keepdims=True)
-            
-            # Add small epsilon to avoid division by zero
-            epsilon = 1e-10
-            size_factors = np.maximum(size_factors, epsilon)
-            
-            # 3. Safe normalization
-            local_median_umi = np.median(size_factors)
-            if local_median_umi < epsilon:
-                local_median_umi = epsilon
-                
-            size_factor_normalized = neighborhood_expression_data / size_factors * local_median_umi
-            
-            # 4. Check for invalid values
-            if np.any(np.isnan(size_factor_normalized)) or np.any(np.isinf(size_factor_normalized)):
-                logging.warning(f"Invalid values detected after normalization for spot {i}. Using fallback.")
-                # Fallback to original data if normalization fails
-                size_factor_normalized = neighborhood_expression_data
-            
-            # 5. Scale each gene to its maximum expression in the neighborhood
-            # This preserves relative differences while making genes comparable
-            gene_max = np.max(size_factor_normalized, axis=0, keepdims=True)
-            gene_max[gene_max == 0] = 1  # Avoid division by zero
-            neighborhood_expression_data = size_factor_normalized / gene_max
-            
-            # 6. Normalize cell type proportions within each spot
-            spot_total_cells = np.sum(neighborhood_cell_type_numbers, axis=1, keepdims=True)
-            spot_total_cells[spot_total_cells == 0] = 1  # Avoid division by zero
-            neighborhood_cell_type_numbers = neighborhood_cell_type_numbers / spot_total_cells
-            
-            logging.debug(f"Neighborhood data shape for spot {i}: {neighborhood_expression_data.shape}")
-            logging.debug(f"Mean expression after normalization: {np.mean(neighborhood_expression_data):.3f}")
-            logging.debug(f"Std expression after normalization: {np.std(neighborhood_expression_data):.3f}")
+        # Calculate spatial weights based on distances
+        spot_coordinates = filtered_adata.obsm['spatial'][neighborhood_indices]
+        distances = np.zeros((len(neighborhood_indices), len(neighborhood_indices)))
+        for idx1 in range(len(neighborhood_indices)):
+            for idx2 in range(idx1 + 1, len(neighborhood_indices)):
+                dist = np.linalg.norm(spot_coordinates[idx1] - spot_coordinates[idx2])
+                # Gaussian kernel for distance weighting
+                weight = np.exp(-dist / (radius/2))  # radius/2 as length scale
+                distances[idx1, idx2] = weight
+                distances[idx2, idx1] = weight
 
-
-        except IndexError as e:
-            logging.error(f"IndexError for spot {i} during data extraction: {e}")
+        # Calculate negative binomial statistics with safety checks
+        neighborhood_mean = np.mean(size_factor_normalized, axis=0)
+        neighborhood_var = np.var(size_factor_normalized, axis=0)
+        
+        # Avoid division by zero and handle edge cases in dispersion calculation
+        epsilon_mean = 1e-10  # Small constant to prevent division by zero
+        
+        # Calculate dispersion only where mean is sufficiently large
+        mean_mask = neighborhood_mean > epsilon_mean
+        dispersion = np.ones_like(neighborhood_mean)  # Initialize with ones
+        
+        # Calculate dispersion only for genes with valid means
+        valid_means = neighborhood_mean[mean_mask]
+        valid_vars = neighborhood_var[mean_mask]
+        
+        # Calculate dispersion for valid genes
+        dispersion[mean_mask] = np.maximum(
+            0, 
+            (valid_vars - valid_means) / (valid_means ** 2 + epsilon_mean)
+        )
+        
+        # Handle edge cases
+        dispersion[np.isnan(dispersion)] = 1.0  # fallback for numerical issues
+        dispersion[np.isinf(dispersion)] = 1.0   # handle infinite values
+        dispersion = np.minimum(dispersion, 10.0) # cap maximum dispersion
+        
+        # Add logging for debugging
+        # Only log NaN issues if they occur
+        if np.any(np.isnan(size_factor_normalized)):
+            logging.error(f"NaN values detected after normalization for spot {i}")
             return None
-        except Exception as e:
-            logging.error(f"Unexpected error during data extraction for spot {i}: {e}")
-            return None
+        
+        # Scale each gene to its maximum expression in the neighborhood
+        gene_max = np.max(size_factor_normalized, axis=0, keepdims=True)
+        gene_max[gene_max == 0] = 1  # Avoid division by zero
+        neighborhood_expression_data = size_factor_normalized / gene_max
+        
+        # Normalize cell type proportions within each spot
+        spot_total_cells = np.sum(neighborhood_cell_type_numbers, axis=1, keepdims=True)
+        spot_total_cells[spot_total_cells == 0] = 1  # Avoid division by zero
+        neighborhood_cell_type_numbers = neighborhood_cell_type_numbers / spot_total_cells
 
-        # ✅ Step 3: Build Gurobi Model
-        try:
-            model = gp.Model(f"gene_expression_proportion_deconvolution_spot_{i}")
-            model.setParam('OutputFlag', 0)
-            model.setParam('Threads', 1)
-            model.setParam('NodefileStart', 0.5)
-            model.setParam('MIPGap', 0.01)
-            model.setParam('TimeLimit', 600)
-            model.setParam('NodeLimit', 1000000)
-            
-            T = neighborhood_cell_type_numbers.shape[1]  # Number of cell types
-            M = neighborhood_expression_data.shape[1]  # Number of genes
-            
-            P = model.addVars(T, M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="cell_type_gene_proportion")
-            error = model.addVars(len(neighborhood_indices), M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="error")
+        # Build Gurobi Model
+        model = gp.Model(f"gene_expression_proportion_deconvolution_spot_{i}")
+        model.setParam('OutputFlag', 0)
+        model.setParam('Threads', 1)
+        model.setParam('NodefileStart', 0.5)
+        model.setParam('MIPGap', 0.01)
+        model.setParam('TimeLimit', 600)
+        model.setParam('NodeLimit', 1000000)
+        
+        T = neighborhood_cell_type_numbers.shape[1]  # Number of cell types
+        M = neighborhood_expression_data.shape[1]    # Number of genes
+        
+        # Define variables
+        P = model.addVars(T, M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="cell_type_gene_proportion")
+        error = model.addVars(len(neighborhood_indices), M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="error")
+        
+        # # New variables for spatial smoothing
+        # spatial_diff = model.addVars(
+        #     len(neighborhood_indices), 
+        #     len(neighborhood_indices), 
+        #     T, M, 
+        #     lb=0, 
+        #     ub=GRB.INFINITY, 
+        #     vtype=GRB.CONTINUOUS, 
+        #     name="spatial_diff"
+        # )
 
-            # ✅ Proportion constraint for each gene
-            wiggle_room = 0.1
+        # Proportion constraint for each gene
+        wiggle_room = 0.1
+        for k in range(M):
+            model.addConstr(
+                gp.quicksum(P[j, k] for j in range(T)) >= 1 - wiggle_room,
+                name=f"proportion_lower_bound_gene_{k}"
+            )
+            model.addConstr(
+                gp.quicksum(P[j, k] for j in range(T)) <= 1 + wiggle_room,
+                name=f"proportion_upper_bound_gene_{k}"
+            )
+
+        # Add NB-weighted error terms
+        for n, spot_idx in enumerate(neighborhood_indices):
             for k in range(M):
+                total_proportion = np.sum(neighborhood_cell_type_numbers[n, :])
+                predicted_gene_expression = gp.quicksum(
+                    (neighborhood_cell_type_numbers[n, j] / total_proportion) * P[j, k] 
+                    for j in range(T)
+                )
+                
+                # Weight errors by inverse dispersion (higher dispersion = lower weight)
+                nb_weight = 1.0 / (1.0 + dispersion[k])
+                
                 model.addConstr(
-                    gp.quicksum(P[j, k] for j in range(T)) >= 1 - wiggle_room,
-                    name=f"proportion_lower_bound_gene_{k}"
+                    error[n, k] >= nb_weight * (neighborhood_expression_data[n, k] - predicted_gene_expression)
                 )
                 model.addConstr(
-                    gp.quicksum(P[j, k] for j in range(T)) <= 1 + wiggle_room,
-                    name=f"proportion_upper_bound_gene_{k}"
+                    error[n, k] >= nb_weight * (predicted_gene_expression - neighborhood_expression_data[n, k])
                 )
 
-            # ✅ Error terms and Elastic Net Regularization
-            for n, spot_idx in enumerate(neighborhood_indices):
-                for k in range(M):
-                    total_proportion = np.sum(neighborhood_cell_type_numbers[n, :])
-                    predicted_gene_expression = gp.quicksum(
-                        (neighborhood_cell_type_numbers[n, j] / total_proportion) * P[j, k] for j in range(T)
-                    )
-                    model.addConstr(error[n, k] >= neighborhood_expression_data[n, k] - predicted_gene_expression)
-                    model.addConstr(error[n, k] >= predicted_gene_expression - neighborhood_expression_data[n, k])
+        # # Add spatial smoothing constraints
+        # for n1 in range(len(neighborhood_indices)):
+        #     for n2 in range(n1 + 1, len(neighborhood_indices)):
+        #         if distances[n1, n2] > 0.01:  # Only consider meaningful distances
+        #             for j in range(T):
+        #                 for k in range(M):
+        #                     # Get predicted expressions for both spots
+        #                     pred1 = gp.quicksum(
+        #                         (neighborhood_cell_type_numbers[n1, j] / np.sum(neighborhood_cell_type_numbers[n1, :])) 
+        #                         * P[j, k]
+        #                     )
+        #                     pred2 = gp.quicksum(
+        #                         (neighborhood_cell_type_numbers[n2, j] / np.sum(neighborhood_cell_type_numbers[n2, :])) 
+        #                         * P[j, k]
+        #                     )
+                            
+        #                     # Add weighted difference constraints
+        #                     model.addConstr(
+        #                         spatial_diff[n1, n2, j, k] >= distances[n1, n2] * (pred1 - pred2)
+        #                     )
+        #                     model.addConstr(
+        #                         spatial_diff[n1, n2, j, k] >= distances[n1, n2] * (pred2 - pred1)
+        #                     )
 
-            lambda_reg = lambda_reg_gex
-            l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
-            l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
+        # # Enhanced objective function with spatial smoothing
+        # spatial_smoothing_term = gp.quicksum(
+        #     spatial_diff[n1, n2, j, k] 
+        #     for n1 in range(len(neighborhood_indices)) 
+        #     for n2 in range(n1 + 1, len(neighborhood_indices))
+        #     for j in range(T)
+        #     for k in range(M)
+        # )
 
-            correlation_weight = 1
-            min_proportion_threshold = 0.2  # Minimum proportion per spot
-            min_expression_threshold = 5.0   # Minimum expression level
-            
-            # Modified correlation terms that:
-            # 1. Uses all correlations (not just significant ones)
-            # 2. Weights impact by statistical significance
-            # 3. Handles positive and negative correlations differently
-            correlation_terms = gp.quicksum(
-                global_confidence[j, k] * (  # global_confidence already includes (1 - adj_pval)
-                    # For positive correlations
-                    (max(0, global_correlations[j, k]) * P[j, k] * -1) +  # Encourage assignment
-                    # For negative correlations (with reduced penalty for less significant ones)
-                    (min(0, global_correlations[j, k]) * P[j, k])  # Discourage assignment
-                )
-                for j in range(T) for k in range(M)
-            )
+        # L1 and L2 terms for elastic net regularization
+        l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
+        l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
 
-            alpha = 0.8
-            
-            # Update objective function with weighted correlation term
-            model.setObjective(
-                gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M)) +
-                lambda_reg * (alpha * l1_term + (1 - alpha) * l2_term) +
-                correlation_weight * correlation_terms,
-                GRB.MINIMIZE
-            )
+        # Enhanced objective function with spatial smoothing AND elastic net regularization
+        model.setObjective(
+            gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M)) +
+            # spatial_smoothing_weight * spatial_smoothing_term +
+            lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term),
+            GRB.MINIMIZE
+        )
 
-            model.optimize()
+        model.optimize()
 
-            if model.SolCount > 0:
-                logging.info(f"Solution found for spot {i}")
-                gene_expression_profile_solution = {key: P[key].X for key in P}
-                return np.array([[gene_expression_profile_solution[j, k] for k in range(M)] for j in range(T)])
-            else:
-                logging.error(f"No feasible solution found for spot {i}.")
-                return None
-        finally:
-            if model:
-                del model
-                gc.collect()
+        if model.SolCount > 0:
+            logging.info(f"Solution found for spot {i}")
+            gene_expression_profile_solution = {key: P[key].X for key in P}
+            return np.array([[gene_expression_profile_solution[j, k] for k in range(M)] for j in range(T)])
+        else:
+            logging.error(f"No feasible solution found for spot {i}.")
+            return None
+
     except Exception as e:
         logging.error(f"Error during deconvolution of spot {i}: {str(e)}")
         logging.error(traceback.format_exc())
         if model:
             del model
+            del neighborhood_expression_data
+            del size_factor_normalized
+            del spatial_diff
         gc.collect()
         return None
 
-def calculate_global_correlations(filtered_adata, cell_type_numbers_array, min_proportion_threshold=0.2, min_expression_threshold=5.0):
-        """
-        Calculate global correlations with confidence weighted by adjusted p-values.
-        """
-        T = cell_type_numbers_array.shape[1]
-        M = filtered_adata.shape[1]
-        
-        correlations = np.zeros((T, M))
-        correlation_confidence = np.zeros((T, M))
-        
-        expression_data = filtered_adata.X.toarray() if sp.issparse(filtered_adata.X) else filtered_adata.X
-        
-        for j in range(T):
-            # Store all p-values for this cell type
-            all_pvals = []
-            all_corrs = []
-            valid_indices = []
-            
-            # First pass: calculate all correlations and p-values
-            for k in range(M):
-                cell_type_props = cell_type_numbers_array[:, j]
-                gene_expr = expression_data[:, k]
-                
-                valid_mask = (
-                    ~(np.isnan(cell_type_props) | np.isnan(gene_expr)) & 
-                    (cell_type_props >= min_proportion_threshold) &
-                    (gene_expr >= min_expression_threshold)
-                )
-                filtered_props = cell_type_props[valid_mask]
-                filtered_expr = gene_expr[valid_mask]
-                
-                if len(filtered_props) < 3 or np.std(filtered_expr) == 0:
-                    correlations[j, k] = 0
-                    correlation_confidence[j, k] = 0
-                else:
-                    corr, pval = spearmanr(filtered_props, filtered_expr)
-                    if not np.isnan(corr) and not np.isnan(pval):
-                        all_corrs.append(corr)
-                        all_pvals.append(pval)
-                        valid_indices.append(k)
-                    else:
-                        correlations[j, k] = 0
-                        correlation_confidence[j, k] = 0
-            
-            # Adjust p-values using Benjamini-Hochberg FDR
-            if all_pvals:
-                adjusted_pvals = multipletests(all_pvals, method='fdr_bh')[1]
-                
-                # Second pass: store results using adjusted p-values
-                for idx, k in enumerate(valid_indices):
-                    corr = all_corrs[idx]
-                    adj_pval = adjusted_pvals[idx]
-                    
-                    # Store correlation as is
-                    correlations[j, k] = corr
-                    
-                    # Calculate confidence based on:
-                    # 1. Statistical significance (1 - adj_pval)
-                    # 2. Number of valid observations
-                    # 3. Strength of correlation
-                    confidence = (
-                        #(len(filtered_props) / len(cell_type_props)) *  # Data coverage
-                        (1 - adj_pval) *                                # Statistical significance
-                        abs(corr)                                       # Correlation strength
-                    )
-                    correlation_confidence[j, k] = confidence
-                    
-                    # Log correlations with their weights
-                    if abs(corr) > 0.3:  # Lower threshold to see more correlations
-                        gene_name = filtered_adata.var_names[k]
-                        logging.info(f"Global correlation found:")
-                        logging.info(f"Cell type {j} with gene {gene_name}:")
-                        logging.info(f"Correlation: {corr:.3f}, adj. p-value: {adj_pval:.3e}")
-                        logging.info(f"Confidence weight: {confidence:.3f}")
-                        logging.info(f"Valid spots: {len(filtered_props)} of {len(cell_type_props)}")
-        
-        return correlations, correlation_confidence
 
 def optimize_gene_expression(
     sample_name,
@@ -479,6 +452,8 @@ def optimize_gene_expression(
                         logging.info(f"Deleted corrupted checkpoint: {file}")
                     except Exception as e:
                         logging.warning(f"Failed to delete {file}: {e}")
+                    completed_spots = set()
+                    spotwise_gene_expression_profiles = {}
         else:
             # Look for the latest checkpoint
             checkpoints = [
@@ -537,10 +512,8 @@ def optimize_gene_expression(
     logging.info(f"Starting analysis for {sample_name}")
     logging.info(f"Already completed spots: {len(completed_spots)}")
 
-    # Calculate global correlations once before parallel processing
-    logging.info("Calculating global correlations...")
-    global_correlations, global_confidence = calculate_global_correlations(filtered_adata, cell_type_numbers_array)
-    logging.info("Global correlations calculated.")
+
+
 
     try:
         workers = max_workers if max_workers is not None else os.cpu_count()
@@ -560,8 +533,7 @@ def optimize_gene_expression(
                     radius,
                     alpha,
                     lambda_reg_gex,
-                    global_correlations,
-                    global_confidence
+
                 ): i for i in remaining_spots
             }
 
