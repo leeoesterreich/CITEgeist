@@ -451,6 +451,8 @@ def optimize_gene_expression(
             except Exception as e:
                 logging.warning(f"Failed to delete {file}: {e}")
         logging.info(f"Starting fresh analysis for {sample_name} (rerun=True)")
+        completed_spots = set()
+        spotwise_gene_expression_profiles = {}
     
     # If not rerunning, check for completed run
     else:
