@@ -36,7 +36,7 @@ def fit_zinb(x, p):
     """
     def zinb_nll(params):
         pi, mu, theta = params
-        # Bound parameters to valid ranges
+        # Bound parameters to valid ranges more strictly
         pi = np.clip(pi, 0.001, 0.999)
         mu = np.clip(mu, 0.001, None)
         theta = np.clip(theta, 0.001, None)
@@ -45,31 +45,42 @@ def fit_zinb(x, p):
         zero_idx = x == 0
         nonzero_idx = ~zero_idx
         
-        # Log-likelihood for zeros: log(π + (1-π)*(θ/(θ+μ))^θ)
-        ll_zeros = np.log(pi + (1-pi) * np.power(theta/(theta+mu), theta))
+        if not np.any(nonzero_idx):
+            return 1e10  # Penalize all-zero cases
         
-        # Log-likelihood for non-zeros
-        ll_nonzeros = (np.log(1-pi) + loggamma(x[nonzero_idx] + theta) - loggamma(theta) - 
-                      loggamma(x[nonzero_idx] + 1) + theta * np.log(theta) + 
-                      x[nonzero_idx] * np.log(mu) - (x[nonzero_idx] + theta) * 
-                      np.log(theta + mu))
+        # Log-likelihood calculation
+        ll_zeros = np.sum(np.log(pi + (1-pi) * np.power(theta/(theta+mu), theta))[zero_idx])
         
-        return -(np.sum(ll_zeros[zero_idx]) + np.sum(ll_nonzeros))
+        ll_nonzeros = np.sum(
+            np.log(1-pi) + loggamma(x[nonzero_idx] + theta) - loggamma(theta) - 
+            loggamma(x[nonzero_idx] + 1) + theta * np.log(theta) + 
+            x[nonzero_idx] * np.log(mu) - (x[nonzero_idx] + theta) * np.log(theta + mu)
+        )
+        
+        return -(ll_zeros + ll_nonzeros)
     
-    # Initial guesses
-    pi_init = np.mean(x == 0)
-    mu_init = np.mean(x[x > 0])
+    # Better initial guesses
+    zero_prop = np.mean(x == 0)
+    pi_init = min(0.9, zero_prop)  # Cap initial pi
+    mu_init = max(0.1, np.mean(x[x > 0])) if np.any(x > 0) else 0.1
     theta_init = 1.0
     
-    # Optimize
-    result = minimize(
-        zinb_nll, 
-        [pi_init, mu_init, theta_init],
-        bounds=[(0.001, 0.999), (0.001, None), (0.001, None)],
-        method='L-BFGS-B'
-    )
-    
-    return result.x
+    try:
+        # Optimize with stricter bounds on pi
+        result = minimize(
+            zinb_nll, 
+            [pi_init, mu_init, theta_init],
+            bounds=[(0.001, 0.95), (0.001, None), (0.001, None)],  # Cap maximum pi at 0.95
+            method='L-BFGS-B'
+        )
+        
+        # Validate results
+        if not result.success:
+            return (zero_prop, mu_init, theta_init)
+        
+        return result.x
+    except:
+        return (zero_prop, mu_init, theta_init)
 
 def analyze_zero_inflation_patterns(
     spotwise_gene_expression_profiles,
@@ -107,12 +118,19 @@ def analyze_zero_inflation_patterns(
             
             if len(expr_values) > 0:
                 zero_prop = np.mean(expr_values <= expression_threshold)
-                mean_nonzero = np.mean(expr_values[expr_values > expression_threshold]) if np.any(expr_values > expression_threshold) else 0
+                nonzero_values = expr_values[expr_values > expression_threshold]
+                
+                # Handle case where all values are zero
+                if len(nonzero_values) == 0:
+                    mean_nonzero = 0.0
+                else:
+                    mean_nonzero = np.mean(nonzero_values)
                 
                 results[ct_name][gene_name] = {
                     'zero_proportion': zero_prop,
                     'mean_nonzero_expression': mean_nonzero,
-                    'n_spots': len(expr_values)
+                    'n_spots': len(expr_values),
+                    'n_nonzero': len(nonzero_values)
                 }
     
     return results
@@ -132,84 +150,72 @@ def compute_global_prior(
     spotwise_gene_expression_profiles,
     cell_type_numbers_array,
     lambda_prior=1.0,
-    num_bins=5,
-    zinb_weight=0.5,  # Weight between MI and ZINB components
-    zero_inflation_threshold=0.8  # Threshold for zero-inflation penalty
+    zero_inflation_threshold=0.9  # Increased threshold
 ):
     """
-    Compute global prior using both mutual information and ZINB fitting.
+    Compute global prior using ZINB fitting to identify cell-type specific expression patterns.
     
     Args:
         spotwise_gene_expression_profiles: Dict of spot profiles from first pass
         cell_type_numbers_array: Array of cell type proportions
         lambda_prior: Scaling factor for prior
-        num_bins: Number of bins for MI calculation
-        zinb_weight: Weight between MI (0) and ZINB (1) components
         zero_inflation_threshold: Threshold for considering a gene zero-inflated
     """
-    # Gather spot indices and shapes
     spot_indices = sorted(spotwise_gene_expression_profiles.keys())
     if not spot_indices:
         raise ValueError("No spotwise profiles found. Did the first pass run correctly?")
     T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
     N = len(spot_indices)
 
-    # Construct usage array as before
+    # Construct usage array
     usage_array = np.zeros((N, T, M), dtype=float)
     for idx, spot_id in enumerate(spot_indices):
         usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
 
     # Initialize matrices
-    mi_matrix = np.zeros((T, M), dtype=float)
     zinb_matrix = np.zeros((T, M), dtype=float)
     zero_inflation_probs = np.zeros((T, M), dtype=float)
 
     # For each cell type and gene
     for t_idx in range(T):
         ct_proportions = cell_type_numbers_array[:, t_idx]
-        ct_disc = np.digitize(ct_proportions, 
-                            bins=np.histogram_bin_edges(ct_proportions, bins=num_bins))
 
         for m_idx in range(M):
             usage_vec = usage_array[:, t_idx, m_idx]
             
-            # 1. Compute MI
-            usage_disc = np.digitize(usage_vec, 
-                                   bins=np.histogram_bin_edges(usage_vec, bins=num_bins))
-            mi_val = mutual_info_score(usage_disc, ct_disc)
-            mi_matrix[t_idx, m_idx] = mi_val
-
-            # 2. Fit ZINB and compute score
             try:
+                # Fit ZINB and compute score
                 pi, mu, theta = fit_zinb(usage_vec, ct_proportions)
                 zero_inflation_probs[t_idx, m_idx] = pi
                 
-                # ZINB score combines:
-                # - Zero-inflation penalty
-                # - Expression level when expressed
-                # - Dispersion penalty
                 if pi > zero_inflation_threshold:
-                    zinb_score = 0.0  # Heavily penalize high zero-inflation
+                    zinb_score = 0.0  # Strong penalty for high zero-inflation
                 else:
+                    # Modified scoring to better reflect expression patterns
+                    # Higher expression and lower dispersion = better score
+                    # Scale by (1-pi) to account for zero-inflation
                     zinb_score = (1 - pi) * (mu / (mu + theta))
+                    
+                    # Additional boost for low zero-inflation
+                    if pi < 0.5:  # If less than 50% zeros
+                        zinb_score *= 1.5  # Boost the score
+                        
                 zinb_matrix[t_idx, m_idx] = zinb_score
             except:
                 zinb_matrix[t_idx, m_idx] = 0.0
                 zero_inflation_probs[t_idx, m_idx] = 1.0
 
-    # Normalize matrices to [0,1] range per gene
-    mi_matrix = mi_matrix / (np.max(mi_matrix, axis=0) + 1e-10)
-    zinb_matrix = zinb_matrix / (np.max(zinb_matrix, axis=0) + 1e-10)
+    # Normalize matrix to [0,1] range per gene
+    # Add small epsilon to avoid division by zero
+    max_scores = np.maximum(np.max(zinb_matrix, axis=0), 1e-10)
+    zinb_matrix = zinb_matrix / max_scores[:, None].T
 
-    # Combine MI and ZINB information
-    combined_matrix = (zinb_weight * zinb_matrix + 
-                      (1 - zinb_weight) * mi_matrix)
-
-    # Convert to prior via softmax
+    # Convert to prior via softmax with stronger scaling
     global_prior = np.zeros((T, M), dtype=float)
     for m_idx in range(M):
-        combined_scores = combined_matrix[:, m_idx]
-        scaled = combined_scores * lambda_prior
+        scores = zinb_matrix[:, m_idx]
+        # Stronger scaling to make assignments more decisive
+        scaled = scores * lambda_prior * 2  # Double the scaling factor
         exps = np.exp(scaled - np.max(scaled))
         denom = np.sum(exps)
         if denom < 1e-12:
@@ -217,7 +223,7 @@ def compute_global_prior(
         else:
             global_prior[:, m_idx] = exps / denom
 
-    return global_prior, mi_matrix, zinb_matrix
+    return global_prior, zinb_matrix, zero_inflation_probs
 
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
@@ -496,7 +502,7 @@ def deconvolute_spot_with_neighbors_with_prior(
         # Add adaptive constraints based on ZINB fitting
         # If a gene shows strong zero-inflation for a cell type,
         # we can add an upper bound constraint
-        zero_inflation_threshold = 0.5  # Adjust this threshold as needed
+        zero_inflation_threshold = 0.9  # Adjust this threshold as needed
         for j in range(T):
             for k in range(M):
                 if global_prior[j, k] < zero_inflation_threshold:
@@ -623,8 +629,44 @@ def log_marker_gene_patterns(zero_patterns, marker_genes):
                 stats = genes_data[gene]
                 logging.info(f"  {ct}:")
                 logging.info(f"    Zero proportion: {stats['zero_proportion']:.3f}")
-                logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
+                if stats['n_nonzero'] > 0:
+                    logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
+                else:
+                    logging.info(f"    Mean nonzero expression: 0.0 (no nonzero values)")
                 logging.info(f"    Number of spots: {stats['n_spots']}")
+                logging.info(f"    Number of nonzero spots: {stats['n_nonzero']}")
+
+def scale_genes(expression_matrix):
+    """Scale each gene independently to [0,1] range.
+    
+    Args:
+        expression_matrix (np.ndarray): Spots x Genes matrix
+        
+    Returns:
+        tuple: (scaled_matrix, gene_mins, gene_maxs)
+    """
+    gene_mins = np.min(expression_matrix, axis=0)
+    gene_maxs = np.max(expression_matrix, axis=0)
+    
+    # Avoid division by zero
+    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
+    scaled_matrix = (expression_matrix - gene_mins) / gene_ranges
+    
+    return scaled_matrix, gene_mins, gene_maxs
+
+def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
+    """Reverse the gene-wise scaling transformation.
+    
+    Args:
+        scaled_matrix (np.ndarray): Scaled matrix
+        gene_mins (np.ndarray): Original minimum values per gene
+        gene_maxs (np.ndarray): Original maximum values per gene
+        
+    Returns:
+        np.ndarray: Unscaled matrix
+    """
+    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
+    return (scaled_matrix * gene_ranges) + gene_mins
 
 def two_pass_optimize_gene_expression(
     sample_name,
@@ -652,9 +694,22 @@ def two_pass_optimize_gene_expression(
     # === PASS 1 (No Prior)
     #########################
     logging.info("=== Pass 1: standard local optimization ===")
-    pass1_result = optimize_gene_expression(
+    
+    """Modified to handle gene scaling"""
+    
+    # Scale the expression data
+    scaled_expression, gene_mins, gene_maxs = scale_genes(deconvolution_expression_data)
+    
+    # Store scaling factors in filtered_adata
+    filtered_adata.uns['gene_scaling'] = {
+        'mins': gene_mins,
+        'maxs': gene_maxs
+    }
+    
+    # Run optimization with scaled data
+    spotwise_scaled_profiles = optimize_gene_expression(
         sample_name=sample_name+"_pass1",
-        deconvolution_expression_data=deconvolution_expression_data,
+        deconvolution_expression_data=scaled_expression,
         cell_type_numbers_array=cell_type_numbers_array,
         filtered_adata=filtered_adata,
         radius=radius,
@@ -691,14 +746,23 @@ def two_pass_optimize_gene_expression(
     # Compute Global Prior from Pass 1
     #########################
     logging.info("=== Computing global prior from pass 1 ===")
-    global_prior_pass1, mi_matrix_pass1, zinb_matrix_pass1 = compute_global_prior(
-        spotwise_gene_expression_profiles=pass1_result,
+    global_prior_pass1, zinb_matrix, zero_inflation_probs = compute_global_prior(
+        spotwise_gene_expression_profiles=spotwise_scaled_profiles,
         cell_type_numbers_array=cell_type_numbers_array,
         lambda_prior=1.0,
-        num_bins=5,
-        zinb_weight=0.5,
-        zero_inflation_threshold=suggested_threshold
+        zero_inflation_threshold=0.9
     )
+
+    # Log ZINB statistics for marker genes
+    for gene in marker_genes:
+        if gene in filtered_adata.var_names:
+            gene_idx = filtered_adata.var_names.get_loc(gene)
+            logging.info(f"\nZINB statistics for {gene}:")
+            for t_idx in range(cell_type_numbers_array.shape[1]):
+                logging.info(f"  CellType_{t_idx}:")
+                logging.info(f"    Zero-inflation probability: {zero_inflation_probs[t_idx, gene_idx]:.3f}")
+                logging.info(f"    ZINB score: {zinb_matrix[t_idx, gene_idx]:.3f}")
+                logging.info(f"    Final prior: {global_prior_pass1[t_idx, gene_idx]:.3f}")
 
     #########################
     # === PASS 2 (With Prior)
@@ -715,14 +779,18 @@ def two_pass_optimize_gene_expression(
     # Use the wrapper function with ProcessPoolExecutor
     pass2_result = optimize_gene_expression_with_custom_spot_fn(
         sample_name=sample_name+"_pass2",
-        deconvolution_expression_data=deconvolution_expression_data,
+        deconvolution_expression_data=scaled_expression,
         cell_type_numbers_array=cell_type_numbers_array,
         filtered_adata=filtered_adata,
         radius=radius,
         alpha=alpha,
         lambda_reg_gex=lambda_reg_gex,
         spot_function=deconvolute_spot_with_neighbors_wrapper,
-        spot_args=spot_args,  # Pass the prepared arguments
+        spot_args=[
+            (i, filtered_adata, cell_type_numbers_array, radius, global_prior_pass1,
+             lambda_prior_weight, alpha, lambda_reg_gex)
+            for i in range(scaled_expression.shape[0])
+        ],
         max_workers=max_workers,
         checkpoint_interval=checkpoint_interval,
         output_dir=output_dir,
@@ -730,11 +798,11 @@ def two_pass_optimize_gene_expression(
     )
 
     # Compute a new prior from pass 2 result, to see if it changed significantly
-    global_prior_pass2, mi_matrix_pass2, zinb_matrix_pass2 = compute_global_prior(
+    global_prior_pass2, zinb_matrix, zero_inflation_probs = compute_global_prior(
         spotwise_gene_expression_profiles=pass2_result,
         cell_type_numbers_array=cell_type_numbers_array,
         lambda_prior=1.0,
-        num_bins=5
+        zero_inflation_threshold=suggested_threshold
     )
 
     # Calculate how much the prior changed (L1 norm or relative difference)
@@ -850,8 +918,8 @@ def optimize_gene_expression_with_custom_spot_fn(
                         logging.info(f"Deleted corrupted checkpoint: {file}")
                     except Exception as e:
                         logging.warning(f"Failed to delete {file}: {e}")
-                completed_spots = set()
-                spotwise_gene_expression_profiles = {}
+                    completed_spots = set()
+                    spotwise_gene_expression_profiles = {}
         else:
             # Look for the latest checkpoint
             checkpoints = [
@@ -868,6 +936,7 @@ def optimize_gene_expression_with_custom_spot_fn(
                     output_dir, 
                     f"{sample_name}_gene_expression_checkpoint_{latest_number}.npz"
                 )
+                
                 try:
                     checkpoint_data = np.load(latest_checkpoint)
                     if 'profiles' in checkpoint_data and 'completed_spots' in checkpoint_data:
@@ -896,6 +965,7 @@ def optimize_gene_expression_with_custom_spot_fn(
                         spotwise_gene_expression_profiles = {}
                 except Exception as e:
                     logging.error(f"Error loading checkpoint file: {e}")
+                    # If checkpoint is corrupt, delete all checkpoints
                     for file in checkpoints:
                         try:
                             os.remove(os.path.join(output_dir, file))
@@ -917,7 +987,7 @@ def optimize_gene_expression_with_custom_spot_fn(
         
         remaining_spots = [i for i in range(N) if i not in completed_spots]
         logging.info(f"Processing {len(remaining_spots)} remaining spots")
-
+        
         with ProcessPoolExecutor(max_workers=workers) as executor:
             # Submit jobs using the args directly
             futures = {
@@ -927,11 +997,13 @@ def optimize_gene_expression_with_custom_spot_fn(
 
             with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
                 spots_since_last_save = 0
+                
                 for future in as_completed(futures):
                     i = futures[future]
                     try:
                         result = future.result()
                         if result is not None:
+                            # Verify result shape before storing
                             if result.ndim != 2:
                                 logging.error(f"Unexpected result shape for spot {i}: {result.shape}")
                                 continue
@@ -944,35 +1016,45 @@ def optimize_gene_expression_with_custom_spot_fn(
 
                             # Save checkpoint every checkpoint_interval spots
                             if spots_since_last_save >= checkpoint_interval:
+                                # Use number of completed spots instead of current spot index
                                 n_completed = len(completed_spots)
                                 checkpoint_path = os.path.join(
                                     output_dir, 
                                     f"{sample_name}_gene_expression_checkpoint_{n_completed}.npz"
                                 )
+                                
+                                # Convert dictionary to numpy array for saving
                                 max_spot = max(spotwise_gene_expression_profiles.keys())
                                 profiles_array = np.full((max_spot + 1, T, M), np.nan)
+                                
                                 for spot_idx, profile in spotwise_gene_expression_profiles.items():
+                                    if profile.shape != (T, M):
+                                        logging.error(f"Invalid profile shape at spot {spot_idx}: {profile.shape}")
+                                        continue
                                     profiles_array[spot_idx] = profile
                                 
                                 try:
+                                    # Save as compressed numpy array with completed spots info
                                     np.savez_compressed(
                                         checkpoint_path,
                                         profiles=profiles_array,
                                         completed_spots=np.array(list(completed_spots)),
                                         n_completed=n_completed
                                     )
-                                    # Clean up old checkpoints
+                                    
+                                    # Only delete old checkpoints if new one saved successfully
                                     existing_checkpoints = [
                                         f for f in os.listdir(output_dir) 
                                         if f.startswith(f"{sample_name}_gene_expression_checkpoint_") 
                                         and f.endswith(".npz")
-                                        and f != os.path.basename(checkpoint_path)
+                                        and f != os.path.basename(checkpoint_path)  # Don't delete the one we just created
                                     ]
                                     for old_checkpoint in existing_checkpoints:
                                         try:
                                             os.remove(os.path.join(output_dir, old_checkpoint))
                                         except Exception as e:
                                             logging.warning(f"Failed to delete old checkpoint {old_checkpoint}: {e}")
+                                    
                                     logging.info(f"Saved checkpoint after {n_completed} completed spots")
                                     spots_since_last_save = 0
                                 except Exception as e:
@@ -987,9 +1069,10 @@ def optimize_gene_expression_with_custom_spot_fn(
         logging.error(f"Error during parallel processing: {str(e)}")
         logging.error(traceback.format_exc())
     finally:
-        # End of parallel region
+        futures.clear()
         gc.collect()
-
+        
+        # Save final results
         final_path = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
         if len(spotwise_gene_expression_profiles) > 0:
             max_spot = max(spotwise_gene_expression_profiles.keys())
