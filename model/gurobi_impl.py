@@ -95,17 +95,7 @@ def analyze_zero_inflation_patterns(
     
     # Ensure we're working with numpy arrays
     if isinstance(usage_array, dict):
-        # If it's a dictionary of profiles, we need to reshape it
-        spots = sorted(usage_array.keys())
-        if not spots:
-            raise ValueError("Empty usage array dictionary")
-        T, M = usage_array[spots[0]].shape
-        N = len(spots)
-        combined_array = np.zeros((N, M))
-        for idx, spot in enumerate(spots):
-            # For each spot, take the maximum expression across cell types
-            combined_array[idx] = np.max(usage_array[spot], axis=0)
-        usage_array = combined_array
+        usage_array = usage_array[0]  # Take first pass data if dict
     
     # Convert to dense if sparse
     if hasattr(usage_array, 'toarray'):
@@ -124,27 +114,42 @@ def analyze_zero_inflation_patterns(
             ct_spots = cell_type_numbers[:, t_idx] > min_proportion
             
             if np.any(ct_spots):
-                # Get expression values for these spots - note the simpler indexing
+                # Get expression values for these spots
                 expr_values = usage_array[ct_spots, m_idx]
                 
                 if len(expr_values) > 0:
                     zero_prop = np.mean(expr_values <= expression_threshold)
-                    patterns[gene][cell_type] = zero_prop
+                    # Store as dictionary with additional info
+                    patterns[gene][cell_type] = {
+                        'zero_proportion': zero_prop,
+                        'mean_nonzero': np.mean(expr_values[expr_values > expression_threshold]) if np.any(expr_values > expression_threshold) else 0,
+                        'n_spots': len(expr_values)
+                    }
                 else:
-                    patterns[gene][cell_type] = np.nan
+                    patterns[gene][cell_type] = {
+                        'zero_proportion': np.nan,
+                        'mean_nonzero': 0,
+                        'n_spots': 0
+                    }
             else:
-                patterns[gene][cell_type] = np.nan
+                patterns[gene][cell_type] = {
+                    'zero_proportion': np.nan,
+                    'mean_nonzero': 0,
+                    'n_spots': 0
+                }
     
     return patterns
 
 def suggest_zero_inflation_threshold(patterns, quantile=0.75):
     """Suggest threshold based on zero-inflation patterns."""
-    all_proportions = []
+    all_zero_props = []
     for gene_patterns in patterns.values():
-        all_proportions.extend([p for p in gene_patterns.values() if not np.isnan(p)])
+        for ct_data in gene_patterns.values():
+            if not np.isnan(ct_data['zero_proportion']):
+                all_zero_props.append(ct_data['zero_proportion'])
     
-    if all_proportions:
-        return np.quantile(all_proportions, quantile)
+    if all_zero_props:
+        return np.quantile(all_zero_props, quantile)
     return 0.5  # Default fallback
 
 def compute_global_prior(
@@ -562,51 +567,7 @@ def deconvolute_spot_with_neighbors_wrapper(args):
         lambda_reg_gex
     )
 
-def analyze_zero_inflation_patterns(
-    spotwise_gene_expression_profiles,
-    cell_type_numbers_array,
-    gene_names,
-    cell_type_names,
-    min_proportion=0.01,
-    expression_threshold=1e-6  # Add small threshold for zero detection
-):
-    """
-    Analyze zero-inflation patterns to help determine appropriate thresholds.
-    """
-    spot_indices = sorted(spotwise_gene_expression_profiles.keys())
-    T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
-    N = len(spot_indices)
-    
-    # Construct usage array
-    usage_array = np.zeros((N, T, M), dtype=float)
-    for idx, spot_id in enumerate(spot_indices):
-        usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
-    
-    results = {}
-    for t_idx in range(T):
-        ct_name = cell_type_names[t_idx]
-        results[ct_name] = {}
-        
-        # Get spots where this cell type is present
-        ct_spots = cell_type_numbers_array[:, t_idx] >= min_proportion
-        
-        for m_idx in range(M):
-            gene_name = gene_names[m_idx]
-            
-            # Get expression values where cell type is present
-            expr_values = usage_array[ct_spots, t_idx, m_idx]
-            
-            if len(expr_values) > 0:
-                zero_prop = np.mean(expr_values <= expression_threshold)  # Changed from == 0
-                mean_nonzero = np.mean(expr_values[expr_values > expression_threshold])
-                
-                results[ct_name][gene_name] = {
-                    'zero_proportion': zero_prop,
-                    'mean_nonzero_expression': mean_nonzero,
-                    'n_spots': len(expr_values)
-                }
-    
-    return results
+
 
 def suggest_zero_inflation_threshold(zero_inflation_patterns, quantile=0.75):
     """
@@ -703,7 +664,7 @@ def two_pass_optimize_gene_expression(
     
     # Analyze patterns
     zero_patterns = analyze_zero_inflation_patterns(
-        {0: original_expression},  # Wrap in dict to match function signature
+        original_expression,  # Changed from usage_array dict to original expression matrix
         cell_type_numbers_array,
         filtered_adata.var_names,
         [f"CellType_{i}" for i in range(cell_type_numbers_array.shape[1])],
@@ -712,7 +673,8 @@ def two_pass_optimize_gene_expression(
     )
     
     # Get suggested threshold
-    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
+    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.5)
+    
     logging.info(f"Suggested zero-inflation threshold from original data: {suggested_threshold:.3f}")
     
     # Log patterns for marker genes if defined
