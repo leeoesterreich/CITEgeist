@@ -1,6 +1,6 @@
 import os
 import scanpy as sc
-from .gurobi_impl import map_antibodies_to_profiles, optimize_cell_proportions, optimize_gene_expression
+from .gurobi_impl import map_antibodies_to_profiles, optimize_cell_proportions, optimize_gene_expression, two_pass_optimize_gene_expression
 from .utils import validate_cell_profile_dict, save_results_to_output, cleanup_memory, setup_logging, get_neighbors_with_fixed_radius, assert_neighborhood_size
 import numpy as np
 import pandas as pd
@@ -305,10 +305,20 @@ class CitegeistModel:
             self.results['cell_prop'] = cell_type_proportions_df
             output_file = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
             save_results_to_output(cell_type_proportions_df, output_file)
-            
             print(f"Cell type proportions saved to '{output_file}'.")
             
-    def run_cell_expression_model(self, radius=2, alpha=0.5, lambda_reg_gex=0.0001, max_workers=None, rerun=False):
+    def run_cell_expression_model(
+        self, 
+        radius=2, 
+        alpha=0.5, 
+        lambda_reg_gex=0.0001, 
+        lambda_prior_weight=0.5,
+        prior_change_threshold=0.01,
+        max_workers=None, 
+        checkpoint_interval=100,
+        output_dir="checkpoints",
+        rerun=False
+    ):
         """
         Run the gene expression deconvolution model using neighborhood-based Gurobi optimization.
 
@@ -332,9 +342,7 @@ class CitegeistModel:
         cell_type_numbers_array = self.results.get('cell_prop').values
         filtered_adata = self.gene_expression_adata
 
-        
-        # Run optimization
-        spotwise_gene_expression_profiles = optimize_gene_expression(
+        spotwise_gene_expression_profiles = two_pass_optimize_gene_expression(
             sample_name=self.sample_name,
             deconvolution_expression_data=deconvolution_expression_data,
             cell_type_numbers_array=cell_type_numbers_array,
@@ -342,9 +350,30 @@ class CitegeistModel:
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
+            lambda_prior_weight=lambda_prior_weight,
+            prior_change_threshold=prior_change_threshold,
             max_workers=max_workers,
+            checkpoint_interval=checkpoint_interval,
+            output_dir=output_dir,
             rerun=rerun
         )
+
+
+
+
+
+        # # Run optimization
+        # spotwise_gene_expression_profiles = optimize_gene_expression(
+        #     sample_name=self.sample_name,
+        #     deconvolution_expression_data=deconvolution_expression_data,
+        #     cell_type_numbers_array=cell_type_numbers_array,
+        #     filtered_adata=self.gene_expression_adata,
+        #     radius=radius,
+        #     alpha=alpha,
+        #     lambda_reg_gex=lambda_reg_gex,
+        #     max_workers=max_workers,
+        #     rerun=rerun
+        # )
 
         # Save results
         spot_names = self.gene_expression_adata.obs_names
