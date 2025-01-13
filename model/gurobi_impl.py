@@ -156,13 +156,13 @@ def compute_global_prior(
     spotwise_gene_expression_profiles,
     cell_type_numbers_array,
     lambda_prior=1.0,
-    zero_inflation_threshold=0.9  # Increased threshold
+    zero_inflation_threshold=0.9
 ):
     """
-    Compute global prior using ZINB fitting to identify cell-type specific expression patterns.
+    Compute global prior using ZINB fitting for discrete count data.
     
     Args:
-        spotwise_gene_expression_profiles: Dict of spot profiles from first pass
+        spotwise_gene_expression_profiles: Dict of spot profiles from first pass (now contains discrete counts)
         cell_type_numbers_array: Array of cell type proportions
         lambda_prior: Scaling factor for prior
         zero_inflation_threshold: Threshold for considering a gene zero-inflated
@@ -173,7 +173,7 @@ def compute_global_prior(
     T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
     N = len(spot_indices)
 
-    # Construct usage array
+    # Construct usage array (now contains discrete counts)
     usage_array = np.zeros((N, T, M), dtype=float)
     for idx, spot_id in enumerate(spot_indices):
         usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
@@ -197,14 +197,17 @@ def compute_global_prior(
                 if pi > zero_inflation_threshold:
                     zinb_score = 0.0  # Strong penalty for high zero-inflation
                 else:
-                    # Modified scoring to better reflect expression patterns
-                    # Higher expression and lower dispersion = better score
-                    # Scale by (1-pi) to account for zero-inflation
-                    zinb_score = (1 - pi) * (mu / (mu + theta))
+                    # Modified scoring for discrete counts
+                    # Consider both frequency of expression and magnitude
+                    nonzero_freq = np.mean(usage_vec > 0)
+                    mean_magnitude = np.mean(usage_vec[usage_vec > 0]) if np.any(usage_vec > 0) else 0
                     
-                    # Additional boost for low zero-inflation
-                    if pi < 0.5:  # If less than 50% zeros
-                        zinb_score *= 1.5  # Boost the score
+                    # Combined score considering both aspects
+                    zinb_score = (1 - pi) * nonzero_freq * (mean_magnitude / (mean_magnitude + theta))
+                    
+                    # Additional boost for consistent expression
+                    if nonzero_freq > 0.3:  # If expressed in >30% of spots
+                        zinb_score *= 1.5
                         
                 zinb_matrix[t_idx, m_idx] = zinb_score
             except:
@@ -212,16 +215,14 @@ def compute_global_prior(
                 zero_inflation_probs[t_idx, m_idx] = 1.0
 
     # Normalize matrix to [0,1] range per gene
-    # Add small epsilon to avoid division by zero
     max_scores = np.maximum(np.max(zinb_matrix, axis=0), 1e-10)
-    zinb_matrix = zinb_matrix / max_scores[:, None].T
+    zinb_matrix = zinb_matrix / max_scores
 
-    # Convert to prior via softmax with stronger scaling
+    # Convert to prior via softmax
     global_prior = np.zeros((T, M), dtype=float)
     for m_idx in range(M):
         scores = zinb_matrix[:, m_idx]
-        # Stronger scaling to make assignments more decisive
-        scaled = scores * lambda_prior * 2  # Double the scaling factor
+        scaled = scores * lambda_prior * 2  # Stronger scaling for discrete data
         exps = np.exp(scaled - np.max(scaled))
         denom = np.sum(exps)
         if denom < 1e-12:
@@ -390,149 +391,165 @@ def deconvolute_spot_with_neighbors_with_prior(
     """
     model = None
     try:
-        if not (0 <= alpha <= 1):
-            raise ValueError("alpha must be between 0 and 1")
-        if lambda_reg_gex < 0:
-            raise ValueError("lambda_reg_gex must be non-negative")
-        if local_weight < 0 or global_weight < 0:
-            raise ValueError("local_weight and global_weight must be non-negative")
-
-        # Neighborhood
-        neighborhood_indices = get_neighbors_with_fixed_radius(i, filtered_adata, radius=radius, include_center=True)
+        # Get neighborhood data first to establish dimensions
+        neighborhood_indices = get_neighbors_with_fixed_radius(
+            i, filtered_adata, radius=radius, include_center=True
+        )
         if not neighborhood_indices:
             logging.error(f"No valid neighbors found for spot {i}.")
             return None
 
         neighborhood_indices = np.array([
-            int(idx) for idx in neighborhood_indices
+            int(idx) for idx in neighborhood_indices 
             if isinstance(idx, (int, np.integer))
         ], dtype=int)
 
-        # Extract local expression
+        # Extract expression data
         deconvolution_expression_data = filtered_adata.X
         if hasattr(deconvolution_expression_data, 'toarray'):
             deconvolution_expression_data = deconvolution_expression_data.toarray()
-
+        
+        # Get dimensions from the data
+        T = cell_type_numbers_array.shape[1]  # number of cell types
+        M = deconvolution_expression_data.shape[1]  # number of genes
+        
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
 
-        epsilon = 1e-10
-        size_factors = np.maximum(
-            np.sum(neighborhood_expression_data, axis=1, keepdims=True),
-            epsilon
-        )
-        local_median_umi = max(np.median(size_factors), epsilon)
-        size_factor_normalized = neighborhood_expression_data / size_factors * local_median_umi
+        # Now we can safely create gene_specific_enrichment
+        gene_specific_enrichment = np.zeros((M, T))
 
-        # NB-like dispersion
-        neighborhood_mean = np.mean(size_factor_normalized, axis=0)
-        neighborhood_var = np.var(size_factor_normalized, axis=0)
-        mean_mask = neighborhood_mean > epsilon
-        dispersion = np.ones_like(neighborhood_mean)
-        dispersion[mean_mask] = np.maximum(
-            0,
-            (neighborhood_var[mean_mask] - neighborhood_mean[mean_mask])
-            / (neighborhood_mean[mean_mask] ** 2 + epsilon)
-        )
-        dispersion = np.clip(dispersion, 0, 10.0)
+        def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
+            """
+            Compute enrichment scores that account for both cell type presence
+            and their gene expression patterns.
+            """
+            gene_expr = expression_data[:, gene_idx]
+            expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
+            high_expr_spots = gene_expr >= expr_threshold
+            
+            if not np.any(high_expr_spots):
+                return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
+            
+            high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
+            background_props = np.mean(cell_type_props, axis=0)
+            
+            epsilon = 1e-10
+            enrichment = high_expr_props / (background_props + epsilon)
+            smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
+            return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
-        gene_max = np.maximum(np.max(size_factor_normalized, axis=0, keepdims=True), epsilon)
-        neighborhood_expression_data = size_factor_normalized / gene_max
+        # Calculate enrichment scores for each gene
+        for k in range(M):
+            local_enrich = compute_expression_aware_enrichment(
+                neighborhood_expression_data,
+                neighborhood_cell_type_numbers,
+                k
+            )
+            
+            global_enrich = compute_expression_aware_enrichment(
+                deconvolution_expression_data,
+                cell_type_numbers_array,
+                k
+            )
+            
+            gene_specific_enrichment[k] = (
+                local_weight * local_enrich +
+                global_weight * global_enrich
+            )
 
-        # Local & Global Enrichment
-        local_proportions = np.mean(neighborhood_cell_type_numbers, axis=0)
-        global_proportions = np.mean(cell_type_numbers_array, axis=0)
-
-        local_enrichment_scores = local_proportions / (global_proportions + epsilon)
-        local_enrichment_scores /= (np.max(local_enrichment_scores) + epsilon)
-
-        # For demonstration, we reuse the same logic for "global_enrichment_scores"
-        global_enrichment_scores = local_enrichment_scores.copy()
-
-        # Build Gurobi model
-        model = gp.Model(f"gene_expression_deconvolution_spot_{i}_with_prior")
+        # Build Gurobi model with relaxed parameters
+        model = gp.Model(f"discrete_gene_expression_spot_{i}")
         model.setParam('OutputFlag', 0)
         model.setParam('Threads', 1)
         model.setParam('NodefileStart', 0.5)
-        model.setParam('MIPGap', 0.01)
-        model.setParam('TimeLimit', 600)
-        model.setParam('NodeLimit', 1000000)
+        model.setParam('MIPGap', 0.1)  # Relaxed MIPGap for phase 2
+        model.setParam('TimeLimit', 60)  # Shorter time limit per spot
+        model.setParam('NodeLimit', 100000)
+        model.setParam('FeasibilityTol', 1e-5)  # Slightly relaxed tolerance
+        model.setParam('IntFeasTol', 1e-4)  # Slightly relaxed integer tolerance
 
-        T = neighborhood_cell_type_numbers.shape[1]
-        M = neighborhood_expression_data.shape[1]
+        # Variables for count assignment
+        X = {}
+        center_counts = deconvolution_expression_data[i, :]
 
-        # Decision variables
-        P = model.addVars(T, M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="P")
-        error = model.addVars(len(neighborhood_indices), M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="error")
-
-        # Proportion constraints
-        wiggle_room = 0.05
+        # Create variables and basic constraints
         for k in range(M):
-            model.addConstr(
-                gp.quicksum(P[j, k] for j in range(T)) >= 1 - wiggle_room,
-                name=f"prop_lower_gene_{k}"
-            )
-            model.addConstr(
-                gp.quicksum(P[j, k] for j in range(T)) <= 1 + wiggle_room,
-                name=f"prop_upper_gene_{k}"
-            )
-
-        # Predicted expression
-        for n, spot_idx in enumerate(neighborhood_indices):
-            for k in range(M):
-                predicted_expression = gp.quicksum(
-                    (
-                        local_weight * local_enrichment_scores[j]
-                        + global_weight * global_enrichment_scores[j]
+            total_counts = int(center_counts[k])
+            if total_counts > 0:
+                for j in range(T):
+                    X[j,k] = model.addVar(
+                        vtype=GRB.INTEGER,
+                        lb=0,
+                        ub=total_counts,
+                        name=f"X_{j}_{k}"
                     )
-                    * neighborhood_cell_type_numbers[n, j]
-                    * P[j, k]
-                    for j in range(T)
+
+                # Count conservation constraint
+                model.addConstr(
+                    gp.quicksum(X[j,k] for j in range(T)) == total_counts,
+                    name=f"count_conservation_{k}"
                 )
-                nb_weight = 1.0 / (1.0 + dispersion[k])
-                model.addConstr(error[n, k] >= nb_weight * (neighborhood_expression_data[n, k] - predicted_expression))
-                model.addConstr(error[n, k] >= nb_weight * (predicted_expression - neighborhood_expression_data[n, k]))
 
-        # Elastic Net terms
-        l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
-        l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
-        reconstruction_error = gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M))
+        # Add ZINB constraints with relaxed thresholds
+        zero_inflation_threshold = 0.95  # Relaxed threshold
+        max_allocation_fraction = 0.4  # Relaxed allocation limit
+        
+        for k in range(M):
+            total_counts = int(center_counts[k])
+            if total_counts > 0:
+                for j in range(T):
+                    if global_prior[j, k] < zero_inflation_threshold:
+                        # Add as a soft constraint using penalty in objective instead
+                        penalty_weight = 1.0 - global_prior[j, k]
+                        model.setObjective(
+                            model.getObjective() - penalty_weight * X[j,k],
+                            GRB.MAXIMIZE
+                        )
 
-        # Global Prior Penalty
-        #   sum_{j,k} [lambda_prior_weight * (1 - global_prior[j,k]) * P[j,k]]
-        prior_penalty = gp.quicksum(
-            lambda_prior_weight * (1.0 - global_prior[j, k]) * P[j, k]
-            for j in range(T) for k in range(M)
-        )
-
-        # Add adaptive constraints based on ZINB fitting
-        # If a gene shows strong zero-inflation for a cell type,
-        # we can add an upper bound constraint
-        zero_inflation_threshold = 0.9  # Adjust this threshold as needed
-        for j in range(T):
-            for k in range(M):
-                if global_prior[j, k] < zero_inflation_threshold:
-                    model.addConstr(
-                        P[j, k] <= 0.2,  # Allow some assignment but heavily restrict it
-                        name=f"zinb_constraint_{j}_{k}"
+        # Modified objective using gene-specific enrichment and prior
+        obj_terms = []
+        for k in range(M):
+            total_counts = int(center_counts[k])
+            if total_counts > 0:
+                for j in range(T):
+                    # Combine enrichment and prior with more weight on prior
+                    enrichment_weight = gene_specific_enrichment[k, j]
+                    prior_weight = np.clip(global_prior[j, k], 0.1, 1.0)  # Clip to avoid zero weights
+                    cell_type_weight = neighborhood_cell_type_numbers[
+                        len(neighborhood_indices)//2, j
+                    ]
+                    
+                    combined_weight = (
+                        (1 - lambda_prior_weight) * enrichment_weight +
+                        lambda_prior_weight * prior_weight
+                    )
+                    
+                    obj_terms.append(
+                        combined_weight * cell_type_weight * X[j,k]
                     )
 
-        # Final objective
         model.setObjective(
-            reconstruction_error + 
-            lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term) + 
-            prior_penalty,
-            GRB.MINIMIZE
+            gp.quicksum(obj_terms),
+            GRB.MAXIMIZE
         )
 
-        model.optimize()
-        if model.SolCount > 0:
-            logging.info(f"Solution found for spot {i}.")
-            gene_expression_profile_solution = {key: P[key].X for key in P}
-            return np.array([
-                [gene_expression_profile_solution[j, k] for k in range(M)]
-                for j in range(T)
-            ])
+        # Optimize with try-catch for numerical issues
+        try:
+            model.optimize()
+        except Exception as e:
+            logging.warning(f"Optimization error for spot {i}: {str(e)}")
+            model.setParam('NumericFocus', 3)  # Try again with higher numeric focus
+            model.optimize()
+
+        if model.status == GRB.OPTIMAL or model.status == GRB.SUBOPTIMAL:
+            result = np.zeros((T, M))
+            for k in range(M):
+                total_counts = int(center_counts[k])
+                if total_counts > 0:
+                    for j in range(T):
+                        result[j,k] = X[j,k].X
+            return result
         else:
             logging.error(f"No feasible solution found for spot {i}.")
             return None
@@ -541,6 +558,7 @@ def deconvolute_spot_with_neighbors_with_prior(
         logging.error(f"Error during deconvolution of spot {i} with prior: {str(e)}")
         logging.error(traceback.format_exc())
         return None
+
     finally:
         if model:
             del model
@@ -643,168 +661,143 @@ def two_pass_optimize_gene_expression(
     max_workers=None,
     checkpoint_interval=100,
     output_dir="checkpoints",
-    rerun=False
+    rerun=False,
+    max_iterations=5  # Maximum number of iterations to prevent infinite loops
 ):
     """
-    1) First pass with normal optimization (no global prior).
-    2) Compute global prior from first pass using mutual information.
-    3) Second pass with prior penalty in the objective.
-    4) Optionally check how much the new prior changed from first to second pass,
-       and decide if we want to stop or do more passes.
+    Iterative optimization that runs until the prior converges.
     """
     #########################
-    # === Analyze Zero-Inflation Patterns from Original Data
+    # === Analyze Zero-Inflation Patterns
     #########################
     logging.info("=== Analyzing zero-inflation patterns from original data ===")
     
-    # Get original expression matrix
+    # Get original expression matrix (raw counts)
     original_expression = filtered_adata.X
     if hasattr(original_expression, 'toarray'):
         original_expression = original_expression.toarray()
     
     # Analyze patterns
     zero_patterns = analyze_zero_inflation_patterns(
-        original_expression,  # Changed from usage_array dict to original expression matrix
+        original_expression,
         cell_type_numbers_array,
         filtered_adata.var_names,
         [f"CellType_{i}" for i in range(cell_type_numbers_array.shape[1])],
         min_proportion=0.01,
-        expression_threshold=1e-6
+        expression_threshold=0.5
     )
     
-    # Get suggested threshold
-    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.5)
-    
-    logging.info(f"Suggested zero-inflation threshold from original data: {suggested_threshold:.3f}")
-    
-    # Log patterns for marker genes if defined
-    marker_genes = ["KRT7"]  # Add your marker genes here
-    log_marker_gene_patterns(zero_patterns, marker_genes)
+    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
+    logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
 
     #########################
-    # === PASS 1 (No Prior)
+    # === Iterative Optimization
     #########################
-    logging.info("=== Pass 1: standard local optimization ===")
-    
-    """Modified to handle gene scaling"""
-    
-    # Scale the expression data
-    scaled_expression, gene_mins, gene_maxs = scale_genes(deconvolution_expression_data)
-    
-    # Calculate basic statistics before optimization
-    stats = {
-        'n_nonzero': np.count_nonzero(scaled_expression),
-        'mean_nonzero_expression': np.mean(scaled_expression[scaled_expression > 0]) if np.any(scaled_expression > 0) else 0,
-        'total_spots': scaled_expression.shape[0],
-        'total_genes': scaled_expression.shape[1]
-    }
-    
-    # Log statistics
-    logging.info(f"Dataset statistics:")
-    logging.info(f"    Total spots: {stats['total_spots']}")
-    logging.info(f"    Total genes: {stats['total_genes']}")
-    logging.info(f"    Number of nonzero values: {stats['n_nonzero']}")
-    if stats['n_nonzero'] > 0:
-        logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
-    
-    # Store scaling factors in filtered_adata
-    filtered_adata.uns['gene_scaling'] = {
-        'mins': gene_mins,
-        'maxs': gene_maxs
-    }
-    
-    # Run optimization with scaled data
-    spotwise_scaled_profiles = optimize_gene_expression(
-        sample_name=sample_name+"_pass1",
-        deconvolution_expression_data=scaled_expression,
-        cell_type_numbers_array=cell_type_numbers_array,
-        filtered_adata=filtered_adata,
-        radius=radius,
-        alpha=alpha,
-        lambda_reg_gex=lambda_reg_gex,
-        max_workers=max_workers,
-        checkpoint_interval=checkpoint_interval,
-        output_dir=output_dir,
-        rerun=rerun
-    )
+    iteration = 0
+    prior_change = float('inf')
+    previous_prior = None
+    current_profiles = None
 
-    #########################
-    # Compute Global Prior from Pass 1
-    #########################
-    logging.info("=== Computing global prior from pass 1 ===")
-    global_prior_pass1, zinb_matrix, zero_inflation_probs = compute_global_prior(
-        spotwise_gene_expression_profiles=spotwise_scaled_profiles,
-        cell_type_numbers_array=cell_type_numbers_array,
-        lambda_prior=1.0,
-        zero_inflation_threshold=suggested_threshold  # Use threshold from original data analysis
-    )
+    while prior_change > prior_change_threshold and iteration < max_iterations:
+        iteration += 1
+        logging.info(f"\n=== Starting iteration {iteration} ===")
 
-    # Log ZINB statistics for marker genes
-    for gene in marker_genes:
-        if gene in filtered_adata.var_names:
-            gene_idx = filtered_adata.var_names.get_loc(gene)
-            logging.info(f"\nZINB statistics for {gene}:")
-            for t_idx in range(cell_type_numbers_array.shape[1]):
-                logging.info(f"  CellType_{t_idx}:")
-                logging.info(f"    Zero-inflation probability: {zero_inflation_probs[t_idx, gene_idx]:.3f}")
-                logging.info(f"    ZINB score: {zinb_matrix[t_idx, gene_idx]:.3f}")
-                logging.info(f"    Final prior: {global_prior_pass1[t_idx, gene_idx]:.3f}")
+        #########################
+        # === PASS 1 (No Prior or Using Previous Prior)
+        #########################
+        if iteration == 1:
+            logging.info("=== Pass 1: Initial optimization without prior ===")
+            spotwise_profiles_pass1 = optimize_gene_expression(
+                sample_name=f"{sample_name}_iter{iteration}_pass1",
+                deconvolution_expression_data=deconvolution_expression_data,
+                cell_type_numbers_array=cell_type_numbers_array,
+                filtered_adata=filtered_adata,
+                radius=radius,
+                alpha=alpha,
+                lambda_reg_gex=lambda_reg_gex,
+                max_workers=max_workers,
+                checkpoint_interval=checkpoint_interval,
+                output_dir=output_dir,
+                rerun=rerun
+            )
+        else:
+            logging.info(f"=== Pass 1 of iteration {iteration}: Using previous prior ===")
+            # Create argument tuples for each spot using previous prior
+            spot_args = [
+                (i, filtered_adata, cell_type_numbers_array, radius, previous_prior,
+                 lambda_prior_weight, alpha, lambda_reg_gex)
+                for i in range(deconvolution_expression_data.shape[0])
+            ]
+            
+            spotwise_profiles_pass1 = optimize_gene_expression_with_custom_spot_fn(
+                sample_name=f"{sample_name}_iter{iteration}_pass1",
+                deconvolution_expression_data=deconvolution_expression_data,
+                cell_type_numbers_array=cell_type_numbers_array,
+                filtered_adata=filtered_adata,
+                radius=radius,
+                alpha=alpha,
+                lambda_reg_gex=lambda_reg_gex,
+                spot_function=deconvolute_spot_with_neighbors_wrapper,
+                spot_args=spot_args,
+                max_workers=max_workers,
+                checkpoint_interval=checkpoint_interval,
+                output_dir=output_dir,
+                rerun=rerun
+            )
 
-    #########################
-    # === PASS 2 (With Prior)
-    #########################
-    logging.info("=== Pass 2: re-optimization with global prior penalty ===")
+        #########################
+        # === Compute New Prior
+        #########################
+        logging.info(f"=== Computing prior from iteration {iteration} ===")
+        current_prior, zinb_matrix, zero_inflation_probs = compute_global_prior(
+            spotwise_gene_expression_profiles=spotwise_profiles_pass1,
+            cell_type_numbers_array=cell_type_numbers_array,
+            lambda_prior=1.0,
+            zero_inflation_threshold=suggested_threshold
+        )
 
-    # Create argument tuples for each spot
-    spot_args = [
-        (i, filtered_adata, cell_type_numbers_array, radius, global_prior_pass1,
-         lambda_prior_weight, alpha, lambda_reg_gex)
-        for i in range(deconvolution_expression_data.shape[0])
-    ]
+        # Calculate prior change if not first iteration
+        if previous_prior is not None:
+            prior_change = np.mean(np.abs(current_prior - previous_prior))
+            logging.info(f"Prior change from previous iteration: {prior_change:.6f}")
+        
+        previous_prior = current_prior.copy()
+        current_profiles = spotwise_profiles_pass1
 
-    # Use the wrapper function with ProcessPoolExecutor
-    spotwise_scaled_profiles_pass2 = optimize_gene_expression_with_custom_spot_fn(
-        sample_name=sample_name+"_pass2",
-        deconvolution_expression_data=scaled_expression,
-        cell_type_numbers_array=cell_type_numbers_array,
-        filtered_adata=filtered_adata,
-        radius=radius,
-        alpha=alpha,
-        lambda_reg_gex=lambda_reg_gex,
-        spot_function=deconvolute_spot_with_neighbors_wrapper,
-        spot_args=[
-            (i, filtered_adata, cell_type_numbers_array, radius, global_prior_pass1,
+        #########################
+        # === PASS 2
+        #########################
+        logging.info(f"=== Pass 2 of iteration {iteration}: Optimization with current prior ===")
+        
+        spot_args = [
+            (i, filtered_adata, cell_type_numbers_array, radius, current_prior,
              lambda_prior_weight, alpha, lambda_reg_gex)
-            for i in range(scaled_expression.shape[0])
-        ],
-        max_workers=max_workers,
-        checkpoint_interval=checkpoint_interval,
-        output_dir=output_dir,
-        rerun=rerun
-    )
+            for i in range(deconvolution_expression_data.shape[0])
+        ]
 
-    # Compute a new prior from pass 2 result, to see if it changed significantly
-    global_prior_pass2, zinb_matrix, zero_inflation_probs = compute_global_prior(
-        spotwise_gene_expression_profiles=spotwise_scaled_profiles_pass2,
-        cell_type_numbers_array=cell_type_numbers_array,
-        lambda_prior=1.0,
-        zero_inflation_threshold=suggested_threshold
-    )
+        current_profiles = optimize_gene_expression_with_custom_spot_fn(
+            sample_name=f"{sample_name}_iter{iteration}_pass2",
+            deconvolution_expression_data=deconvolution_expression_data,
+            cell_type_numbers_array=cell_type_numbers_array,
+            filtered_adata=filtered_adata,
+            radius=radius,
+            alpha=alpha,
+            lambda_reg_gex=lambda_reg_gex,
+            spot_function=deconvolute_spot_with_neighbors_wrapper,
+            spot_args=spot_args,
+            max_workers=max_workers,
+            checkpoint_interval=checkpoint_interval,
+            output_dir=output_dir,
+            rerun=rerun
+        )
 
-    # Calculate how much the prior changed (L1 norm or relative difference)
-    prior_diff = np.mean(np.abs(global_prior_pass2 - global_prior_pass1))
-    logging.info(f"Prior difference between pass1 -> pass2: {prior_diff:.5f}")
-    logging.info(f"Prior convergence threshold: {prior_change_threshold}")
-
-    if prior_diff < prior_change_threshold:
-        logging.info("Global prior converged sufficiently; stopping after pass 2.")
-        final_result = spotwise_scaled_profiles_pass2
+    logging.info(f"\n=== Optimization completed after {iteration} iterations ===")
+    if prior_change <= prior_change_threshold:
+        logging.info("Converged: Prior change below threshold")
     else:
-        logging.warning(f"Global prior changed significantly ({prior_diff:.5f} > {prior_change_threshold})")
-        logging.info("Accepting pass 2 results, but you may want to consider additional passes.")
-        final_result = spotwise_scaled_profiles_pass2
+        logging.info("Stopped: Maximum iterations reached")
 
-    return spotwise_scaled_profiles_pass2, gene_mins, gene_maxs
+    return current_profiles
 
 def optimize_gene_expression_with_custom_spot_fn(
     sample_name,
@@ -912,6 +905,7 @@ def optimize_gene_expression_with_custom_spot_fn(
                 f for f in os.listdir(output_dir)
                 if f.startswith(f"{sample_name}_gene_expression_checkpoint_") and f.endswith(".npz")
             ]
+            
             if checkpoints:
                 checkpoint_numbers = [
                     int(f.replace(f"{sample_name}_gene_expression_checkpoint_", "").replace(".npz", ""))
@@ -945,10 +939,6 @@ def optimize_gene_expression_with_custom_spot_fn(
                             logging.warning(f"Invalid profile shape in checkpoint: {profiles.shape}, expected ({N}, {T}, {M})")
                             completed_spots = set()
                             spotwise_gene_expression_profiles = {}
-                    else:
-                        logging.warning("Checkpoint data is missing 'profiles' or 'completed_spots'")
-                        completed_spots = set()
-                        spotwise_gene_expression_profiles = {}
                 except Exception as e:
                     logging.error(f"Error loading checkpoint file: {e}")
                     # If checkpoint is corrupt, delete all checkpoints
@@ -971,6 +961,7 @@ def optimize_gene_expression_with_custom_spot_fn(
         workers = max_workers if max_workers is not None else os.cpu_count()
         logging.info(f"Using {workers} workers")
         
+        # Only process spots that haven't been completed
         remaining_spots = [i for i in range(N) if i not in completed_spots]
         logging.info(f"Processing {len(remaining_spots)} remaining spots")
         
@@ -993,9 +984,7 @@ def optimize_gene_expression_with_custom_spot_fn(
                             if result.ndim != 2:
                                 logging.error(f"Unexpected result shape for spot {i}: {result.shape}")
                                 continue
-                            if result.shape != (T, M):
-                                logging.error(f"Result shape {result.shape} doesn't match (T={T}, M={M})")
-                                continue
+                                
                             spotwise_gene_expression_profiles[i] = result.copy()
                             completed_spots.add(i)
                             spots_since_last_save += 1
@@ -1085,33 +1074,15 @@ def deconvolute_spot_with_neighbors(
     radius, 
     alpha=0.5, 
     lambda_reg_gex=0.0001,
-    local_weight=0.5,   # Weight for local neighborhood enrichment
-    global_weight=0.5   # Weight for global dataset enrichment
+    local_weight=0.5,
+    global_weight=0.5
 ):
     """
-    Deconvolution incorporating local vs. global cell type enrichment patterns.
-    Removing the concept of a separate 'broader' region entirely:
-      - 'local' means immediate neighborhood
-      - 'global' means entire dataset
-    If local_weight + global_weight < 1, you could treat the leftover as a baseline factor.
+    Deconvolution with robustness to gene expression heterogeneity within cell types.
     """
     model = None
     try:
-        # ------------------------------------------------------------------
-        # Validate user parameters
-        # ------------------------------------------------------------------
-        if not (0 <= alpha <= 1):
-            raise ValueError("alpha must be between 0 and 1")
-        if lambda_reg_gex < 0:
-            raise ValueError("lambda_reg_gex must be non-negative")
-        if local_weight < 0 or global_weight < 0:
-            raise ValueError("local_weight and global_weight must be non-negative")
-
-        logging.info(f"Starting deconvolution for spot {i}")
-
-        # ------------------------------------------------------------------
-        # 1) Identify the Local Neighborhood
-        # ------------------------------------------------------------------
+        # Get neighborhood data first to establish dimensions
         neighborhood_indices = get_neighbors_with_fixed_radius(
             i, filtered_adata, radius=radius, include_center=True
         )
@@ -1124,68 +1095,74 @@ def deconvolute_spot_with_neighbors(
             if isinstance(idx, (int, np.integer))
         ], dtype=int)
 
-        # ------------------------------------------------------------------
-        # 2) Extract Data for the Neighborhood
-        # ------------------------------------------------------------------
+        # Extract expression data
         deconvolution_expression_data = filtered_adata.X
         if hasattr(deconvolution_expression_data, 'toarray'):
             deconvolution_expression_data = deconvolution_expression_data.toarray()
-
-        # Local expression and cell-type counts
+        
+        # Get dimensions from the data
+        T = cell_type_numbers_array.shape[1]  # number of cell types
+        M = deconvolution_expression_data.shape[1]  # number of genes
+        
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
 
-        # ------------------------------------------------------------------
-        # 3) Size-Factor Normalization (local)
-        # ------------------------------------------------------------------
-        epsilon = 1e-10
-        size_factors = np.maximum(
-            np.sum(neighborhood_expression_data, axis=1, keepdims=True),
-            epsilon
-        )
-        local_median_umi = max(np.median(size_factors), epsilon)
-        size_factor_normalized = neighborhood_expression_data / size_factors * local_median_umi
+        # Now we can safely create gene_specific_enrichment
+        gene_specific_enrichment = np.zeros((M, T))
 
-        # ------------------------------------------------------------------
-        # 4) Compute NB-Like Dispersion & Scale Expression
-        # ------------------------------------------------------------------
-        neighborhood_mean = np.mean(size_factor_normalized, axis=0)
-        neighborhood_var = np.var(size_factor_normalized, axis=0)
-        mean_mask = neighborhood_mean > epsilon
-        dispersion = np.ones_like(neighborhood_mean)
-        dispersion[mean_mask] = np.maximum(
-            0,
-            (neighborhood_var[mean_mask] - neighborhood_mean[mean_mask])
-            / (neighborhood_mean[mean_mask] ** 2 + epsilon)
-        )
-        dispersion = np.clip(dispersion, 0, 10.0)
+        # Compute expression-aware enrichment for each gene
+        def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
+            """
+            Compute enrichment scores that account for both cell type presence
+            and their gene expression patterns.
+            """
+            gene_expr = expression_data[:, gene_idx]
+            expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
+            high_expr_spots = gene_expr >= expr_threshold
+            
+            if not np.any(high_expr_spots):
+                return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
+            
+            # Calculate cell type proportions in high-expression spots
+            high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
+            background_props = np.mean(cell_type_props, axis=0)
+            
+            # Compute enrichment scores
+            epsilon = 1e-10
+            enrichment = high_expr_props / (background_props + epsilon)
+            
+            # Smooth the enrichment scores
+            smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
+            
+            # Normalize
+            return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
-        # Scale neighborhood gene expression to [0, 1]
-        gene_max = np.maximum(np.max(size_factor_normalized, axis=0, keepdims=True), epsilon)
-        neighborhood_expression_data = size_factor_normalized / gene_max
+        # Compute expression-aware enrichment for each gene
+        gene_specific_enrichment = np.zeros((M, T))
 
-        # ------------------------------------------------------------------
-        # 5) Local & Global Cell-Type Enrichment
-        # ------------------------------------------------------------------
-        # Local proportions for the neighborhood
-        local_proportions = np.mean(neighborhood_cell_type_numbers, axis=0)
+        for k in range(M):
+            # Local enrichment (in neighborhood)
+            local_enrich = compute_expression_aware_enrichment(
+                neighborhood_expression_data,
+                neighborhood_cell_type_numbers,
+                k
+            )
+            
+            # Global enrichment (across all spots)
+            global_enrich = compute_expression_aware_enrichment(
+                deconvolution_expression_data,
+                cell_type_numbers_array,
+                k
+            )
+            
+            # Combine local and global enrichment
+            gene_specific_enrichment[k] = (
+                local_weight * local_enrich +
+                global_weight * global_enrich
+            )
 
-        # Global proportions for entire dataset
-        global_proportions = np.mean(cell_type_numbers_array, axis=0)
-
-        # Convert local/global proportions into "enrichment" scores
-        local_enrichment_scores = local_proportions / (global_proportions + epsilon)
-        local_enrichment_scores /= (np.max(local_enrichment_scores) + epsilon)
-
-        # You might define another measure for "global" as well. 
-        # Here, a direct approach: 
-        global_enrichment_scores = local_proportions / (global_proportions + epsilon)
-        global_enrichment_scores /= (np.max(global_enrichment_scores) + epsilon)
-
-        # ------------------------------------------------------------------
-        # 6) Build the Gurobi Model
-        # ------------------------------------------------------------------
-        model = gp.Model(f"gene_expression_deconvolution_spot_{i}")
+        # Build Gurobi model (similar to before)
+        model = gp.Model(f"discrete_gene_expression_spot_{i}")
         model.setParam('OutputFlag', 0)
         model.setParam('Threads', 1)
         model.setParam('NodefileStart', 0.5)
@@ -1196,94 +1173,73 @@ def deconvolute_spot_with_neighbors(
         T = neighborhood_cell_type_numbers.shape[1]
         M = neighborhood_expression_data.shape[1]
 
-        # Define variables: P[j, k] for cell type j, gene k
-        P = model.addVars(T, M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="P")
+        # Variables for count assignment
+        X = {}
+        center_counts = deconvolution_expression_data[i, :]
 
-        # Error variables: absolute deviation from observed
-        error = model.addVars(
-            len(neighborhood_indices), M, 
-            lb=0, ub=GRB.INFINITY,
-            vtype=GRB.CONTINUOUS,
-            name="error"
-        )
-
-        # ------------------------------------------------------------------
-        # 7) Proportion Constraints per Gene
-        # ------------------------------------------------------------------
-        wiggle_room = 0.05
         for k in range(M):
-            model.addConstr(
-                gp.quicksum(P[j, k] for j in range(T)) >= 1 - wiggle_room,
-                name=f"prop_lower_gene_{k}"
-            )
-            model.addConstr(
-                gp.quicksum(P[j, k] for j in range(T)) <= 1 + wiggle_room,
-                name=f"prop_upper_gene_{k}"
-            )
-
-        # ------------------------------------------------------------------
-        # 8) Predicted Expression Incorporating Local & Global Context
-        # ------------------------------------------------------------------
-        for n, spot_idx in enumerate(neighborhood_indices):
-            for k in range(M):
-                # Weighted sum of local + global enrichment for each cell type
-                # If local_weight + global_weight < 1, leftover can be baseline
-                predicted_expression = gp.quicksum(
-                    (
-                        local_weight * local_enrichment_scores[j]
-                        + global_weight * global_enrichment_scores[j]
+            total_counts = int(center_counts[k])
+            if total_counts > 0:
+                for j in range(T):
+                    X[j,k] = model.addVar(
+                        vtype=GRB.INTEGER,
+                        lb=0,
+                        ub=total_counts,
+                        name=f"X_{j}_{k}"
                     )
-                    * neighborhood_cell_type_numbers[n, j]
-                    * P[j, k]
-                    for j in range(T)
+
+                # Count conservation constraint
+                model.addConstr(
+                    gp.quicksum(X[j,k] for j in range(T)) == total_counts,
+                    name=f"count_conservation_{k}"
                 )
 
-                # NB-weight: penalize large deviations more strongly
-                nb_weight = 1.0 / (1.0 + dispersion[k])
+        # Modified objective using gene-specific enrichment
+        obj_terms = []
+        for k in range(M):
+            total_counts = int(center_counts[k])
+            if total_counts > 0:
+                for j in range(T):
+                    # Use gene-specific enrichment scores
+                    enrichment_weight = gene_specific_enrichment[k, j]
+                    
+                    # Current spot's cell type proportion
+                    cell_type_weight = neighborhood_cell_type_numbers[
+                        len(neighborhood_indices)//2, j
+                    ]
+                    
+                    # Add stochasticity to allow for heterogeneity
+                    randomness = 0.9 + 0.2 * np.random.random()  # Random factor between 0.9 and 1.1
+                    
+                    obj_terms.append(
+                        enrichment_weight * cell_type_weight * randomness * X[j,k]
+                    )
 
-                # Constrain error[n, k] to be >= the absolute difference
-                model.addConstr(error[n, k] >= nb_weight * (
-                    neighborhood_expression_data[n, k] - predicted_expression
-                ))
-                model.addConstr(error[n, k] >= nb_weight * (
-                    predicted_expression - neighborhood_expression_data[n, k]
-                ))
-
-        # ------------------------------------------------------------------
-        # 9) Elastic Net Regularization
-        # ------------------------------------------------------------------
-        l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
-        l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
         model.setObjective(
-            gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M))
-            + lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term),
-            GRB.MINIMIZE
+            gp.quicksum(obj_terms),
+            GRB.MAXIMIZE
         )
 
+        # Optimize
         model.optimize()
 
-        if model.SolCount > 0:
+        if model.status == GRB.OPTIMAL:
             logging.info(f"Solution found for spot {i}")
-            gene_expression_profile_solution = {key: P[key].X for key in P}
-            return np.array([
-                [gene_expression_profile_solution[j, k] for k in range(M)]
-                for j in range(T)
-            ])
+            # Convert solution to array format
+            result = np.zeros((T, M))
+            for k in range(M):
+                total_counts = int(center_counts[k])
+                if total_counts > 0:
+                    for j in range(T):
+                        result[j,k] = X[j,k].X
+            return result
         else:
             logging.error(f"No feasible solution found for spot {i}.")
             return None
 
     except Exception as e:
-        logging.error(f"Error during deconvolution of spot {i}: {str(e)}")
+        logging.error(f"Error during discrete deconvolution of spot {i}: {str(e)}")
         logging.error(traceback.format_exc())
-
-        # Debug statements to aid troubleshooting
-        print("Debug Info:")
-        print(f"Spot index: {i}")
-        print("Local proportions:", local_proportions)
-        print("Global proportions:", global_proportions)
-        print("Local enrichment:", local_enrichment_scores)
-        print("Global enrichment:", global_enrichment_scores)
         return None
 
     finally:
