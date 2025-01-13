@@ -165,84 +165,107 @@ def deconvolute_spot_with_neighbors(
     radius, 
     alpha=0.5, 
     lambda_reg_gex=0.0001,
-    local_weight=0.7  # Weight for local cell type enrichment
+    local_weight=0.7,   # Weight for local neighborhood enrichment
+    global_weight=0.2   # Weight for global dataset enrichment
 ):
     """
-    Deconvolution incorporating local cell type enrichment patterns
+    Deconvolution incorporating local vs. global cell type enrichment patterns.
+    Removing the concept of a separate 'broader' region entirely:
+      - 'local' means immediate neighborhood
+      - 'global' means entire dataset
+    If local_weight + global_weight < 1, you could treat the leftover as a baseline factor.
     """
     model = None
     try:
-        # Validate parameters
+        # ------------------------------------------------------------------
+        # Validate user parameters
+        # ------------------------------------------------------------------
         if not (0 <= alpha <= 1):
             raise ValueError("alpha must be between 0 and 1")
         if lambda_reg_gex < 0:
             raise ValueError("lambda_reg_gex must be non-negative")
-        if local_weight < 0:
-            raise ValueError("local_weight must be non-negative")
+        if local_weight < 0 or global_weight < 0:
+            raise ValueError("local_weight and global_weight must be non-negative")
 
         logging.info(f"Starting deconvolution for spot {i}")
 
-        # Get Neighborhood Indices
-        neighborhood_indices = get_neighbors_with_fixed_radius(i, filtered_adata, radius=radius, include_center=True)
+        # ------------------------------------------------------------------
+        # 1) Identify the Local Neighborhood
+        # ------------------------------------------------------------------
+        neighborhood_indices = get_neighbors_with_fixed_radius(
+            i, filtered_adata, radius=radius, include_center=True
+        )
         if not neighborhood_indices:
             logging.error(f"No valid neighbors found for spot {i}.")
             return None
 
-        # Get broader region for enrichment calculation
-        broader_indices = get_neighbors_with_fixed_radius(i, filtered_adata, radius=radius*3, include_center=True)
+        neighborhood_indices = np.array([
+            int(idx) for idx in neighborhood_indices 
+            if isinstance(idx, (int, np.integer))
+        ], dtype=int)
 
-        # Ensure indices are integers
-        neighborhood_indices = np.array([int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))], dtype=int)
-        broader_indices = np.array([int(idx) for idx in broader_indices if isinstance(idx, (int, np.integer))], dtype=int)
-
-        # Extract Gene Expression Data
+        # ------------------------------------------------------------------
+        # 2) Extract Data for the Neighborhood
+        # ------------------------------------------------------------------
         deconvolution_expression_data = filtered_adata.X
         if hasattr(deconvolution_expression_data, 'toarray'):
             deconvolution_expression_data = deconvolution_expression_data.toarray()
-        
-        # Get neighborhood data
+
+        # Local expression and cell-type counts
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
-        
-        # Calculate size factors and normalize
+
+        # ------------------------------------------------------------------
+        # 3) Size-Factor Normalization (local)
+        # ------------------------------------------------------------------
         epsilon = 1e-10
-        size_factors = np.maximum(np.sum(neighborhood_expression_data, axis=1, keepdims=True), epsilon)
+        size_factors = np.maximum(
+            np.sum(neighborhood_expression_data, axis=1, keepdims=True),
+            epsilon
+        )
         local_median_umi = max(np.median(size_factors), epsilon)
         size_factor_normalized = neighborhood_expression_data / size_factors * local_median_umi
 
-        # Calculate spatial weights based on distances
-        spot_coordinates = filtered_adata.obsm['spatial'][neighborhood_indices]
-        distances = np.zeros((len(neighborhood_indices), len(neighborhood_indices)))
-        for idx1 in range(len(neighborhood_indices)):
-            for idx2 in range(idx1 + 1, len(neighborhood_indices)):
-                dist = np.linalg.norm(spot_coordinates[idx1] - spot_coordinates[idx2])
-                weight = np.exp(-dist / (radius/2))
-                distances[idx1, idx2] = weight
-                distances[idx2, idx1] = weight
-
-        # Calculate negative binomial statistics
+        # ------------------------------------------------------------------
+        # 4) Compute NB-Like Dispersion & Scale Expression
+        # ------------------------------------------------------------------
         neighborhood_mean = np.mean(size_factor_normalized, axis=0)
         neighborhood_var = np.var(size_factor_normalized, axis=0)
-        
-        # Calculate dispersion
         mean_mask = neighborhood_mean > epsilon
         dispersion = np.ones_like(neighborhood_mean)
-        dispersion[mean_mask] = np.maximum(0, (neighborhood_var[mean_mask] - neighborhood_mean[mean_mask]) / 
-                                         (neighborhood_mean[mean_mask] ** 2 + epsilon))
+        dispersion[mean_mask] = np.maximum(
+            0,
+            (neighborhood_var[mean_mask] - neighborhood_mean[mean_mask])
+            / (neighborhood_mean[mean_mask] ** 2 + epsilon)
+        )
         dispersion = np.clip(dispersion, 0, 10.0)
 
-        # Scale gene expression
+        # Scale neighborhood gene expression to [0, 1]
         gene_max = np.maximum(np.max(size_factor_normalized, axis=0, keepdims=True), epsilon)
         neighborhood_expression_data = size_factor_normalized / gene_max
 
-        # Calculate cell type enrichment scores
-        local_proportions = np.mean(cell_type_numbers_array[neighborhood_indices], axis=0)
-        broader_proportions = np.mean(cell_type_numbers_array[broader_indices], axis=0)
-        enrichment_scores = local_proportions / (broader_proportions + epsilon)
-        enrichment_scores = enrichment_scores / (np.max(enrichment_scores) + epsilon)
+        # ------------------------------------------------------------------
+        # 5) Local & Global Cell-Type Enrichment
+        # ------------------------------------------------------------------
+        # Local proportions for the neighborhood
+        local_proportions = np.mean(neighborhood_cell_type_numbers, axis=0)
 
-        # Build Gurobi Model
-        model = gp.Model(f"gene_expression_proportion_deconvolution_spot_{i}")
+        # Global proportions for entire dataset
+        global_proportions = np.mean(cell_type_numbers_array, axis=0)
+
+        # Convert local/global proportions into "enrichment" scores
+        local_enrichment_scores = local_proportions / (global_proportions + epsilon)
+        local_enrichment_scores /= (np.max(local_enrichment_scores) + epsilon)
+
+        # You might define another measure for "global" as well. 
+        # Here, a direct approach: 
+        global_enrichment_scores = local_proportions / (global_proportions + epsilon)
+        global_enrichment_scores /= (np.max(global_enrichment_scores) + epsilon)
+
+        # ------------------------------------------------------------------
+        # 6) Build the Gurobi Model
+        # ------------------------------------------------------------------
+        model = gp.Model(f"gene_expression_deconvolution_spot_{i}")
         model.setParam('OutputFlag', 0)
         model.setParam('Threads', 1)
         model.setParam('NodefileStart', 0.5)
@@ -253,48 +276,67 @@ def deconvolute_spot_with_neighbors(
         T = neighborhood_cell_type_numbers.shape[1]
         M = neighborhood_expression_data.shape[1]
 
-        # Define variables
+        # Define variables: P[j, k] for cell type j, gene k
         P = model.addVars(T, M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="P")
-        error = model.addVars(len(neighborhood_indices), M, lb=0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS, name="error")
 
-        # Add proportion constraints
+        # Error variables: absolute deviation from observed
+        error = model.addVars(
+            len(neighborhood_indices), M, 
+            lb=0, ub=GRB.INFINITY,
+            vtype=GRB.CONTINUOUS,
+            name="error"
+        )
+
+        # ------------------------------------------------------------------
+        # 7) Proportion Constraints per Gene
+        # ------------------------------------------------------------------
         wiggle_room = 0.05
         for k in range(M):
             model.addConstr(
                 gp.quicksum(P[j, k] for j in range(T)) >= 1 - wiggle_room,
-                name=f"proportion_lower_bound_gene_{k}"
+                name=f"prop_lower_gene_{k}"
             )
             model.addConstr(
                 gp.quicksum(P[j, k] for j in range(T)) <= 1 + wiggle_room,
-                name=f"proportion_upper_bound_gene_{k}"
+                name=f"prop_upper_gene_{k}"
             )
 
-        # Add NB-weighted error terms with enrichment weighting
+        # ------------------------------------------------------------------
+        # 8) Predicted Expression Incorporating Local & Global Context
+        # ------------------------------------------------------------------
         for n, spot_idx in enumerate(neighborhood_indices):
             for k in range(M):
+                # Weighted sum of local + global enrichment for each cell type
+                # If local_weight + global_weight < 1, leftover can be baseline
                 predicted_expression = gp.quicksum(
-                    (local_weight * enrichment_scores[j] + (1 - local_weight)) * 
-                    neighborhood_cell_type_numbers[n, j] * P[j, k] 
+                    (
+                        local_weight * local_enrichment_scores[j]
+                        + global_weight * global_enrichment_scores[j]
+                    )
+                    * neighborhood_cell_type_numbers[n, j]
+                    * P[j, k]
                     for j in range(T)
                 )
-                
-                nb_weight = 1.0 / (1.0 + dispersion[k])
-                
-                model.addConstr(
-                    error[n, k] >= nb_weight * (neighborhood_expression_data[n, k] - predicted_expression)
-                )
-                model.addConstr(
-                    error[n, k] >= nb_weight * (predicted_expression - neighborhood_expression_data[n, k])
-                )
 
-        # L1 and L2 terms for elastic net regularization
+                # NB-weight: penalize large deviations more strongly
+                nb_weight = 1.0 / (1.0 + dispersion[k])
+
+                # Constrain error[n, k] to be >= the absolute difference
+                model.addConstr(error[n, k] >= nb_weight * (
+                    neighborhood_expression_data[n, k] - predicted_expression
+                ))
+                model.addConstr(error[n, k] >= nb_weight * (
+                    predicted_expression - neighborhood_expression_data[n, k]
+                ))
+
+        # ------------------------------------------------------------------
+        # 9) Elastic Net Regularization
+        # ------------------------------------------------------------------
         l1_term = gp.quicksum(P[j, k] for j in range(T) for k in range(M))
         l2_term = gp.quicksum(P[j, k] * P[j, k] for j in range(T) for k in range(M))
-
-        # Objective function
         model.setObjective(
-            gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M)) +
-            lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term),
+            gp.quicksum(error[n, k] for n in range(len(neighborhood_indices)) for k in range(M))
+            + lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term),
             GRB.MINIMIZE
         )
 
@@ -303,7 +345,10 @@ def deconvolute_spot_with_neighbors(
         if model.SolCount > 0:
             logging.info(f"Solution found for spot {i}")
             gene_expression_profile_solution = {key: P[key].X for key in P}
-            return np.array([[gene_expression_profile_solution[j, k] for k in range(M)] for j in range(T)])
+            return np.array([
+                [gene_expression_profile_solution[j, k] for k in range(M)]
+                for j in range(T)
+            ])
         else:
             logging.error(f"No feasible solution found for spot {i}.")
             return None
@@ -311,12 +356,21 @@ def deconvolute_spot_with_neighbors(
     except Exception as e:
         logging.error(f"Error during deconvolution of spot {i}: {str(e)}")
         logging.error(traceback.format_exc())
+
+        # Debug statements to aid troubleshooting
+        print("Debug Info:")
+        print(f"Spot index: {i}")
+        print("Local proportions:", local_proportions)
+        print("Global proportions:", global_proportions)
+        print("Local enrichment:", local_enrichment_scores)
+        print("Global enrichment:", global_enrichment_scores)
         return None
 
     finally:
         if model:
             del model
         gc.collect()
+
 
 
 def optimize_gene_expression(
