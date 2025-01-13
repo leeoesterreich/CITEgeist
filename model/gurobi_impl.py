@@ -83,68 +83,69 @@ def fit_zinb(x, p):
         return (zero_prop, mu_init, theta_init)
 
 def analyze_zero_inflation_patterns(
-    spotwise_gene_expression_profiles,
-    cell_type_numbers_array,
+    usage_array,
+    cell_type_numbers,
     gene_names,
     cell_type_names,
     min_proportion=0.01,
     expression_threshold=1e-6
 ):
-    """
-    Analyze zero-inflation patterns to help determine appropriate thresholds.
-    """
-    spot_indices = sorted(spotwise_gene_expression_profiles.keys())
-    T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
-    N = len(spot_indices)
+    """Analyze zero-inflation patterns in gene expression data."""
+    patterns = {}
     
-    # Construct usage array
-    usage_array = np.zeros((N, T, M), dtype=float)
-    for idx, spot_id in enumerate(spot_indices):
-        usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
+    # Ensure we're working with numpy arrays
+    if isinstance(usage_array, dict):
+        # If it's a dictionary of profiles, we need to reshape it
+        spots = sorted(usage_array.keys())
+        if not spots:
+            raise ValueError("Empty usage array dictionary")
+        T, M = usage_array[spots[0]].shape
+        N = len(spots)
+        combined_array = np.zeros((N, M))
+        for idx, spot in enumerate(spots):
+            # For each spot, take the maximum expression across cell types
+            combined_array[idx] = np.max(usage_array[spot], axis=0)
+        usage_array = combined_array
     
-    results = {}
-    for t_idx in range(T):
-        ct_name = cell_type_names[t_idx]
-        results[ct_name] = {}
+    # Convert to dense if sparse
+    if hasattr(usage_array, 'toarray'):
+        usage_array = usage_array.toarray()
+    
+    if usage_array.ndim != 2:
+        raise ValueError(f"Expected 2D array, got shape {usage_array.shape}")
+    
+    N, M = usage_array.shape  # N spots, M genes
+    
+    for m_idx, gene in enumerate(gene_names):
+        patterns[gene] = {}
         
-        # Get spots where this cell type is present
-        ct_spots = cell_type_numbers_array[:, t_idx] >= min_proportion
-        
-        for m_idx in range(M):
-            gene_name = gene_names[m_idx]
+        for t_idx, cell_type in enumerate(cell_type_names):
+            # Get spots where this cell type is present
+            ct_spots = cell_type_numbers[:, t_idx] > min_proportion
             
-            # Get expression values where cell type is present
-            expr_values = usage_array[ct_spots, t_idx, m_idx]
-            
-            if len(expr_values) > 0:
-                zero_prop = np.mean(expr_values <= expression_threshold)
-                nonzero_values = expr_values[expr_values > expression_threshold]
+            if np.any(ct_spots):
+                # Get expression values for these spots - note the simpler indexing
+                expr_values = usage_array[ct_spots, m_idx]
                 
-                # Handle case where all values are zero
-                if len(nonzero_values) == 0:
-                    mean_nonzero = 0.0
+                if len(expr_values) > 0:
+                    zero_prop = np.mean(expr_values <= expression_threshold)
+                    patterns[gene][cell_type] = zero_prop
                 else:
-                    mean_nonzero = np.mean(nonzero_values)
-                
-                results[ct_name][gene_name] = {
-                    'zero_proportion': zero_prop,
-                    'mean_nonzero_expression': mean_nonzero,
-                    'n_spots': len(expr_values),
-                    'n_nonzero': len(nonzero_values)
-                }
+                    patterns[gene][cell_type] = np.nan
+            else:
+                patterns[gene][cell_type] = np.nan
     
-    return results
+    return patterns
 
-def suggest_zero_inflation_threshold(zero_inflation_patterns, quantile=0.75):
-    """
-    Suggest a zero-inflation threshold based on the analysis results.
-    """
-    all_zero_props = []
-    for ct_data in zero_inflation_patterns.values():
-        for gene_data in ct_data.values():
-            all_zero_props.append(gene_data['zero_proportion'])
+def suggest_zero_inflation_threshold(patterns, quantile=0.75):
+    """Suggest threshold based on zero-inflation patterns."""
+    all_proportions = []
+    for gene_patterns in patterns.values():
+        all_proportions.extend([p for p in gene_patterns.values() if not np.isnan(p)])
     
-    return np.quantile(all_zero_props, quantile)
+    if all_proportions:
+        return np.quantile(all_proportions, quantile)
+    return 0.5  # Default fallback
 
 def compute_global_prior(
     spotwise_gene_expression_profiles,
@@ -691,6 +692,34 @@ def two_pass_optimize_gene_expression(
        and decide if we want to stop or do more passes.
     """
     #########################
+    # === Analyze Zero-Inflation Patterns from Original Data
+    #########################
+    logging.info("=== Analyzing zero-inflation patterns from original data ===")
+    
+    # Get original expression matrix
+    original_expression = filtered_adata.X
+    if hasattr(original_expression, 'toarray'):
+        original_expression = original_expression.toarray()
+    
+    # Analyze patterns
+    zero_patterns = analyze_zero_inflation_patterns(
+        {0: original_expression},  # Wrap in dict to match function signature
+        cell_type_numbers_array,
+        filtered_adata.var_names,
+        [f"CellType_{i}" for i in range(cell_type_numbers_array.shape[1])],
+        min_proportion=0.01,
+        expression_threshold=1e-6
+    )
+    
+    # Get suggested threshold
+    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
+    logging.info(f"Suggested zero-inflation threshold from original data: {suggested_threshold:.3f}")
+    
+    # Log patterns for marker genes if defined
+    marker_genes = ["KRT7"]  # Add your marker genes here
+    log_marker_gene_patterns(zero_patterns, marker_genes)
+
+    #########################
     # === PASS 1 (No Prior)
     #########################
     logging.info("=== Pass 1: standard local optimization ===")
@@ -699,6 +728,22 @@ def two_pass_optimize_gene_expression(
     
     # Scale the expression data
     scaled_expression, gene_mins, gene_maxs = scale_genes(deconvolution_expression_data)
+    
+    # Calculate basic statistics before optimization
+    stats = {
+        'n_nonzero': np.count_nonzero(scaled_expression),
+        'mean_nonzero_expression': np.mean(scaled_expression[scaled_expression > 0]) if np.any(scaled_expression > 0) else 0,
+        'total_spots': scaled_expression.shape[0],
+        'total_genes': scaled_expression.shape[1]
+    }
+    
+    # Log statistics
+    logging.info(f"Dataset statistics:")
+    logging.info(f"    Total spots: {stats['total_spots']}")
+    logging.info(f"    Total genes: {stats['total_genes']}")
+    logging.info(f"    Number of nonzero values: {stats['n_nonzero']}")
+    if stats['n_nonzero'] > 0:
+        logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
     
     # Store scaling factors in filtered_adata
     filtered_adata.uns['gene_scaling'] = {
@@ -722,27 +767,6 @@ def two_pass_optimize_gene_expression(
     )
 
     #########################
-    # Analyze Zero-Inflation Patterns
-    #########################
-    logging.info("=== Analyzing zero-inflation patterns from pass 1 ===")
-    zero_patterns = analyze_zero_inflation_patterns(
-        pass1_result,
-        cell_type_numbers_array,
-        filtered_adata.var_names,
-        [f"CellType_{i}" for i in range(cell_type_numbers_array.shape[1])],
-        min_proportion=0.01,
-        expression_threshold=1e-6
-    )
-    
-    # Get suggested threshold
-    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
-    logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
-    
-    # Log patterns for marker genes
-    marker_genes = ["KRT7"]  # Add your marker genes here
-    log_marker_gene_patterns(zero_patterns, marker_genes)
-    
-    #########################
     # Compute Global Prior from Pass 1
     #########################
     logging.info("=== Computing global prior from pass 1 ===")
@@ -750,7 +774,7 @@ def two_pass_optimize_gene_expression(
         spotwise_gene_expression_profiles=spotwise_scaled_profiles,
         cell_type_numbers_array=cell_type_numbers_array,
         lambda_prior=1.0,
-        zero_inflation_threshold=0.9
+        zero_inflation_threshold=suggested_threshold  # Use threshold from original data analysis
     )
 
     # Log ZINB statistics for marker genes
@@ -777,7 +801,7 @@ def two_pass_optimize_gene_expression(
     ]
 
     # Use the wrapper function with ProcessPoolExecutor
-    pass2_result = optimize_gene_expression_with_custom_spot_fn(
+    spotwise_scaled_profiles_pass2 = optimize_gene_expression_with_custom_spot_fn(
         sample_name=sample_name+"_pass2",
         deconvolution_expression_data=scaled_expression,
         cell_type_numbers_array=cell_type_numbers_array,
@@ -799,7 +823,7 @@ def two_pass_optimize_gene_expression(
 
     # Compute a new prior from pass 2 result, to see if it changed significantly
     global_prior_pass2, zinb_matrix, zero_inflation_probs = compute_global_prior(
-        spotwise_gene_expression_profiles=pass2_result,
+        spotwise_gene_expression_profiles=spotwise_scaled_profiles_pass2,
         cell_type_numbers_array=cell_type_numbers_array,
         lambda_prior=1.0,
         zero_inflation_threshold=suggested_threshold
@@ -812,13 +836,13 @@ def two_pass_optimize_gene_expression(
 
     if prior_diff < prior_change_threshold:
         logging.info("Global prior converged sufficiently; stopping after pass 2.")
-        final_result = pass2_result
+        final_result = spotwise_scaled_profiles_pass2
     else:
         logging.warning(f"Global prior changed significantly ({prior_diff:.5f} > {prior_change_threshold})")
         logging.info("Accepting pass 2 results, but you may want to consider additional passes.")
-        final_result = pass2_result
+        final_result = spotwise_scaled_profiles_pass2
 
-    return final_result
+    return spotwise_scaled_profiles_pass2, gene_mins, gene_maxs
 
 def optimize_gene_expression_with_custom_spot_fn(
     sample_name,
