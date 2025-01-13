@@ -19,36 +19,133 @@ from statsmodels.stats.multitest import multipletests
 import numpy as np
 import math
 from sklearn.metrics import mutual_info_score
+from scipy.optimize import minimize
+from scipy.special import loggamma, digamma
 
+
+def fit_zinb(x, p):
+    """
+    Fit ZINB model for a gene's expression (x) against cell type proportion (p)
+    
+    Args:
+        x (np.ndarray): Gene expression values
+        p (np.ndarray): Cell type proportions
+    
+    Returns:
+        tuple: (π, μ, θ) - zero-inflation probability, mean, and dispersion
+    """
+    def zinb_nll(params):
+        pi, mu, theta = params
+        # Bound parameters to valid ranges
+        pi = np.clip(pi, 0.001, 0.999)
+        mu = np.clip(mu, 0.001, None)
+        theta = np.clip(theta, 0.001, None)
+        
+        # Zero and non-zero indices
+        zero_idx = x == 0
+        nonzero_idx = ~zero_idx
+        
+        # Log-likelihood for zeros: log(π + (1-π)*(θ/(θ+μ))^θ)
+        ll_zeros = np.log(pi + (1-pi) * np.power(theta/(theta+mu), theta))
+        
+        # Log-likelihood for non-zeros
+        ll_nonzeros = (np.log(1-pi) + loggamma(x[nonzero_idx] + theta) - loggamma(theta) - 
+                      loggamma(x[nonzero_idx] + 1) + theta * np.log(theta) + 
+                      x[nonzero_idx] * np.log(mu) - (x[nonzero_idx] + theta) * 
+                      np.log(theta + mu))
+        
+        return -(np.sum(ll_zeros[zero_idx]) + np.sum(ll_nonzeros))
+    
+    # Initial guesses
+    pi_init = np.mean(x == 0)
+    mu_init = np.mean(x[x > 0])
+    theta_init = 1.0
+    
+    # Optimize
+    result = minimize(
+        zinb_nll, 
+        [pi_init, mu_init, theta_init],
+        bounds=[(0.001, 0.999), (0.001, None), (0.001, None)],
+        method='L-BFGS-B'
+    )
+    
+    return result.x
+
+def analyze_zero_inflation_patterns(
+    spotwise_gene_expression_profiles,
+    cell_type_numbers_array,
+    gene_names,
+    cell_type_names,
+    min_proportion=0.01,
+    expression_threshold=1e-6
+):
+    """
+    Analyze zero-inflation patterns to help determine appropriate thresholds.
+    """
+    spot_indices = sorted(spotwise_gene_expression_profiles.keys())
+    T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
+    N = len(spot_indices)
+    
+    # Construct usage array
+    usage_array = np.zeros((N, T, M), dtype=float)
+    for idx, spot_id in enumerate(spot_indices):
+        usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
+    
+    results = {}
+    for t_idx in range(T):
+        ct_name = cell_type_names[t_idx]
+        results[ct_name] = {}
+        
+        # Get spots where this cell type is present
+        ct_spots = cell_type_numbers_array[:, t_idx] >= min_proportion
+        
+        for m_idx in range(M):
+            gene_name = gene_names[m_idx]
+            
+            # Get expression values where cell type is present
+            expr_values = usage_array[ct_spots, t_idx, m_idx]
+            
+            if len(expr_values) > 0:
+                zero_prop = np.mean(expr_values <= expression_threshold)
+                mean_nonzero = np.mean(expr_values[expr_values > expression_threshold]) if np.any(expr_values > expression_threshold) else 0
+                
+                results[ct_name][gene_name] = {
+                    'zero_proportion': zero_prop,
+                    'mean_nonzero_expression': mean_nonzero,
+                    'n_spots': len(expr_values)
+                }
+    
+    return results
+
+def suggest_zero_inflation_threshold(zero_inflation_patterns, quantile=0.75):
+    """
+    Suggest a zero-inflation threshold based on the analysis results.
+    """
+    all_zero_props = []
+    for ct_data in zero_inflation_patterns.values():
+        for gene_data in ct_data.values():
+            all_zero_props.append(gene_data['zero_proportion'])
+    
+    return np.quantile(all_zero_props, quantile)
 
 def compute_global_prior(
     spotwise_gene_expression_profiles,
     cell_type_numbers_array,
     lambda_prior=1.0,
-    num_bins=5
+    num_bins=5,
+    zinb_weight=0.5,  # Weight between MI and ZINB components
+    zero_inflation_threshold=0.8  # Threshold for zero-inflation penalty
 ):
     """
-    Compute a global prior for each (celltype, gene) pair based on mutual information
-    between the gene's assigned usage (from the first pass) and the cell type's proportion
-    across all spots.
-
+    Compute global prior using both mutual information and ZINB fitting.
+    
     Args:
-        spotwise_gene_expression_profiles (dict[int -> (T x M) array]):
-            A dictionary from spot index to a (T x M) matrix with the *first-pass* assignment
-            of each gene among T cell types.
-        cell_type_numbers_array (np.ndarray):
-            N x T array of cell-type proportions (or counts) across N spots.
-        lambda_prior (float):
-            A scaling factor used to transform raw MI into a sharper or flatter distribution.
-        num_bins (int):
-            Number of bins to use when discretizing continuous values for MI calculation.
-
-    Returns:
-        global_prior (np.ndarray):
-            A (T x M) matrix in [0,1], where global_prior[t, m] indicates how likely
-            gene m belongs to cell type t based on global mutual information.
-        mi_matrix (np.ndarray):
-            The raw mutual information values (T x M) before transformation.
+        spotwise_gene_expression_profiles: Dict of spot profiles from first pass
+        cell_type_numbers_array: Array of cell type proportions
+        lambda_prior: Scaling factor for prior
+        num_bins: Number of bins for MI calculation
+        zinb_weight: Weight between MI (0) and ZINB (1) components
+        zero_inflation_threshold: Threshold for considering a gene zero-inflated
     """
     # Gather spot indices and shapes
     spot_indices = sorted(spotwise_gene_expression_profiles.keys())
@@ -57,43 +154,70 @@ def compute_global_prior(
     T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
     N = len(spot_indices)
 
-    # usage_array[n, t, m] = fraction of gene m assigned to cell type t at spot n
+    # Construct usage array as before
     usage_array = np.zeros((N, T, M), dtype=float)
     for idx, spot_id in enumerate(spot_indices):
         usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
 
-    # Helper for discretization
-    def discretize(values, bins):
-        return np.digitize(values, bins=np.histogram_bin_edges(values, bins=bins))
-
+    # Initialize matrices
     mi_matrix = np.zeros((T, M), dtype=float)
+    zinb_matrix = np.zeros((T, M), dtype=float)
+    zero_inflation_probs = np.zeros((T, M), dtype=float)
 
-    # For each cell type t, discretize the cell_type_numbers_array[:, t]
-    # and compute MI with usage_array[:, t, m] for each gene m
+    # For each cell type and gene
     for t_idx in range(T):
-        ct_disc = discretize(cell_type_numbers_array[:, t_idx], bins=num_bins)
+        ct_proportions = cell_type_numbers_array[:, t_idx]
+        ct_disc = np.digitize(ct_proportions, 
+                            bins=np.histogram_bin_edges(ct_proportions, bins=num_bins))
 
         for m_idx in range(M):
             usage_vec = usage_array[:, t_idx, m_idx]
-            usage_disc = discretize(usage_vec, bins=num_bins)
+            
+            # 1. Compute MI
+            usage_disc = np.digitize(usage_vec, 
+                                   bins=np.histogram_bin_edges(usage_vec, bins=num_bins))
             mi_val = mutual_info_score(usage_disc, ct_disc)
             mi_matrix[t_idx, m_idx] = mi_val
 
-    # Convert MI to [0,1] prior via softmax across t for each gene m
+            # 2. Fit ZINB and compute score
+            try:
+                pi, mu, theta = fit_zinb(usage_vec, ct_proportions)
+                zero_inflation_probs[t_idx, m_idx] = pi
+                
+                # ZINB score combines:
+                # - Zero-inflation penalty
+                # - Expression level when expressed
+                # - Dispersion penalty
+                if pi > zero_inflation_threshold:
+                    zinb_score = 0.0  # Heavily penalize high zero-inflation
+                else:
+                    zinb_score = (1 - pi) * (mu / (mu + theta))
+                zinb_matrix[t_idx, m_idx] = zinb_score
+            except:
+                zinb_matrix[t_idx, m_idx] = 0.0
+                zero_inflation_probs[t_idx, m_idx] = 1.0
+
+    # Normalize matrices to [0,1] range per gene
+    mi_matrix = mi_matrix / (np.max(mi_matrix, axis=0) + 1e-10)
+    zinb_matrix = zinb_matrix / (np.max(zinb_matrix, axis=0) + 1e-10)
+
+    # Combine MI and ZINB information
+    combined_matrix = (zinb_weight * zinb_matrix + 
+                      (1 - zinb_weight) * mi_matrix)
+
+    # Convert to prior via softmax
     global_prior = np.zeros((T, M), dtype=float)
     for m_idx in range(M):
-        mis = mi_matrix[:, m_idx]
-        scaled = mis * lambda_prior
-        # subtract max(scaled) for numerical stability
+        combined_scores = combined_matrix[:, m_idx]
+        scaled = combined_scores * lambda_prior
         exps = np.exp(scaled - np.max(scaled))
         denom = np.sum(exps)
         if denom < 1e-12:
-            # If everything is near 0, fallback to uniform
             global_prior[:, m_idx] = 1.0 / T
         else:
             global_prior[:, m_idx] = exps / denom
 
-    return global_prior, mi_matrix
+    return global_prior, mi_matrix, zinb_matrix
 
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
@@ -369,16 +493,29 @@ def deconvolute_spot_with_neighbors_with_prior(
             for j in range(T) for k in range(M)
         )
 
+        # Add adaptive constraints based on ZINB fitting
+        # If a gene shows strong zero-inflation for a cell type,
+        # we can add an upper bound constraint
+        zero_inflation_threshold = 0.5  # Adjust this threshold as needed
+        for j in range(T):
+            for k in range(M):
+                if global_prior[j, k] < zero_inflation_threshold:
+                    model.addConstr(
+                        P[j, k] <= 0.2,  # Allow some assignment but heavily restrict it
+                        name=f"zinb_constraint_{j}_{k}"
+                    )
+
         # Final objective
         model.setObjective(
             reconstruction_error + 
             lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term) + 
-            lambda_prior_weight * prior_penalty,
+            prior_penalty,
             GRB.MINIMIZE
         )
 
         model.optimize()
         if model.SolCount > 0:
+            logging.info(f"Solution found for spot {i}.")
             gene_expression_profile_solution = {key: P[key].X for key in P}
             return np.array([
                 [gene_expression_profile_solution[j, k] for k in range(M)]
@@ -418,6 +555,77 @@ def deconvolute_spot_with_neighbors_wrapper(args):
         lambda_reg_gex
     )
 
+def analyze_zero_inflation_patterns(
+    spotwise_gene_expression_profiles,
+    cell_type_numbers_array,
+    gene_names,
+    cell_type_names,
+    min_proportion=0.01,
+    expression_threshold=1e-6  # Add small threshold for zero detection
+):
+    """
+    Analyze zero-inflation patterns to help determine appropriate thresholds.
+    """
+    spot_indices = sorted(spotwise_gene_expression_profiles.keys())
+    T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
+    N = len(spot_indices)
+    
+    # Construct usage array
+    usage_array = np.zeros((N, T, M), dtype=float)
+    for idx, spot_id in enumerate(spot_indices):
+        usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
+    
+    results = {}
+    for t_idx in range(T):
+        ct_name = cell_type_names[t_idx]
+        results[ct_name] = {}
+        
+        # Get spots where this cell type is present
+        ct_spots = cell_type_numbers_array[:, t_idx] >= min_proportion
+        
+        for m_idx in range(M):
+            gene_name = gene_names[m_idx]
+            
+            # Get expression values where cell type is present
+            expr_values = usage_array[ct_spots, t_idx, m_idx]
+            
+            if len(expr_values) > 0:
+                zero_prop = np.mean(expr_values <= expression_threshold)  # Changed from == 0
+                mean_nonzero = np.mean(expr_values[expr_values > expression_threshold])
+                
+                results[ct_name][gene_name] = {
+                    'zero_proportion': zero_prop,
+                    'mean_nonzero_expression': mean_nonzero,
+                    'n_spots': len(expr_values)
+                }
+    
+    return results
+
+def suggest_zero_inflation_threshold(zero_inflation_patterns, quantile=0.75):
+    """
+    Suggest a zero-inflation threshold based on the analysis results.
+    """
+    all_zero_props = []
+    for ct_data in zero_inflation_patterns.values():
+        for gene_data in ct_data.values():
+            all_zero_props.append(gene_data['zero_proportion'])
+    
+    return np.quantile(all_zero_props, quantile)
+
+def log_marker_gene_patterns(zero_patterns, marker_genes):
+    """
+    Log detailed patterns for marker genes.
+    """
+    for gene in marker_genes:
+        logging.info(f"\nPatterns for {gene}:")
+        for ct, genes_data in zero_patterns.items():
+            if gene in genes_data:
+                stats = genes_data[gene]
+                logging.info(f"  {ct}:")
+                logging.info(f"    Zero proportion: {stats['zero_proportion']:.3f}")
+                logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
+                logging.info(f"    Number of spots: {stats['n_spots']}")
+
 def two_pass_optimize_gene_expression(
     sample_name,
     deconvolution_expression_data,
@@ -440,7 +648,6 @@ def two_pass_optimize_gene_expression(
     4) Optionally check how much the new prior changed from first to second pass,
        and decide if we want to stop or do more passes.
     """
-
     #########################
     # === PASS 1 (No Prior)
     #########################
@@ -459,17 +666,38 @@ def two_pass_optimize_gene_expression(
         rerun=rerun
     )
 
-    # pass1_result is a dict: spot_index -> (T x M) array
-
+    #########################
+    # Analyze Zero-Inflation Patterns
+    #########################
+    logging.info("=== Analyzing zero-inflation patterns from pass 1 ===")
+    zero_patterns = analyze_zero_inflation_patterns(
+        pass1_result,
+        cell_type_numbers_array,
+        filtered_adata.var_names,
+        [f"CellType_{i}" for i in range(cell_type_numbers_array.shape[1])],
+        min_proportion=0.01,
+        expression_threshold=1e-6
+    )
+    
+    # Get suggested threshold
+    suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
+    logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
+    
+    # Log patterns for marker genes
+    marker_genes = ["KRT7"]  # Add your marker genes here
+    log_marker_gene_patterns(zero_patterns, marker_genes)
+    
     #########################
     # Compute Global Prior from Pass 1
     #########################
     logging.info("=== Computing global prior from pass 1 ===")
-    global_prior_pass1, mi_matrix_pass1 = compute_global_prior(
-        pass1_result,
-        cell_type_numbers_array,
-        lambda_prior=1.0,  # or some "temperature" factor for the MI-based prior
-        num_bins=5
+    global_prior_pass1, mi_matrix_pass1, zinb_matrix_pass1 = compute_global_prior(
+        spotwise_gene_expression_profiles=pass1_result,
+        cell_type_numbers_array=cell_type_numbers_array,
+        lambda_prior=1.0,
+        num_bins=5,
+        zinb_weight=0.5,
+        zero_inflation_threshold=suggested_threshold
     )
 
     #########################
@@ -502,9 +730,9 @@ def two_pass_optimize_gene_expression(
     )
 
     # Compute a new prior from pass 2 result, to see if it changed significantly
-    global_prior_pass2, mi_matrix_pass2 = compute_global_prior(
-        pass2_result,
-        cell_type_numbers_array,
+    global_prior_pass2, mi_matrix_pass2, zinb_matrix_pass2 = compute_global_prior(
+        spotwise_gene_expression_profiles=pass2_result,
+        cell_type_numbers_array=cell_type_numbers_array,
         lambda_prior=1.0,
         num_bins=5
     )
@@ -655,6 +883,7 @@ def optimize_gene_expression_with_custom_spot_fn(
                                 for i in completed_spots 
                                 if not np.any(np.isnan(profiles[i]))
                             }
+                            # Update completed_spots to only include valid profiles
                             completed_spots = set(spotwise_gene_expression_profiles.keys())
                             logging.info(f"Loaded {len(completed_spots)} valid profiles from checkpoint")
                         else:
