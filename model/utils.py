@@ -4,6 +4,9 @@ import logging
 import pandas as pd
 import numpy as np
 import scanpy as sc
+from scipy.spatial.distance import jensenshannon
+from scipy.stats import pearsonr
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 
 def validate_cell_profile_dict(cell_profile_dict):
     """
@@ -152,3 +155,153 @@ def assert_neighborhood_size(adata, cell_profile_dict, radius=50, num_spots=5):
     
     
     assert all(x <= len(cell_profile_dict) for x in neighborhood_sizes), f"Some neighborhood values in the list are less than {len(cell_profile_dict)} celltypes being deconvoluted"
+
+def benchmark_cell_proportions(true_proportions, predicted_proportions, cell_type_names):
+    """
+    Calculate performance metrics for cell type proportion predictions.
+    
+    Args:
+        true_proportions (np.ndarray): Ground truth cell type proportions matrix
+        predicted_proportions (np.ndarray): Predicted cell type proportions matrix
+        cell_type_names (list): Names of cell types corresponding to matrix columns
+        
+    Returns:
+        dict: Dictionary containing various performance metrics
+    """
+    if not isinstance(true_proportions, np.ndarray) or not isinstance(predicted_proportions, np.ndarray):
+        raise ValueError("Input proportions must be numpy arrays")
+
+    # Initialize JSD matrix
+    true_jsd_mtrx = np.zeros((true_proportions.shape[0], 1))
+
+    # Calculate Jensen-Shannon Divergence
+    for i in range(true_proportions.shape[0]):
+        x = np.vstack([true_proportions[i, :], predicted_proportions[i, :]])
+        if np.sum(predicted_proportions[i, :]) > 0:
+            true_jsd_mtrx[i, 0] = jensenshannon(x[0], x[1], base=2)
+        else:
+            true_jsd_mtrx[i, 0] = 1
+
+    # Calculate per-celltype and overall metrics
+    RMSE = {}
+    MAE = {}
+    all_rmse = 0
+    all_mae = 0
+
+    for i in range(true_proportions.shape[1]):
+        mse = np.sum((true_proportions[:, i] - predicted_proportions[:, i]) ** 2)
+        all_rmse += mse
+        RMSE[cell_type_names[i]] = np.sqrt(mse / true_proportions.shape[0])
+
+        mae = mean_absolute_error(true_proportions[:, i], predicted_proportions[:, i])
+        all_mae += mae
+        MAE[cell_type_names[i]] = mae
+
+    # Calculate overall metrics
+    all_rmse = np.sqrt(all_rmse / (true_proportions.shape[0] * true_proportions.shape[1]))
+    all_mae = all_mae / true_proportions.shape[1]
+
+    # Calculate JSD quantiles and correlation
+    quants_jsd = np.quantile(np.min(true_jsd_mtrx, axis=1), [0.25, 0.5, 0.75])
+    corr, _ = pearsonr(true_proportions.flatten(), predicted_proportions.flatten())
+
+    return {
+        'JSD': quants_jsd[1],
+        'RMSE': RMSE,
+        'Sum_RMSE': all_rmse,
+        'MAE': MAE,
+        'Sum_MAE': all_mae,
+        'corr': corr
+    }
+
+def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='range'):
+    """
+    Calculate performance metrics for gene expression predictions.
+    
+    Args:
+        ground_truth_dir (str): Directory containing ground truth CSV files
+        predictions_dir (str): Directory containing prediction CSV files
+        normalize (str): Normalization method for NRMSE ('range' or 'mean')
+        
+    Returns:
+        dict: Dictionary containing performance metrics per cell type and overall statistics
+    """
+    metrics_per_cell_type = {}
+
+    for gt_filename in os.listdir(ground_truth_dir):
+        if not gt_filename.endswith("_GT.csv"):
+            continue
+
+        cell_type = gt_filename.replace("_GT.csv", "")
+        gt_filepath = os.path.join(ground_truth_dir, gt_filename)
+        pred_filepath = os.path.join(predictions_dir, f"{cell_type}_layer.csv")
+
+        if not os.path.exists(pred_filepath):
+            logging.warning(f"Prediction file for {cell_type} not found. Skipping.")
+            continue
+
+        # Load and preprocess data
+        gt_df = pd.read_csv(gt_filepath, index_col=0)
+        pred_df = pd.read_csv(pred_filepath, index_col=0)
+
+        # Find common genes and spots
+        common_genes = gt_df.index.intersection(pred_df.index)
+        common_spots = gt_df.columns.intersection(pred_df.columns)
+
+        if len(common_genes) == 0 or len(common_spots) == 0:
+            logging.warning(f"No common genes or spots for {cell_type}. Skipping.")
+            continue
+
+        # Subset and normalize data
+        gt_df = np.log1p(gt_df.loc[common_genes, common_spots])
+        pred_df = np.log1p(pred_df.loc[common_genes, common_spots])
+
+        # Calculate metrics
+        mse = mean_squared_error(gt_df.values, pred_df.values)
+        rmse = np.sqrt(mse)
+        mae = mean_absolute_error(gt_df.values, pred_df.values)
+
+        # Calculate NRMSE
+        if normalize == 'range':
+            range_gt = gt_df.values.max() - gt_df.values.min()
+            nrmse = rmse / range_gt if range_gt != 0 else np.nan
+        elif normalize == 'mean':
+            mean_gt = gt_df.values.mean()
+            nrmse = rmse / mean_gt if mean_gt != 0 else np.nan
+        else:
+            raise ValueError("Normalization type must be 'range' or 'mean'")
+
+        metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
+
+    # Calculate overall statistics
+    all_metrics = pd.DataFrame(metrics_per_cell_type).T
+    
+    return {
+        "metrics_per_cell_type": metrics_per_cell_type,
+        "average_rmse": all_metrics['RMSE'].mean(),
+        "median_rmse": all_metrics['RMSE'].median(),
+        "average_nrmse": all_metrics['NRMSE'].mean(),
+        "median_nrmse": all_metrics['NRMSE'].median(),
+        "average_mae": all_metrics['MAE'].mean(),
+        "median_mae": all_metrics['MAE'].median()
+    }
+
+def export_anndata_layers(adata, output_dir):
+    """
+    Export all layers of an AnnData object to separate CSV files.
+    
+    Args:
+        adata (AnnData): AnnData object containing the layers to export
+        output_dir (str): Directory where CSV files will be saved
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    for layer_name in adata.layers.keys():
+        layer_data = adata.layers[layer_name]
+        dense_data = layer_data.toarray() if hasattr(layer_data, 'toarray') else layer_data
+        
+        df = pd.DataFrame(dense_data, index=adata.obs.index, columns=adata.var.index)
+        output_file = os.path.join(output_dir, f"{layer_name}_layer.csv")
+        
+        df.to_csv(output_file)
+        logging.info(f"Exported layer '{layer_name}' to '{output_file}'")
