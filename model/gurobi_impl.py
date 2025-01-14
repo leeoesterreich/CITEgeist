@@ -21,6 +21,14 @@ import math
 from sklearn.metrics import mutual_info_score
 from scipy.optimize import minimize
 from scipy.special import loggamma, digamma
+import os
+from pathlib import Path
+import logging
+import traceback
+import gc
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from tqdm import tqdm
+import numpy as np
 
 
 def fit_zinb(x, p):
@@ -796,14 +804,7 @@ def optimize_gene_expression_with_custom_spot_fn(
     Returns:
         dict: spot_index -> (T x M) array of gene expression profiles per spot.
     """
-    import os
-    from pathlib import Path
-    import logging
-    import traceback
-    import gc
-    from concurrent.futures import ProcessPoolExecutor, as_completed
-    from tqdm import tqdm
-    import numpy as np
+
 
     if spot_function is None:
         raise ValueError("`spot_function` must be provided.")
@@ -820,8 +821,8 @@ def optimize_gene_expression_with_custom_spot_fn(
             f for f in os.listdir(output_dir) 
             if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
         ]
+        logging.info(f"Found existing files: {existing_files}")
         print("Found existing files: ", existing_files)
-        logging.info("Found existing files: ", existingfiles)
 
         for file in existing_files:
             try:
@@ -1233,7 +1234,9 @@ def optimize_gene_expression(
             f for f in os.listdir(output_dir) 
             if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
         ]
+        logging.info(f"Found existing files: {existing_files}")
         print("Found existing files: ", existing_files)
+
         for file in existing_files:
             try:
                 os.remove(os.path.join(output_dir, file))

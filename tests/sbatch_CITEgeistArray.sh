@@ -1,14 +1,15 @@
 #!/bin/bash
 #SBATCH --job-name=CITEgeist_array
-#SBATCH --output=logs/CITEgeist_array_%A_%a.log
-#SBATCH --error=logs/CITEgeist_array_%A_%a.log
+#SBATCH --output=benchmarking_logs/CITEgeist_array_%A_%a.log
+#SBATCH --error=benchmarking_logs/CITEgeist_array_%A_%a.log
 #SBATCH --time=72:00:00
 #SBATCH --mem=32G
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=alc376@pitt.edu
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
-#SBATCH --array=0-3  # 3 radii = 3 combinations (0-44)
+#SBATCH --partition=HTC
+#SBATCH --array=0-2  # 3 radii = 3 combinations 
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -23,14 +24,12 @@ cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
 # Define parameter arrays
-radii=(4 6)
+radii=(4 6 8)
 
 
 # Calculate indices for each parameter based on array task ID
-radius_idx=$(( SLURM_ARRAY_TASK_ID / (${#alphas[@]} * ${#gex_lambdas[@]}) ))
+radius=${radii[$SLURM_ARRAY_TASK_ID]}
 
-# Get parameter values
-radius=${radii[$radius_idx]}
 
 
 TEST_SET="mixed"
@@ -45,10 +44,11 @@ mkdir -p "$OUTPUT_FOLDER"
 echo "Running with parameters: radius=$radius, input_folder=$INPUT_FOLDER, output_folder=$OUTPUT_FOLDER"
 
 # Run the Python script with these parameters
-python CITEgeistBenchmarkGridSearchArray.py \
+python tests/test_citegeist_simulated.py \
     --radius $radius \
     --input_folder $INPUT_FOLDER \
-    --output_folder $OUTPUT_FOLDER
+    --output_folder $OUTPUT_FOLDER \
+    --profiling_only True
 
 
 echo "Job completed at $(date)"
