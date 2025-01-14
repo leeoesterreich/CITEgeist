@@ -131,7 +131,8 @@ class CitegeistModel:
         self.antibody_capture_adata = self.adata[:, antibody_capture_idx].copy()
 
         print("AnnData has been successfully split into 'gene_expression_adata' and 'antibody_capture_adata'.")
-        
+
+
     # -----------------------------------------
     # Utility Functions
     # -----------------------------------------
@@ -229,17 +230,22 @@ class CitegeistModel:
     
     def preprocess_gex(self):
         """
-        Preprocess gene expression data:
-        - Normalize to target sum.
+        Preprocess gene expression data.
+        For discrete counts, we only validate the data type.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
-        #sc.pp.normalize_total(self.gene_expression_adata, target_sum=1e4)
+        # Ensure data is in integer format for counts
+        matrix = self.gene_expression_adata.X
+        if hasattr(matrix, 'toarray'):
+            matrix = matrix.toarray()
+        
+        if not np.all(np.equal(np.mod(matrix, 1), 0)):
+            raise ValueError("Gene expression data contains non-integer values. Expected discrete counts.")
         
         self.preprocessed_gex = True
-
-        print("Gene expression data preprocessing completed: Normalized.")
+        print("Gene expression data validated for discrete count analysis.")
 
     def preprocess_antibody(self):
         """
@@ -298,7 +304,9 @@ class CitegeistModel:
                 raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
 
             profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(self.antibody_capture_adata, self.cell_profile_dict)
+            
             Y_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
+            
             spot_names = self.adata.obs_names
             cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
             # Store and save results
@@ -320,110 +328,98 @@ class CitegeistModel:
         rerun=False
     ):
         """
-        Run the gene expression deconvolution model using neighborhood-based Gurobi optimization.
-
-        Args:
-            radius (int): Neighborhood radius for neighboring spot selection.
-            alpha (float): L1-L2 Elastic Net regularization parameter.
-            lambda_reg_gex (float): Regularization strength for gene expression model.
-            max_workers (int): Number of parallel workers.
-
-        Raises:
-            ValueError: If gene expression data is not initialized.
+        Run the discrete count-based gene expression deconvolution model.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
         self.validate_neighborhood_size(radius)
         
-        # Extract required data
-        filtered_data = self.gene_expression_adata.X.toarray() if hasattr(self.gene_expression_adata.X, 'toarray') else self.gene_expression_adata.X
-        deconvolution_expression_data = filtered_data
+        # Extract required data (keeping as integers)
+        filtered_data = self.gene_expression_adata.X
+        if hasattr(filtered_data, 'toarray'):
+            filtered_data = filtered_data.toarray()
+        filtered_data = np.array(filtered_data, dtype=int)
+        
         cell_type_numbers_array = self.results.get('cell_prop').values
-        filtered_adata = self.gene_expression_adata
 
-        spotwise_gene_expression_profiles = two_pass_optimize_gene_expression(
+        # Run optimization without scaling
+        spotwise_profiles = two_pass_optimize_gene_expression(
             sample_name=self.sample_name,
-            deconvolution_expression_data=deconvolution_expression_data,
+            deconvolution_expression_data=filtered_data,
             cell_type_numbers_array=cell_type_numbers_array,
             filtered_adata=self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
             lambda_prior_weight=lambda_prior_weight,
-            prior_change_threshold=prior_change_threshold,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun
         )
 
-
-
-
-
-        # # Run optimization
-        # spotwise_gene_expression_profiles = optimize_gene_expression(
-        #     sample_name=self.sample_name,
-        #     deconvolution_expression_data=deconvolution_expression_data,
-        #     cell_type_numbers_array=cell_type_numbers_array,
-        #     filtered_adata=self.gene_expression_adata,
-        #     radius=radius,
-        #     alpha=alpha,
-        #     lambda_reg_gex=lambda_reg_gex,
-        #     max_workers=max_workers,
-        #     rerun=rerun
-        # )
-
-        # Save results
+        # Prepare data for saving
         spot_names = self.gene_expression_adata.obs_names
         gene_names = self.gene_expression_adata.var_names
         cell_type_names = list(self.cell_profile_dict.keys())
-        N = deconvolution_expression_data.shape[0]
-        M = deconvolution_expression_data.shape[1]
+        N = filtered_data.shape[0]
         T = len(cell_type_names)
+        M = filtered_data.shape[1]
 
-        # Imputation for NaN spots
-        nan_spots = [i for i in range(N) if i not in spotwise_gene_expression_profiles]
+        # Imputation for NaN spots (using integer averages)
+        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
         for nan_spot in nan_spots:
-            # Get the indices of neighbors at radius 2
-            neighbor_indices = get_neighbors_with_fixed_radius(nan_spot, filtered_adata, radius=2, include_center=False)
+            neighbor_indices = get_neighbors_with_fixed_radius(
+                nan_spot, 
+                self.gene_expression_adata, 
+                radius=radius, 
+                include_center=False
+            )
 
-            # Collect non-NaN neighbors
             neighbor_profiles = [
-                spotwise_gene_expression_profiles[i]
+                spotwise_profiles[i]
                 for i in neighbor_indices
-                if i in spotwise_gene_expression_profiles
+                if i in spotwise_profiles
             ]
 
             if neighbor_profiles:
-                # Compute the average proportions from neighbors
-                imputed_profile = np.nanmean(neighbor_profiles, axis=0)
-                spotwise_gene_expression_profiles[nan_spot] = imputed_profile
-                logging.info(f"Imputed spot {nan_spot} using neighbors at radius 2.")
+                # Round to nearest integer for count data
+                imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
+                spotwise_profiles[nan_spot] = imputed_profile
+                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius}.")
             else:
                 logging.warning(f"No valid neighbors found to impute spot {nan_spot}. Leaving as NaN.")
-            
-    
-        spot_celltype_indices = [f"{spot_names[i]}_{cell_type_names[j]}" for i in range(N) for j in range(T)]
+
+        # Create combined matrix of count data
+        spot_celltype_indices = [
+            f"{spot_names[i]}_{cell_type_names[j]}" 
+            for i in range(N) 
+            for j in range(T)
+        ]
         nan_matrix = np.full((T, M), np.nan)
-        gene_expression_data_combined = np.vstack(
-            [spotwise_gene_expression_profiles.get(i, nan_matrix) for i in range(N)]
+        data_combined = np.vstack([
+            spotwise_profiles.get(i, nan_matrix) 
+            for i in range(N)
+        ])
+
+        # Create DataFrame with count data
+        gene_expression_df = pd.DataFrame(
+            data_combined, 
+            index=spot_celltype_indices, 
+            columns=gene_names
         )
 
-        # Validate shape
-        expected_shape = (N * T, M)
-        if gene_expression_data_combined.shape != expected_shape:
-            raise ValueError(
-                f"Invalid shape in combined results. Expected {expected_shape}, got {gene_expression_data_combined.shape}."
-            )
-
-        gene_expression_df = pd.DataFrame(gene_expression_data_combined, index=spot_celltype_indices, columns=gene_names)
-
         # Save to Parquet
-        parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression.parquet")
+        parquet_path = os.path.join(
+            self.output_folder, 
+            f"{self.sample_name}_gene_expression.parquet"
+        )
         gene_expression_df.to_parquet(parquet_path, compression="gzip")
-        print(f"✅ Gene expression data saved to '{parquet_path}'.")
+        print(f"✅ Discrete count gene expression data saved to '{parquet_path}'.")
+
+        # Store results
+        self.results['gene_expression'] = gene_expression_df
 
     def append_proportions_to_adata(self, proportions_path = None):
         """
@@ -505,13 +501,12 @@ class CitegeistModel:
                     f"Shape mismatch: CellType matrix {celltype_matrix.shape} does not match adata.X {X_dense.shape}"
                 )
 
-            # Calculate gene contribution for this cell type
-            celltype_gene_matrix = celltype_matrix * X_dense
+
 
             # Add matrices to layers
             layer_name = celltype.replace(' ', '_')  # Sanitize layer name
-            self.gene_expression_adata.layers[layer_name + "_contribution"] = celltype_matrix
-            self.gene_expression_adata.layers[layer_name + "_genes"] = celltype_gene_matrix
+            #self.gene_expression_adata.layers[layer_name + "_contribution"] = celltype_matrix
+            self.gene_expression_adata.layers[layer_name + "_genes"] = celltype_matrix
 
             print(f"Added layers: {layer_name}_contribution, {layer_name}_genes (Shape: {celltype_matrix.shape})")
 

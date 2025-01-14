@@ -250,8 +250,8 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
     existing_markers = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
-        print("Adata variables: ", adata.var_names)
-        print("Antibody markers: ", all_markers)
+        logging.info("Adata variables: ", adata.var_names)
+        logging.info("Antibody markers: ", all_markers)
         raise ValueError("No matching antibody markers found in adata.var_names.")
     
     adata.var_names_make_unique()
@@ -277,13 +277,13 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         if relevant_marker_indices:
             profile_based_antibody_data[:, profile_idx] = antibody_capture_data[:, relevant_marker_indices].mean(axis=1)
         else:
-            print(f"⚠️ No valid markers found for profile '{profile_name}'.")
+            logging.warning(f"⚠️ No valid markers found for profile '{profile_name}'.")
 
     # Step 3: Normalize columns to prevent zero-division
     column_max = np.max(profile_based_antibody_data, axis=0)
     zero_columns = column_max == 0
     if np.any(zero_columns):
-        print(f"⚠️ Warning: Zero columns detected. Adding epsilon to prevent NaNs.")
+        logging.warning(f"⚠️ Warning: Zero columns detected. Adding epsilon to prevent NaNs.")
         column_max[zero_columns] = 1e-6
 
     profile_based_antibody_data /= column_max
@@ -319,7 +319,7 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
     iteration = 0
 
     while iteration < max_iterations:
-        print(f"\nIteration {iteration + 1}")
+        logging.info(f"\nIteration {iteration + 1}")
         model = gp.Model("EM_Cell_Proportions")
         model.setParam('OutputFlag', 0)
         
@@ -362,9 +362,9 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
         beta_diff = np.linalg.norm(beta_new - beta_prev)
         Y_diff = np.linalg.norm(Y_values - Y_prev)
         
-        print(f"Change in beta: {beta_diff:.6f}, Change in Y: {Y_diff:.6f}")
+        logging.info(f"Change in beta: {beta_diff:.6f}, Change in Y: {Y_diff:.6f}")
         if beta_diff < tolerance and Y_diff < tolerance:
-            print("Convergence achieved.")
+            logging.info("Convergence achieved.")
             break
         
         beta_prev = beta_new
@@ -656,16 +656,15 @@ def two_pass_optimize_gene_expression(
     radius=2,
     alpha=0.5,
     lambda_reg_gex=0.0001,
-    lambda_prior_weight=0.5,
-    prior_change_threshold=0.01,
+    lambda_prior_weight=0.3,  # Reduced weight on prior
     max_workers=None,
     checkpoint_interval=100,
     output_dir="checkpoints",
-    rerun=False,
-    max_iterations=5  # Maximum number of iterations to prevent infinite loops
+    rerun=False
 ):
     """
-    Iterative optimization that runs until the prior converges.
+    Two-pass optimization with ZINB-guided prior.
+    First pass establishes baseline patterns, second pass refines with soft prior guidance.
     """
     #########################
     # === Analyze Zero-Inflation Patterns
@@ -691,113 +690,72 @@ def two_pass_optimize_gene_expression(
     logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
 
     #########################
-    # === Iterative Optimization
+    # === PASS 1 (No Prior)
     #########################
-    iteration = 0
-    prior_change = float('inf')
-    previous_prior = None
-    current_profiles = None
+    logging.info("=== Pass 1: Initial optimization without prior ===")
+    spotwise_profiles_pass1 = optimize_gene_expression(
+        sample_name=f"{sample_name}_pass1",
+        deconvolution_expression_data=deconvolution_expression_data,
+        cell_type_numbers_array=cell_type_numbers_array,
+        filtered_adata=filtered_adata,
+        radius=radius,
+        alpha=alpha,
+        lambda_reg_gex=lambda_reg_gex,
+        max_workers=max_workers,
+        checkpoint_interval=checkpoint_interval,
+        output_dir=output_dir,
+        rerun=rerun
+    )
 
-    while prior_change > prior_change_threshold and iteration < max_iterations:
-        iteration += 1
-        logging.info(f"\n=== Starting iteration {iteration} ===")
+    #########################
+    # === Compute Prior
+    #########################
+    logging.info("=== Computing global prior from pass 1 ===")
+    global_prior, zinb_matrix, zero_inflation_probs = compute_global_prior(
+        spotwise_gene_expression_profiles=spotwise_profiles_pass1,
+        cell_type_numbers_array=cell_type_numbers_array,
+        lambda_prior=1.0,
+        zero_inflation_threshold=suggested_threshold
+    )
 
-        #########################
-        # === PASS 1 (No Prior or Using Previous Prior)
-        #########################
-        if iteration == 1:
-            logging.info("=== Pass 1: Initial optimization without prior ===")
-            spotwise_profiles_pass1 = optimize_gene_expression(
-                sample_name=f"{sample_name}_iter{iteration}_pass1",
-                deconvolution_expression_data=deconvolution_expression_data,
-                cell_type_numbers_array=cell_type_numbers_array,
-                filtered_adata=filtered_adata,
-                radius=radius,
-                alpha=alpha,
-                lambda_reg_gex=lambda_reg_gex,
-                max_workers=max_workers,
-                checkpoint_interval=checkpoint_interval,
-                output_dir=output_dir,
-                rerun=rerun
-            )
-        else:
-            logging.info(f"=== Pass 1 of iteration {iteration}: Using previous prior ===")
-            # Create argument tuples for each spot using previous prior
-            spot_args = [
-                (i, filtered_adata, cell_type_numbers_array, radius, previous_prior,
-                 lambda_prior_weight, alpha, lambda_reg_gex)
-                for i in range(deconvolution_expression_data.shape[0])
-            ]
-            
-            spotwise_profiles_pass1 = optimize_gene_expression_with_custom_spot_fn(
-                sample_name=f"{sample_name}_iter{iteration}_pass1",
-                deconvolution_expression_data=deconvolution_expression_data,
-                cell_type_numbers_array=cell_type_numbers_array,
-                filtered_adata=filtered_adata,
-                radius=radius,
-                alpha=alpha,
-                lambda_reg_gex=lambda_reg_gex,
-                spot_function=deconvolute_spot_with_neighbors_wrapper,
-                spot_args=spot_args,
-                max_workers=max_workers,
-                checkpoint_interval=checkpoint_interval,
-                output_dir=output_dir,
-                rerun=rerun
-            )
+    #########################
+    # === PASS 2 (With Prior)
+    #########################
+    logging.info("=== Pass 2: Optimization with prior guidance ===")
+    
+    spot_args = [
+        (i, filtered_adata, cell_type_numbers_array, radius, global_prior,
+         lambda_prior_weight, alpha, lambda_reg_gex)
+        for i in range(deconvolution_expression_data.shape[0])
+    ]
 
-        #########################
-        # === Compute New Prior
-        #########################
-        logging.info(f"=== Computing prior from iteration {iteration} ===")
-        current_prior, zinb_matrix, zero_inflation_probs = compute_global_prior(
-            spotwise_gene_expression_profiles=spotwise_profiles_pass1,
-            cell_type_numbers_array=cell_type_numbers_array,
-            lambda_prior=1.0,
-            zero_inflation_threshold=suggested_threshold
-        )
+    final_profiles = optimize_gene_expression_with_custom_spot_fn(
+        sample_name=f"{sample_name}_pass2",
+        deconvolution_expression_data=deconvolution_expression_data,
+        cell_type_numbers_array=cell_type_numbers_array,
+        filtered_adata=filtered_adata,
+        radius=radius,
+        alpha=alpha,
+        lambda_reg_gex=lambda_reg_gex,
+        spot_function=deconvolute_spot_with_neighbors_wrapper,
+        spot_args=spot_args,
+        max_workers=max_workers,
+        checkpoint_interval=checkpoint_interval,
+        output_dir=output_dir,
+        rerun=rerun
+    )
 
-        # Calculate prior change if not first iteration
-        if previous_prior is not None:
-            prior_change = np.mean(np.abs(current_prior - previous_prior))
-            logging.info(f"Prior change from previous iteration: {prior_change:.6f}")
-        
-        previous_prior = current_prior.copy()
-        current_profiles = spotwise_profiles_pass1
+    # Log some statistics about the final results
+    n_spots = len(final_profiles)
+    logging.info(f"=== Optimization completed ===")
+    logging.info(f"Successfully processed {n_spots} spots")
+    
+    # Optional: Log some ZINB statistics
+    high_zi_genes = np.sum(zero_inflation_probs > suggested_threshold, axis=1)
+    for ct_idx in range(len(high_zi_genes)):
+        logging.info(f"Cell type {ct_idx} has {high_zi_genes[ct_idx]} highly zero-inflated genes")
 
-        #########################
-        # === PASS 2
-        #########################
-        logging.info(f"=== Pass 2 of iteration {iteration}: Optimization with current prior ===")
-        
-        spot_args = [
-            (i, filtered_adata, cell_type_numbers_array, radius, current_prior,
-             lambda_prior_weight, alpha, lambda_reg_gex)
-            for i in range(deconvolution_expression_data.shape[0])
-        ]
-
-        current_profiles = optimize_gene_expression_with_custom_spot_fn(
-            sample_name=f"{sample_name}_iter{iteration}_pass2",
-            deconvolution_expression_data=deconvolution_expression_data,
-            cell_type_numbers_array=cell_type_numbers_array,
-            filtered_adata=filtered_adata,
-            radius=radius,
-            alpha=alpha,
-            lambda_reg_gex=lambda_reg_gex,
-            spot_function=deconvolute_spot_with_neighbors_wrapper,
-            spot_args=spot_args,
-            max_workers=max_workers,
-            checkpoint_interval=checkpoint_interval,
-            output_dir=output_dir,
-            rerun=rerun
-        )
-
-    logging.info(f"\n=== Optimization completed after {iteration} iterations ===")
-    if prior_change <= prior_change_threshold:
-        logging.info("Converged: Prior change below threshold")
-    else:
-        logging.info("Stopped: Maximum iterations reached")
-
-    return current_profiles
+    return final_profiles
 
 def optimize_gene_expression_with_custom_spot_fn(
     sample_name,
@@ -863,6 +821,8 @@ def optimize_gene_expression_with_custom_spot_fn(
             if f.startswith(f"{sample_name}_gene_expression") and f.endswith(".npz")
         ]
         print("Found existing files: ", existing_files)
+        logging.info("Found existing files: ", existingfiles)
+
         for file in existing_files:
             try:
                 os.remove(os.path.join(output_dir, file))
