@@ -273,10 +273,6 @@ class CitegeistModel:
         # Step 3: Winsorize to cap extreme values
         matrix = self.winsorize(matrix, lower_percentile=5, upper_percentile=95)
 
-        # New step: Apply Gaussian smoothing for local background correction
-        smoothed_background = gaussian_filter(matrix, sigma=(gaussian_sigma, 0))
-        matrix = matrix - smoothed_background
-        matrix[matrix < 0] = 0  # Ensure no negative values
 
         # Continue with existing steps...
         column_sums = matrix.sum(axis=0)
@@ -299,30 +295,71 @@ class CitegeistModel:
 
         print("Antibody capture data preprocessing completed: Winsorized, Gaussian smoothed, CLR applied, no NaNs detected.")
 
-    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5):
-            """
-            Orchestrates the cell proportion optimization workflow.
-            Delegates optimization to `optimize_cell_proportions` in `gurobi_impl.py`.
-            """
-            if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
-                raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
+    def run_cell_proportion_model(
+        self, 
+        tolerance=1e-4, 
+        max_iterations=50, 
+        lambda_reg=1.0, 
+        alpha=0.5, 
+        lambda_reg_w=0.1
+    ):
+        """
+        Orchestrates the cell proportion optimization workflow using marker weights.
+        Delegates optimization to `optimize_cell_proportions_with_marker_weights_from_model`
+        in `gurobi_impl.py`, which pulls markers and cell type info directly from
+        self.antibody_capture_adata and self.cell_profile_dict.
 
-            if self.cell_profile_dict is None:
-                raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
+        Args:
+            tolerance (float): Convergence tolerance for changes in Y and W.
+            max_iterations (int): Maximum number of EM-like iterations.
+            lambda_reg (float): Elastic net regularization strength for Y.
+            alpha (float): L1-L2 mixing parameter (alpha=1 => L1 only, alpha=0 => L2 only).
+            lambda_reg_w (float): L2 penalty weight that keeps W[m] near 1.
 
-            profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(self.antibody_capture_adata, self.cell_profile_dict)
-            
-            Y_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
-            
-            spot_names = self.antibody_capture_adata.obs_names
-            cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-            
-            # Store and save results
-            self.results['cell_prop'] = cell_type_proportions_df
-            output_file = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
-            save_results_to_output(cell_type_proportions_df, output_file)
-            print(f"Cell type proportions saved to '{output_file}'.")
-            
+        Returns:
+            None.  (Results stored in self.results)
+
+        Raises:
+            ValueError: If no valid data is loaded or if cell_profile_dict is missing.
+        """
+        from .gurobi_impl import optimize_cell_proportions_with_marker_weights_from_model
+
+        # Basic checks
+        if self.antibody_capture_adata is None:
+            raise ValueError(
+                "No valid antibody capture data loaded. Ensure `adata` is split "
+                "or `antibody_capture_adata` is set."
+            )
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
+
+        # Run the updated optimization that uses internal data & profiles
+        Y_values, W_values = optimize_cell_proportions_with_marker_weights_from_model(
+            citegeist_model=self,
+            tolerance=tolerance,
+            max_iterations=max_iterations,
+            lambda_reg=lambda_reg,
+            alpha=alpha,
+            lambda_reg_w=lambda_reg_w
+        )
+
+        # Build a DataFrame of cell type proportions
+        cell_type_names = list(self.cell_profile_dict.keys())
+        spot_names = self.antibody_capture_adata.obs_names
+        cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+
+        # Store and save results
+        self.results['cell_prop'] = cell_type_proportions_df
+        output_file = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
+        cell_type_proportions_df.to_csv(output_file)
+        print(f"Cell type proportions saved to '{output_file}'.")
+
+        # Optionally, store W_values as well. Since we don't automatically know the matched marker names here, 
+        # we can just store them by index, or you could extend the code to track the marker list used.
+        # For now, we'll place them in the results as a NumPy array:
+        self.results['marker_weights'] = W_values
+        print("Marker weights have been stored in self.results['marker_weights'].")
+
     def run_cell_expression_model(
         self, 
         radius=2, 
