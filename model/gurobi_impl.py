@@ -381,6 +381,11 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
 
     return Y_values
 
+
+
+################################################################################
+# === DECONVOLUTION FOR GENES ===
+################################################################################
 def deconvolute_spot_with_neighbors_with_prior(
     i, 
     filtered_adata, 
