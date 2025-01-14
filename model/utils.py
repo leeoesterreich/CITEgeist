@@ -228,13 +228,15 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
     """
     metrics_per_cell_type = {}
 
+    logging.info(f"Calculating gene expression metrics for {ground_truth_dir} and {predictions_dir}")
+
     for gt_filename in os.listdir(ground_truth_dir):
         if not gt_filename.endswith("_GT.csv"):
             continue
 
         cell_type = gt_filename.replace("_GT.csv", "")
         gt_filepath = os.path.join(ground_truth_dir, gt_filename)
-        pred_filepath = os.path.join(predictions_dir, f"{cell_type}_layer.csv")
+        pred_filepath = os.path.join(predictions_dir, f"{cell_type}_genes_layer.csv")
 
         if not os.path.exists(pred_filepath):
             logging.warning(f"Prediction file for {cell_type} not found. Skipping.")
@@ -274,17 +276,20 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
 
     # Calculate overall statistics
-    all_metrics = pd.DataFrame(metrics_per_cell_type).T
-    
-    return {
-        "metrics_per_cell_type": metrics_per_cell_type,
-        "average_rmse": all_metrics['RMSE'].mean(),
-        "median_rmse": all_metrics['RMSE'].median(),
-        "average_nrmse": all_metrics['NRMSE'].mean(),
-        "median_nrmse": all_metrics['NRMSE'].median(),
-        "average_mae": all_metrics['MAE'].mean(),
-        "median_mae": all_metrics['MAE'].median()
-    }
+    if metrics_per_cell_type:  # Only calculate if we have metrics
+        all_metrics = pd.DataFrame.from_dict(metrics_per_cell_type, orient='index')
+        return {
+            "metrics_per_cell_type": metrics_per_cell_type,
+            "average_rmse": all_metrics['RMSE'].mean(),
+            "median_rmse": all_metrics['RMSE'].median(),
+            "average_nrmse": all_metrics['NRMSE'].mean(),
+            "median_nrmse": all_metrics['NRMSE'].median(),
+            "average_mae": all_metrics['MAE'].mean(),
+            "median_mae": all_metrics['MAE'].median()
+        }
+    else:
+        raise ValueError("No metrics were calculated - no valid cell types found")
+
 
 def export_anndata_layers(adata, output_dir):
     """

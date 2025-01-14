@@ -1,11 +1,12 @@
 import os
 import scanpy as sc
-from .gurobi_impl import map_antibodies_to_profiles, optimize_cell_proportions, optimize_gene_expression, two_pass_optimize_gene_expression
+from model.gurobi_impl import map_antibodies_to_profiles, optimize_cell_proportions, optimize_gene_expression, two_pass_optimize_gene_expression
 from .utils import validate_cell_profile_dict, save_results_to_output, cleanup_memory, setup_logging, get_neighbors_with_fixed_radius, assert_neighborhood_size
 import numpy as np
 import pandas as pd
 import logging
 import pyarrow.parquet as pq
+from scipy.ndimage import gaussian_filter
 
 
 class CitegeistModel:
@@ -247,19 +248,23 @@ class CitegeistModel:
         self.preprocessed_gex = True
         print("Gene expression data validated for discrete count analysis.")
 
-    def preprocess_antibody(self):
+    def preprocess_antibody(self, gaussian_sigma=5):
         """
         Preprocess antibody capture data:
         - Winsorize extreme values.
+        - Apply Gaussian smoothing for local background correction.
         - Apply global CLR normalization.
         - Raise an error if NaNs or Infs are detected in the processed data.
+
+        Args:
+            gaussian_sigma (float): Standard deviation for Gaussian kernel. Higher values mean more smoothing.
         """
         if self.antibody_capture_adata is None:
             raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
 
         # Step 1: Extract and ensure matrix is dense
         matrix = self.antibody_capture_adata.X.toarray() if hasattr(self.antibody_capture_adata.X, 'toarray') else self.antibody_capture_adata.X
-        matrix = np.asarray(matrix)  # Ensure it's a NumPy array
+        matrix = np.asarray(matrix)
 
         # Step 2: Validate initial data (no NaNs or Infs at start)
         if np.isnan(matrix).any() or np.isinf(matrix).any():
@@ -268,19 +273,23 @@ class CitegeistModel:
         # Step 3: Winsorize to cap extreme values
         matrix = self.winsorize(matrix, lower_percentile=5, upper_percentile=95)
 
-        # Step 4: Prevent zero-only columns (add small epsilon if column sum is zero)
+        # New step: Apply Gaussian smoothing for local background correction
+        smoothed_background = gaussian_filter(matrix, sigma=(gaussian_sigma, 0))
+        matrix = matrix - smoothed_background
+        matrix[matrix < 0] = 0  # Ensure no negative values
+
+        # Continue with existing steps...
         column_sums = matrix.sum(axis=0)
         zero_columns = column_sums == 0
         if np.any(zero_columns):
-            matrix[:, zero_columns] += 1e-6  # Add epsilon to zero columns
+            matrix[:, zero_columns] += 1e-6
 
         # Step 5: Apply CLR Normalization
         matrix = self.global_clr(matrix)
 
         # Step 6: Final Validation for NaNs or Infs
         if np.isnan(matrix).any() or np.isinf(matrix).any():
-            raise ValueError("NaN or Inf values detected in antibody capture matrix after preprocessing. "
-                             "Check input data and preprocessing steps.")
+            raise ValueError("NaN or Inf values detected in antibody capture matrix after preprocessing.")
 
         # Step 7: Reassign processed matrix to AnnData object
         self.antibody_capture_adata.X = matrix
@@ -288,7 +297,7 @@ class CitegeistModel:
         # Update status flag
         self.preprocessed_antibody = True
 
-        print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
+        print("Antibody capture data preprocessing completed: Winsorized, Gaussian smoothed, CLR applied, no NaNs detected.")
 
     def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5):
             """
@@ -298,8 +307,6 @@ class CitegeistModel:
             if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
                 raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
 
-            adata = self.antibody_capture_adata if self.antibody_capture_adata is not None else self.adata
-
             if self.cell_profile_dict is None:
                 raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
 
@@ -307,8 +314,9 @@ class CitegeistModel:
             
             Y_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
             
-            spot_names = self.adata.obs_names
+            spot_names = self.antibody_capture_adata.obs_names
             cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+            
             # Store and save results
             self.results['cell_prop'] = cell_type_proportions_df
             output_file = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
@@ -442,11 +450,33 @@ class CitegeistModel:
 
         # Load proportions CSV
         spot_by_celltype_df = pd.read_csv(proportions_path, index_col=0)
+        spot_by_celltype_df.index = pd.Index(spot_by_celltype_df.index, dtype=str)
+        
+
+        # Sort both dataframes by their indices
+        if 'spot_' in str(spot_by_celltype_df.index[0]):
+            # For simulated data with 'spot_' prefix
+            def safe_spot_sort(x):
+                try:
+                    return int(x.split('spot_')[1])
+                except:
+                    return x
+            spot_by_celltype_df = spot_by_celltype_df.sort_index(key=safe_spot_sort)
+        else:
+            # For real data, use regular string sorting
+            spot_by_celltype_df = spot_by_celltype_df.sort_index()
+            
+
 
         # Check index alignment
         if not all(spot_by_celltype_df.index == self.gene_expression_adata.obs_names):
-            print(spot_by_celltype_df.index)
-            print(self.gene_expression_adata.obs_names)
+            print("Index mismatch details:")
+            print("CSV shape:", spot_by_celltype_df.shape)
+            print("AnnData shape:", self.gene_expression_adata.shape)
+            print("First mismatched indices:")
+            mismatch_idx = [i for i, (a, b) in enumerate(zip(spot_by_celltype_df.index, self.gene_expression_adata.obs_names)) if a != b][:5]
+            for idx in mismatch_idx:
+                print(f"Position {idx}: CSV={spot_by_celltype_df.index[idx]}, AnnData={self.gene_expression_adata.obs_names[idx]}")
             raise ValueError("Spot indices do not match between the CSV and AnnData object. Please verify your data.")
         else:
             print("✅ Spot indices match between CSV and adata.obs.")
