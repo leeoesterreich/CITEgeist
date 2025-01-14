@@ -429,63 +429,45 @@ class CitegeistModel:
         # Store results
         self.results['gene_expression'] = gene_expression_df
 
-    def append_proportions_to_adata(self, proportions_path = None):
-        """
-        Append cell type proportion results back into the AnnData object.
-
-        Args:
-            proportions_path (str): Path to the CSV file containing cell type proportions.
-
-        Raises:
-            ValueError: If `adata` is not initialized or spot indices do not match.
-
-        Returns:
-            None: Updates `self.adata` in place.
-        """
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression AnnData object is not initialized in the model.")
-            
+    def append_proportions_to_adata(self, proportions_path=None):
+        """Append cell type proportions to AnnData object."""
         if proportions_path is None:
             proportions_path = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
 
         # Load proportions CSV
         spot_by_celltype_df = pd.read_csv(proportions_path, index_col=0)
-        spot_by_celltype_df.index = pd.Index(spot_by_celltype_df.index, dtype=str)
         
-
-        # Sort both dataframes by their indices
+        # Debug prints before sorting
+        print("\nBefore sorting:")
+        print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
+        print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
+        
         if 'spot_' in str(spot_by_celltype_df.index[0]):
-            # For simulated data with 'spot_' prefix
-            def safe_spot_sort(x):
-                try:
-                    return int(x.split('spot_')[1])
-                except:
-                    return x
-            spot_by_celltype_df = spot_by_celltype_df.sort_index(key=safe_spot_sort)
-        else:
-            # For real data, use regular string sorting
-            spot_by_celltype_df = spot_by_celltype_df.sort_index()
+            # Sort both numerically by the spot number
+            def get_spot_number(x):
+                return int(x.split('spot_')[1])
             
-
-
-        # Check index alignment
+            # Sort using reindex instead of sort_index
+            sorted_csv_idx = sorted(spot_by_celltype_df.index, key=get_spot_number)
+            sorted_adata_idx = sorted(self.gene_expression_adata.obs_names, key=get_spot_number)
+            
+            spot_by_celltype_df = spot_by_celltype_df.reindex(sorted_csv_idx)
+            self.gene_expression_adata = self.gene_expression_adata[sorted_adata_idx].copy()
+            
+            # Debug prints after sorting
+            print("\nAfter sorting:")
+            print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
+            print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
+        
+        # Check if indices match after sorting
         if not all(spot_by_celltype_df.index == self.gene_expression_adata.obs_names):
-            print("Index mismatch details:")
-            print("CSV shape:", spot_by_celltype_df.shape)
-            print("AnnData shape:", self.gene_expression_adata.shape)
-            print("First mismatched indices:")
-            mismatch_idx = [i for i, (a, b) in enumerate(zip(spot_by_celltype_df.index, self.gene_expression_adata.obs_names)) if a != b][:5]
-            for idx in mismatch_idx:
-                print(f"Position {idx}: CSV={spot_by_celltype_df.index[idx]}, AnnData={self.gene_expression_adata.obs_names[idx]}")
-            raise ValueError("Spot indices do not match between the CSV and AnnData object. Please verify your data.")
-        else:
-            print("✅ Spot indices match between CSV and adata.obs.")
-
-        # Append cell type proportions to `adata.obs`
+            raise ValueError("Spot indices still don't match after sorting. Please verify your data.")
+        
+        # Add cell type proportions to adata.obs
         for cell_type in spot_by_celltype_df.columns:
             self.gene_expression_adata.obs[cell_type] = spot_by_celltype_df[cell_type]
-
-        print("✅ Cell type proportions have been appended to adata.obs.")
+        
+        print("✅ Cell type proportions have been appended to adata.obs")
         
         
     def append_gex_to_adata(self, parquet_path = None):
