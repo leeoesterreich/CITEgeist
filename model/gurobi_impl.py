@@ -1444,3 +1444,221 @@ def optimize_gene_expression(
         logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     return spotwise_gene_expression_profiles
+
+def optimize_cell_proportions_with_marker_weights_from_model(
+    citegeist_model,
+    tolerance=1e-4,
+    max_iterations=50,
+    lambda_reg=1.0,
+    alpha=0.5,
+    lambda_reg_w=0.1
+):
+    """
+    A convenience function that:
+      1) Uses citegeist_model.cell_profile_dict to extract the relevant markers for each cell type.
+      2) Builds marker_signal_data (N x M) automatically from citegeist_model.antibody_capture_adata.
+      3) Learns cell type proportions (Y) and per-marker weights (W) via the iterative EM-like approach.
+    
+    This eliminates the need to manually pass marker_signal_data and cell_type_names.
+    
+    Args:
+        citegeist_model (CitegeistModel): The model holding the antibody_capture_adata and cell_profile_dict.
+        tolerance (float): Convergence tolerance for changes in Y and W.
+        max_iterations (int): Maximum EM-like iterations.
+        lambda_reg (float): Strength of Elastic Net regularization for Y.
+        alpha (float): L1-L2 mixing parameter for the Elastic Net on Y (alpha=1 purely L1, alpha=0 purely L2).
+        lambda_reg_w (float): L2 penalty strength to keep W[m] near 1.
+
+    Returns:
+        (Y_values, W_values)
+          Y_values: (N x T) array of cell type proportions per spot.
+          W_values: (M,) array of marker weights.
+    """
+    import gurobipy as gp
+    from gurobipy import GRB, quicksum
+    import numpy as np
+    import logging
+
+    # -------------------------------------------------
+    # 1) Safety checks and data extraction
+    # -------------------------------------------------
+    if citegeist_model.cell_profile_dict is None:
+        raise ValueError("No cell_profile_dict found in citegeist_model. Please load it first.")
+    if citegeist_model.antibody_capture_adata is None:
+        raise ValueError("No antibody_capture_adata found in citegeist_model. "
+                         "Ensure you have split your data or provided an antibody AnnData.")
+    
+    cell_profile_dict = citegeist_model.cell_profile_dict
+    antibody_adata = citegeist_model.antibody_capture_adata
+    # Each row in antibody_adata corresponds to a spot, each column to a marker.
+
+    # We will build:
+    #   1) cell_type_names  (list of T unique cell types in the dict)
+    #   2) marker_signal_data (N x M) with M = total unique markers across all cell types
+    #      but typically we only gather the markers that are relevant across the entire profile dict.
+    #      For each marker col, we store the raw intensities from antibody_adata.X
+    #      We'll compile them in the order we find them in the dictionary.
+
+    # Extract the set of all markers from cell_profile_dict
+    # Example dict structure:
+    #   {
+    #       "Cancer Cells": {
+    #           "Major": ["EPCAM-1"], 
+    #           "Minor": ["SDC1-1", "KRT5-1"]
+    #       },
+    #       ...
+    #   }
+    # We'll flatten these lists (Major, Minor, ...) and keep them unique.
+    cell_type_names = list(cell_profile_dict.keys())
+    # Build a reproducible list of unique markers (like "CD68-1", "CD14-1", etc.)
+    all_markers = []
+    for ct in cell_type_names:
+        for category, marker_list in cell_profile_dict[ct].items():
+            all_markers.extend(marker_list)
+    unique_markers = list(set(all_markers))  # remove duplicates if any exist
+    unique_markers.sort()  # sort for consistent indexing
+
+    # The shape of antibody_adata is (N_spots x M_total_in_adata).
+    # We'll form a sub-matrix with columns restricted to those in unique_markers that are
+    # actually found in antibody_adata.var_names.
+    # A typical scenario: "CD68-1" in cell_profile_dict must be found in antibody_adata.var_names.
+    # If not found, we log a warning or ignore that marker.
+
+    adata_markers = list(antibody_adata.var_names)
+    marker_indices = []
+    found_markers = []
+    missing_markers = []
+    for item in unique_markers:
+        if item in adata_markers:
+            marker_indices.append(adata_markers.index(item))
+            found_markers.append(item)
+        else:
+            missing_markers.append(item)
+    if missing_markers:
+        logging.warning(f"Some markers in cell_profile_dict not found in antibody_capture_adata: {missing_markers}")
+    if not found_markers:
+        raise ValueError("No matching markers found between cell_profile_dict and antibody_capture_adata.")
+
+    # Create the sub-matrix (N x M_found):
+    # We'll convert to dense if needed.
+    X_dense = antibody_adata.X
+    if hasattr(X_dense, "toarray"):
+        X_dense = X_dense.toarray()  # make sure it's actually a numpy array
+    marker_signal_data = X_dense[:, marker_indices]
+    N, M = marker_signal_data.shape
+    T = len(cell_type_names)
+
+    logging.info(f"Building marker_signal_data with shape {marker_signal_data.shape} from {len(found_markers)} markers.")
+    logging.info(f"Cell types: {cell_type_names}")
+
+    # -------------------------------------------------
+    # 2) Initialize beta, Y, W
+    # -------------------------------------------------
+    beta_estimates = np.ones(T, dtype=float)  # One beta_j per cell type
+    Y_prev = np.zeros((N, T), dtype=float)    # Proportions matrix
+    W_prev = np.ones(M, dtype=float)          # Marker weights
+    iteration = 0
+
+    # -------------------------------------------------
+    # 3) Iterative algorithm (EM-like)
+    # -------------------------------------------------
+    while iteration < max_iterations:
+        logging.info(f"optimize_cell_proportions_with_marker_weights_from_model - Iteration {iteration+1}")
+
+        # Build Gurobi model
+        model = gp.Model("EM_Cell_Proportions_With_Marker_Weights")
+        model.setParam('OutputFlag', 0)  # Turn off Gurobi printing
+
+        # Define variables:
+        #   Y[i,j] in [0,1]
+        #   W[m] >= 0 (or unconstrained?), keep upper bound 10.0 to avoid blow-up
+        Y = model.addVars(N, T, lb=0, ub=1, vtype=GRB.CONTINUOUS, name="Y")
+        W = model.addVars(M, lb=0, ub=10.0, vtype=GRB.CONTINUOUS, name="W")
+
+        # Quadratic objective for the sum of squared residuals:
+        #   Σ_{i,m} [ S[i,m] - W[m]*Σ_j (beta_j * Y[i,j]) ]^2
+        quad_error = gp.QuadExpr()
+        for i_spot in range(N):
+            for m_marker in range(M):
+                S_im = marker_signal_data[i_spot, m_marker]
+                expr_sum_betaY = quicksum(beta_estimates[j] * Y[i_spot, j] for j in range(T))
+                residual = S_im - W[m_marker] * expr_sum_betaY
+                quad_error.add(residual * residual)
+
+        # L2 penalty on W: λ_reg_w * Σ_m (W[m] - 1)²
+        w_reg = gp.QuadExpr()
+        for m_marker in range(M):
+            diff = (W[m_marker] - 1.0)
+            w_reg.add(diff * diff)
+        w_reg *= lambda_reg_w
+
+        # Elastic Net penalty on Y:
+        #   EN(Y) = lambda_reg * [ alpha * L1(Y) + (1-alpha) * L2(Y) ]
+        l1_expr = quicksum(Y[i_spot, j] for i_spot in range(N) for j in range(T))
+        l2_expr = quicksum(Y[i_spot, j] * Y[i_spot, j] for i_spot in range(N) for j in range(T))
+        en_expr = lambda_reg * (alpha * l1_expr + (1.0 - alpha) * l2_expr)
+
+        # Final objective
+        obj = quad_error + w_reg + en_expr
+        model.setObjective(obj, GRB.MINIMIZE)
+
+        # Constraints: sum_j Y[i,j] in [0.95, 1.05] for each spot i
+        for i_spot in range(N):
+            model.addConstr(quicksum(Y[i_spot, j] for j in range(T)) >= 0.95,
+                            name=f"sumY_lower_spot_{i_spot}")
+            model.addConstr(quicksum(Y[i_spot, j] for j in range(T)) <= 1.05,
+                            name=f"sumY_upper_spot_{i_spot}")
+
+        # Solve
+        model.optimize()
+        if model.status != GRB.OPTIMAL:
+            raise ValueError("Gurobi optimization failed to converge or was infeasible.")
+
+        # Extract solutions
+        Y_values = np.zeros((N, T), dtype=float)
+        W_values = np.zeros(M, dtype=float)
+        for i_spot in range(N):
+            for j in range(T):
+                Y_values[i_spot, j] = Y[i_spot, j].X
+        for m_marker in range(M):
+            W_values[m_marker] = W[m_marker].X
+
+        model.dispose()
+
+        # -------------------------------------------------
+        # 4) Update β_j using a least-squares approach
+        # -------------------------------------------------
+        new_beta = np.zeros(T, dtype=float)
+        for j in range(T):
+            num_j = 0.0
+            den_j = 0.0
+            for i_spot in range(N):
+                for m_marker in range(M):
+                    num_j += W_values[m_marker] * Y_values[i_spot, j] * marker_signal_data[i_spot, m_marker]
+                    den_j += (W_values[m_marker] ** 2) * (Y_values[i_spot, j] ** 2)
+            if den_j > 1e-12:
+                new_beta[j] = num_j / den_j
+            else:
+                new_beta[j] = 0.0
+
+        # -------------------------------------------------
+        # 5) Check for convergence
+        # -------------------------------------------------
+        beta_diff = np.linalg.norm(new_beta - beta_estimates)
+        Y_diff = np.linalg.norm(Y_values - Y_prev)
+        W_diff = np.linalg.norm(W_values - W_prev)
+        logging.info(f"Iteration {iteration+1}: dBeta={beta_diff:.6f}, dY={Y_diff:.6f}, dW={W_diff:.6f}")
+
+        if max(beta_diff, Y_diff, W_diff) < tolerance:
+            logging.info("Convergence achieved.")
+            break
+
+        beta_estimates = new_beta
+        Y_prev = Y_values
+        W_prev = W_values
+        iteration += 1
+
+    # -------------------------------------------------
+    # 6) Return final results
+    # -------------------------------------------------
+    return (Y_values, W_values)
