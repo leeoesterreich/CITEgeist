@@ -47,8 +47,6 @@ echo "Running with parameters: radius=$radius, input_folder=$INPUT_FOLDER, outpu
 python tests/test_citegeist_simulated.py \
     --radius $radius \
     --input_folder $INPUT_FOLDER \
-    --output_folder $OUTPUT_FOLDER \
-    --profiling_only True
-
+    --output_folder $OUTPUT_FOLDER
 
 echo "Job completed at $(date)"

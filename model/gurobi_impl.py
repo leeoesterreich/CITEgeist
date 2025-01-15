@@ -29,6 +29,8 @@ import gc
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 import numpy as np
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.spatial.distance import squareform
 
 
 def fit_zinb(x, p):
@@ -1449,3 +1451,238 @@ def optimize_gene_expression(
         logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     return spotwise_gene_expression_profiles
+
+def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
+    """
+    Approximate WGCNA-like approach in Python:
+      1) Compute gene-gene correlations
+      2) Convert to distance matrix
+      3) Cluster using hierarchical clustering
+      4) Define modules from clusters
+      5) Build a (genes x modules) binary membership matrix
+
+    Args:
+        adata_gex (AnnData): Spots × Genes
+        max_clusters (int): Maximum number of modules to cut from the tree
+        correlation_method (str): 'pearson' or 'spearman'
+
+    Returns:
+        module_matrix (np.ndarray): shape=(G, K), where G=number of genes, K=actual modules found
+        module_labels (List[str]): names or IDs for the modules
+    """
+    # 1) Extract gene expression matrix
+    gex_data = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
+    # shape: N (spots) × G (genes)
+    # We want gene-gene correlation, so transpose to G (genes) × N (spots)
+    gex_data_t = gex_data.T  # shape: G × N
+
+    # 2) Compute gene-gene correlation
+    if correlation_method == 'spearman':
+        from scipy.stats import spearmanr
+        corr, _ = spearmanr(gex_data_t, axis=1)
+    else:
+        corr = np.corrcoef(gex_data_t)
+
+    # 3) Convert correlation to distance for clustering
+    #    distance = 1 - corr
+    distance_matrix = 1.0 - corr
+
+    # 4) Perform hierarchical clustering on distance_matrix
+    #    Convert square distance to condensed form
+    dist_condensed = squareform(distance_matrix, checks=False)
+    Z = linkage(dist_condensed, method='average')  # average linkage, or "ward"/"complete"
+
+    # 5) Cut into clusters (modules)
+    cluster_ids = fcluster(Z, t=max_clusters, criterion='maxclust')  # 1..max_clusters
+    unique_clusters = np.unique(cluster_ids)
+    K = len(unique_clusters)  # actual number of modules
+
+    # 6) Build module_matrix (G × K), where entry=1 if gene in that module
+    module_matrix = np.zeros((gex_data.shape[1], K), dtype=float)
+    for i_gene, cluster_id in enumerate(cluster_ids):
+        module_matrix[i_gene, cluster_id - 1] = 1.0
+
+    module_labels = [f"Module_{c}" for c in unique_clusters]
+    return module_matrix, module_labels
+
+def optimize_multimodal_phase_3_wgcna(
+    adata_gex,
+    adata_antibody,
+    cell_prop_array,
+    cell_profiles,
+    max_clusters=10,
+    alpha_gex=1.0,
+    alpha_antibody=1.0,
+    alpha_spatial=0.0,
+    lambda_reg_module=0.1,
+    spatial_adjacency=None,
+    random_seed=42
+):
+    """
+    Integrate approximate WGCNA modules with an antibody-based term referencing 'cell_profiles'.
+
+    Args:
+        adata_gex (AnnData): Spots × Genes
+        adata_antibody (AnnData): Spots × Markers
+        cell_prop_array (np.ndarray): (N × T) existing cell-type proportions
+        cell_profiles (dict): e.g. your Major/Minor marker dictionary
+        max_clusters (int): upper bound on the number of gene modules
+        alpha_gex, alpha_antibody (float): weights for GEX vs. antibody alignment
+        alpha_spatial (float): weight for spatial term
+        lambda_reg_module (float): L2 or L1 penalty for module usage
+        spatial_adjacency (np.ndarray or None): (N × N) adjacency for spots
+        random_seed (int): random seed
+
+    Returns:
+        results (dict):
+          - modules: (G × K) matrix of module memberships
+          - updated_cell_prop: (N × T) updated cell-type proportions
+          - layers: (N × T × G) final refined expression per (spot, celltype, gene)
+    """
+    np.random.seed(random_seed)
+
+    # 1) Approximate WGCNA to get (G × K) module membership matrix
+    module_matrix, module_labels = approximate_wgcna(adata_gex, max_clusters=max_clusters)
+    G, K = module_matrix.shape  # G = #genes, K = #modules
+
+    # Data shapes
+    gex_data = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
+    antibody_data = adata_antibody.X.toarray() if hasattr(adata_antibody.X, 'toarray') else adata_antibody.X
+    N = gex_data.shape[0]  # spots
+    T = cell_prop_array.shape[1]  # cell types
+    M = antibody_data.shape[1]    # #markers
+
+    logging.info(f"[Phase 3 (WGCNA)] N={N}, G={G}, K={K}, T={T}, M={M}")
+
+    # 2) Optionally build a marker→celltype weighting from cell_profiles
+    #    For simplicity, we create W[m, c] = 1 if marker m belongs to cell c, else 0.
+    marker_var_names = list(adata_antibody.var_names)
+    cell_type_names = list(cell_profiles.keys())
+    marker_celltype_map = np.zeros((M, T), dtype=float)
+
+    for t_idx, ct_name in enumerate(cell_type_names):
+        major_markers = cell_profiles[ct_name].get("Major", [])
+        # Convert your marker naming to var_names
+        for mk in major_markers:
+            # example mk = "CD68-1"
+            if mk in marker_var_names:
+                m_idx = marker_var_names.index(mk)
+                marker_celltype_map[m_idx, t_idx] = 1.0
+
+    # 3) Create Gurobi model
+    model = gp.Model("Phase3_WGCNA")
+    model.setParam('OutputFlag', 0)
+    model.setParam('Seed', random_seed)
+
+    # 4) Create variables:
+    #    - X_module[i, k]: usage of module k in spot i
+    #    - Y[i, c]: refined cell-type proportions
+    #    (We also rely on module_matrix[G×K] for membership of gene→module.)
+    X_module = {}
+    for i in range(N):
+        for k_ in range(K):
+            X_module[(i, k_)] = model.addVar(lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
+                                             name=f"X_module_{i}_{k_}")
+
+    Y_refined = {}
+    for i in range(N):
+        for c in range(T):
+            Y_refined[(i, c)] = model.addVar(lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS,
+                                             name=f"Y_{i}_{c}")
+
+    model.update()
+
+    # 5) Objective Terms
+    # a) GEX reconstruction error
+    gex_residuals = []
+    for i in range(N):
+        for g_ in range(G):
+            # predicted expression for gene g_ in spot i = sum_k( X_module[i,k] * module_matrix[g_,k] )
+            pred_gex = gp.quicksum(X_module[(i, k_)] * module_matrix[g_, k_] for k_ in range(K))
+            diff = gex_data[i, g_] - pred_gex
+            gex_residuals.append(diff * diff)
+
+    # b) Antibody-based constraints
+    #    predicted antibody for marker m in spot i = sum_c( Y[i,c] * marker_celltype_map[m,c] ).
+    #    We keep it simple, but you might do something more advanced.
+    ab_residuals = []
+    for i in range(N):
+        for m_ in range(M):
+            pred_ab = gp.quicksum(Y_refined[(i, c_)] * marker_celltype_map[m_, c_] for c_ in range(T))
+            diff = antibody_data[i, m_] - pred_ab
+            ab_residuals.append(diff * diff)
+
+    # c) Spatial smoothing for Y
+    spatial_terms = []
+    if spatial_adjacency is not None and alpha_spatial > 0.0:
+        # adjacency is NxN
+        for i in range(N):
+            for j in range(N):
+                if spatial_adjacency[i, j] > 0:
+                    for c_ in range(T):
+                        delta = Y_refined[(i, c_)] - Y_refined[(j, c_)]
+                        spatial_terms.append(delta * delta * spatial_adjacency[i, j])
+
+    # d) Regularization on X_module usage
+    #    L2 penalty: sum(X_module[i,k]^2)
+    reg_module = []
+    for i in range(N):
+        for k_ in range(K):
+            reg_module.append(X_module[(i, k_)] * X_module[(i, k_)])
+
+    # Combine objectives
+    obj = (
+        alpha_gex * gp.quicksum(gex_residuals) +
+        alpha_antibody * gp.quicksum(ab_residuals) +
+        alpha_spatial * gp.quicksum(spatial_terms) +
+        lambda_reg_module * gp.quicksum(reg_module)
+    )
+    model.setObjective(obj, GRB.MINIMIZE)
+
+    # 6) Constraints
+    # Force sum of Y[i,c] ~ 1
+    for i in range(N):
+        model.addConstr(
+            gp.quicksum(Y_refined[(i, c_)] for c_ in range(T)) == 1.0,
+            name=f"SumToOne_spot_{i}"
+        )
+        # Initialize Y with existing cell_prop_array
+        for c_ in range(T):
+            Y_refined[(i, c_)].start = float(cell_prop_array[i, c_])
+
+    model.update()
+
+    # 7) Optimize
+    model.optimize()
+    if model.status != GRB.OPTIMAL:
+        logging.warning(f"WGCNA Phase 3: Model ended with status {model.status}")
+
+    # 8) Extract results
+    X_mod_sol = np.zeros((N, K), dtype=float)
+    for i in range(N):
+        for k_ in range(K):
+            X_mod_sol[i, k_] = X_module[(i, k_)].X
+
+    Y_sol = np.zeros((N, T), dtype=float)
+    for i in range(N):
+        for c_ in range(T):
+            Y_sol[i, c_] = Y_refined[(i, c_)].X
+
+    # 9) Construct updated layers: shape (N x T x G)
+    #    e.g. each cell type's expression for gene g in spot i
+    #    could be cell proportion * fraction of X_module usage for that gene's module.
+    layers = np.zeros((N, T, G), dtype=float)
+    for i in range(N):
+        for c_ in range(T):
+            for g_ in range(G):
+                # sum across modules that gene belongs to
+                # gene g_ is in module k_ if module_matrix[g_, k_] > 0
+                val_mod = sum(X_mod_sol[i, k_] * module_matrix[g_, k_] for k_ in range(K))
+                layers[i, c_, g_] = Y_sol[i, c_] * float(val_mod)
+
+    results = {
+        "modules": module_matrix,       # G x K
+        "updated_cell_prop": Y_sol,     # N x T
+        "layers": layers                # N x T x G
+    }
+    return results

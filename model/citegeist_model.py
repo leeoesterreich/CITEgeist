@@ -505,17 +505,78 @@ class CitegeistModel:
                     f"Shape mismatch: CellType matrix {celltype_matrix.shape} does not match adata.X {X_dense.shape}"
                 )
 
-
-
             # Add matrices to layers
             layer_name = celltype.replace(' ', '_')  # Sanitize layer name
-            #self.gene_expression_adata.layers[layer_name + "_contribution"] = celltype_matrix
             self.gene_expression_adata.layers[layer_name + "_genes"] = celltype_matrix
 
-            print(f"Added layers: {layer_name}_contribution, {layer_name}_genes (Shape: {celltype_matrix.shape})")
+            print(f"Added layers: {layer_name}_genes (Shape: {celltype_matrix.shape})")
 
         print("All layers added successfully.")
         print("Available layers:", self.gene_expression_adata.layers.keys())
+
+    def run_multimodal_phase_3_wgcna(
+        self,
+        max_clusters=10,
+        alpha_gex=1.0,
+        alpha_antibody=1.0,
+        alpha_spatial=0.0,
+        lambda_reg_module=0.1,
+        spatial_adjacency=None
+    ):
+        """
+        Run Phase 3 optimization using WGCNA-like module detection and multimodal integration.
+        
+        Args:
+            max_clusters (int): Maximum number of gene modules to detect
+            alpha_gex (float): Weight for gene expression reconstruction term
+            alpha_antibody (float): Weight for antibody-based term
+            alpha_spatial (float): Weight for spatial smoothing term
+            lambda_reg_module (float): Regularization strength for module usage
+            spatial_adjacency (np.ndarray, optional): NxN adjacency matrix for spatial smoothing
+        """
+        # Ensure data is present
+        if self.gene_expression_adata is None or self.antibody_capture_adata is None:
+            raise ValueError("Gene expression & antibody data not loaded or split. Cannot run WGCNA-based Phase 3.")
+        if 'cell_prop' not in self.results:
+            raise ValueError("Cell proportions not found in results. Run Phase 1 or 2 first.")
+
+        # Extract input arrays
+        cell_prop_array = self.results['cell_prop'].values  # (N x T)
+        from model.gurobi_impl import optimize_multimodal_phase_3_wgcna
+
+        # Run Phase 3 optimization
+        phase3_result = optimize_multimodal_phase_3_wgcna(
+            adata_gex=self.gene_expression_adata,
+            adata_antibody=self.antibody_capture_adata,
+            cell_prop_array=cell_prop_array,
+            cell_profiles=self.cell_profile_dict,
+            max_clusters=max_clusters,
+            alpha_gex=alpha_gex,
+            alpha_antibody=alpha_antibody,
+            alpha_spatial=alpha_spatial,
+            lambda_reg_module=lambda_reg_module,
+            spatial_adjacency=spatial_adjacency
+        )
+
+        # Unpack results
+        updated_cell_prop = phase3_result["updated_cell_prop"]
+        layers = phase3_result["layers"]
+        spot_names = self.gene_expression_adata.obs_names
+        cell_type_names = list(self.cell_profile_dict.keys())
+
+        # Save refined cell props
+        refined_df = pd.DataFrame(updated_cell_prop, index=spot_names, columns=cell_type_names)
+        self.results['cell_prop_phase3'] = refined_df
+        refined_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_phase3_results.csv"))
+
+        # Create layers in gene_expression_adata
+        # layers shape: N x T x G
+        for t_idx, ct_name in enumerate(cell_type_names):
+            layer_key = ct_name.replace(" ", "_") + "_phase3"
+            # each cell type: shape (N, G)
+            self.gene_expression_adata.layers[layer_key] = layers[:, t_idx, :]
+
+        print("✅ WGCNA-based Phase 3 refinement complete.")
 
     def get_adata(self):
         """
