@@ -340,6 +340,104 @@ def main():
         # Save the DataFrame to a CSV file
         gex_results.to_csv(os.path.join(output_folder,f'{sample_name}_gex_metrics_summary_{suffix}_{radius}.csv'), index=False)
 
+        ##############################################################################
+        # 3) Phase 3: WGCNA-based Multimodal Integration
+        ##############################################################################
+        
+        logging.info(f"Running Phase 3 WGCNA-based integration for {sample_name} ...")
+
+        # Run Phase 3 optimization
+        model.run_multimodal_phase_3_wgcna(
+            max_clusters=30,  # Adjust based on expected number of gene modules
+            alpha_gex=1.0,
+            alpha_antibody=0.5,
+            alpha_spatial=0.0,  # No spatial smoothing for now
+            lambda_reg_module=0.1
+        )
+
+        # Get updated AnnData with Phase 3 layers
+        prop_gex_adata_phase3 = model.get_adata()
+
+        # Export Phase 3 layers
+        layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_{suffix}_{radius}_phase3/layers")
+        export_anndata_layers(prop_gex_adata_phase3, layer_dir_phase3)
+
+        # Calculate Phase 3 metrics for cell proportions
+        proportions_path_phase3 = os.path.join(output_folder, f"{sample_name}_cell_prop_phase3_results.csv")
+        test_spots_df_phase3 = pd.read_csv(proportions_path_phase3, index_col=0).sort_index().sort_index(axis=1)
+
+        # Verify columns match
+        if not np.array_equal(test_spots_df_phase3.columns, spot_composition_df.columns):
+            logging.warning(f"Phase 3 test_spots_df columns: {test_spots_df_phase3.columns}, spot_composition_df columns: {spot_composition_df.columns}")
+            raise ValueError("ERROR: The column names in the Phase 3 CSV files do not match or are not in the same order!")
+
+        # Convert DataFrames to numpy arrays for Phase 3 cell proportions
+        test_spots_metadata_mtrx_phase3 = test_spots_df_phase3.values
+        results_phase3 = benchmark_cell_proportions(test_spots_metadata_mtrx_phase3, spot_composition_mtrx, column_names)
+
+        logging.info(f"Phase 3 cell proportion benchmarking results: {results_phase3}")
+
+        # Convert to DataFrame and save Phase 3 cell proportion results
+        prop_results_df_phase3 = pd.DataFrame([results_phase3])
+        prop_results_name_phase3 = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_phase3_{suffix}_{radius}.csv')
+        prop_results_df_phase3.to_csv(prop_results_name_phase3, index=False)
+
+        print("Phase 3 cell proportion results:")
+        print(prop_results_df_phase3)
+        logging.info(f"Phase 3 cell proportion results summary: \n{prop_results_df_phase3}")
+
+        # Calculate Phase 3 metrics for gene expression
+        metrics_phase3 = calculate_expression_metrics(ground_truth_dir, layer_dir_phase3, normalize="range")
+
+        average_rmse_phase3  = metrics_phase3.get('average_rmse')
+        median_rmse_phase3   = metrics_phase3.get('median_rmse')
+        average_nrmse_phase3 = metrics_phase3.get('average_nrmse')
+        median_nrmse_phase3  = metrics_phase3.get('median_nrmse')
+        average_mae_phase3   = metrics_phase3.get('average_mae')
+        median_mae_phase3    = metrics_phase3.get('median_mae')
+    
+        # Create the metrics dictionary for Phase 3
+        metrics_values_phase3 = {
+            'Average RMSE': average_rmse_phase3,
+            'Median RMSE': median_rmse_phase3,
+            'Average NRMSE': average_nrmse_phase3,
+            'Median NRMSE': median_nrmse_phase3,
+            'Average MAE': average_mae_phase3,
+            'Median MAE': median_mae_phase3
+        }
+    
+        # Convert the Phase 3 metrics dictionary to a DataFrame
+        gex_results_phase3 = pd.DataFrame(list(metrics_values_phase3.items()), columns=['Metric', 'Value'])
+
+        print("Phase 3 gene expression metrics:")
+        print(gex_results_phase3)
+        logging.info(f"Phase 3 gene expression metrics: \n{gex_results_phase3}")
+
+        # Save Phase 3 gene expression metrics
+        gex_results_phase3.to_csv(os.path.join(output_folder,f'{sample_name}_gex_metrics_summary_phase3_{suffix}_{radius}.csv'), index=False)
+
+        # Print comparison between original and Phase 3 results
+        print("\nComparison of results:")
+        print("Cell proportions:")
+        comparison_df = pd.concat([
+            prop_results_df.add_prefix('Original_'),
+            prop_results_df_phase3.add_prefix('Phase3_')
+        ], axis=1)
+        print(comparison_df)
+        logging.info(f"Comparison of cell proportions:\n{comparison_df}")
+
+        print("\nGene expression:")
+        gex_comparison = pd.DataFrame({
+            'Metric': gex_results['Metric'],
+            'Original': gex_results['Value'],
+            'Phase3': gex_results_phase3['Value']
+        })
+        print(gex_comparison)
+        logging.info(f"Comparison of gene expression metrics:\n{gex_comparison}")
+
+        # Save comparisons
+        comparison_df.to_csv(os.path.join(output_folder,f'{sample_name}_comparison_cellprop_{suffix}_{radius}.csv'), index=False)
+        gex_comparison.to_csv(os.path.join(output_folder,f'{sample_name}_comparison_gex_{suffix}_{radius}.csv'), index=False)
 
         logging.info(f"Finished processing sample: {sample_name}")
 
