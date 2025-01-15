@@ -1,7 +1,26 @@
 import os
 import scanpy as sc
-from model.gurobi_impl import map_antibodies_to_profiles, optimize_cell_proportions, optimize_gene_expression, two_pass_optimize_gene_expression
-from .utils import validate_cell_profile_dict, save_results_to_output, cleanup_memory, setup_logging, get_neighbors_with_fixed_radius, assert_neighborhood_size
+from model.gurobi_impl import (
+    map_antibodies_to_profiles, 
+    optimize_cell_proportions, 
+    optimize_gene_expression, 
+    optimize_gene_expression_with_custom_spot_fn,
+    deconvolute_spot_with_neighbors_wrapper,
+    analyze_zero_inflation_patterns,
+    suggest_zero_inflation_threshold,
+    compute_global_prior,
+    optimize_multimodal_phase_3_wgcna
+)
+from .utils import (
+    validate_cell_profile_dict, 
+    save_results_to_output, 
+    cleanup_memory, 
+    setup_logging, 
+    get_neighbors_with_fixed_radius, 
+    assert_neighborhood_size,
+    export_anndata_layers,
+    calculate_expression_metrics
+)
 import numpy as np
 import pandas as pd
 import logging
@@ -315,20 +334,23 @@ class CitegeistModel:
             save_results_to_output(cell_type_proportions_df, output_file)
             print(f"Cell type proportions saved to '{output_file}'.")
             
-    def run_cell_expression_model(
+    def run_cell_expression_pass1(
         self, 
         radius=2, 
         alpha=0.5, 
-        lambda_reg_gex=0.0001, 
-        lambda_prior_weight=0.5,
-        prior_change_threshold=0.01,
+        lambda_reg_gex=0.0001,
         max_workers=None, 
         checkpoint_interval=100,
         output_dir="checkpoints",
-        rerun=False
+        rerun=False,
+        local_weight=0.5,
+        global_weight=0.5
     ):
         """
-        Run the discrete count-based gene expression deconvolution model.
+        Run first pass of gene expression deconvolution without prior.
+        
+        Returns:
+            dict: First pass results containing spotwise profiles
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
@@ -343,33 +365,31 @@ class CitegeistModel:
         
         cell_type_numbers_array = self.results.get('cell_prop').values
 
-        # Run optimization without scaling
-        spotwise_profiles = two_pass_optimize_gene_expression(
-            sample_name=self.sample_name,
+        #########################
+        # === PASS 1 (No Prior)
+        #########################
+        logging.info("=== Pass 1: Initial optimization without prior ===")
+        spotwise_profiles_pass1 = optimize_gene_expression(
+            sample_name=f"{self.sample_name}_pass1",
             deconvolution_expression_data=filtered_data,
             cell_type_numbers_array=cell_type_numbers_array,
             filtered_adata=self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            lambda_prior_weight=lambda_prior_weight,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun
         )
 
-        # Prepare data for saving
-        spot_names = self.gene_expression_adata.obs_names
-        gene_names = self.gene_expression_adata.var_names
-        cell_type_names = list(self.cell_profile_dict.keys())
+        # Impute NaN spots for first pass
         N = filtered_data.shape[0]
-        T = len(cell_type_names)
+        T = cell_type_numbers_array.shape[1]
         M = filtered_data.shape[1]
-
-        # Imputation for NaN spots (using integer averages)
-        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
-        for nan_spot in nan_spots:
+        
+        nan_spots_pass1 = [i for i in range(N) if i not in spotwise_profiles_pass1]
+        for nan_spot in nan_spots_pass1:
             neighbor_indices = get_neighbors_with_fixed_radius(
                 nan_spot, 
                 self.gene_expression_adata, 
@@ -378,48 +398,229 @@ class CitegeistModel:
             )
 
             neighbor_profiles = [
-                spotwise_profiles[i]
+                spotwise_profiles_pass1[i]
                 for i in neighbor_indices
-                if i in spotwise_profiles
+                if i in spotwise_profiles_pass1
             ]
 
             if neighbor_profiles:
                 # Round to nearest integer for count data
                 imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles[nan_spot] = imputed_profile
-                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius}.")
+                spotwise_profiles_pass1[nan_spot] = imputed_profile
+                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 1).")
             else:
-                logging.warning(f"No valid neighbors found to impute spot {nan_spot}. Leaving as NaN.")
+                logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 1). Leaving as NaN.")
 
-        # Create combined matrix of count data
-        spot_celltype_indices = [
-            f"{spot_names[i]}_{cell_type_names[j]}" 
-            for i in range(N) 
-            for j in range(T)
+        # Store first pass results
+        self.results['gene_expression_pass1'] = spotwise_profiles_pass1
+        
+        # Save first pass results to parquet
+        parquet_path_pass1 = os.path.join(
+            self.output_folder, 
+            f"{self.sample_name}_gene_expression_pass1.parquet"
+        )
+        self._save_profiles_to_parquet(spotwise_profiles_pass1, parquet_path_pass1)
+        logging.info("✅ First pass results saved.")
+
+        # Evaluate first pass immediately
+        self.append_gex_to_adata(pass_number=1)
+        logging.info("First pass results appended to AnnData.")
+
+        # Export layers for evaluation
+        layer_dir_pass1 = os.path.join(self.output_folder, f"{self.sample_name}_pass1/layers")
+        export_anndata_layers(self.gene_expression_adata, layer_dir_pass1, pass_number=1)
+        logging.info("First pass layers exported for evaluation.")
+
+        return {
+            'spotwise_profiles': spotwise_profiles_pass1,
+            'dimensions': {'N': N, 'T': T, 'M': M}
+        }
+
+    def compute_expression_prior(
+        self,
+        spotwise_profiles_pass1,
+        cell_type_numbers_array,
+        nonzero_percentage=0.01,
+        mean_expression_threshold=1.1,
+        lambda_prior=1.0,
+        zero_inflation_threshold=0.9
+    ):
+        """
+        Compute prior for second pass based on first pass results.
+        
+        Returns:
+            dict: Prior information including global prior and ZINB analysis
+        """
+        filtered_data = self.gene_expression_adata.X
+        if hasattr(filtered_data, 'toarray'):
+            filtered_data = filtered_data.toarray()
+        filtered_data = np.array(filtered_data, dtype=int)
+
+        # Analyze patterns from first pass
+        zero_patterns = analyze_zero_inflation_patterns(
+            filtered_data,
+            cell_type_numbers_array,
+            self.gene_expression_adata.var_names,
+            list(self.cell_profile_dict.keys()),  # Use actual cell type names
+            min_proportion=nonzero_percentage,
+            expression_threshold=mean_expression_threshold
+        )
+        
+        suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
+        logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
+
+        global_prior, zinb_matrix, zero_inflation_probs = compute_global_prior(
+            spotwise_gene_expression_profiles=spotwise_profiles_pass1,
+            cell_type_numbers_array=cell_type_numbers_array,
+            lambda_prior=lambda_prior,
+            zero_inflation_threshold=zero_inflation_threshold
+        )
+
+        return {
+            'global_prior': global_prior,
+            'zinb_matrix': zinb_matrix,
+            'zero_inflation_probs': zero_inflation_probs,
+            'suggested_threshold': suggested_threshold,
+            'zero_patterns': zero_patterns
+        }
+
+    def run_cell_expression_pass2(
+        self,
+        global_prior,
+        dimensions,
+        radius=2,
+        alpha=0.5,
+        lambda_reg_gex=0.0001,
+        lambda_prior_weight=0.5,
+        max_workers=None,
+        checkpoint_interval=100,
+        output_dir="checkpoints",
+        rerun=False
+    ):
+        """
+        Run second pass of gene expression deconvolution with prior guidance.
+        
+        Returns:
+            dict: Second pass results containing spotwise profiles
+        """
+        filtered_data = self.gene_expression_adata.X
+        if hasattr(filtered_data, 'toarray'):
+            filtered_data = filtered_data.toarray()
+        filtered_data = np.array(filtered_data, dtype=int)
+        
+        cell_type_numbers_array = self.results.get('cell_prop').values
+
+        N, T, M = dimensions['N'], dimensions['T'], dimensions['M']
+
+        #########################
+        # === PASS 2 (With Prior)
+        #########################
+        logging.info("=== Pass 2: Optimization with prior guidance ===")
+        
+        spot_args = [
+            (i, self.gene_expression_adata, cell_type_numbers_array, radius, global_prior,
+             lambda_prior_weight, alpha, lambda_reg_gex)
+            for i in range(filtered_data.shape[0])
         ]
+
+        spotwise_profiles_pass2 = optimize_gene_expression_with_custom_spot_fn(
+            sample_name=f"{self.sample_name}_pass2",
+            deconvolution_expression_data=filtered_data,
+            cell_type_numbers_array=cell_type_numbers_array,
+            filtered_adata=self.gene_expression_adata,
+            radius=radius,
+            alpha=alpha,
+            lambda_reg_gex=lambda_reg_gex,
+            spot_function=deconvolute_spot_with_neighbors_wrapper,
+            spot_args=spot_args,
+            max_workers=max_workers,
+            checkpoint_interval=checkpoint_interval,
+            output_dir=output_dir,
+            rerun=rerun
+        )
+
+        # Impute NaN spots for second pass
+        nan_spots_pass2 = [i for i in range(N) if i not in spotwise_profiles_pass2]
+        for nan_spot in nan_spots_pass2:
+            neighbor_indices = get_neighbors_with_fixed_radius(
+                nan_spot, 
+                self.gene_expression_adata, 
+                radius=radius, 
+                include_center=False
+            )
+
+            neighbor_profiles = [
+                spotwise_profiles_pass2[i]
+                for i in neighbor_indices
+                if i in spotwise_profiles_pass2
+            ]
+
+            if neighbor_profiles:
+                # Round to nearest integer for count data
+                imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
+                spotwise_profiles_pass2[nan_spot] = imputed_profile
+                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 2).")
+            else:
+                logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 2). Leaving as NaN.")
+
+        # Store second pass results
+        self.results['gene_expression_pass2'] = spotwise_profiles_pass2
+        
+        # Save to Parquet with consistent naming
+        parquet_path = os.path.join(
+            self.output_folder, 
+            f"{self.sample_name}_gene_expression_pass2.parquet"
+        )
+        self._save_profiles_to_parquet(spotwise_profiles_pass2, parquet_path)
+        logging.info("✅ Second pass results saved.")
+
+        # Evaluate second pass
+        self.append_gex_to_adata(pass_number=2)
+        logging.info("Second pass results appended to AnnData.")
+
+        # Export layers for evaluation
+        layer_dir_pass2 = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
+        export_anndata_layers(self.gene_expression_adata, layer_dir_pass2, pass_number=2)
+        logging.info("Second pass layers exported for evaluation.")
+
+        return spotwise_profiles_pass2
+
+    def _save_profiles_to_parquet(self, profiles, path):
+        """Helper method to save profiles to parquet format with consistent naming."""
+        if not profiles:
+            logging.warning("No profiles to save.")
+            return
+        
+        N = max(profiles.keys()) + 1
+        T = profiles[0].shape[0]
+        M = profiles[0].shape[1]
+        
+        # Get cell type names from the dictionary
+        cell_type_names = list(self.cell_profile_dict.keys())
+        
+        # Create combined matrix with proper cell type names and spot formatting
+        spot_celltype_indices = []
+        for i in range(N):
+            spot_name = self.gene_expression_adata.obs_names[i]  # Use actual spot names from AnnData
+            for cell_type in cell_type_names:
+                spot_celltype_indices.append(f"{spot_name}_{cell_type}")
+        
+        gene_names = self.gene_expression_adata.var_names
         nan_matrix = np.full((T, M), np.nan)
         data_combined = np.vstack([
-            spotwise_profiles.get(i, nan_matrix) 
+            profiles.get(i, nan_matrix) 
             for i in range(N)
         ])
-
-        # Create DataFrame with count data
-        gene_expression_df = pd.DataFrame(
+        
+        # Create DataFrame
+        df = pd.DataFrame(
             data_combined, 
             index=spot_celltype_indices, 
             columns=gene_names
         )
-
-        # Save to Parquet
-        parquet_path = os.path.join(
-            self.output_folder, 
-            f"{self.sample_name}_gene_expression.parquet"
-        )
-        gene_expression_df.to_parquet(parquet_path, compression="gzip")
-        print(f"✅ Discrete count gene expression data saved to '{parquet_path}'.")
-
-        # Store results
-        self.results['gene_expression'] = gene_expression_df
+        
+        df.to_parquet(path, compression="gzip")
+        logging.info(f"Saved profiles to {path} with cell types: {cell_type_names}")
 
     def append_proportions_to_adata(self, proportions_path=None):
         """Append cell type proportions to AnnData object."""
@@ -462,25 +663,23 @@ class CitegeistModel:
         print("✅ Cell type proportions have been appended to adata.obs")
         
         
-    def append_gex_to_adata(self, parquet_path = None):
+    def append_gex_to_adata(self, parquet_path=None, pass_number=2):
         """
         Append gene expression layers from a Parquet file back into the gene_expression_adata object.
-
-        Args:
-            parquet_path (str): Path to the Parquet file containing spot-by-celltype gene expression data.
-
-        Returns:
-            None: Updates the `gene_expression_adata` object in place.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
+        
         if parquet_path is None:
-            parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression.parquet")
+            parquet_path = os.path.join(
+                self.output_folder, 
+                f"{self.sample_name}_gene_expression_pass{pass_number}.parquet"
+            )
 
         # Step 1: Read the Parquet file into a pandas DataFrame
         table = pq.read_table(parquet_path)
         df = table.to_pandas()
-        print("Parquet file loaded successfully.")
+        print(f"Parquet file for pass {pass_number} loaded successfully.")
 
         # Step 2: Reset the index to extract 'Spot' and 'CellType'
         df = df.reset_index()
@@ -488,31 +687,51 @@ class CitegeistModel:
         df = df.drop(columns=['index'])
         print("Spot and CellType successfully split.")
 
-        # Step 3: Process each unique CellType
-        for celltype in df['CellType'].unique():
-            # Subset DataFrame to this cell type
-            celltype_df = df[df['CellType'] == celltype].drop(columns=['Spot', 'CellType'])
-            celltype_df.index = df[df['CellType'] == celltype]['Spot']
+        # Debug print spot names
+        print("\nSpot name formats:")
+        print("AnnData spot names format:", self.gene_expression_adata.obs_names[:5])
+        print("Parquet spot names format:", df['Spot'].unique()[:5])
 
-            # Convert the DataFrame to a numpy array
-            celltype_matrix = celltype_df.values
+        # Get cell type names from the dictionary for validation
+        expected_cell_types = set(self.cell_profile_dict.keys())
+        found_cell_types = set(df['CellType'].unique())
+        
+        if not found_cell_types.issubset(expected_cell_types):
+            logging.warning(f"Found unexpected cell types: {found_cell_types - expected_cell_types}")
+            logging.warning(f"Expected cell types: {expected_cell_types}")
+            raise ValueError("Cell type mismatch in loaded data")
 
-            # Ensure gene_expression_adata.X is dense
-            X_dense = self.gene_expression_adata.X.toarray() if hasattr(self.gene_expression_adata.X, 'toarray') else self.gene_expression_adata.X
-
-            if X_dense.shape != celltype_matrix.shape:
-                raise ValueError(
-                    f"Shape mismatch: CellType matrix {celltype_matrix.shape} does not match adata.X {X_dense.shape}"
-                )
-
-            # Add matrices to layers
-            layer_name = celltype.replace(' ', '_')  # Sanitize layer name
-            self.gene_expression_adata.layers[layer_name + "_genes"] = celltype_matrix
-
-            print(f"Added layers: {layer_name}_genes (Shape: {celltype_matrix.shape})")
-
-        print("All layers added successfully.")
-        print("Available layers:", self.gene_expression_adata.layers.keys())
+        # Step 3: Process each cell type
+        for cell_type in found_cell_types:
+            # Filter data for this cell type
+            celltype_data = df[df['CellType'] == cell_type].copy()
+            celltype_data = celltype_data.drop(columns=['CellType'])
+            
+            # Ensure spot names match AnnData format
+            if 'spot_' in str(self.gene_expression_adata.obs_names[0]) and not celltype_data['Spot'].str.contains('spot_').all():
+                celltype_data['Spot'] = 'spot_' + celltype_data['Spot'].astype(str)
+            elif celltype_data['Spot'].str.contains('spot_').all() and not 'spot_' in str(self.gene_expression_adata.obs_names[0]):
+                celltype_data['Spot'] = celltype_data['Spot'].str.replace('spot_', '')
+            
+            # Set Spot as index
+            celltype_data = celltype_data.set_index('Spot')
+            
+            # Verify all spots exist in AnnData
+            missing_spots = set(celltype_data.index) - set(self.gene_expression_adata.obs_names)
+            if missing_spots:
+                raise ValueError(f"Found spots in parquet that don't exist in AnnData: {missing_spots}")
+            
+            # Create matrix with proper spot ordering
+            celltype_matrix = np.zeros((len(self.gene_expression_adata.obs_names), len(self.gene_expression_adata.var_names)))
+            for spot in self.gene_expression_adata.obs_names:
+                if spot in celltype_data.index:
+                    idx = self.gene_expression_adata.obs_names.get_loc(spot)
+                    celltype_matrix[idx] = celltype_data.loc[spot].values
+            
+            # Add as layer with consistent naming
+            layer_name = f"{cell_type}_genes_pass{pass_number}"
+            self.gene_expression_adata.layers[layer_name] = celltype_matrix
+            print(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
 
     def run_multimodal_phase_3_wgcna(
         self,
