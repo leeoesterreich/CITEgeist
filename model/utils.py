@@ -214,7 +214,54 @@ def benchmark_cell_proportions(true_proportions, predicted_proportions, cell_typ
         'corr': corr
     }
 
-def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='range'):
+def export_anndata_layers(adata, output_dir, pass_number=None):
+    """
+    Export all layers of an AnnData object to separate CSV files.
+    Creates separate folders for different passes.
+    
+    Args:
+        adata (AnnData): AnnData object containing the layers to export
+        output_dir (str): Base directory where CSV files will be saved
+        pass_number (int, optional): If specified, only export layers from this pass
+    """
+    # Create base output directory
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Create pass-specific directory if needed
+    if pass_number is not None:
+        target_dir = os.path.join(output_dir, f"pass{pass_number}")
+        os.makedirs(target_dir, exist_ok=True)
+    else:
+        target_dir = output_dir
+
+    # Filter layers for specific pass if requested
+    layer_pattern = f"_pass{pass_number}" if pass_number is not None else None
+    
+    for layer_name in adata.layers.keys():
+        # Skip if not matching pass number
+        if layer_pattern is not None and layer_pattern not in layer_name:
+            continue
+        
+        # Extract data and ensure it's dense
+        layer_data = adata.layers[layer_name]
+        dense_data = layer_data.toarray() if hasattr(layer_data, 'toarray') else layer_data
+        
+        # Create DataFrame
+        df = pd.DataFrame(dense_data, index=adata.obs.index, columns=adata.var.index)
+        
+        # Extract cell type name from layer name consistently
+        cell_type = layer_name.split('_genes_pass')[0]
+        
+        # Save with standardized naming including pass number
+        if pass_number is not None:
+            output_file = os.path.join(target_dir, f"{cell_type}_layer_pass{pass_number}.csv")
+        else:
+            output_file = os.path.join(target_dir, f"{cell_type}_layer.csv")
+            
+        df.to_csv(output_file)
+        logging.info(f"Exported layer '{layer_name}' to '{output_file}'")
+
+def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='range', pass_number=None):
     """
     Calculate performance metrics for gene expression predictions.
     
@@ -222,21 +269,55 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         ground_truth_dir (str): Directory containing ground truth CSV files
         predictions_dir (str): Directory containing prediction CSV files
         normalize (str): Normalization method for NRMSE ('range' or 'mean')
+        pass_number (int, optional): If specified, look for predictions in pass-specific subdirectory
         
     Returns:
         dict: Dictionary containing performance metrics per cell type and overall statistics
     """
     metrics_per_cell_type = {}
+    
+    # Adjust predictions directory if pass number specified
+    if pass_number is not None:
+        predictions_dir = os.path.join(predictions_dir, f"pass{pass_number}")
+    
+    logging.info(f"Ground truth directory: {ground_truth_dir}")
+    logging.info(f"Ground truth files: {sorted(os.listdir(ground_truth_dir))}")
+    logging.info(f"Layer directory: {predictions_dir}")
+    logging.info(f"Layer files: {sorted(os.listdir(predictions_dir))}")
 
-    logging.info(f"Calculating gene expression metrics for {ground_truth_dir} and {predictions_dir}")
+    # Get sorted lists of files with pass number handling
+    gt_files = sorted([f for f in os.listdir(ground_truth_dir) if f.endswith('_GT.csv')])
+    if pass_number is not None:
+        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith(f'_layer_pass{pass_number}.csv')])
+    else:
+        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith('_layer.csv')])
 
-    for gt_filename in os.listdir(ground_truth_dir):
-        if not gt_filename.endswith("_GT.csv"):
-            continue
+    print("GT files: ", gt_files)
+    print("Pred files: ", pred_files)
 
+    assert len(gt_files) == len(pred_files), "Number of ground truth files and prediction files do not match"
+
+    # Create a dictionary to map cell types to their ground truth files
+    gt_file_map = {f.replace('_GT.csv', ''): f for f in gt_files}
+
+    # Create a list to store matched prediction and ground truth file pairs
+    matched_files = []
+
+    for pred_file in pred_files:
+        # Remove pass number suffix if present
+        base_pred_file = pred_file.replace(f'_pass{pass_number}', '') if pass_number is not None else pred_file
+        cell_type = base_pred_file.replace('_layer.csv', '').split('_')[0]
+        if cell_type in gt_file_map:
+            matched_files.append((pred_file, gt_file_map[cell_type]))
+
+    # Sort matched files by the cell type name
+    matched_files.sort(key=lambda x: x[0])
+
+    # Calculate metrics
+    for pred_filename, gt_filename in matched_files:
         cell_type = gt_filename.replace("_GT.csv", "")
         gt_filepath = os.path.join(ground_truth_dir, gt_filename)
-        pred_filepath = os.path.join(predictions_dir, f"{cell_type}_genes_layer.csv")
+        pred_filepath = os.path.join(predictions_dir, pred_filename)
 
         if not os.path.exists(pred_filepath):
             logging.warning(f"Prediction file for {cell_type} not found. Skipping.")
@@ -274,39 +355,6 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
             raise ValueError("Normalization type must be 'range' or 'mean'")
 
         metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
-
-    # Calculate overall statistics
-    if metrics_per_cell_type:  # Only calculate if we have metrics
-        all_metrics = pd.DataFrame.from_dict(metrics_per_cell_type, orient='index')
-        return {
-            "metrics_per_cell_type": metrics_per_cell_type,
-            "average_rmse": all_metrics['RMSE'].mean(),
-            "median_rmse": all_metrics['RMSE'].median(),
-            "average_nrmse": all_metrics['NRMSE'].mean(),
-            "median_nrmse": all_metrics['NRMSE'].median(),
-            "average_mae": all_metrics['MAE'].mean(),
-            "median_mae": all_metrics['MAE'].median()
-        }
-    else:
-        raise ValueError("No metrics were calculated - no valid cell types found")
-
-
-def export_anndata_layers(adata, output_dir):
-    """
-    Export all layers of an AnnData object to separate CSV files.
-    
-    Args:
-        adata (AnnData): AnnData object containing the layers to export
-        output_dir (str): Directory where CSV files will be saved
-    """
-    os.makedirs(output_dir, exist_ok=True)
-
-    for layer_name in adata.layers.keys():
-        layer_data = adata.layers[layer_name]
-        dense_data = layer_data.toarray() if hasattr(layer_data, 'toarray') else layer_data
+        logging.info(f"Metrics for {cell_type}: RMSE={rmse:.4f}, NRMSE={nrmse:.4f}, MAE={mae:.4f}")
         
-        df = pd.DataFrame(dense_data, index=adata.obs.index, columns=adata.var.index)
-        output_file = os.path.join(output_dir, f"{layer_name}_layer.csv")
-        
-        df.to_csv(output_file)
-        logging.info(f"Exported layer '{layer_name}' to '{output_file}'")
+    return metrics_per_cell_type

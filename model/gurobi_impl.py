@@ -31,6 +31,8 @@ from tqdm import tqdm
 import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
+import time
+import concurrent.futures.process
 
 
 def fit_zinb(x, p):
@@ -151,7 +153,9 @@ def analyze_zero_inflation_patterns(
     return patterns
 
 def suggest_zero_inflation_threshold(patterns, quantile=0.75):
-    """Suggest threshold based on zero-inflation patterns."""
+    """
+    Suggest a zero-inflation threshold based on the analysis results.
+    """
     all_zero_props = []
     for gene_patterns in patterns.values():
         for ct_data in gene_patterns.values():
@@ -586,32 +590,24 @@ def deconvolute_spot_with_neighbors_wrapper(args):
     Args should be a tuple of (i, filtered_adata, cell_type_numbers_array, radius, global_prior, 
     lambda_prior_weight, alpha, lambda_reg_gex)
     """
-    (i, filtered_adata, cell_type_numbers_array, radius, global_prior, 
-     lambda_prior_weight, alpha, lambda_reg_gex) = args
-    
-    return deconvolute_spot_with_neighbors_with_prior(
-        i,
-        filtered_adata,
-        cell_type_numbers_array,
-        radius,
-        global_prior,
-        lambda_prior_weight,
-        alpha,
-        lambda_reg_gex
-    )
+    try:
+        i, filtered_adata, cell_type_numbers_array, radius, global_prior, lambda_prior_weight, alpha, lambda_reg_gex = args
+        return deconvolute_spot_with_neighbors_with_prior(
+            i=i,
+            filtered_adata=filtered_adata,
+            cell_type_numbers_array=cell_type_numbers_array,
+            radius=radius,
+            global_prior=global_prior,
+            lambda_prior_weight=lambda_prior_weight,
+            alpha=alpha,
+            lambda_reg_gex=lambda_reg_gex
+        )
+    except Exception as e:
+        logging.error(f"Error in deconvolute_spot_with_neighbors_wrapper: {str(e)}")
+        logging.error(traceback.format_exc())
+        return None
 
 
-
-def suggest_zero_inflation_threshold(zero_inflation_patterns, quantile=0.75):
-    """
-    Suggest a zero-inflation threshold based on the analysis results.
-    """
-    all_zero_props = []
-    for ct_data in zero_inflation_patterns.values():
-        for gene_data in ct_data.values():
-            all_zero_props.append(gene_data['zero_proportion'])
-    
-    return np.quantile(all_zero_props, quantile)
 
 def log_marker_gene_patterns(zero_patterns, marker_genes):
     """
@@ -811,12 +807,11 @@ def optimize_gene_expression_with_custom_spot_fn(
     Returns:
         dict: spot_index -> (T x M) array of gene expression profiles per spot.
     """
-
-
     if spot_function is None:
         raise ValueError("`spot_function` must be provided.")
 
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
     
     N = deconvolution_expression_data.shape[0]
     M = deconvolution_expression_data.shape[1]
@@ -926,114 +921,103 @@ def optimize_gene_expression_with_custom_spot_fn(
     logging.info(f"Already completed spots: {len(completed_spots)}")
 
     try:
-        workers = max_workers if max_workers is not None else os.cpu_count()
+        workers = max_workers if max_workers is not None else os.cpu_count()  
         logging.info(f"Using {workers} workers")
         
         # Only process spots that haven't been completed
         remaining_spots = [i for i in range(N) if i not in completed_spots]
         logging.info(f"Processing {len(remaining_spots)} remaining spots")
         
-        with ProcessPoolExecutor(max_workers=workers) as executor:
-            # Submit jobs using the args directly
-            futures = {
-                executor.submit(spot_function, args): i 
-                for i, args in enumerate(spot_args)
-            }
+        retry_count = 0
+        max_retries = 3
+        while retry_count < max_retries:
+            try:
+                with ProcessPoolExecutor(max_workers=workers) as executor:
+                    # Submit jobs with proper argument handling
+                    futures = {}
+                    for spot_idx in remaining_spots:
+                        if spot_idx < len(spot_args):
+                            future = executor.submit(spot_function, spot_args[spot_idx])
+                            futures[future] = spot_idx
 
-            with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
-                spots_since_last_save = 0
-                
-                for future in as_completed(futures):
-                    i = futures[future]
-                    try:
-                        result = future.result()
-                        if result is not None:
-                            # Verify result shape before storing
-                            if result.ndim != 2:
-                                logging.error(f"Unexpected result shape for spot {i}: {result.shape}")
-                                continue
-                                
-                            spotwise_gene_expression_profiles[i] = result.copy()
-                            completed_spots.add(i)
-                            spots_since_last_save += 1
-
-                            # Save checkpoint every checkpoint_interval spots
-                            if spots_since_last_save >= checkpoint_interval:
-                                # Use number of completed spots instead of current spot index
-                                n_completed = len(completed_spots)
-                                checkpoint_path = os.path.join(
-                                    output_dir, 
-                                    f"{sample_name}_gene_expression_checkpoint_{n_completed}.npz"
-                                )
-                                
-                                # Convert dictionary to numpy array for saving
-                                max_spot = max(spotwise_gene_expression_profiles.keys())
-                                profiles_array = np.full((max_spot + 1, T, M), np.nan)
-                                
-                                for spot_idx, profile in spotwise_gene_expression_profiles.items():
-                                    if profile.shape != (T, M):
-                                        logging.error(f"Invalid profile shape at spot {spot_idx}: {profile.shape}")
+                    with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
+                        spots_since_last_save = 0
+                        
+                        for future in as_completed(futures):
+                            i = futures[future]
+                            try:
+                                result = future.result(timeout=300)  # 5 minute timeout per spot
+                                if result is not None:
+                                    # Verify result shape before storing
+                                    if result.ndim != 2:
+                                        logging.error(f"Unexpected result shape for spot {i}: {result.shape}")
                                         continue
-                                    profiles_array[spot_idx] = profile
-                                
-                                try:
-                                    # Save as compressed numpy array with completed spots info
-                                    np.savez_compressed(
-                                        checkpoint_path,
-                                        profiles=profiles_array,
-                                        completed_spots=np.array(list(completed_spots)),
-                                        n_completed=n_completed
-                                    )
-                                    
-                                    # Only delete old checkpoints if new one saved successfully
-                                    existing_checkpoints = [
-                                        f for f in os.listdir(output_dir) 
-                                        if f.startswith(f"{sample_name}_gene_expression_checkpoint_") 
-                                        and f.endswith(".npz")
-                                        and f != os.path.basename(checkpoint_path)  # Don't delete the one we just created
-                                    ]
-                                    for old_checkpoint in existing_checkpoints:
-                                        try:
-                                            os.remove(os.path.join(output_dir, old_checkpoint))
-                                        except Exception as e:
-                                            logging.warning(f"Failed to delete old checkpoint {old_checkpoint}: {e}")
-                                    
-                                    logging.info(f"Saved checkpoint after {n_completed} completed spots")
-                                    spots_since_last_save = 0
-                                except Exception as e:
-                                    logging.error(f"Failed to save checkpoint: {e}")
+                                        
+                                    spotwise_gene_expression_profiles[i] = result.copy()
+                                    completed_spots.add(i)
+                                    spots_since_last_save += 1
+                                    pbar.update(1)
 
-                    except Exception as e:
-                        logging.error(f"Error in spot {i}: {str(e)}")
-                        logging.error(traceback.format_exc())
-                    pbar.update(1)
+                                    # Save checkpoint every checkpoint_interval spots
+                                    if spots_since_last_save >= checkpoint_interval:
+                                        # Save checkpoint
+                                        checkpoint_path = os.path.join(
+                                            output_dir,
+                                            f"{sample_name}_gene_expression_checkpoint_{len(completed_spots)}.npz"
+                                        )
+                                        
+                                        # Convert dictionary to numpy array for saving
+                                        max_spot = max(spotwise_gene_expression_profiles.keys())
+                                        profiles_array = np.full((max_spot + 1, T, M), np.nan)
+                                        
+                                        for spot_idx, profile in spotwise_gene_expression_profiles.items():
+                                            profiles_array[spot_idx] = profile
+                                        
+                                        # Save as compressed numpy array with completed spots info
+                                        np.savez_compressed(
+                                            checkpoint_path,
+                                            profiles=profiles_array,
+                                            completed_spots=np.array(list(completed_spots))
+                                        )
+                                        logging.info(f"Saved checkpoint after {len(completed_spots)} completed spots")
+                                        spots_since_last_save = 0
+                            except TimeoutError:
+                                logging.error(f"Timeout processing spot {i}")
+                                continue
+                            except Exception as e:
+                                logging.error(f"Error processing spot {i}: {str(e)}")
+                                logging.error(traceback.format_exc())
+                                continue
+                
+                # If we get here, all spots completed successfully
+                break
+                
+            except concurrent.futures.process.BrokenProcessPool:
+                retry_count += 1
+                logging.warning(f"Process pool broken, retry {retry_count}/{max_retries}")
+                if retry_count == max_retries:
+                    logging.error("Max retries reached, saving current progress")
+                time.sleep(5)  # Wait before retrying
 
-    except Exception as e:
-        logging.error(f"Error during parallel processing: {str(e)}")
-        logging.error(traceback.format_exc())
     finally:
         futures.clear()
         gc.collect()
         
         # Save final results
         final_path = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
-        if len(spotwise_gene_expression_profiles) > 0:
-            max_spot = max(spotwise_gene_expression_profiles.keys())
-            final_profiles = np.full((max_spot + 1, T, M), np.nan)
-            for spot_idx, profile in spotwise_gene_expression_profiles.items():
-                final_profiles[spot_idx] = profile
-                
-            np.savez_compressed(
-                final_path, 
-                profiles=final_profiles, 
-                completed_spots=np.array(list(completed_spots))
-            )
-            logging.info(f"Saved final results with {len(completed_spots)} completed spots")
-        else:
-            logging.info("No profiles to save (empty result).")
+        max_spot = max(spotwise_gene_expression_profiles.keys())
+        final_profiles = np.full((max_spot + 1, T, M), np.nan)
+        for spot_idx, profile in spotwise_gene_expression_profiles.items():
+            final_profiles[spot_idx] = profile
+            
+        np.savez_compressed(
+            final_path, 
+            profiles=final_profiles, 
+            completed_spots=np.array(list(completed_spots))
+        )
+        logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     return spotwise_gene_expression_profiles
-
 
 def deconvolute_spot_with_neighbors(
     i, 
@@ -1253,9 +1237,8 @@ def optimize_gene_expression(
         logging.info(f"Starting fresh analysis for {sample_name} (rerun=True)")
         completed_spots = set()
         spotwise_gene_expression_profiles = {}
-    
-    # If not rerunning, check for completed run
     else:
+        # If not rerunning, check for completed run
         complete_file = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
         if os.path.exists(complete_file):
             try:
@@ -1264,7 +1247,7 @@ def optimize_gene_expression(
                 if 'profiles' in complete_data and 'completed_spots' in complete_data:
                     logging.info(f"Found completed analysis for {sample_name}")
                     profiles = complete_data['profiles']
-                    if profiles.shape == (N, T, M):  # Verify correct dimensions
+                    if profiles.shape == (N, T, M):  # Verify correct dims
                         return {i: profiles[i] for i in range(N)}
             except Exception as e:
                 logging.error(f"Error loading complete file: {e}")

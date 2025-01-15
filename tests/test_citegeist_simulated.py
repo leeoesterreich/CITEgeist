@@ -11,17 +11,67 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 
-# Here we import the new CITEgeist code (instead of re-defining large chunks of it).
-# Adjust these imports according to your project structure.
-import sys
-import os
-
-# Add the parent directory (not just model) to the system path
+# Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 # Now import using the full package path
 from model.citegeist_model import CitegeistModel
 from model.utils import benchmark_cell_proportions, calculate_expression_metrics, export_anndata_layers
+
+def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
+    """
+    Calculate gene expression metrics and format them into a DataFrame.
+    
+    Args:
+        ground_truth_dir (str): Directory containing ground truth files
+        layer_dir (str): Directory containing prediction layers
+        pass_number (int, optional): Pass number for logging
+        
+    Returns:
+        pd.DataFrame: DataFrame containing metrics
+    """
+    metrics = calculate_expression_metrics(ground_truth_dir, layer_dir, normalize="range", pass_number=pass_number)
+    
+    # Create DataFrame with metrics
+    metrics_values = {
+        'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
+        'Metric': [
+            'Average RMSE', 'Median RMSE', 'Average NRMSE',
+            'Median NRMSE', 'Average MAE', 'Median MAE'
+        ],
+        'Value': [
+            np.mean([m['RMSE'] for m in metrics.values()]),
+            np.median([m['RMSE'] for m in metrics.values()]),
+            np.mean([m['NRMSE'] for m in metrics.values()]),
+            np.median([m['NRMSE'] for m in metrics.values()]),
+            np.mean([m['MAE'] for m in metrics.values()]),
+            np.median([m['MAE'] for m in metrics.values()])
+        ]
+    }
+    return pd.DataFrame(metrics_values)
+
+def calculate_improvements(pass1_metrics, pass2_metrics):
+    """
+    Calculate improvement percentages between passes.
+    
+    Args:
+        pass1_metrics (pd.DataFrame): Metrics from pass 1
+        pass2_metrics (pd.DataFrame): Metrics from pass 2
+        
+    Returns:
+        pd.DataFrame: DataFrame containing improvement percentages
+    """
+    improvements = {}
+    for metric in pass1_metrics['Metric'].unique():
+        pass1_value = pass1_metrics[pass1_metrics['Metric'] == metric]['Value'].values[0]
+        pass2_value = pass2_metrics[pass2_metrics['Metric'] == metric]['Value'].values[0]
+        improvement = ((pass1_value - pass2_value) / pass1_value) * 100
+        improvements[metric] = improvement
+    
+    return pd.DataFrame({
+        'Metric': list(improvements.keys()),
+        'Improvement_Percentage': list(improvements.values())
+    })
 
 ##############################################################################
 # Example cell-type profile dictionary for demonstration (adjust as needed).
@@ -70,8 +120,6 @@ def main():
 
     parser = argparse.ArgumentParser(description='Run CITEgeist on simulated data.')
     parser.add_argument('--radius', type=float, required=True, help='Radius for neighbor detection')
-    # parser.add_argument('--alpha', type=float, required=True, help='Elastic-net alpha value')
-    # parser.add_argument('--gex_lambda', type=float, required=True, help='Regularization lambda for gene expression')
     parser.add_argument('--input_folder', type=str, default='.', help='Folder all requisite samples and ground truth')
     parser.add_argument('--output_folder', type=str, default='citegeist_output', help='Output folder')
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
@@ -80,6 +128,9 @@ def main():
     args = parser.parse_args()
 
     radius = args.radius
+
+    #variables = f"radius_{radius}_lambda_prior_weight_{lambda_prior_weight}"
+
     input_folder = args.input_folder
     output_folder = args.output_folder
 
@@ -101,17 +152,12 @@ def main():
     )
     logging.info(f"Starting CITEgeist run with parameters: radius={radius}")
 
-    # -------------------------------------------------------------------------
-    # 1) Load H5AD files (Gene Expression and Antibody Capture)
-    #    Example: any .h5ad files that match your naming pattern
-    # -------------------------------------------------------------------------
     # Find all unique sample numbers for Wu_rep_{number} pairs
     h5ad_dir = os.path.join(args.input_folder, "h5ad_objects")
     sample_numbers = []
     for f in os.listdir(h5ad_dir):
         if f.startswith(args.sample_prefix):
-            # Extract number from Wu_rep_{number}
-            number = f.split('_')[2].split('.')[0]  # Handle potential file extensions
+            number = f.split('_')[2].split('.')[0]
             if number not in sample_numbers:
                 sample_numbers.append(number)
     
@@ -151,14 +197,9 @@ def main():
         if np.any(adata_gex.X > 0) and np.all(adata_gex.X == np.round(np.expm1(adata_gex.X))):
             logging.warning("adata_gex.X appears to be in log1p space. Consider applying inverse transformation.")
 
-        
         # Since the GEX data is log1p transformed, we will inverse that transformation.
         adata_gex.X = np.round(np.expm1(adata_gex.X))  # Round after inverse transformation
-        # Inverse log1p transformation
         logging.info("Inverse log1p transformation applied to the GEX data.")
-
-
-        # Our simulated data is pre-split into CITE and GEX since it doesn't have the idiosyncrasies of Visium data.
 
         ##############################################################################
         # Initialize the model
@@ -168,7 +209,6 @@ def main():
                                simulation=True, 
                                gene_expression_adata=adata_gex, antibody_capture_adata=adata_cite)
         
-
         # Load cell profile dictionary
         model.load_cell_profile_dict(cell_type_profiles)
 
@@ -181,276 +221,134 @@ def main():
         # Register Gurobi license
         model.register_gurobi("/ihome/crc/install/gurobi/gurobi1102/linux64/lic/gurobi.lic")
 
-        logging.info(f"Running cell proportion model for {sample_name} ...")
-
-
-
         ##############################################################################
         # 1) Cell Proportion Inference
         ##############################################################################
-
-        # Run cell proportion model
+        logging.info(f"Running cell proportion model for {sample_name} ...")
         model.run_cell_proportion_model()
-
         logging.info(f"Completed cell proportion inference for {sample_name}.")
 
         # Plot cell proportions (Append cell proportions) 
         model.append_proportions_to_adata()
 
-
-        
-
         # Benchmarking Cell Proportions
-
         st_folder = os.path.join(input_folder, "ST_sim")
-    
-        number = sample_name.split('_')[2]
-
-
         proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_results.csv")
-        
-        test_spots_df = pd.read_csv(proportions_path, index_col = 0).sort_index().sort_index(axis=1)
-
-        spot_composition_df = pd.read_csv(os.path.join(st_folder, f"Wu_ST_{number}_prop.csv"), index_col = 0).sort_index().sort_index(axis=1)
+        test_spots_df = pd.read_csv(proportions_path, index_col=0).sort_index().sort_index(axis=1)
+        spot_composition_df = pd.read_csv(os.path.join(st_folder, f"Wu_ST_{number}_prop.csv"), index_col=0).sort_index().sort_index(axis=1)
         spot_composition_df = spot_composition_df.iloc[:, :-2]
-
 
         # Check if columns match
         if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
             logging.warning(f"test_spots_df columns: {test_spots_df.columns}, spot_composition_df columns: {spot_composition_df.columns}")
             raise ValueError("ERROR: The column names in the input CSV files do not match or are not in the same order!")
 
-        # Check if rows match
-        if not np.array_equal(test_spots_df.index, spot_composition_df.index):
-            logging.warning(f"test_spots_df index: {test_spots_df.index}, spot_composition_df index: {spot_composition_df.index}")
-            mismatches = [(i, test_spots_df.index[i], spot_composition_df.index[i]) 
-                        for i in range(len(test_spots_df.index)) 
-                        if test_spots_df.index[i] != spot_composition_df.index[i]]
-            logging.warning("Mismatched indices:")
-            for idx, test_index, comp_index in mismatches:
-                logging.warning(f"Position {idx}: test_spots_df index = {test_index}, spot_composition_df index = {comp_index}")
-            
-
         # Convert DataFrames to numpy arrays
         test_spots_metadata_mtrx = test_spots_df.values
         spot_composition_mtrx = spot_composition_df.values
-        column_names = test_spots_df.columns.tolist()  # Get column names for RMSE and MAE
+        column_names = test_spots_df.columns.tolist()
 
-        
         results = benchmark_cell_proportions(test_spots_metadata_mtrx, spot_composition_mtrx, column_names)
-
         logging.info(f"Cell proportion benchmarking results: {results}")
 
-        # Convert to a DataFrame
-        prop_results_df = pd.DataFrame([results])  # Wrap in a list to create a single-row DataFrame
-        
-        # Save to a CSV file
+        # Save cell proportion results
+        prop_results_df = pd.DataFrame([results])
         prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_{suffix}_{radius}_.csv')
-        
         prop_results_df.to_csv(prop_results_name, index=False)
-
-        print(prop_results_df)
         logging.info(f"Cell proportion results summary: \n{prop_results_df}")
-
-
-        ##############################################################################
-        # 2) Gene Expression Deconvolution
-        ##############################################################################
 
         if args.profiling_only:
             logging.info("Skipping gene-expression deconvolution (profiling_only=True).")
             continue
 
-
-        logging.info(f"Running gene expression optimization for {sample_name} ...")
-
-        model.run_cell_expression_model(radius=radius, alpha=0.5, lambda_reg_gex=0.001, lambda_prior_weight=1,
-                                max_workers=None, checkpoint_interval=100, 
-                                output_dir="checkpoints", rerun=True)
-
-        # Plot cell proportions (Append cell proportions) 
-        model.append_gex_to_adata()
-
-        prop_gex_adata = model.get_adata()
-
-        print(prop_gex_adata)
-
-
-        # Benchmarking Cell Gene Expression
-
-        layer_dir = os.path.join(output_folder, f"{sample_name}_{suffix}_{radius}/layers")
-    
-        export_anndata_layers(prop_gex_adata, layer_dir)
-
-        ground_truth_folder = os.path.join(input_folder,"ST_GEX_sim")
-
-        # Set directories for ground truth and prediction files
-        ground_truth_dir = os.path.join(ground_truth_folder,f"sample_{number}","layers")
-
-        # Add these debug statements before calling calculate_expression_metrics
-        logging.info(f"Ground truth directory: {ground_truth_dir}")
-        logging.info(f"Ground truth files: {os.listdir(ground_truth_dir)}")
-        logging.info(f"Layer directory: {layer_dir}")
-        logging.info(f"Layer files: {os.listdir(layer_dir)}")
-
-        # Add this debug code before calculate_expression_metrics
-        for gt_file in os.listdir(ground_truth_dir):
-            if gt_file.endswith("_GT.csv"):
-                cell_type = gt_file.replace("_GT.csv", "")
-                gt_path = os.path.join(ground_truth_dir, gt_file)
-                pred_path = os.path.join(layer_dir, f"{cell_type}_layer.csv")
-                
-                if os.path.exists(pred_path):
-                    gt_df = pd.read_csv(gt_path, index_col=0)
-                    pred_df = pd.read_csv(pred_path, index_col=0)
-                    logging.info(f"Cell type: {cell_type}")
-                    logging.info(f"Ground truth shape: {gt_df.shape}")
-                    logging.info(f"Prediction shape: {pred_df.shape}")
-                    logging.info(f"Common genes: {len(gt_df.index.intersection(pred_df.index))}")
-                    logging.info(f"Common spots: {len(gt_df.columns.intersection(pred_df.columns))}")
-
-        # Calculate RMSE and Normalized RMSE
-        metrics = calculate_expression_metrics(ground_truth_dir, layer_dir, normalize = "range")
-
-
-        average_rmse  = metrics.get('average_rmse')
-        median_rmse   = metrics.get('median_rmse')
-        average_nrmse = metrics.get('average_nrmse')
-        median_nrmse  = metrics.get('median_nrmse')
-        average_mae   = metrics.get('average_mae')
-        median_mae    = metrics.get('median_mae')
-    
-        # Create the metrics dictionary
-        metrics_values = {
-            'Average RMSE': average_rmse,
-            'Median RMSE': median_rmse,
-            'Average NRMSE': average_nrmse,
-            'Median NRMSE': median_nrmse,
-            'Average MAE': average_mae,
-            'Median MAE': median_mae
-        }
-    
-        # Convert the metrics dictionary to a DataFrame
-        gex_results = pd.DataFrame(list(metrics_values.items()), columns=['Metric', 'Value'])
-
-        print(gex_results)
-
-        logging.info(f"Gene expression metrics: \n{gex_results}")
-
-        # Save the DataFrame to a CSV file
-        gex_results.to_csv(os.path.join(output_folder,f'{sample_name}_gex_metrics_summary_{suffix}_{radius}.csv'), index=False)
-
         ##############################################################################
-        # 3) Phase 3: WGCNA-based Multimodal Integration
+        # 2) Gene Expression Deconvolution - Pass 1
         ##############################################################################
-        
-        logging.info(f"Running Phase 3 WGCNA-based integration for {sample_name} ...")
+        logging.info(f"Running pass 1 gene expression optimization for {sample_name} ...")
 
-        # Run Phase 3 optimization
-        model.run_multimodal_phase_3_wgcna(
-            max_clusters=30,  # Adjust based on expected number of gene modules
-            alpha_gex=1.0,
-            alpha_antibody=0.5,
-            alpha_spatial=0.0,  # No spatial smoothing for now
-            lambda_reg_module=0.1
+        # Run first pass
+        pass1_results = model.run_cell_expression_pass1(
+            radius=radius, 
+            alpha=0.5, 
+            lambda_reg_gex=0.001,
+            max_workers=None, 
+            checkpoint_interval=100, 
+            output_dir="checkpoints", 
+            rerun=True
         )
 
-        # Get updated AnnData with Phase 3 layers
-        prop_gex_adata_phase3 = model.get_adata()
+        # Calculate pass 1 metrics
+        ground_truth_folder = os.path.join(input_folder, "ST_GEX_sim")
+        ground_truth_dir = os.path.join(ground_truth_folder, f"sample_{number}", "layers")
+        layer_dir_pass1 = os.path.join(output_folder, f"{sample_name}_pass1/layers")
 
-        # Export Phase 3 layers
-        layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_{suffix}_{radius}_phase3/layers")
-        export_anndata_layers(prop_gex_adata_phase3, layer_dir_phase3)
+        if os.path.exists(ground_truth_dir):
+            logging.info("Calculating metrics for pass 1...")
+            pass1_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass1, pass_number=1)
+            logging.info(f"Pass 1 metrics:\n{pass1_metrics}")
+            
+            # Save pass 1 metrics
+            metrics_path_pass1 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass1.csv")
+            pass1_metrics.to_csv(metrics_path_pass1, index=False)
 
-        # Calculate Phase 3 metrics for cell proportions
-        proportions_path_phase3 = os.path.join(output_folder, f"{sample_name}_cell_prop_phase3_results.csv")
-        test_spots_df_phase3 = pd.read_csv(proportions_path_phase3, index_col=0).sort_index().sort_index(axis=1)
+            ##############################################################################
+            # 3) Compute Prior and Run Pass 2
+            ##############################################################################
+            logging.info("Computing prior from pass 1 results...")
+            prior_info = model.compute_expression_prior(
+                spotwise_profiles_pass1=pass1_results['spotwise_profiles'],
+                cell_type_numbers_array=model.results.get('cell_prop').values
+            )
 
-        # Verify columns match
-        if not np.array_equal(test_spots_df_phase3.columns, spot_composition_df.columns):
-            logging.warning(f"Phase 3 test_spots_df columns: {test_spots_df_phase3.columns}, spot_composition_df columns: {spot_composition_df.columns}")
-            raise ValueError("ERROR: The column names in the Phase 3 CSV files do not match or are not in the same order!")
+            logging.info(f"Running pass 2 with prior guidance for {sample_name} ...")
+            
+            spotwise_profiles_pass2 = model.run_cell_expression_pass2(
+                global_prior=prior_info['global_prior'],
+                dimensions=pass1_results['dimensions'],
+                radius=radius,
+                alpha=0.5,
+                lambda_reg_gex=0.001,
+                lambda_prior_weight=0.5,
+                max_workers=None,
+                checkpoint_interval=100,
+                output_dir="checkpoints",
+                rerun=True
+            )
 
-        # Convert DataFrames to numpy arrays for Phase 3 cell proportions
-        test_spots_metadata_mtrx_phase3 = test_spots_df_phase3.values
-        results_phase3 = benchmark_cell_proportions(test_spots_metadata_mtrx_phase3, spot_composition_mtrx, column_names)
+            # Calculate pass 2 metrics
+            layer_dir_pass2 = os.path.join(output_folder, f"{sample_name}_pass2/layers")
+            pass2_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass2, pass_number=2)
+            logging.info(f"Pass 2 metrics:\n{pass2_metrics}")
+            
+            # Save pass 2 metrics
+            metrics_path_pass2 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass2.csv")
+            pass2_metrics.to_csv(metrics_path_pass2, index=False)
 
-        logging.info(f"Phase 3 cell proportion benchmarking results: {results_phase3}")
+            # Calculate and save improvements
+            improvements_df = calculate_improvements(pass1_metrics, pass2_metrics)
+            logging.info("Improvements from pass 1 to pass 2:")
+            for _, row in improvements_df.iterrows():
+                logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
 
-        # Convert to DataFrame and save Phase 3 cell proportion results
-        prop_results_df_phase3 = pd.DataFrame([results_phase3])
-        prop_results_name_phase3 = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_phase3_{suffix}_{radius}.csv')
-        prop_results_df_phase3.to_csv(prop_results_name_phase3, index=False)
+            # Save improvements
+            improvements_df.to_csv(
+                os.path.join(output_folder, f"{sample_name}_gex_improvements.csv"),
+                index=False
+            )
 
-        print("Phase 3 cell proportion results:")
-        print(prop_results_df_phase3)
-        logging.info(f"Phase 3 cell proportion results summary: \n{prop_results_df_phase3}")
+            # Save combined metrics
+            pd.concat([pass1_metrics, pass2_metrics]).to_csv(
+                os.path.join(output_folder, f"{sample_name}_gex_metrics_combined.csv"),
+                index=False
+            )
+        else:
+            logging.warning(f"Ground truth directory not found: {ground_truth_dir}")
+            logging.warning("Skipping metric calculations and pass 2.")
 
-        # Calculate Phase 3 metrics for gene expression
-        metrics_phase3 = calculate_expression_metrics(ground_truth_dir, layer_dir_phase3, normalize="range")
-
-        average_rmse_phase3  = metrics_phase3.get('average_rmse')
-        median_rmse_phase3   = metrics_phase3.get('median_rmse')
-        average_nrmse_phase3 = metrics_phase3.get('average_nrmse')
-        median_nrmse_phase3  = metrics_phase3.get('median_nrmse')
-        average_mae_phase3   = metrics_phase3.get('average_mae')
-        median_mae_phase3    = metrics_phase3.get('median_mae')
-    
-        # Create the metrics dictionary for Phase 3
-        metrics_values_phase3 = {
-            'Average RMSE': average_rmse_phase3,
-            'Median RMSE': median_rmse_phase3,
-            'Average NRMSE': average_nrmse_phase3,
-            'Median NRMSE': median_nrmse_phase3,
-            'Average MAE': average_mae_phase3,
-            'Median MAE': median_mae_phase3
-        }
-    
-        # Convert the Phase 3 metrics dictionary to a DataFrame
-        gex_results_phase3 = pd.DataFrame(list(metrics_values_phase3.items()), columns=['Metric', 'Value'])
-
-        print("Phase 3 gene expression metrics:")
-        print(gex_results_phase3)
-        logging.info(f"Phase 3 gene expression metrics: \n{gex_results_phase3}")
-
-        # Save Phase 3 gene expression metrics
-        gex_results_phase3.to_csv(os.path.join(output_folder,f'{sample_name}_gex_metrics_summary_phase3_{suffix}_{radius}.csv'), index=False)
-
-        # Print comparison between original and Phase 3 results
-        print("\nComparison of results:")
-        print("Cell proportions:")
-        comparison_df = pd.concat([
-            prop_results_df.add_prefix('Original_'),
-            prop_results_df_phase3.add_prefix('Phase3_')
-        ], axis=1)
-        print(comparison_df)
-        logging.info(f"Comparison of cell proportions:\n{comparison_df}")
-
-        print("\nGene expression:")
-        gex_comparison = pd.DataFrame({
-            'Metric': gex_results['Metric'],
-            'Original': gex_results['Value'],
-            'Phase3': gex_results_phase3['Value']
-        })
-        print(gex_comparison)
-        logging.info(f"Comparison of gene expression metrics:\n{gex_comparison}")
-
-        # Save comparisons
-        comparison_df.to_csv(os.path.join(output_folder,f'{sample_name}_comparison_cellprop_{suffix}_{radius}.csv'), index=False)
-        gex_comparison.to_csv(os.path.join(output_folder,f'{sample_name}_comparison_gex_{suffix}_{radius}.csv'), index=False)
-
-        logging.info(f"Finished processing sample: {sample_name}")
-
-        # ---------------------------------------------------------------------
-        # Cleanup this sample to free memory
-        # ---------------------------------------------------------------------
-        del adata_cite
-        del adata_gex
-        del model
+        # Clean up
         gc.collect()
 
     logging.info("All samples processed successfully.")
-
 
 if __name__ == "__main__":
     main()
