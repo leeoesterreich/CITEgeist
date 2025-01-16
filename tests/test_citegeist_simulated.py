@@ -120,6 +120,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='Run CITEgeist on simulated data.')
     parser.add_argument('--radius', type=float, required=True, help='Radius for neighbor detection')
+    parser.add_argument('--lambda_prior_weight', type=float, default=0.5, help='Weight for prior guidance in pass 2')
     parser.add_argument('--input_folder', type=str, default='.', help='Folder all requisite samples and ground truth')
     parser.add_argument('--output_folder', type=str, default='citegeist_output', help='Output folder')
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
@@ -128,21 +129,22 @@ def main():
     args = parser.parse_args()
 
     radius = args.radius
-
-    #variables = f"radius_{radius}_lambda_prior_weight_{lambda_prior_weight}"
+    lambda_prior_weight = args.lambda_prior_weight
+    
+    variables = f"radius_{radius}_lambda_prior_weight_{lambda_prior_weight}"
 
     input_folder = args.input_folder
     output_folder = args.output_folder
 
     suffix = "FilteredRadiiArrayWinsorCLRDiscrete"
 
-    output_folder = os.path.join(output_folder, f'test_results/radius_{radius}.', suffix + "CITEgeistOutput")
+    output_folder = os.path.join(output_folder, f'test_results/{variables}.', suffix + "CITEgeistOutput")
 
     # Create an output directory
     os.makedirs(output_folder, exist_ok=True)
 
     # Initialize logging
-    log_file = f"Simulated_CITEgeist_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{radius}.log"
+    log_file = f"Simulated_CITEgeist_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{radius}_{lambda_prior_weight}.log"
     log_path = os.path.join(args.output_folder, log_file)
     logging.basicConfig(
         filename=log_path,
@@ -150,7 +152,7 @@ def main():
         format='%(asctime)s - %(levelname)s - %(message)s',
         level=logging.DEBUG
     )
-    logging.info(f"Starting CITEgeist run with parameters: radius={radius}")
+    logging.info(f"Starting CITEgeist run with parameters: radius={radius}, lambda_prior_weight={lambda_prior_weight}")
 
     # Find all unique sample numbers for Wu_rep_{number} pairs
     h5ad_dir = os.path.join(args.input_folder, "h5ad_objects")
@@ -254,8 +256,12 @@ def main():
         # Save cell proportion results
         prop_results_df = pd.DataFrame([results])
         prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_{suffix}_{radius}_.csv')
+        
+        
         prop_results_df.to_csv(prop_results_name, index=False)
         logging.info(f"Cell proportion results summary: \n{prop_results_df}")
+        print(f"Cell proportion results summary: \n{prop_results_df}")
+
 
         if args.profiling_only:
             logging.info("Skipping gene-expression deconvolution (profiling_only=True).")
@@ -308,7 +314,7 @@ def main():
                 radius=radius,
                 alpha=0.5,
                 lambda_reg_gex=0.001,
-                lambda_prior_weight=0.5,
+                lambda_prior_weight=lambda_prior_weight,
                 max_workers=None,
                 checkpoint_interval=100,
                 output_dir="checkpoints",
@@ -317,6 +323,8 @@ def main():
 
             # Calculate pass 2 metrics
             layer_dir_pass2 = os.path.join(output_folder, f"{sample_name}_pass2/layers")
+
+
             pass2_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass2, pass_number=2)
             logging.info(f"Pass 2 metrics:\n{pass2_metrics}")
             

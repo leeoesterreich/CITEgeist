@@ -817,6 +817,11 @@ def optimize_gene_expression_with_custom_spot_fn(
     M = deconvolution_expression_data.shape[1]
     T = cell_type_numbers_array.shape[1]
 
+    # Initialize empty dictionaries
+    completed_spots = set()
+    spotwise_gene_expression_profiles = {}
+    futures = {}
+
     # If rerun is True, delete all existing files for this sample
     if rerun:
         existing_files = [
@@ -920,8 +925,12 @@ def optimize_gene_expression_with_custom_spot_fn(
     logging.info(f"Starting analysis for {sample_name}")
     logging.info(f"Already completed spots: {len(completed_spots)}")
 
+    # Initialize futures as empty dict before try block
+    futures = {}
+    
     try:
-        workers = max_workers if max_workers is not None else os.cpu_count()  
+        # Calculate number of workers (ensure it's an integer)
+        workers = max_workers if max_workers is not None else max(1, os.cpu_count() // 2)
         logging.info(f"Using {workers} workers")
         
         # Only process spots that haven't been completed
@@ -934,7 +943,7 @@ def optimize_gene_expression_with_custom_spot_fn(
             try:
                 with ProcessPoolExecutor(max_workers=workers) as executor:
                     # Submit jobs with proper argument handling
-                    futures = {}
+                    futures.clear()  # Clear any existing futures
                     for spot_idx in remaining_spots:
                         if spot_idx < len(spot_args):
                             future = executor.submit(spot_function, spot_args[spot_idx])
@@ -1000,22 +1009,24 @@ def optimize_gene_expression_with_custom_spot_fn(
                 time.sleep(5)  # Wait before retrying
 
     finally:
-        futures.clear()
+        if futures:
+            futures.clear()
         gc.collect()
         
         # Save final results
         final_path = os.path.join(output_dir, f"{sample_name}_gene_expression_complete.npz")
-        max_spot = max(spotwise_gene_expression_profiles.keys())
-        final_profiles = np.full((max_spot + 1, T, M), np.nan)
-        for spot_idx, profile in spotwise_gene_expression_profiles.items():
-            final_profiles[spot_idx] = profile
-            
-        np.savez_compressed(
-            final_path, 
-            profiles=final_profiles, 
-            completed_spots=np.array(list(completed_spots))
-        )
-        logging.info(f"Saved final results with {len(completed_spots)} completed spots")
+        if spotwise_gene_expression_profiles:  # Only save if we have results
+            max_spot = max(spotwise_gene_expression_profiles.keys())
+            final_profiles = np.full((max_spot + 1, T, M), np.nan)
+            for spot_idx, profile in spotwise_gene_expression_profiles.items():
+                final_profiles[spot_idx] = profile
+                
+            np.savez_compressed(
+                final_path, 
+                profiles=final_profiles, 
+                completed_spots=np.array(list(completed_spots))
+            )
+            logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     return spotwise_gene_expression_profiles
 
@@ -1363,24 +1374,22 @@ def optimize_gene_expression(
 
                             # Save checkpoint every checkpoint_interval spots
                             if spots_since_last_save >= checkpoint_interval:
-                                # Use number of completed spots instead of current spot index
-                                n_completed = len(completed_spots)
-                                checkpoint_path = os.path.join(
-                                    output_dir, 
-                                    f"{sample_name}_gene_expression_checkpoint_{n_completed}.npz"
-                                )
-                                
-                                # Convert dictionary to numpy array for saving
-                                max_spot = max(spotwise_gene_expression_profiles.keys())
-                                profiles_array = np.full((max_spot + 1, T, M), np.nan)
-                                
-                                for spot_idx, profile in spotwise_gene_expression_profiles.items():
-                                    if profile.shape != (T, M):
-                                        logging.error(f"Invalid profile shape at spot {spot_idx}: {profile.shape}")
-                                        continue
-                                    profiles_array[spot_idx] = profile
-                                
+
                                 try:
+                                    # Use number of completed spots instead of current spot index
+                                    n_completed = len(completed_spots)
+                                    checkpoint_path = os.path.join(
+                                        output_dir, 
+                                        f"{sample_name}_gene_expression_checkpoint_{n_completed}.npz"
+                                    )
+                                    
+                                    # Convert dictionary to numpy array for saving
+                                    max_spot = max(spotwise_gene_expression_profiles.keys())
+                                    profiles_array = np.full((max_spot + 1, T, M), np.nan)
+                                    
+                                    for spot_idx, profile in spotwise_gene_expression_profiles.items():
+                                        profiles_array[spot_idx] = profile
+                                    
                                     # Save as compressed numpy array with completed spots info
                                     np.savez_compressed(
                                         checkpoint_path,
