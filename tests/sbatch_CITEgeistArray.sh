@@ -3,7 +3,7 @@
 #SBATCH --output=benchmarking_logs/CITEgeist_array_%A_%a.log
 #SBATCH --error=benchmarking_logs/CITEgeist_array_%A_%a.log
 #SBATCH --time=72:00:00
-#SBATCH --mem=32G
+#SBATCH --mem=64G
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=alc376@pitt.edu
 #SBATCH --cluster=htc
