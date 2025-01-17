@@ -334,62 +334,41 @@ class CitegeistModel:
             save_results_to_output(cell_type_proportions_df, output_file)
             print(f"Cell type proportions saved to '{output_file}'.")
             
-    def run_cell_expression_pass1(
-        self, 
-        radius=2, 
-        alpha=0.5, 
-        lambda_reg_gex=0.0001,
-        max_workers=None, 
-        checkpoint_interval=100,
-        output_dir="checkpoints",
-        rerun=False,
-        local_weight=0.5,
-        global_weight=0.5
-    ):
+    def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
+                            max_workers=None, checkpoint_interval=100, 
+                            output_dir="checkpoints", rerun=True):
         """
-        Run first pass of gene expression deconvolution without prior.
-        
-        Returns:
-            dict: First pass results containing spotwise profiles
+        Run first pass of gene expression deconvolution using error minimization.
+        No prior is used in this pass.
         """
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
+        if not self.preprocessed_gex:
+            raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
-        self.validate_neighborhood_size(radius)
+        logging.info("Starting Pass 1: Error minimization without prior...")
         
-        # Extract required data (keeping as integers)
-        filtered_data = self.gene_expression_adata.X
-        if hasattr(filtered_data, 'toarray'):
-            filtered_data = filtered_data.toarray()
-        filtered_data = np.array(filtered_data, dtype=int)
-        
-        cell_type_numbers_array = self.results.get('cell_prop').values
-
-        #########################
-        # === PASS 1 (No Prior)
-        #########################
-        logging.info("=== Pass 1: Initial optimization without prior ===")
-        spotwise_profiles_pass1 = optimize_gene_expression(
-            sample_name=f"{self.sample_name}_pass1",
-            deconvolution_expression_data=filtered_data,
-            cell_type_numbers_array=cell_type_numbers_array,
-            filtered_adata=self.gene_expression_adata,
+        # Use the error-minimizing implementation from gurobi_impl.py
+        spotwise_profiles = optimize_gene_expression(
+            self.gene_expression_adata,
+            self.results.get('cell_prop').values,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
+            lambda_prior_weight=0,  # No prior in first pass
+            global_prior=None,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun
         )
 
-        # Impute NaN spots for first pass
-        N = filtered_data.shape[0]
-        T = cell_type_numbers_array.shape[1]
-        M = filtered_data.shape[1]
+        # Get dimensions for NaN imputation
+        N = self.gene_expression_adata.shape[0]  # number of spots
+        T = self.results.get('cell_prop').values.shape[1]  # number of cell types
+        M = self.gene_expression_adata.shape[1]  # number of genes
         
-        nan_spots_pass1 = [i for i in range(N) if i not in spotwise_profiles_pass1]
-        for nan_spot in nan_spots_pass1:
+        # Impute NaN spots for first pass
+        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
+        for nan_spot in nan_spots:
             neighbor_indices = get_neighbors_with_fixed_radius(
                 nan_spot, 
                 self.gene_expression_adata, 
@@ -398,28 +377,28 @@ class CitegeistModel:
             )
 
             neighbor_profiles = [
-                spotwise_profiles_pass1[i]
+                spotwise_profiles[i]
                 for i in neighbor_indices
-                if i in spotwise_profiles_pass1
+                if i in spotwise_profiles
             ]
 
             if neighbor_profiles:
                 # Round to nearest integer for count data
                 imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles_pass1[nan_spot] = imputed_profile
+                spotwise_profiles[nan_spot] = imputed_profile
                 logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 1).")
             else:
                 logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 1). Leaving as NaN.")
 
         # Store first pass results
-        self.results['gene_expression_pass1'] = spotwise_profiles_pass1
+        self.results['gene_expression_pass1'] = spotwise_profiles
         
         # Save first pass results to parquet
         parquet_path_pass1 = os.path.join(
             self.output_folder, 
             f"{self.sample_name}_gene_expression_pass1.parquet"
         )
-        self._save_profiles_to_parquet(spotwise_profiles_pass1, parquet_path_pass1)
+        self._save_profiles_to_parquet(spotwise_profiles, parquet_path_pass1)
         logging.info("✅ First pass results saved.")
 
         # Evaluate first pass immediately
@@ -431,117 +410,80 @@ class CitegeistModel:
         export_anndata_layers(self.gene_expression_adata, layer_dir_pass1, pass_number=1)
         logging.info("First pass layers exported for evaluation.")
 
+        # Save results
+        dimensions = self.gene_expression_adata.shape
+        self._save_gene_expression_results(spotwise_profiles, pass_number=1)
+
         return {
-            'spotwise_profiles': spotwise_profiles_pass1,
-            'dimensions': {'N': N, 'T': T, 'M': M}
+            'spotwise_profiles': spotwise_profiles,
+            'dimensions': dimensions
         }
 
-    def compute_expression_prior(
-        self,
-        spotwise_profiles_pass1,
-        cell_type_numbers_array,
-        nonzero_percentage=0.01,
-        mean_expression_threshold=1.1,
-        lambda_prior=1.0,
-        zero_inflation_threshold=0.9
-    ):
+    def compute_expression_prior(self, spotwise_profiles_pass1, cell_type_numbers_array):
         """
-        Compute prior for second pass based on first pass results.
+        Compute global prior from pass 1 results using zero-inflation patterns.
+        """
+        logging.info("Computing prior from pass 1 results...")
         
-        Returns:
-            dict: Prior information including global prior and ZINB analysis
-        """
-        filtered_data = self.gene_expression_adata.X
-        if hasattr(filtered_data, 'toarray'):
-            filtered_data = filtered_data.toarray()
-        filtered_data = np.array(filtered_data, dtype=int)
-
-        # Analyze patterns from first pass
-        zero_patterns = analyze_zero_inflation_patterns(
-            filtered_data,
+        # Get gene and cell type names
+        gene_names = self.gene_expression_adata.var_names
+        cell_type_names = list(self.cell_profile_dict.keys())
+        
+        # Analyze zero-inflation patterns
+        patterns = analyze_zero_inflation_patterns(
+            spotwise_profiles_pass1,
             cell_type_numbers_array,
-            self.gene_expression_adata.var_names,
-            list(self.cell_profile_dict.keys()),  # Use actual cell type names
-            min_proportion=nonzero_percentage,
-            expression_threshold=mean_expression_threshold
+            gene_names,
+            cell_type_names
         )
         
-        suggested_threshold = suggest_zero_inflation_threshold(zero_patterns, quantile=0.75)
-        logging.info(f"Suggested zero-inflation threshold: {suggested_threshold:.3f}")
-
-        global_prior, zinb_matrix, zero_inflation_probs = compute_global_prior(
-            spotwise_gene_expression_profiles=spotwise_profiles_pass1,
-            cell_type_numbers_array=cell_type_numbers_array,
-            lambda_prior=lambda_prior,
-            zero_inflation_threshold=zero_inflation_threshold
+        # Get suggested threshold
+        threshold = suggest_zero_inflation_threshold(patterns)
+        
+        # Compute global prior
+        prior_info = compute_global_prior(
+            spotwise_profiles_pass1,
+            cell_type_numbers_array,
+            lambda_prior=1.0,
+            zero_inflation_threshold=threshold
         )
+        
+        return prior_info
 
-        return {
-            'global_prior': global_prior,
-            'zinb_matrix': zinb_matrix,
-            'zero_inflation_probs': zero_inflation_probs,
-            'suggested_threshold': suggested_threshold,
-            'zero_patterns': zero_patterns
-        }
-
-    def run_cell_expression_pass2(
-        self,
-        global_prior,
-        dimensions,
-        radius=2,
-        alpha=0.5,
-        lambda_reg_gex=0.0001,
-        lambda_prior_weight=0.5,
-        max_workers=None,
-        checkpoint_interval=100,
-        output_dir="checkpoints",
-        rerun=False
-    ):
+    def run_cell_expression_pass2(self, global_prior, dimensions, radius, 
+                            alpha=0.5, lambda_reg_gex=0.001, lambda_prior_weight=0.5,
+                            max_workers=None, checkpoint_interval=100, 
+                            output_dir="checkpoints", rerun=True):
         """
-        Run second pass of gene expression deconvolution with prior guidance.
-        
-        Returns:
-            dict: Second pass results containing spotwise profiles
+        Run second pass of gene expression deconvolution using error minimization
+        with prior guidance from first pass.
         """
-        filtered_data = self.gene_expression_adata.X
-        if hasattr(filtered_data, 'toarray'):
-            filtered_data = filtered_data.toarray()
-        filtered_data = np.array(filtered_data, dtype=int)
+        if not self.preprocessed_gex:
+            raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
+
+        logging.info("Starting Pass 2: Error minimization with prior guidance...")
         
-        cell_type_numbers_array = self.results.get('cell_prop').values
-
-        N, T, M = dimensions['N'], dimensions['T'], dimensions['M']
-
-        #########################
-        # === PASS 2 (With Prior)
-        #########################
-        logging.info("=== Pass 2: Optimization with prior guidance ===")
-        
-        spot_args = [
-            (i, self.gene_expression_adata, cell_type_numbers_array, radius, global_prior,
-             lambda_prior_weight, alpha, lambda_reg_gex)
-            for i in range(filtered_data.shape[0])
-        ]
-
-        spotwise_profiles_pass2 = optimize_gene_expression_with_custom_spot_fn(
-            sample_name=f"{self.sample_name}_pass2",
-            deconvolution_expression_data=filtered_data,
-            cell_type_numbers_array=cell_type_numbers_array,
-            filtered_adata=self.gene_expression_adata,
+        # Use the same error-minimizing implementation but with prior
+        spotwise_profiles = optimize_gene_expression(
+            self.gene_expression_adata,
+            self.results.get('cell_prop').values,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            spot_function=deconvolute_spot_with_neighbors_wrapper,
-            spot_args=spot_args,
+            lambda_prior_weight=lambda_prior_weight,
+            global_prior=global_prior,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun
         )
 
+        # Get dimensions for NaN imputation
+        N = self.gene_expression_adata.shape[0]  # number of spots
+        
         # Impute NaN spots for second pass
-        nan_spots_pass2 = [i for i in range(N) if i not in spotwise_profiles_pass2]
-        for nan_spot in nan_spots_pass2:
+        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
+        for nan_spot in nan_spots:
             neighbor_indices = get_neighbors_with_fixed_radius(
                 nan_spot, 
                 self.gene_expression_adata, 
@@ -550,28 +492,28 @@ class CitegeistModel:
             )
 
             neighbor_profiles = [
-                spotwise_profiles_pass2[i]
+                spotwise_profiles[i]
                 for i in neighbor_indices
-                if i in spotwise_profiles_pass2
+                if i in spotwise_profiles
             ]
 
             if neighbor_profiles:
                 # Round to nearest integer for count data
                 imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles_pass2[nan_spot] = imputed_profile
+                spotwise_profiles[nan_spot] = imputed_profile
                 logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 2).")
             else:
                 logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 2). Leaving as NaN.")
 
         # Store second pass results
-        self.results['gene_expression_pass2'] = spotwise_profiles_pass2
+        self.results['gene_expression_pass2'] = spotwise_profiles
         
         # Save to Parquet with consistent naming
         parquet_path = os.path.join(
             self.output_folder, 
             f"{self.sample_name}_gene_expression_pass2.parquet"
         )
-        self._save_profiles_to_parquet(spotwise_profiles_pass2, parquet_path)
+        self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
         logging.info("✅ Second pass results saved.")
 
         # Evaluate second pass
@@ -582,9 +524,12 @@ class CitegeistModel:
         layer_dir_pass2 = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
         export_anndata_layers(self.gene_expression_adata, layer_dir_pass2, pass_number=2)
         logging.info("Second pass layers exported for evaluation.")
-
-        return spotwise_profiles_pass2
-
+        
+        # Save results
+        self._save_gene_expression_results(spotwise_profiles, pass_number=2)
+        
+        return spotwise_profiles
+        
     def _save_profiles_to_parquet(self, profiles, path):
         """Helper method to save profiles to parquet format with consistent naming."""
         if not profiles:

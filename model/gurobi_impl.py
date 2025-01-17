@@ -406,8 +406,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     global_weight=0.5
 ):
     """
-    Same structure as `deconvolute_spot_with_neighbors`, but includes a penalty term
-    that discourages assigning gene k to cell type j if global_prior[j,k] is small.
+    Error-minimizing discrete deconvolution with optional prior guidance.
     """
     model = None
     try:
@@ -493,6 +492,63 @@ def deconvolute_spot_with_neighbors_with_prior(
         X = {}
         center_counts = deconvolution_expression_data[i, :]
 
+        # 1. Create error variables for each neighbor and gene
+        error_vars = model.addVars(
+            len(neighborhood_indices),
+            M,
+            lb=0, 
+            ub=GRB.INFINITY,
+            vtype=GRB.CONTINUOUS,
+            name="error"
+        )
+
+        # 2. Define predicted expression for neighbors
+        for n, spot_idx in enumerate(neighborhood_indices):
+            total_prop_n = np.sum(neighborhood_cell_type_numbers[n, :])
+            if total_prop_n < 1e-10:
+                total_prop_n = 1e-10
+
+            for k in range(M):
+                if int(center_counts[k]) > 0:  # Only process non-zero genes
+                    predicted_expr = gp.quicksum(
+                        (neighborhood_cell_type_numbers[n, j] / total_prop_n) * X[j, k]
+                        for j in range(T)
+                    )
+                    
+                    observed_expr_nk = neighborhood_expression_data[n, k]
+                    
+                    # 3. Add absolute difference constraints
+                    model.addConstr(error_vars[n, k] >= observed_expr_nk - predicted_expr)
+                    model.addConstr(error_vars[n, k] >= predicted_expr - observed_expr_nk)
+
+        # 4. Build minimization objective
+        total_error = gp.quicksum(error_vars[n, k] 
+                                 for n in range(len(neighborhood_indices)) 
+                                 for k in range(M))
+
+        # Optional regularization
+        l1_term = gp.quicksum(X[j,k] for j in range(T) for k in range(M) 
+                             if int(center_counts[k]) > 0)
+        l2_term = gp.quicksum(X[j,k]*X[j,k] for j in range(T) for k in range(M) 
+                             if int(center_counts[k]) > 0)
+        regularization_term = lambda_reg_gex * (alpha*l1_term + (1-alpha)*l2_term)
+
+        # Optional prior penalty (only used in pass 2)
+        if global_prior is not None and lambda_prior_weight > 0:
+            prior_penalty = lambda_prior_weight * gp.quicksum(
+                (1 - global_prior[j, k]) * X[j, k]
+                for j in range(T) for k in range(M)
+                if int(center_counts[k]) > 0
+            )
+        else:
+            prior_penalty = 0
+
+        # Set final objective
+        model.setObjective(
+            total_error + regularization_term + prior_penalty,
+            GRB.MINIMIZE
+        )
+
         # Create variables and basic constraints
         for k in range(M):
             total_counts = int(center_counts[k])
@@ -526,33 +582,6 @@ def deconvolute_spot_with_neighbors_with_prior(
                             model.getObjective() - penalty_weight * X[j,k],
                             GRB.MAXIMIZE
                         )
-
-        # Modified objective using gene-specific enrichment and prior
-        obj_terms = []
-        for k in range(M):
-            total_counts = int(center_counts[k])
-            if total_counts > 0:
-                for j in range(T):
-                    # Combine enrichment and prior with more weight on prior
-                    enrichment_weight = gene_specific_enrichment[k, j]
-                    prior_weight = np.clip(global_prior[j, k], 0.1, 1.0)  # Clip to avoid zero weights
-                    cell_type_weight = neighborhood_cell_type_numbers[
-                        len(neighborhood_indices)//2, j
-                    ]
-                    
-                    combined_weight = (
-                        (1 - lambda_prior_weight) * enrichment_weight +
-                        lambda_prior_weight * prior_weight
-                    )
-                    
-                    obj_terms.append(
-                        combined_weight * cell_type_weight * X[j,k]
-                    )
-
-        model.setObjective(
-            gp.quicksum(obj_terms),
-            GRB.MAXIMIZE
-        )
 
         # Optimize with try-catch for numerical issues
         try:
@@ -675,32 +704,7 @@ def optimize_gene_expression(
     output_dir="checkpoints",
     rerun=False
 ):
-    """
-    Similar to `optimize_gene_expression`, but calls `spot_function(...)` instead of
-    `deconvolute_spot_with_neighbors(...)` for each spot. The rest of the checkpoint
-    and parallel logic remains the same.
 
-    Args:
-        sample_name (str): Unique name for this sample (used in checkpoint files).
-        deconvolution_expression_data (np.ndarray): (N x M) gene expression data.
-        cell_type_numbers_array (np.ndarray): (N x T) cell type proportions or counts.
-        filtered_adata (AnnData): Anndata with .X for expression and .obsm['spatial'] for coords.
-        radius (float): Neighborhood radius.
-        alpha (float): L1-L2 regularization mixing param.
-        lambda_reg_gex (float): Regularization strength for the Gurobi model.
-        spot_function (callable): The function used to deconvolute a single spot. 
-            Must accept: (i, filtered_adata, cell_type_numbers_array, radius, alpha, lambda_reg_gex)
-            and return a (T x M) np.array or None.
-        max_workers (int): Number of parallel workers.
-        checkpoint_interval (int): Save frequency in # of spots processed.
-        output_dir (str): Directory for checkpoint files.
-        rerun (bool): If True, delete all existing checkpoint files.
-
-    Returns:
-        dict: spot_index -> (T x M) array of gene expression profiles per spot.
-    """
-    if spot_function is None:
-        raise ValueError("`spot_function` must be provided.")
 
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -732,7 +736,7 @@ def optimize_gene_expression(
     
     try:
         # Calculate number of workers (ensure it's an integer)
-        workers = max_workers if max_workers is not None else max(1, os.cpu_count() // 2)
+        workers = max_workers if max_workers is not None else os.cpu_count()
         logging.info(f"Using {workers} workers")
         
         # Only process spots that haven't been completed
