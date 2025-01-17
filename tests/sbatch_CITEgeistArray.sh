@@ -4,8 +4,8 @@
 #SBATCH --error=benchmarking_logs/CITEgeist_array_%A_%a.log
 #SBATCH --time=72:00:00
 #SBATCH --mem=64G
-#SBATCH --mail-type=ALL
-#SBATCH --mail-user=alc376@pitt.edu
+##SBATCH --mail-type=ALL
+##SBATCH --mail-user=alc376@pitt.edu
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC

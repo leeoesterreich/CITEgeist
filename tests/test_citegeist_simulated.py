@@ -136,7 +136,7 @@ def main():
     input_folder = args.input_folder
     output_folder = args.output_folder
 
-    suffix = "FilteredRadiiArrayWinsorCLRDiscrete"
+    suffix = "FilteredRadiiArrayWinsorCLRDiscreteErrorMinimizing"
 
     output_folder = os.path.join(output_folder, f'test_results/{variables}.', suffix + "CITEgeistOutput")
 
