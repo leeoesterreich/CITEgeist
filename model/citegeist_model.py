@@ -347,14 +347,17 @@ class CitegeistModel:
         logging.info("Starting Pass 1: Error minimization without prior...")
         
         # Use the error-minimizing implementation from gurobi_impl.py
-        spotwise_profiles = optimize_gene_expression(
+
+        spotwise_profiles =  optimize_gene_expression(
+            self.sample_name,
             self.gene_expression_adata,
             self.results.get('cell_prop').values,
+            self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            lambda_prior_weight=0,  # No prior in first pass
-            global_prior=None,
+            lambda_prior_weight=0,  # Added this parameter
+            global_prior=None,      # Added this parameter
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
@@ -412,7 +415,7 @@ class CitegeistModel:
 
         # Save results
         dimensions = self.gene_expression_adata.shape
-        self._save_gene_expression_results(spotwise_profiles, pass_number=1)
+
 
         return {
             'spotwise_profiles': spotwise_profiles,
@@ -525,8 +528,6 @@ class CitegeistModel:
         export_anndata_layers(self.gene_expression_adata, layer_dir_pass2, pass_number=2)
         logging.info("Second pass layers exported for evaluation.")
         
-        # Save results
-        self._save_gene_expression_results(spotwise_profiles, pass_number=2)
         
         return spotwise_profiles
         

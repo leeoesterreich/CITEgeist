@@ -699,6 +699,8 @@ def optimize_gene_expression(
     radius=2,
     alpha=0.5,
     lambda_reg_gex=0.0001,
+    lambda_prior_weight=0,  # Added this parameter
+    global_prior=None,      # Added this parameter
     max_workers=None,
     checkpoint_interval=100,
     output_dir="checkpoints",
