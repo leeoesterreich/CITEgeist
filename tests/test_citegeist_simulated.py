@@ -199,9 +199,6 @@ def main():
         if np.any(adata_gex.X > 0) and np.all(adata_gex.X == np.round(np.expm1(adata_gex.X))):
             logging.warning("adata_gex.X appears to be in log1p space. Consider applying inverse transformation.")
 
-        # Since the GEX data is log1p transformed, we will inverse that transformation.
-        adata_gex.X = np.round(np.expm1(adata_gex.X))  # Round after inverse transformation
-        logging.info("Inverse log1p transformation applied to the GEX data.")
 
         ##############################################################################
         # Initialize the model
@@ -355,6 +352,10 @@ def main():
 
         # Clean up
         gc.collect()
+
+        # Phase 3
+
+
 
     logging.info("All samples processed successfully.")
 
