@@ -108,16 +108,26 @@ def analyze_zero_inflation_patterns(
     
     # Ensure we're working with numpy arrays
     if isinstance(usage_array, dict):
-        usage_array = usage_array[0]  # Take first pass data if dict
+        # Convert dictionary to array with shape (T x M) for cell types x genes
+        T = len(cell_type_names)    # number of cell types
+        M = len(gene_names)         # number of genes
+        
+        # Take the first spot's profile as template for shape
+        first_profile = next(iter(usage_array.values()))
+        if first_profile.shape != (T, M):
+            raise ValueError(f"Expected profile shape (T={T}, M={M}), got {first_profile.shape}")
+            
+        usage_array = first_profile  # Use first spot's profile as reference
     
     # Convert to dense if sparse
     if hasattr(usage_array, 'toarray'):
         usage_array = usage_array.toarray()
     
     if usage_array.ndim != 2:
-        raise ValueError(f"Expected 2D array, got shape {usage_array.shape}")
+        raise ValueError(f"Expected 2D array (cell_types x genes), got shape {usage_array.shape}")
     
-    N, M = usage_array.shape  # N spots, M genes
+    T, M = usage_array.shape  # T cell types, M genes
+    N = cell_type_numbers.shape[0]  # number of spots
     
     for m_idx, gene in enumerate(gene_names):
         patterns[gene] = {}
@@ -127,23 +137,17 @@ def analyze_zero_inflation_patterns(
             ct_spots = cell_type_numbers[:, t_idx] > min_proportion
             
             if np.any(ct_spots):
-                # Get expression values for these spots
-                expr_values = usage_array[ct_spots, m_idx]
+                # Get expression value for this cell type and gene
+                expr_value = usage_array[t_idx, m_idx]
+                n_spots = np.sum(ct_spots)
                 
-                if len(expr_values) > 0:
-                    zero_prop = np.mean(expr_values <= expression_threshold)
-                    # Store as dictionary with additional info
-                    patterns[gene][cell_type] = {
-                        'zero_proportion': zero_prop,
-                        'mean_nonzero': np.mean(expr_values[expr_values > expression_threshold]) if np.any(expr_values > expression_threshold) else 0,
-                        'n_spots': len(expr_values)
-                    }
-                else:
-                    patterns[gene][cell_type] = {
-                        'zero_proportion': np.nan,
-                        'mean_nonzero': 0,
-                        'n_spots': 0
-                    }
+                # For a cell type's gene expression, we only have one value
+                zero_prop = 1.0 if expr_value <= expression_threshold else 0.0
+                patterns[gene][cell_type] = {
+                    'zero_proportion': zero_prop,
+                    'mean_nonzero': expr_value if expr_value > expression_threshold else 0,
+                    'n_spots': n_spots
+                }
             else:
                 patterns[gene][cell_type] = {
                     'zero_proportion': np.nan,
