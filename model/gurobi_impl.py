@@ -34,6 +34,7 @@ from scipy.spatial.distance import squareform
 import time
 import concurrent.futures.process
 from .checkpoints import CheckpointManager
+import scipy.sparse
 
 
 def fit_zinb(x, p):
@@ -1350,3 +1351,34 @@ def optimize_multimodal_phase_3_wgcna(
         "layers": layers                # N x T x G
     }
     return results
+
+def normalize_counts(adata, target_sum=10000):
+    """
+    Normalize counts while preserving integer values and relative proportions.
+    
+    Args:
+        adata: AnnData object
+        target_sum: Target sum for each cell/spot
+    
+    Returns:
+        Normalized AnnData object
+    """
+    # Get matrix
+    X = adata.X.toarray() if scipy.sparse.issparse(adata.X) else adata.X
+    
+    # Calculate scaling factors
+    size_factors = X.sum(axis=1)
+    median_size = np.median(size_factors)
+    scaling_factors = size_factors / median_size
+    
+    # Scale to target sum while preserving integers
+    X_scaled = np.round(X * (target_sum / size_factors[:, None])).astype(int)
+    
+    # Create new AnnData with scaled counts
+    adata_norm = adata.copy()
+    adata_norm.X = X_scaled
+    
+    # Store size factors
+    adata_norm.obs['size_factors'] = scaling_factors
+    
+    return adata_norm
