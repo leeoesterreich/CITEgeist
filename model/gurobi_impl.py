@@ -5,6 +5,7 @@ import traceback
 import gc
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Any, Optional, List, Tuple, Union
+import json
 
 # Third-party imports
 import numpy as np
@@ -238,6 +239,10 @@ def compute_global_prior(
             global_prior[:, m_idx] = 1.0 / T
         else:
             global_prior[:, m_idx] = exps / denom
+
+    logging.info(f"Prior statistics - Mean: {np.mean(global_prior):.4f}, "
+                f"Std: {np.std(global_prior):.4f}, "
+                f"Max: {np.max(global_prior):.4f}")
 
     return {
     'global_prior': global_prior,
@@ -534,7 +539,8 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         # Optional prior penalty (only used in pass 2)
         if global_prior is not None and lambda_prior_weight > 0:
-            prior_penalty = lambda_prior_weight * gp.quicksum(
+            lambda_prior_weight_adjusted = lambda_prior_weight * (np.mean(center_counts) / 10000)
+            prior_penalty = lambda_prior_weight_adjusted * gp.quicksum(
                 (1 - global_prior[j, k]) * X[j, k]
                 for j in range(T) for k in range(M)
                 if int(center_counts[k]) > 0
@@ -1236,23 +1242,73 @@ def normalize_counts(adata, target_sum=10000):
     
     return adata_norm
 
-def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
-                            max_workers=None, checkpoint_interval=100, 
-                            output_dir="checkpoints", rerun=True) -> Dict[str, Any]:
-    # Update call to match new optimize_gene_expression signature
-    results = optimize_gene_expression(
-        sample_name=self.sample_name,
-        deconvolution_expression_data=self.gene_expression_adata.X,
-        cell_type_numbers_array=self.results['cell_prop'].values,
-        filtered_adata=self.gene_expression_adata,
-        radius=radius,
-        alpha=alpha,
-        lambda_reg_gex=lambda_reg_gex,
-        lambda_prior_weight=0,
-        global_prior=None,
-        max_workers=max_workers,
-        checkpoint_interval=checkpoint_interval,
-        output_dir=output_dir,
-        rerun=rerun
-    )
-    return results
+
+def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, global_prior):
+    """
+    Compare pass1 and pass2 results to verify prior influence.
+    
+    Args:
+        spotwise_profiles_pass1 (dict): First pass results {spot_idx: profile_matrix}
+        spotwise_profiles_pass2 (dict): Second pass results {spot_idx: profile_matrix}
+        global_prior (np.ndarray): Global prior matrix (T x M)
+        
+    Returns:
+        dict: Dictionary containing validation metrics
+    """
+    prior_guided_changes = []
+    spot_metrics = {}
+    
+    # Ensure we have matching spots
+    common_spots = set(spotwise_profiles_pass1.keys()) & set(spotwise_profiles_pass2.keys())
+    
+    if not common_spots:
+        logging.error("No matching spots found between pass1 and pass2 results")
+        return None
+        
+    for spot in common_spots:
+        profile1 = spotwise_profiles_pass1[spot]
+        profile2 = spotwise_profiles_pass2[spot]
+        
+        # Calculate absolute changes between passes
+        profile_diff = np.abs(profile2 - profile1)
+        total_diff = np.sum(profile_diff)
+        
+        # Calculate prior influence on pass2 assignment
+        prior_alignment = np.sum(global_prior * profile2)
+        
+        prior_guided_changes.append((total_diff, prior_alignment))
+        
+        # Store per-spot metrics
+        spot_metrics[spot] = {
+            'total_change': total_diff,
+            'prior_alignment': prior_alignment,
+            'mean_change': np.mean(profile_diff),
+            'max_change': np.max(profile_diff)
+        }
+    
+    # Calculate correlation between changes and prior influence
+    changes = np.array([x[0] for x in prior_guided_changes])
+    influences = np.array([x[1] for x in prior_guided_changes])
+    
+    correlation = np.corrcoef(changes, influences)[0,1]
+    
+    # Calculate summary statistics
+    validation_metrics = {
+        'prior_correlation': correlation,
+        'mean_total_change': np.mean(changes),
+        'mean_prior_influence': np.mean(influences),
+        'std_total_change': np.std(changes),
+        'std_prior_influence': np.std(influences),
+        'n_spots_analyzed': len(common_spots),
+        'spot_metrics': spot_metrics
+    }
+    
+    # Log summary statistics
+    logging.info("Prior Effect Validation:")
+    logging.info(f"Prior-Change Correlation: {correlation:.4f}")
+    logging.info(f"Mean Total Change: {validation_metrics['mean_total_change']:.4f}")
+    logging.info(f"Mean Prior Influence: {validation_metrics['mean_prior_influence']:.4f}")
+    logging.info(f"Number of Spots Analyzed: {validation_metrics['n_spots_analyzed']}")
+    
+    return validation_metrics
+
