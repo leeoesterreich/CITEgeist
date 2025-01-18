@@ -6,6 +6,7 @@ import argparse
 import logging
 import gc
 from datetime import datetime
+from typing import Dict, Any, List, Optional
 
 import numpy as np
 import scanpy as sc
@@ -214,7 +215,7 @@ def main():
         model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1)
 
         # Preprocess datasets
-        model.preprocess_gex()
+        model.preprocess_gex(target_sum=10000)
         model.preprocess_antibody()
 
         # Register Gurobi license
@@ -300,12 +301,11 @@ def main():
             logging.info("Computing prior from pass 1 results...")
             prior_info = model.compute_expression_prior(
                 spotwise_profiles_pass1=pass1_results['spotwise_profiles'],
-                cell_type_numbers_array=model.results.get('cell_prop').values
+                cell_type_numbers_array=model.results['cell_prop'].values
             )
 
-            logging.info(f"Running pass 2 with prior guidance for {sample_name} ...")
-            
-            spotwise_profiles_pass2 = model.run_cell_expression_pass2(
+            # Run pass 2 with prior guidance
+            pass2_results = model.run_cell_expression_pass2(
                 global_prior=prior_info['global_prior'],
                 dimensions=pass1_results['dimensions'],
                 radius=radius,
@@ -320,7 +320,6 @@ def main():
 
             # Calculate pass 2 metrics
             layer_dir_pass2 = os.path.join(output_folder, f"{sample_name}_pass2/layers")
-
 
             pass2_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass2, pass_number=2)
             logging.info(f"Pass 2 metrics:\n{pass2_metrics}")

@@ -1,41 +1,30 @@
+# Standard library imports
+import os
+import logging
+import traceback
+import gc
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from typing import Dict, Any, Optional, List, Tuple, Union
+
+# Third-party imports
 import numpy as np
+import pandas as pd
 import gurobipy as gp
 from gurobipy import Model, GRB, quicksum
-import pandas as pd
-import numpy as np
-import gurobipy as gp
-from gurobipy import GRB
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from tqdm import tqdm
-import logging
-import traceback
-import gc
-from .utils import get_neighbors_with_fixed_radius
-import os
-from pathlib import Path
+import scanpy as sc
+import scipy
 from scipy.stats import spearmanr
-import scipy.sparse as sp
-from statsmodels.stats.multitest import multipletests
-import numpy as np
-import math
-from sklearn.metrics import mutual_info_score
 from scipy.optimize import minimize
 from scipy.special import loggamma, digamma
-import os
-from pathlib import Path
-import logging
-import traceback
-import gc
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from tqdm import tqdm
-import numpy as np
 from scipy.cluster.hierarchy import linkage, fcluster
 from scipy.spatial.distance import squareform
-import time
-import concurrent.futures.process
-from .checkpoints import CheckpointManager
-import scipy.sparse
+import scipy.sparse as sp
+from statsmodels.stats.multitest import multipletests
+from tqdm import tqdm
 
+# Local imports
+from .utils import get_neighbors_with_fixed_radius
+from .checkpoints import CheckpointManager
 
 def fit_zinb(x, p):
     """
@@ -250,7 +239,12 @@ def compute_global_prior(
         else:
             global_prior[:, m_idx] = exps / denom
 
-    return global_prior, zinb_matrix, zero_inflation_probs
+    return {
+    'global_prior': global_prior,
+    'zinb_matrix': zinb_matrix,
+    'zero_inflation_probs': zero_inflation_probs,
+    'zero_inflation_threshold': zero_inflation_threshold
+}
 
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
@@ -619,30 +613,6 @@ def deconvolute_spot_with_neighbors_with_prior(
         gc.collect()
 
 
-def deconvolute_spot_with_neighbors_wrapper(args):
-    """
-    Wrapper function for parallel processing that unpacks arguments and calls the main function.
-    Args should be a tuple of (i, filtered_adata, cell_type_numbers_array, radius, global_prior, 
-    lambda_prior_weight, alpha, lambda_reg_gex)
-    """
-    try:
-        i, filtered_adata, cell_type_numbers_array, radius, global_prior, lambda_prior_weight, alpha, lambda_reg_gex = args
-        return deconvolute_spot_with_neighbors_with_prior(
-            i=i,
-            filtered_adata=filtered_adata,
-            cell_type_numbers_array=cell_type_numbers_array,
-            radius=radius,
-            global_prior=global_prior,
-            lambda_prior_weight=lambda_prior_weight,
-            alpha=alpha,
-            lambda_reg_gex=lambda_reg_gex
-        )
-    except Exception as e:
-        logging.error(f"Error in deconvolute_spot_with_neighbors_wrapper: {str(e)}")
-        logging.error(traceback.format_exc())
-        return None
-
-
 
 def log_marker_gene_patterns(zero_patterns, marker_genes):
     """
@@ -697,20 +667,20 @@ def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
 
 
 def optimize_gene_expression(
-    sample_name,
-    deconvolution_expression_data,
-    cell_type_numbers_array,
-    filtered_adata,
-    radius=2,
-    alpha=0.5,
-    lambda_reg_gex=0.0001,
-    lambda_prior_weight=0,  # Added this parameter
-    global_prior=None,      # Added this parameter
-    max_workers=None,
-    checkpoint_interval=100,
-    output_dir="checkpoints",
-    rerun=False
-):
+    sample_name: str,
+    deconvolution_expression_data: np.ndarray,
+    cell_type_numbers_array: np.ndarray,
+    filtered_adata: sc.AnnData,
+    radius: float = 2,
+    alpha: float = 0.5,
+    lambda_reg_gex: float = 0.001,
+    lambda_prior_weight: float = 0,
+    global_prior: Optional[np.ndarray] = None,
+    max_workers: Optional[int] = None,
+    checkpoint_interval: int = 100,
+    output_dir: str = "checkpoints",
+    rerun: bool = False
+) -> Dict[str, Any]:
 
 
     # Create output directory if it doesn't exist
@@ -1000,123 +970,6 @@ def deconvolute_spot_with_neighbors(
         gc.collect()
 
 
-def optimize_gene_expression_with_custom_spot_fn(
-    sample_name,
-    deconvolution_expression_data,
-    cell_type_numbers_array,
-    filtered_adata,
-    radius=2,
-    alpha=0.5,
-    lambda_reg_gex=0.0001,
-    spot_function=None,
-    spot_args=None,
-    max_workers=None,
-    checkpoint_interval=100,
-    output_dir="checkpoints",
-    rerun=False
-):
-    """
-    Similar to optimize_gene_expression but with custom spot function.
-    """
-    if spot_function is None:
-        raise ValueError("`spot_function` must be provided.")
-
-    N = deconvolution_expression_data.shape[0]
-    M = deconvolution_expression_data.shape[1]
-    T = cell_type_numbers_array.shape[1]
-
-    # Initialize checkpoint manager
-    checkpoint_mgr = CheckpointManager(output_dir, sample_name)
-    
-    # If rerun=False, check for completed run
-    if not rerun:
-        complete_results = checkpoint_mgr.check_complete_run(N, T, M)
-        if complete_results is not None:
-            return complete_results
-            
-        # Load latest checkpoint if available
-        completed_spots, spotwise_gene_expression_profiles = checkpoint_mgr.load_latest_checkpoint(N, T, M)
-    else:
-        completed_spots = set()
-        spotwise_gene_expression_profiles = {}
-
-    logging.info(f"Starting analysis for {sample_name}")
-    logging.info(f"Already completed spots: {len(completed_spots)}")
-
-    futures = {}
-    
-    try:
-        workers = max_workers if max_workers is not None else max(1, os.cpu_count() // 2)
-        logging.info(f"Using {workers} workers")
-        
-        remaining_spots = [i for i in range(N) if i not in completed_spots]
-        logging.info(f"Processing {len(remaining_spots)} remaining spots")
-        
-        retry_count = 0
-        max_retries = 3
-        while retry_count < max_retries:
-            try:
-                with ProcessPoolExecutor(max_workers=workers) as executor:
-                    futures.clear()
-                    for spot_idx in remaining_spots:
-                        if spot_idx < len(spot_args):
-                            future = executor.submit(spot_function, spot_args[spot_idx])
-                            futures[future] = spot_idx
-
-                    with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
-                        spots_since_last_save = 0
-                        
-                        for future in as_completed(futures):
-                            i = futures[future]
-                            try:
-                                result = future.result(timeout=300)
-                                if result is not None and result.ndim == 2:
-                                    spotwise_gene_expression_profiles[i] = result.copy()
-                                    completed_spots.add(i)
-                                    spots_since_last_save += 1
-                                    pbar.update(1)
-
-                                    if spots_since_last_save >= checkpoint_interval:
-                                        checkpoint_mgr.save_checkpoint(
-                                            completed_spots,
-                                            spotwise_gene_expression_profiles,
-                                            N, T, M
-                                        )
-                                        spots_since_last_save = 0
-                            except TimeoutError:
-                                logging.error(f"Timeout processing spot {i}")
-                                continue
-                            except Exception as e:
-                                logging.error(f"Error processing spot {i}: {str(e)}")
-                                logging.error(traceback.format_exc())
-                                continue
-                
-                break
-                
-            except concurrent.futures.process.BrokenProcessPool:
-                retry_count += 1
-                logging.warning(f"Process pool broken, retry {retry_count}/{max_retries}")
-                if retry_count == max_retries:
-                    logging.error("Max retries reached, saving current progress")
-                time.sleep(5)
-
-    except Exception as e:
-        logging.error(f"Error during parallel processing: {str(e)}")
-        logging.error(traceback.format_exc())
-    finally:
-        if futures:
-            futures.clear()
-        gc.collect()
-        
-        if spotwise_gene_expression_profiles:
-            checkpoint_mgr.save_final_results(
-                spotwise_gene_expression_profiles,
-                completed_spots,
-                N, T, M
-            )
-
-    return spotwise_gene_expression_profiles
-
 def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     """
     Approximate WGCNA-like approach in Python:
@@ -1382,3 +1235,24 @@ def normalize_counts(adata, target_sum=10000):
     adata_norm.obs['size_factors'] = scaling_factors
     
     return adata_norm
+
+def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
+                            max_workers=None, checkpoint_interval=100, 
+                            output_dir="checkpoints", rerun=True) -> Dict[str, Any]:
+    # Update call to match new optimize_gene_expression signature
+    results = optimize_gene_expression(
+        sample_name=self.sample_name,
+        deconvolution_expression_data=self.gene_expression_adata.X,
+        cell_type_numbers_array=self.results['cell_prop'].values,
+        filtered_adata=self.gene_expression_adata,
+        radius=radius,
+        alpha=alpha,
+        lambda_reg_gex=lambda_reg_gex,
+        lambda_prior_weight=0,
+        global_prior=None,
+        max_workers=max_workers,
+        checkpoint_interval=checkpoint_interval,
+        output_dir=output_dir,
+        rerun=rerun
+    )
+    return results

@@ -1,11 +1,20 @@
+# Standard library imports
 import os
+import logging
+from typing import Dict, Any, Optional, Tuple, List, Union
+
+# Third-party imports
+import numpy as np
+import pandas as pd
 import scanpy as sc
-from model.gurobi_impl import (
+import pyarrow.parquet as pq
+from scipy.ndimage import gaussian_filter
+
+# Local imports
+from .gurobi_impl import (
     map_antibodies_to_profiles, 
     optimize_cell_proportions, 
     optimize_gene_expression, 
-    optimize_gene_expression_with_custom_spot_fn,
-    deconvolute_spot_with_neighbors_wrapper,
     analyze_zero_inflation_patterns,
     suggest_zero_inflation_threshold,
     compute_global_prior,
@@ -22,11 +31,6 @@ from .utils import (
     export_anndata_layers,
     calculate_expression_metrics
 )
-import numpy as np
-import pandas as pd
-import logging
-import pyarrow.parquet as pq
-from scipy.ndimage import gaussian_filter
 
 
 class CitegeistModel:
@@ -341,26 +345,29 @@ class CitegeistModel:
                             max_workers=None, checkpoint_interval=100, 
                             output_dir="checkpoints", rerun=True):
         """
-        Run first pass of gene expression deconvolution using error minimization.
-        No prior is used in this pass.
+        Run first pass of gene expression deconvolution.
+        
+        Returns:
+            Dict[str, Any]: {
+                'spotwise_profiles': Dict[int, np.ndarray],  # spot_idx -> profile matrix
+                'dimensions': Tuple[int, int, int]  # (N_spots, T_celltypes, M_genes)
+            }
         """
         if not self.preprocessed_gex:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
         logging.info("Starting Pass 1: Error minimization without prior...")
         
-        # Use the error-minimizing implementation from gurobi_impl.py
-
-        spotwise_profiles =  optimize_gene_expression(
-            self.sample_name,
-            self.gene_expression_adata,
-            self.results.get('cell_prop').values,
-            self.gene_expression_adata,
+        spotwise_profiles = optimize_gene_expression(
+            sample_name=self.sample_name,
+            deconvolution_expression_data=self.gene_expression_adata.X,
+            cell_type_numbers_array=self.results['cell_prop'].values,
+            filtered_adata=self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            lambda_prior_weight=0,  # Added this parameter
-            global_prior=None,      # Added this parameter
+            lambda_prior_weight=0,  # No prior in pass 1
+            global_prior=None,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
@@ -399,26 +406,20 @@ class CitegeistModel:
         # Store first pass results
         self.results['gene_expression_pass1'] = spotwise_profiles
         
-        # Save first pass results to parquet
-        parquet_path_pass1 = os.path.join(
-            self.output_folder, 
-            f"{self.sample_name}_gene_expression_pass1.parquet"
-        )
-        self._save_profiles_to_parquet(spotwise_profiles, parquet_path_pass1)
-        logging.info("✅ First pass results saved.")
+        # Get dimensions for consistency checks
+        N = self.gene_expression_adata.shape[0]  # spots
+        T = self.results['cell_prop'].values.shape[1]  # cell types
+        M = self.gene_expression_adata.shape[1]  # genes
+        dimensions = (N, T, M)
 
-        # Evaluate first pass immediately
+        # Save and evaluate results
+        parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression_pass1.parquet")
+        self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
+        
         self.append_gex_to_adata(pass_number=1)
-        logging.info("First pass results appended to AnnData.")
-
-        # Export layers for evaluation
-        layer_dir_pass1 = os.path.join(self.output_folder, f"{self.sample_name}_pass1/layers")
-        export_anndata_layers(self.gene_expression_adata, layer_dir_pass1, pass_number=1)
-        logging.info("First pass layers exported for evaluation.")
-
-        # Save results
-        dimensions = self.gene_expression_adata.shape
-
+        
+        layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass1/layers")
+        export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=1)
 
         return {
             'spotwise_profiles': spotwise_profiles,
@@ -427,7 +428,15 @@ class CitegeistModel:
 
     def compute_expression_prior(self, spotwise_profiles_pass1, cell_type_numbers_array):
         """
-        Compute global prior from pass 1 results using zero-inflation patterns.
+        Compute global prior from pass 1 results.
+        
+        Returns:
+            Dict[str, Any]: {
+                'global_prior': np.ndarray,  # shape (T_celltypes, M_genes)
+                'zinb_matrix': np.ndarray,
+                'zero_inflation_probs': np.ndarray,
+                'zero_inflation_threshold': float
+            }
         """
         logging.info("Computing prior from pass 1 results...")
         
@@ -435,7 +444,6 @@ class CitegeistModel:
         gene_names = self.gene_expression_adata.var_names
         cell_type_names = list(self.cell_profile_dict.keys())
         
-        # Analyze zero-inflation patterns
         patterns = analyze_zero_inflation_patterns(
             spotwise_profiles_pass1,
             cell_type_numbers_array,
@@ -461,18 +469,27 @@ class CitegeistModel:
                             max_workers=None, checkpoint_interval=100, 
                             output_dir="checkpoints", rerun=True):
         """
-        Run second pass of gene expression deconvolution using error minimization
-        with prior guidance from first pass.
-        """
-        if not self.preprocessed_gex:
-            raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
-
-        logging.info("Starting Pass 2: Error minimization with prior guidance...")
+        Run second pass with prior guidance.
         
-        # Use the same error-minimizing implementation but with prior
+        Returns:
+            Dict[str, Any]: {
+                'spotwise_profiles': Dict[int, np.ndarray],
+                'dimensions': Tuple[int, int, int]
+            }
+        """
+        # Input validation
+        if not isinstance(global_prior, np.ndarray):
+            raise TypeError("global_prior must be a numpy array")
+        
+        N, T, M = dimensions
+        if global_prior.shape != (T, M):
+            raise ValueError(f"global_prior shape {global_prior.shape} does not match expected ({T}, {M})")
+        
         spotwise_profiles = optimize_gene_expression(
-            self.gene_expression_adata,
-            self.results.get('cell_prop').values,
+            sample_name=self.sample_name,
+            deconvolution_expression_data=self.gene_expression_adata.X,
+            cell_type_numbers_array=self.results['cell_prop'].values,
+            filtered_adata=self.gene_expression_adata,
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
@@ -514,26 +531,21 @@ class CitegeistModel:
         # Store second pass results
         self.results['gene_expression_pass2'] = spotwise_profiles
         
-        # Save to Parquet with consistent naming
-        parquet_path = os.path.join(
-            self.output_folder, 
-            f"{self.sample_name}_gene_expression_pass2.parquet"
-        )
+        parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression_pass2.parquet")
         self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
         logging.info("✅ Second pass results saved.")
 
         # Evaluate second pass
         self.append_gex_to_adata(pass_number=2)
-        logging.info("Second pass results appended to AnnData.")
+        
+        layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
+        export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=2)
+        
+        return {
+            'spotwise_profiles': spotwise_profiles,
+            'dimensions': dimensions
+        }
 
-        # Export layers for evaluation
-        layer_dir_pass2 = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
-        export_anndata_layers(self.gene_expression_adata, layer_dir_pass2, pass_number=2)
-        logging.info("Second pass layers exported for evaluation.")
-        
-        
-        return spotwise_profiles
-        
     def _save_profiles_to_parquet(self, profiles, path):
         """Helper method to save profiles to parquet format with consistent naming."""
         if not profiles:
