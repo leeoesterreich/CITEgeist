@@ -9,7 +9,8 @@ from model.gurobi_impl import (
     analyze_zero_inflation_patterns,
     suggest_zero_inflation_threshold,
     compute_global_prior,
-    optimize_multimodal_phase_3_wgcna
+    optimize_multimodal_phase_3_wgcna,
+    normalize_counts
 )
 from .utils import (
     validate_cell_profile_dict, 
@@ -248,24 +249,26 @@ class CitegeistModel:
               f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
               f"in nonzero spots).")
     
-    def preprocess_gex(self):
+    def preprocess_gex(self, target_sum=10000):
         """
-        Preprocess gene expression data.
-        For discrete counts, we only validate the data type.
+        Preprocess gene expression data with count-preserving normalization.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
-        # Ensure data is in integer format for counts
+        # Normalize while preserving counts
+        self.gene_expression_adata = normalize_counts(self.gene_expression_adata, target_sum=target_sum)
+        
+        # Validate integer format
         matrix = self.gene_expression_adata.X
         if hasattr(matrix, 'toarray'):
             matrix = matrix.toarray()
         
         if not np.all(np.equal(np.mod(matrix, 1), 0)):
-            raise ValueError("Gene expression data contains non-integer values. Expected discrete counts.")
+            raise ValueError("Gene expression data contains non-integer values after normalization.")
         
         self.preprocessed_gex = True
-        print("Gene expression data validated for discrete count analysis.")
+        logging.info(f"Gene expression data normalized to {target_sum} counts per spot and validated for discrete count analysis.")
 
     def preprocess_antibody(self):
         """
