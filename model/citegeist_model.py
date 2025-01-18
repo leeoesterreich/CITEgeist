@@ -19,7 +19,8 @@ from .gurobi_impl import (
     suggest_zero_inflation_threshold,
     compute_global_prior,
     optimize_multimodal_phase_3_wgcna,
-    normalize_counts
+    normalize_counts,
+    validate_prior_effect
 )
 from .utils import (
     validate_cell_profile_dict, 
@@ -541,10 +542,31 @@ class CitegeistModel:
         layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
         export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=2)
         
+
+        # Validate prior influence
+        
+        # After completing pass 2, validate prior effect
+        validation_results = validate_prior_effect(
+            self.results['gene_expression_pass1'],
+            spotwise_profiles,
+            global_prior
+        )
+        
+        # Store validation results
+        if validation_results:
+            validation_path = os.path.join(
+                self.output_folder, 
+                f"{self.sample_name}_prior_validation_metrics.json"
+            )
+            with open(validation_path, 'w') as f:
+                json.dump(validation_results, f, indent=2)
+        
         return {
             'spotwise_profiles': spotwise_profiles,
-            'dimensions': dimensions
+            'dimensions': dimensions,
+            'prior_validation': validation_results
         }
+
 
     def _save_profiles_to_parquet(self, profiles, path):
         """Helper method to save profiles to parquet format with consistent naming."""
