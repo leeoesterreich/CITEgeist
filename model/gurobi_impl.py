@@ -24,7 +24,7 @@ from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
 # Local imports
-from .utils import get_neighbors_with_fixed_radius
+from .utils import get_neighbors_with_fixed_radius, huber_loss
 from .checkpoints import CheckpointManager
 
 def fit_zinb(x, p):
@@ -325,6 +325,8 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
     return profile_based_antibody_data, cell_type_names
 
 
+
+
 def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5):
     """
     Perform EM-based optimization for cell type proportions using Gurobi.
@@ -363,7 +365,8 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
                 S_ij = profile_based_antibody_data[i, j]
                 beta_j = beta_estimates[cell_type_names[j]]
                 Y_ij = Y[i, j]
-                error_terms.append((S_ij - beta_j * Y_ij) * (S_ij - beta_j * Y_ij))
+                error = S_ij - beta_j * Y_ij
+                error_terms.append(huber_loss(error))
 
         total_error = gp.quicksum(error_terms)
         l1_term = gp.quicksum(Y[i, j] for i in range(N) for j in range(T))
