@@ -196,10 +196,6 @@ def main():
         if np.any(adata_gex.X < 0):
             logging.warning("adata_gex.X contains negative values, which is not expected in count data.")
         
-        # Check for log1p transformation
-        if np.any(adata_gex.X > 0) and np.all(adata_gex.X == np.round(np.expm1(adata_gex.X))):
-            logging.warning("adata_gex.X appears to be in log1p space. Consider applying inverse transformation.")
-
 
         ##############################################################################
         # Initialize the model
@@ -345,16 +341,78 @@ def main():
                 os.path.join(output_folder, f"{sample_name}_gex_metrics_combined.csv"),
                 index=False
             )
+
+            ##############################################################################
+            # 4) Run Phase 3 WGCNA-based Optimization
+            ##############################################################################
+            logging.info("Running Phase 3 WGCNA-based optimization...")
+
+            # Compute spatial adjacency matrix if needed
+            spatial_coords = model.gene_expression_adata.obsm.get('spatial', None)
+            spatial_adjacency = None
+            if spatial_coords is not None:
+                from scipy.spatial.distance import cdist
+                distances = cdist(spatial_coords, spatial_coords)
+                spatial_adjacency = np.exp(-distances / radius)  # Gaussian kernel
+                spatial_adjacency[distances > radius] = 0  # Threshold by radius
+
+            # Run Phase 3
+            model.run_multimodal_phase_3_wgcna(
+                max_clusters=30,  # Number of gene modules
+                alpha_gex=1.0,    # Weight for gene expression term
+                alpha_antibody=1.0,  # Weight for antibody term
+                alpha_spatial=0.5 if spatial_adjacency is not None else 0.0,  # Weight for spatial term
+                lambda_reg_module=0.1,  # Regularization for module usage
+                spatial_adjacency=spatial_adjacency
+            )
+
+            # Calculate Phase 3 metrics for cell proportions
+            phase3_proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_phase3_results.csv")
+            phase3_spots_df = pd.read_csv(phase3_proportions_path, index_col=0).sort_index().sort_index(axis=1)
+            
+            # Convert to numpy arrays for benchmarking
+            phase3_spots_mtrx = phase3_spots_df.values
+            phase3_prop_results = benchmark_cell_proportions(phase3_spots_mtrx, spot_composition_mtrx, column_names)
+            logging.info(f"Phase 3 cell proportion benchmarking results: {phase3_prop_results}")
+
+            # Save Phase 3 cell proportion results
+            phase3_prop_results_df = pd.DataFrame([phase3_prop_results])
+            phase3_prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_phase3_summary.csv')
+            phase3_prop_results_df.to_csv(phase3_prop_results_name, index=False)
+
+            # Calculate Phase 3 metrics for gene expression
+            layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_phase3/layers")
+            phase3_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_phase3, pass_number=3)
+            logging.info(f"Phase 3 metrics:\n{phase3_metrics}")
+            
+            # Save Phase 3 metrics
+            metrics_path_phase3 = os.path.join(output_folder, f"{sample_name}_gex_metrics_phase3.csv")
+            phase3_metrics.to_csv(metrics_path_phase3, index=False)
+
+            # Calculate improvements from Pass 2 to Phase 3
+            phase3_improvements_df = calculate_improvements(pass2_metrics, phase3_metrics)
+            logging.info("Improvements from Pass 2 to Phase 3:")
+            for _, row in phase3_improvements_df.iterrows():
+                logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
+
+            # Save Phase 3 improvements
+            phase3_improvements_df.to_csv(
+                os.path.join(output_folder, f"{sample_name}_gex_improvements_phase3.csv"),
+                index=False
+            )
+
+            # Save all metrics combined
+            pd.concat([pass1_metrics, pass2_metrics, phase3_metrics]).to_csv(
+                os.path.join(output_folder, f"{sample_name}_gex_metrics_all_phases.csv"),
+                index=False
+            )
+
         else:
             logging.warning(f"Ground truth directory not found: {ground_truth_dir}")
-            logging.warning("Skipping metric calculations and pass 2.")
+            logging.warning("Skipping metric calculations and subsequent phases.")
 
         # Clean up
         gc.collect()
-
-        # Phase 3
-
-
 
     logging.info("All samples processed successfully.")
 
