@@ -1247,25 +1247,41 @@ def normalize_counts(adata, target_sum=10000):
         target_sum: Target sum for each cell/spot
     
     Returns:
-        Normalized AnnData object
+        Normalized AnnData object with counts scaled to target_sum
     """
     # Get matrix
     X = adata.X.toarray() if scipy.sparse.issparse(adata.X) else adata.X
     
     # Calculate scaling factors
-    size_factors = X.sum(axis=1)
-    median_size = np.median(size_factors)
-    scaling_factors = size_factors / median_size
+    size_factors = np.maximum(X.sum(axis=1), 1)  # Avoid division by zero
+    median_size = max(np.median(size_factors), 1)  # Ensure positive median
+    
+    # Calculate scaling factors with bounds
+    scaling_factors = np.clip(size_factors / median_size, 0.1, 10.0)  # Limit scaling range
     
     # Scale to target sum while preserving integers
-    X_scaled = np.round(X * (target_sum / size_factors[:, None])).astype(int)
+    # Use a more controlled scaling approach
+    scaled_factors = (target_sum / np.maximum(size_factors, 1))
+    X_scaled = np.round(X * scaled_factors[:, None]).astype(int)
+    
+    # Add safety check for extreme values
+    max_allowed = target_sum * 2  # Set reasonable maximum
+    X_scaled = np.clip(X_scaled, 0, max_allowed)
     
     # Create new AnnData with scaled counts
     adata_norm = adata.copy()
     adata_norm.X = X_scaled
     
-    # Store size factors
+    # Store size factors and scaling info
     adata_norm.obs['size_factors'] = scaling_factors
+    adata_norm.obs['original_total'] = size_factors
+    adata_norm.obs['scaled_total'] = X_scaled.sum(axis=1)
+    
+    # Log statistics for validation
+    logging.info(f"Normalization stats:")
+    logging.info(f"Original median total: {median_size:.2f}")
+    logging.info(f"Mean scaled total: {X_scaled.sum(axis=1).mean():.2f}")
+    logging.info(f"Max scaled value: {X_scaled.max():.2f}")
     
     return adata_norm
 
