@@ -263,8 +263,6 @@ def compute_global_prior(
     }
 
 
-
-
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
     Map antibody capture data to predefined cell type profiles.
@@ -425,22 +423,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     global_weight=0.5
 ):
     """
-    Error-minimizing discrete deconvolution with prior guidance.
-    
-    Args:
-        i (int): Spot index
-        filtered_adata (AnnData): Filtered gene expression data
-        cell_type_numbers_array (np.ndarray): Cell type proportions array
-        radius (float): Neighborhood radius
-        global_prior (np.ndarray): Prior guidance matrix
-        lambda_prior_weight (float): Weight for prior guidance term
-        alpha (float): L1-L2 mixing parameter
-        lambda_reg_gex (float): Gene expression regularization strength
-        local_weight (float): Weight for local enrichment
-        global_weight (float): Weight for global enrichment
-        
-    Returns:
-        np.ndarray or None: Deconvoluted expression matrix if successful, None otherwise
+    Error-minimizing discrete deconvolution with optional prior guidance.
     """
     model = None
     try:
@@ -468,12 +451,10 @@ def deconvolute_spot_with_neighbors_with_prior(
         
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
-        center_counts = deconvolution_expression_data[i, :]
 
         # Now we can safely create gene_specific_enrichment
         gene_specific_enrichment = np.zeros((M, T))
 
-        # Compute expression-aware enrichment for each gene
         def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
             """
             Compute enrichment scores that account for both cell type presence
@@ -486,53 +467,123 @@ def deconvolute_spot_with_neighbors_with_prior(
             if not np.any(high_expr_spots):
                 return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
             
-            # Calculate cell type proportions in high-expression spots
             high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
             background_props = np.mean(cell_type_props, axis=0)
             
-            # Compute enrichment scores
             epsilon = 1e-10
             enrichment = high_expr_props / (background_props + epsilon)
-            
-            # Smooth the enrichment scores
             smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
-            
-            # Normalize
             return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
-        # Compute expression-aware enrichment for each gene
+        # Calculate enrichment scores for each gene
         for k in range(M):
-            # Local enrichment (in neighborhood)
             local_enrich = compute_expression_aware_enrichment(
                 neighborhood_expression_data,
                 neighborhood_cell_type_numbers,
                 k
             )
             
-            # Global enrichment (across all spots)
             global_enrich = compute_expression_aware_enrichment(
                 deconvolution_expression_data,
                 cell_type_numbers_array,
                 k
             )
             
-            # Combine local and global enrichment
             gene_specific_enrichment[k] = (
                 local_weight * local_enrich +
                 global_weight * global_enrich
             )
 
-        # Build Gurobi model
+        # Build Gurobi model with relaxed parameters
         model = gp.Model(f"discrete_gene_expression_spot_{i}")
         model.setParam('OutputFlag', 0)
         model.setParam('Threads', 1)
         model.setParam('NodefileStart', 0.5)
-        model.setParam('MIPGap', 0.01)
-        model.setParam('TimeLimit', 600)
-        model.setParam('NodeLimit', 1000000)
+        model.setParam('MIPGap', 0.1)  # Relaxed MIPGap for phase 2
+        model.setParam('TimeLimit', 60)  # Shorter time limit per spot
+        model.setParam('NodeLimit', 100000)
+        model.setParam('FeasibilityTol', 1e-5)  # Slightly relaxed tolerance
+        model.setParam('IntFeasTol', 1e-4)  # Slightly relaxed integer tolerance
 
-        # Create variables first for all genes with non-zero counts
+        # Variables for count assignment
         X = {}
+        center_counts = deconvolution_expression_data[i, :]
+
+        # 1. Create error variables for each neighbor and gene
+        error_vars = model.addVars(
+            len(neighborhood_indices),
+            M,
+            lb=0, 
+            ub=GRB.INFINITY,
+            vtype=GRB.CONTINUOUS,
+            name="error"
+        )
+
+        # 2. Define predicted expression for neighbors
+        for n, spot_idx in enumerate(neighborhood_indices):
+            total_prop_n = np.sum(neighborhood_cell_type_numbers[n, :])
+            if total_prop_n < 1e-10:
+                total_prop_n = 1e-10
+
+            for k in range(M):
+                if int(center_counts[k]) > 0:  # Only process non-zero genes
+                    predicted_expr = gp.quicksum(
+                        (neighborhood_cell_type_numbers[n, j] / total_prop_n) * X[j, k]
+                        for j in range(T)
+                    )
+                    
+                    observed_expr_nk = neighborhood_expression_data[n, k]
+                    
+                    # 3. Add absolute difference constraints
+                    model.addConstr(error_vars[n, k] >= observed_expr_nk - predicted_expr)
+                    model.addConstr(error_vars[n, k] >= predicted_expr - observed_expr_nk)
+
+        # 4. Build minimization objective
+        total_error = gp.quicksum(error_vars[n, k] 
+                                 for n in range(len(neighborhood_indices)) 
+                                 for k in range(M))
+
+        # Optional regularization
+        l1_term = gp.quicksum(X[j,k] for j in range(T) for k in range(M) 
+                             if int(center_counts[k]) > 0)
+        l2_term = gp.quicksum(X[j,k]*X[j,k] for j in range(T) for k in range(M) 
+                             if int(center_counts[k]) > 0)
+        regularization_term = lambda_reg_gex * (alpha*l1_term + (1-alpha)*l2_term)
+
+        # Optional prior penalty (only used in pass 2)
+        if global_prior is not None and lambda_prior_weight > 0:
+            # Scale prior weight by total counts to match error term scale
+            scale_factor = np.mean([c for c in center_counts if c > 0])
+            lambda_prior_weight_adjusted = lambda_prior_weight * scale_factor
+            
+            prior_penalty = gp.quicksum(
+                lambda_prior_weight_adjusted * (1 - global_prior[j, k]) * X[j, k] / max(center_counts[k], 1)
+                for j in range(T) 
+                for k in range(M)
+                if int(center_counts[k]) > 0
+            )
+            
+            logging.info(f"Prior penalty scale - lambda: {lambda_prior_weight_adjusted:.4f}, "
+                        f"mean prior value: {np.mean(global_prior):.4f}")
+        else:
+            prior_penalty = 0
+
+        # Set objective once, at the end
+        total_objective = (
+            total_error +  # Main reconstruction error
+            regularization_term +  # L1/L2 regularization
+            prior_penalty  # Prior guidance term
+        )
+        
+        model.setObjective(total_objective, GRB.MINIMIZE)
+
+        # Add logging to check objective terms
+        logging.info(f"Spot {i} objective components:")
+        logging.info(f" - Error term magnitude: {total_error.getValue():.4f}")
+        logging.info(f" - Regularization magnitude: {regularization_term.getValue():.4f}")
+        logging.info(f" - Prior penalty magnitude: {prior_penalty.getValue() if prior_penalty else 0:.4f}")
+
+        # Create variables and basic constraints
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
@@ -543,98 +594,39 @@ def deconvolute_spot_with_neighbors_with_prior(
                         ub=total_counts,
                         name=f"X_{j}_{k}"
                     )
-                # Add count conservation constraint immediately
+
+                # Count conservation constraint
                 model.addConstr(
                     gp.quicksum(X[j,k] for j in range(T)) == total_counts,
                     name=f"count_conservation_{k}"
                 )
 
-        # Create error variables
-        error_vars = model.addVars(
-            len(neighborhood_indices),
-            M,
-            lb=0, 
-            ub=GRB.INFINITY,
-            vtype=GRB.CONTINUOUS,
-            name="error"
-        )
-
-        # Define predicted expression only for genes with variables
-        total_error = 0
-        for n, spot_idx in enumerate(neighborhood_indices):
-            total_prop_n = np.sum(neighborhood_cell_type_numbers[n, :])
-            if total_prop_n < 1e-10:
-                total_prop_n = 1e-10
-
-            for k in range(M):
-                if int(center_counts[k]) > 0:  # Only process genes with variables
-                    predicted_expr = gp.quicksum(
-                        (neighborhood_cell_type_numbers[n, j] / total_prop_n) * X[j, k]
-                        for j in range(T)
-                    )
-                    
-                    observed_expr_nk = neighborhood_expression_data[n, k]
-                    
-                    model.addConstr(error_vars[n, k] >= observed_expr_nk - predicted_expr)
-                    model.addConstr(error_vars[n, k] >= predicted_expr - observed_expr_nk)
-                    total_error += error_vars[n, k]
-
-        # Add regularization terms
-        regularization_term = 0
-        for k in range(M):
-            if int(center_counts[k]) > 0:
-                l1_term = gp.quicksum(X[j,k] for j in range(T))
-                l2_term = gp.quicksum(X[j,k] * X[j,k] for j in range(T))
-                regularization_term += lambda_reg_gex * (alpha * l1_term + (1 - alpha) * l2_term)
-
-        # Add prior guidance term
-        prior_penalty = 0
-        if global_prior is not None and lambda_prior_weight > 0:
-            for k in range(M):
-                if int(center_counts[k]) > 0:
-                    for j in range(T):
-                        prior_score = global_prior[j, k]
-                        prior_penalty += lambda_prior_weight * (1 - prior_score) * X[j,k]
-
-        # Add enrichment-based objective terms
-        obj_terms = []
+        # Add ZINB constraints with relaxed thresholds
+        zero_inflation_threshold = 0.95  # Relaxed threshold
+        max_allocation_fraction = 0.4  # Relaxed allocation limit
+        
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    # Use gene-specific enrichment scores
-                    enrichment_weight = gene_specific_enrichment[k, j]
-                    
-                    # Current spot's cell type proportion
-                    cell_type_weight = neighborhood_cell_type_numbers[
-                        len(neighborhood_indices)//2, j
-                    ]
-                    
-                    # Add stochasticity to allow for heterogeneity
-                    randomness = 0.9 + 0.2 * np.random.random()  # Random factor between 0.9 and 1.1
-                    
-                    obj_terms.append(
-                        enrichment_weight * cell_type_weight * randomness * X[j,k]
-                    )
+                    if global_prior[j, k] < zero_inflation_threshold:
+                        # Instead of modifying objective, add a constraint
+                        max_count = int(total_counts * max_allocation_fraction)
+                        model.addConstr(X[j,k] <= max_count)
 
-        # Set final objective combining all terms
-        total_objective = total_error + regularization_term + prior_penalty - gp.quicksum(obj_terms)
-        model.setObjective(total_objective, GRB.MINIMIZE)
-
-        # Optimize
+        # Optimize with try-catch for numerical issues
         try:
             model.optimize()
         except Exception as e:
             logging.warning(f"Optimization error for spot {i}: {str(e)}")
-            model.setParam('NumericFocus', 3)
+            model.setParam('NumericFocus', 3)  # Try again with higher numeric focus
             model.optimize()
 
-        if model.status == GRB.OPTIMAL:
-            logging.info(f"Solution found for spot {i}")
-            # Convert solution to array format
+        if model.status == GRB.OPTIMAL or model.status == GRB.SUBOPTIMAL:
             result = np.zeros((T, M))
             for k in range(M):
-                if int(center_counts[k]) > 0:
+                total_counts = int(center_counts[k])
+                if total_counts > 0:
                     for j in range(T):
                         result[j,k] = X[j,k].X
             return result
@@ -666,7 +658,7 @@ def log_marker_gene_patterns(zero_patterns, marker_genes):
                 logging.info(f"  {ct}:")
                 logging.info(f"    Zero proportion: {stats['zero_proportion']:.3f}")
                 if stats['n_nonzero'] > 0:
-                    logging.info(f"    Mean nonzero expression: {stats['mean_nonzero']:.3f}")
+                    logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
                 else:
                     logging.info(f"    Mean nonzero expression: 0.0 (no nonzero values)")
                 logging.info(f"    Number of spots: {stats['n_spots']}")
@@ -722,6 +714,7 @@ def optimize_gene_expression(
     rerun: bool = False
 ) -> Dict[str, Any]:
 
+
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -766,29 +759,15 @@ def optimize_gene_expression(
                 with ProcessPoolExecutor(max_workers=workers) as executor:
                     futures.clear()
                     for spot_idx in remaining_spots:
-                        # Choose the appropriate deconvolution function based on whether a prior is provided
-                        if global_prior is not None:
-                            future = executor.submit(
-                                deconvolute_spot_with_neighbors_with_prior,
-                                spot_idx,
-                                filtered_adata,
-                                cell_type_numbers_array,
-                                radius,
-                                global_prior,
-                                lambda_prior_weight,
-                                alpha,
-                                lambda_reg_gex
-                            )
-                        else:
-                            future = executor.submit(
-                                deconvolute_spot_with_neighbors,
-                                spot_idx,
-                                filtered_adata,
-                                cell_type_numbers_array,
-                                radius,
-                                alpha,
-                                lambda_reg_gex
-                            )
+                        future = executor.submit(
+                            deconvolute_spot_with_neighbors,
+                            spot_idx,
+                            filtered_adata,
+                            cell_type_numbers_array,
+                            radius,
+                            alpha,
+                            lambda_reg_gex
+                        )
                         futures[future] = spot_idx
 
                     with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
@@ -945,10 +924,15 @@ def deconvolute_spot_with_neighbors(
         model.setParam('TimeLimit', 600)
         model.setParam('NodeLimit', 1000000)
 
-        # Create variables first for all genes with non-zero counts
+        T = neighborhood_cell_type_numbers.shape[1]
+        M = neighborhood_expression_data.shape[1]
+
+        # Variables for count assignment
         X = {}
+        center_counts = deconvolution_expression_data[i, :]
+
         for k in range(M):
-            total_counts = int(neighborhood_cell_type_numbers[0, k])
+            total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
                     X[j,k] = model.addVar(
@@ -967,7 +951,7 @@ def deconvolute_spot_with_neighbors(
         # Modified objective using gene-specific enrichment
         obj_terms = []
         for k in range(M):
-            total_counts = int(neighborhood_cell_type_numbers[0, k])
+            total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
                     # Use gene-specific enrichment scores
@@ -998,7 +982,7 @@ def deconvolute_spot_with_neighbors(
             # Convert solution to array format
             result = np.zeros((T, M))
             for k in range(M):
-                total_counts = int(neighborhood_cell_type_numbers[0, k])
+                total_counts = int(center_counts[k])
                 if total_counts > 0:
                     for j in range(T):
                         result[j,k] = X[j,k].X
@@ -1370,3 +1354,4 @@ def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, glob
     logging.info(f"Number of Spots Analyzed: {validation_metrics['n_spots_analyzed']}")
     
     return validation_metrics
+
