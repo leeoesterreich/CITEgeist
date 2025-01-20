@@ -1283,6 +1283,7 @@ def normalize_counts(adata, target_sum=10000):
     logging.info(f"Mean scaled total: {X_scaled.sum(axis=1).mean():.2f}")
     logging.info(f"Max scaled value: {X_scaled.max():.2f}")
     
+    
     return adata_norm
 
 
