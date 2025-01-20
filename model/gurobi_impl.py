@@ -228,11 +228,18 @@ def compute_global_prior(
     max_scores = np.maximum(np.max(zinb_matrix, axis=0), 1e-10)
     zinb_matrix = zinb_matrix / max_scores
 
-    # Convert to prior via softmax
+    # Modify prior computation to create stronger signals
     global_prior = np.zeros((T, M), dtype=float)
     for m_idx in range(M):
         scores = zinb_matrix[:, m_idx]
-        scaled = scores * lambda_prior * 2  # Stronger scaling for discrete data
+        
+        # Increase contrast in scores
+        scores = np.power(scores, 2)  # Square scores to increase contrast
+        
+        # Apply stronger scaling
+        scaled = scores * lambda_prior * 4  # Increased scaling factor
+        
+        # Sharper softmax
         exps = np.exp(scaled - np.max(scaled))
         denom = np.sum(exps)
         if denom < 1e-12:
@@ -240,16 +247,20 @@ def compute_global_prior(
         else:
             global_prior[:, m_idx] = exps / denom
 
-    logging.info(f"Prior statistics - Mean: {np.mean(global_prior):.4f}, "
-                f"Std: {np.std(global_prior):.4f}, "
-                f"Max: {np.max(global_prior):.4f}")
+    # Add more detailed logging
+    logging.info("Prior computation statistics:")
+    logging.info(f" - Mean: {np.mean(global_prior):.4f}")
+    logging.info(f" - Std: {np.std(global_prior):.4f}")
+    logging.info(f" - Max: {np.max(global_prior):.4f}")
+    logging.info(f" - % Strong signals (>0.5): {100 * np.mean(global_prior > 0.5):.2f}%")
+    logging.info(f" - % Weak signals (<0.1): {100 * np.mean(global_prior < 0.1):.2f}%")
 
     return {
-    'global_prior': global_prior,
-    'zinb_matrix': zinb_matrix,
-    'zero_inflation_probs': zero_inflation_probs,
-    'zero_inflation_threshold': zero_inflation_threshold
-}
+        'global_prior': global_prior,
+        'zinb_matrix': zinb_matrix,
+        'zero_inflation_probs': zero_inflation_probs,
+        'zero_inflation_threshold': zero_inflation_threshold
+    }
 
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
@@ -362,8 +373,8 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
         model.setObjective(total_error + regularization_term, GRB.MINIMIZE)
         
         for i in range(N):
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.95)
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.05)
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.9)
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.2)
         
         model.optimize()
         
@@ -539,20 +550,36 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         # Optional prior penalty (only used in pass 2)
         if global_prior is not None and lambda_prior_weight > 0:
-            lambda_prior_weight_adjusted = lambda_prior_weight * (np.mean(center_counts) / 10000)
-            prior_penalty = lambda_prior_weight_adjusted * gp.quicksum(
-                (1 - global_prior[j, k]) * X[j, k]
-                for j in range(T) for k in range(M)
+            # Scale prior weight by total counts to match error term scale
+            scale_factor = np.mean([c for c in center_counts if c > 0])
+            lambda_prior_weight_adjusted = lambda_prior_weight * scale_factor
+            
+            prior_penalty = gp.quicksum(
+                lambda_prior_weight_adjusted * (1 - global_prior[j, k]) * X[j, k] / max(center_counts[k], 1)
+                for j in range(T) 
+                for k in range(M)
                 if int(center_counts[k]) > 0
             )
+            
+            logging.info(f"Prior penalty scale - lambda: {lambda_prior_weight_adjusted:.4f}, "
+                        f"mean prior value: {np.mean(global_prior):.4f}")
         else:
             prior_penalty = 0
 
-        # Set final objective
-        model.setObjective(
-            total_error + regularization_term + prior_penalty,
-            GRB.MINIMIZE
+        # Set objective once, at the end
+        total_objective = (
+            total_error +  # Main reconstruction error
+            regularization_term +  # L1/L2 regularization
+            prior_penalty  # Prior guidance term
         )
+        
+        model.setObjective(total_objective, GRB.MINIMIZE)
+
+        # Add logging to check objective terms
+        logging.info(f"Spot {i} objective components:")
+        logging.info(f" - Error term magnitude: {total_error.getValue():.4f}")
+        logging.info(f" - Regularization magnitude: {regularization_term.getValue():.4f}")
+        logging.info(f" - Prior penalty magnitude: {prior_penalty.getValue() if prior_penalty else 0:.4f}")
 
         # Create variables and basic constraints
         for k in range(M):
@@ -581,12 +608,9 @@ def deconvolute_spot_with_neighbors_with_prior(
             if total_counts > 0:
                 for j in range(T):
                     if global_prior[j, k] < zero_inflation_threshold:
-                        # Add as a soft constraint using penalty in objective instead
-                        penalty_weight = 1.0 - global_prior[j, k]
-                        model.setObjective(
-                            model.getObjective() - penalty_weight * X[j,k],
-                            GRB.MAXIMIZE
-                        )
+                        # Instead of modifying objective, add a constraint
+                        max_count = int(total_counts * max_allocation_fraction)
+                        model.addConstr(X[j,k] <= max_count)
 
         # Optimize with try-catch for numerical issues
         try:
