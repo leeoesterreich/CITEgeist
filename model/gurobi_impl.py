@@ -713,8 +713,6 @@ def optimize_gene_expression(
     output_dir: str = "checkpoints",
     rerun: bool = False
 ) -> Dict[str, Any]:
-
-
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -739,6 +737,14 @@ def optimize_gene_expression(
 
     logging.info(f"Starting analysis for {sample_name}")
     logging.info(f"Already completed spots: {len(completed_spots)}")
+    
+    # Log whether using prior-guided deconvolution
+    if global_prior is not None and lambda_prior_weight > 0:
+        logging.info("Using prior-guided deconvolution")
+        deconvolution_func = deconvolute_spot_with_neighbors_with_prior
+    else:
+        logging.info("Using standard deconvolution")
+        deconvolution_func = deconvolute_spot_with_neighbors
 
     # Initialize futures as empty dict before try block
     futures = {}
@@ -759,15 +765,29 @@ def optimize_gene_expression(
                 with ProcessPoolExecutor(max_workers=workers) as executor:
                     futures.clear()
                     for spot_idx in remaining_spots:
-                        future = executor.submit(
-                            deconvolute_spot_with_neighbors,
-                            spot_idx,
-                            filtered_adata,
-                            cell_type_numbers_array,
-                            radius,
-                            alpha,
-                            lambda_reg_gex
-                        )
+                        # Conditionally submit the appropriate deconvolution function
+                        if global_prior is not None and lambda_prior_weight > 0:
+                            future = executor.submit(
+                                deconvolution_func,
+                                spot_idx,
+                                filtered_adata,
+                                cell_type_numbers_array,
+                                radius,
+                                global_prior,
+                                lambda_prior_weight,
+                                alpha,
+                                lambda_reg_gex
+                            )
+                        else:
+                            future = executor.submit(
+                                deconvolution_func,
+                                spot_idx,
+                                filtered_adata,
+                                cell_type_numbers_array,
+                                radius,
+                                alpha,
+                                lambda_reg_gex
+                            )
                         futures[future] = spot_idx
 
                     with tqdm(total=len(remaining_spots), desc="Deconvoluting Remaining Spots") as pbar:
@@ -828,6 +848,7 @@ def deconvolute_spot_with_neighbors(
     radius, 
     alpha=0.5, 
     lambda_reg_gex=0.0001,
+    
     local_weight=0.5,
     global_weight=0.5
 ):
