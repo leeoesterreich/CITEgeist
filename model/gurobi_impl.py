@@ -664,38 +664,6 @@ def log_marker_gene_patterns(zero_patterns, marker_genes):
                 logging.info(f"    Number of spots: {stats['n_spots']}")
                 logging.info(f"    Number of nonzero spots: {stats['n_nonzero']}")
 
-def scale_genes(expression_matrix):
-    """Scale each gene independently to [0,1] range.
-    
-    Args:
-        expression_matrix (np.ndarray): Spots x Genes matrix
-        
-    Returns:
-        tuple: (scaled_matrix, gene_mins, gene_maxs)
-    """
-    gene_mins = np.min(expression_matrix, axis=0)
-    gene_maxs = np.max(expression_matrix, axis=0)
-    
-    # Avoid division by zero
-    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
-    scaled_matrix = (expression_matrix - gene_mins) / gene_ranges
-    
-    return scaled_matrix, gene_mins, gene_maxs
-
-def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
-    """Reverse the gene-wise scaling transformation.
-    
-    Args:
-        scaled_matrix (np.ndarray): Scaled matrix
-        gene_mins (np.ndarray): Original minimum values per gene
-        gene_maxs (np.ndarray): Original maximum values per gene
-        
-    Returns:
-        np.ndarray: Unscaled matrix
-    """
-    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
-    return (scaled_matrix * gene_ranges) + gene_mins
-
 
 
 def optimize_gene_expression(
