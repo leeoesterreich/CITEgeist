@@ -5,6 +5,7 @@ import sys
 import argparse
 import logging
 import gc
+import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
@@ -352,27 +353,18 @@ def main():
 
             
             ##############################################################################
-            # 4) Run Phase 3 WGCNA-based Optimization
+            # 4) Run Phase 3 Cell-type-level WNN Optimization
             ##############################################################################
-            logging.info("Running Phase 3 WGCNA-based optimization...")
-
-            # Compute spatial adjacency matrix if needed
-            spatial_coords = model.gene_expression_adata.obsm.get('spatial', None)
-            spatial_adjacency = None
-            if spatial_coords is not None:
-                from scipy.spatial.distance import cdist
-                distances = cdist(spatial_coords, spatial_coords)
-                spatial_adjacency = np.exp(-distances / radius)  # Gaussian kernel
-                spatial_adjacency[distances > radius] = 0  # Threshold by radius
+            logging.info("Running Phase 3 cell-type-level WNN optimization...")
 
             # Run Phase 3
-            model.run_multimodal_phase_3_wnn(
-                max_clusters=30,  # Number of gene modules
-                alpha_gex=1.0,    # Weight for gene expression term
-                alpha_antibody=1.0,  # Weight for antibody term
-                alpha_spatial=0.5 if spatial_adjacency is not None else 0.0,  # Weight for spatial term
-                lambda_reg_module=0.1,  # Regularization for module usage
-                spatial_adjacency=spatial_adjacency
+            model.run_multimodal_phase_3_celltype_wnn(
+                radius=radius,  # Use same radius as previous passes
+                n_neighbors=30,  # Number of neighbors for WNN
+                alpha_rna=0.5,  # Equal weight to RNA and protein
+                alpha_protein=0.5,
+                lambda_smooth=0.1,  # Spatial smoothing strength
+                min_cells_per_cluster=5  # Minimum cluster size
             )
 
             # Calculate Phase 3 metrics for cell proportions
@@ -390,7 +382,7 @@ def main():
             phase3_prop_results_df.to_csv(phase3_prop_results_name, index=False)
 
             # Calculate Phase 3 metrics for gene expression
-            layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_phase3/layers")
+            layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_pass3/layers")
             phase3_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_phase3, pass_number=3)
             logging.info(f"Phase 3 metrics:\n{phase3_metrics}")
             
@@ -409,6 +401,15 @@ def main():
                 os.path.join(output_folder, f"{sample_name}_gex_improvements_phase3.csv"),
                 index=False
             )
+
+            # Save clustering information
+            if 'phase3_clusters' in model.results:
+                cluster_info = {
+                    'proportion_clusters': model.results['phase3_clusters']['proportion_clusters'].tolist(),
+                    'expression_clusters': model.results['phase3_clusters']['expression_clusters'].tolist()
+                }
+                with open(os.path.join(output_folder, f"{sample_name}_phase3_clusters.json"), 'w') as f:
+                    json.dump(cluster_info, f)
 
         else:
             logging.warning(f"Ground truth directory not found: {ground_truth_dir}")

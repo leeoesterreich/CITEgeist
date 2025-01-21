@@ -863,7 +863,7 @@ def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     module_labels = [f"Module_{c}" for c in unique_clusters]
     return module_matrix, module_labels
 
-def optimize_multimodal_phase_3_wnn(
+def optimize_multimodal_phase_3_celltype_wnn(
     adata_gex,
     adata_antibody,
     cell_prop_array,
@@ -872,103 +872,163 @@ def optimize_multimodal_phase_3_wnn(
     n_neighbors: int = 30,
     alpha_rna: float = 0.5,
     alpha_protein: float = 0.5,
-    lambda_smooth: float = 0.1
+    lambda_smooth: float = 0.1,
+    min_cells_per_cluster: int = 5
 ):
     """
-    Integrate RNA and protein data using weighted nearest neighbors approach.
+    Integrate RNA and protein data using cell-type-level WNN approach.
     
     Args:
-        adata_gex (AnnData): Gene expression data
+        adata_gex (AnnData): Gene expression data with cell-type-specific layers
         adata_antibody (AnnData): Protein/antibody data
         cell_prop_array (np.ndarray): Current cell type proportions (N × T)
         cell_profiles (dict): Cell type marker profiles
-        radius (float): Radius for spatial neighbors
-        n_neighbors (int): Number of nearest neighbors to consider
-        alpha_rna (float): Weight for RNA modality
-        alpha_protein (float): Weight for protein modality
-        lambda_smooth (float): Smoothing parameter for spatial regularization
-        
-    Returns:
-        dict: Contains refined cell proportions and gene expression profiles
     """
     from sklearn.neighbors import NearestNeighbors
-    from scipy.sparse import csr_matrix
+    from sklearn.cluster import KMeans
     import numpy as np
     
-    # 1. Compute normalized feature matrices
-    # RNA: Use highly variable genes or all genes
-    X_rna = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
-    X_rna = (X_rna - X_rna.mean(axis=0)) / (X_rna.std(axis=0) + 1e-6)
+    N = adata_gex.shape[0]  # number of spots
+    T = cell_prop_array.shape[1]  # number of cell types
+    cell_type_names = list(cell_profiles.keys())
     
-    # Protein: Use all antibody features
-    X_protein = adata_antibody.X.toarray() if hasattr(adata_antibody.X, 'toarray') else adata_antibody.X
-    X_protein = (X_protein - X_protein.mean(axis=0)) / (X_protein.std(axis=0) + 1e-6)
+    # 1. Extract features for clustering
     
-    # 2. Compute modality-specific neighbors
-    nbrs_rna = NearestNeighbors(n_neighbors=n_neighbors).fit(X_rna)
-    nbrs_protein = NearestNeighbors(n_neighbors=n_neighbors).fit(X_protein)
+    # Cell type proportions features
+    prop_features = cell_prop_array  # (N x T)
     
-    # Get distances and indices for both modalities
-    dists_rna, idx_rna = nbrs_rna.kneighbors(X_rna)
-    dists_protein, idx_protein = nbrs_protein.kneighbors(X_protein)
+    # Cell type-specific gene expression features
+    gex_features = []
+    for t, ct_name in enumerate(cell_type_names):
+        # Get layer name for this cell type
+        layer_key = f"{ct_name.replace(' ', '_')}_genes_pass2"
+        if layer_key not in adata_gex.layers:
+            raise ValueError(f"Layer {layer_key} not found in adata_gex")
+        
+        # Extract and normalize cell type-specific expression
+        ct_expression = adata_gex.layers[layer_key]
+        if hasattr(ct_expression, 'toarray'):
+            ct_expression = ct_expression.toarray()
+        
+        # Weight by cell type proportion
+        ct_prop = cell_prop_array[:, t].reshape(-1, 1)
+        weighted_expression = ct_expression * ct_prop
+        gex_features.append(weighted_expression)
     
-    # 3. Compute weights for each modality
-    weights_rna = np.exp(-dists_rna / dists_rna.mean())
-    weights_protein = np.exp(-dists_protein / dists_protein.mean())
+    # Combine features
+    gex_features = np.hstack(gex_features)  # (N x (T*G))
     
-    # 4. Get spatial neighbors
-    N = adata_gex.shape[0]
-    spatial_coords = adata_gex.obsm['spatial']
-    nbrs_spatial = NearestNeighbors(radius=radius).fit(spatial_coords)
-    spatial_graph = nbrs_spatial.radius_neighbors_graph(spatial_coords)
+    # 2. Cluster spots based on both proportions and expression
+    n_clusters = max(int(N / min_cells_per_cluster), T)
     
-    # 5. Create Gurobi model for refined proportions
-    model = gp.Model("Phase3_WNN")
+    # Normalize features before clustering
+    prop_features = (prop_features - prop_features.mean(axis=0)) / (prop_features.std(axis=0) + 1e-6)
+    gex_features = (gex_features - gex_features.mean(axis=0)) / (gex_features.std(axis=0) + 1e-6)
+    
+    # Cluster using proportions
+    prop_clusters = KMeans(n_clusters=n_clusters).fit_predict(prop_features)
+    
+    # Cluster using gene expression
+    gex_clusters = KMeans(n_clusters=n_clusters).fit_predict(gex_features)
+    
+    # 3. Compute cluster centroids
+    def get_cluster_centroids(data, clusters):
+        centroids = np.zeros((n_clusters, data.shape[1]))
+        for k in range(n_clusters):
+            mask = clusters == k
+            if np.any(mask):
+                centroids[k] = np.mean(data[mask], axis=0)
+        return centroids
+    
+    prop_centroids = get_cluster_centroids(prop_features, prop_clusters)
+    gex_centroids = get_cluster_centroids(gex_features, gex_clusters)
+    
+    # 4. Find nearest neighbors between clusters
+    nbrs_prop = NearestNeighbors(n_neighbors=n_neighbors).fit(prop_centroids)
+    nbrs_gex = NearestNeighbors(n_neighbors=n_neighbors).fit(gex_centroids)
+    
+    dists_prop, idx_prop = nbrs_prop.kneighbors(prop_centroids)
+    dists_gex, idx_gex = nbrs_gex.kneighbors(gex_centroids)
+    
+    # 5. Create Gurobi model for refinement
+    model = gp.Model("Phase3_CellType_WNN")
     model.setParam('OutputFlag', 0)
     
-    # Variables for refined cell proportions
-    T = cell_prop_array.shape[1]
-    Y_refined = {}
+    # Variables for refined proportions and expression
+    Y_refined = {}  # Refined proportions
+    X_refined = {}  # Refined expression
+    
     for i in range(N):
         for t in range(T):
             Y_refined[i,t] = model.addVar(lb=0, ub=1, name=f'Y_{i}_{t}')
+            for g in range(adata_gex.shape[1]):
+                X_refined[i,t,g] = model.addVar(lb=0, name=f'X_{i}_{t}_{g}')
     
     # 6. Objective terms
     obj_terms = []
     
-    # RNA-based neighbor consistency
+    # Proportion-based consistency
     for i in range(N):
-        for k in range(n_neighbors):
-            j = idx_rna[i,k]
-            w = weights_rna[i,k] * alpha_rna
-            for t in range(T):
-                diff = Y_refined[i,t] - Y_refined[j,t]
-                obj_terms.append(w * diff * diff)
+        prop_cluster = prop_clusters[i]
+        neighbor_clusters = idx_prop[prop_cluster]
+        weights = np.exp(-dists_prop[prop_cluster] / dists_prop[prop_cluster].mean())
+        
+        for k, n_cluster in enumerate(neighbor_clusters):
+            neighbor_spots = np.where(prop_clusters == n_cluster)[0]
+            if len(neighbor_spots) > 0:
+                w = weights[k] * alpha_protein
+                for t in range(T):
+                    for j in neighbor_spots:
+                        diff = Y_refined[i,t] - Y_refined[j,t]
+                        obj_terms.append(w * diff * diff)
     
-    # Protein-based neighbor consistency
+    # Expression-based consistency
     for i in range(N):
-        for k in range(n_neighbors):
-            j = idx_protein[i,k]
-            w = weights_protein[i,k] * alpha_protein
-            for t in range(T):
-                diff = Y_refined[i,t] - Y_refined[j,t]
-                obj_terms.append(w * diff * diff)
+        gex_cluster = gex_clusters[i]
+        neighbor_clusters = idx_gex[gex_cluster]
+        weights = np.exp(-dists_gex[gex_cluster] / dists_gex[gex_cluster].mean())
+        
+        for k, n_cluster in enumerate(neighbor_clusters):
+            neighbor_spots = np.where(gex_clusters == n_cluster)[0]
+            if len(neighbor_spots) > 0:
+                w = weights[k] * alpha_rna
+                for t in range(T):
+                    for g in range(adata_gex.shape[1]):
+                        for j in neighbor_spots:
+                            diff = X_refined[i,t,g] - X_refined[j,t,g]
+                            obj_terms.append(w * diff * diff)
     
-    # Spatial smoothing
-    spatial_indices = spatial_graph.nonzero()
-    for idx in range(len(spatial_indices[0])):
-        i, j = spatial_indices[0][idx], spatial_indices[1][idx]
-        for t in range(T):
-            diff = Y_refined[i,t] - Y_refined[j,t]
-            obj_terms.append(lambda_smooth * diff * diff)
+    # Spatial smoothing if available
+    if 'spatial' in adata_gex.obsm:
+        spatial_coords = adata_gex.obsm['spatial']
+        nbrs_spatial = NearestNeighbors(radius=radius).fit(spatial_coords)
+        spatial_graph = nbrs_spatial.radius_neighbors_graph(spatial_coords)
+        
+        spatial_indices = spatial_graph.nonzero()
+        for idx in range(len(spatial_indices[0])):
+            i, j = spatial_indices[0][idx], spatial_indices[1][idx]
+            # Smooth proportions
+            for t in range(T):
+                diff_prop = Y_refined[i,t] - Y_refined[j,t]
+                obj_terms.append(lambda_smooth * diff_prop * diff_prop)
+                # Smooth expression
+                for g in range(adata_gex.shape[1]):
+                    diff_expr = X_refined[i,t,g] - X_refined[j,t,g]
+                    obj_terms.append(lambda_smooth * diff_expr * diff_expr)
     
     # Add objective
     model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
     
     # 7. Constraints
-    # Sum to 1 constraint
+    # Sum-to-one for proportions
     for i in range(N):
         model.addConstr(gp.quicksum(Y_refined[i,t] for t in range(T)) == 1)
+    
+    # Expression must be proportional to cell type abundance
+    for i in range(N):
+        for t in range(T):
+            for g in range(adata_gex.shape[1]):
+                model.addConstr(X_refined[i,t,g] <= adata_gex.X[i,g] * Y_refined[i,t])
     
     # 8. Optimize
     model.optimize()
@@ -976,48 +1036,23 @@ def optimize_multimodal_phase_3_wnn(
     if model.status != GRB.OPTIMAL:
         raise RuntimeError("Failed to find optimal solution")
     
-    # 9. Extract refined proportions
+    # 9. Extract results
     refined_props = np.zeros((N, T))
+    refined_profiles = np.zeros((N, T, adata_gex.shape[1]))
+    
     for i in range(N):
         for t in range(T):
             refined_props[i,t] = Y_refined[i,t].X
-            
-    # 10. Update gene expression profiles using refined proportions
-    G = adata_gex.shape[1]  # number of genes
-    refined_profiles = np.zeros((N, T, G))
-    
-    # For each spot, update expression profiles using WNN
-    for i in range(N):
-        # Get RNA neighbors and their weights
-        rna_weights = weights_rna[i]
-        rna_neighbors = idx_rna[i]
-        
-        # Get protein neighbors and their weights
-        protein_weights = weights_protein[i]
-        protein_neighbors = idx_protein[i]
-        
-        # Combine neighbor information
-        combined_weights = alpha_rna * rna_weights + alpha_protein * protein_weights
-        combined_neighbors = np.union1d(rna_neighbors, protein_neighbors)
-        
-        # Update profiles using weighted combinations
-        for t in range(T):
-            neighbor_profiles = np.array([
-                X_rna[j] * refined_props[j,t] for j in combined_neighbors
-            ])
-            refined_profiles[i,t] = np.average(
-                neighbor_profiles, 
-                weights=combined_weights[:len(combined_neighbors)],
-                axis=0
-            )
+            for g in range(adata_gex.shape[1]):
+                refined_profiles[i,t,g] = X_refined[i,t,g].X
     
     return {
         'refined_proportions': refined_props,
         'refined_profiles': refined_profiles,
-        'rna_neighbors': idx_rna,
-        'protein_neighbors': idx_protein,
-        'rna_weights': weights_rna,
-        'protein_weights': weights_protein
+        'cluster_assignments': {
+            'proportion_clusters': prop_clusters,
+            'expression_clusters': gex_clusters
+        }
     }
 
 def normalize_counts(adata, target_sum=10000):
