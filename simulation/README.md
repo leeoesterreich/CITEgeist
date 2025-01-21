@@ -1,6 +1,6 @@
 # Spatial Transcriptomics Simulation Framework
 
-This folder contains the simulation framework for generating synthetic spatial transcriptomics datasets to benchmark deconvolution methods using (scCube)[https://github.com/ZJUFanLab/scCube]
+This folder contains the simulation framework for generating synthetic spatial transcriptomics datasets to benchmark deconvolution methods using [scCube](https://github.com/ZJUFanLab/scCube).
 
 ## Overview
 
