@@ -20,10 +20,9 @@ from .gurobi_impl import (
     analyze_zero_inflation_patterns,
     suggest_zero_inflation_threshold,
     compute_global_prior,
-    optimize_multimodal_phase_3_wgcna,
     normalize_counts,
     validate_prior_effect,
-    optimize_multimodal_phase_3_wnn
+    optimize_multimodal_phase_3_celltype_wnn
 )
 from .utils import (
     validate_cell_profile_dict, 
@@ -751,16 +750,17 @@ class CitegeistModel:
             self.gene_expression_adata.layers[layer_name] = celltype_matrix
             print(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
 
-    def run_multimodal_phase_3_wnn(
+    def run_multimodal_phase_3_celltype_wnn(
         self,
         radius: float = 2.0,
         n_neighbors: int = 30,
         alpha_rna: float = 0.5,
         alpha_protein: float = 0.5,
-        lambda_smooth: float = 0.1
+        lambda_smooth: float = 0.1,
+        min_cells_per_cluster: int = 5
     ):
         """
-        Run Phase 3 optimization using weighted nearest neighbors approach.
+        Run Phase 3 optimization using cell-type-level WNN approach.
         
         Args:
             radius (float): Radius for spatial neighbors
@@ -768,6 +768,7 @@ class CitegeistModel:
             alpha_rna (float): Weight for RNA modality
             alpha_protein (float): Weight for protein modality
             lambda_smooth (float): Spatial smoothing strength
+            min_cells_per_cluster (int): Minimum cells per cluster
         """
         # Ensure data is present
         if self.gene_expression_adata is None or self.antibody_capture_adata is None:
@@ -779,8 +780,15 @@ class CitegeistModel:
         if 'spatial' not in self.gene_expression_adata.obsm:
             raise ValueError("Spatial coordinates required for WNN analysis")
         
-        # Run WNN optimization
-        phase3_result = optimize_multimodal_phase_3_wnn(
+        # Verify cell type layers exist from pass 2
+        cell_type_names = list(self.cell_profile_dict.keys())
+        for ct_name in cell_type_names:
+            layer_key = f"{ct_name.replace(' ', '_')}_genes_pass2"
+            if layer_key not in self.gene_expression_adata.layers:
+                raise ValueError(f"Missing pass 2 layer for cell type: {ct_name}")
+        
+        # Run cell-type-level WNN optimization
+        phase3_result = optimize_multimodal_phase_3_celltype_wnn(
             adata_gex=self.gene_expression_adata,
             adata_antibody=self.antibody_capture_adata,
             cell_prop_array=self.results['cell_prop'].values,
@@ -789,7 +797,8 @@ class CitegeistModel:
             n_neighbors=n_neighbors,
             alpha_rna=alpha_rna,
             alpha_protein=alpha_protein,
-            lambda_smooth=lambda_smooth
+            lambda_smooth=lambda_smooth,
+            min_cells_per_cluster=min_cells_per_cluster
         )
         
         # Extract results
@@ -798,7 +807,6 @@ class CitegeistModel:
         
         # Save refined cell proportions
         spot_names = self.gene_expression_adata.obs_names
-        cell_type_names = list(self.cell_profile_dict.keys())
         refined_df = pd.DataFrame(
             refined_props,
             index=spot_names,
@@ -818,15 +826,10 @@ class CitegeistModel:
         layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass3/layers")
         export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=3)
         
-        # Store neighbor graphs for potential downstream analysis
-        self.results['phase3_neighbors'] = {
-            'rna_neighbors': phase3_result['rna_neighbors'],
-            'protein_neighbors': phase3_result['protein_neighbors'],
-            'rna_weights': phase3_result['rna_weights'],
-            'protein_weights': phase3_result['protein_weights']
-        }
+        # Store clustering info for potential downstream analysis
+        self.results['phase3_clusters'] = phase3_result['cluster_assignments']
         
-        print("✅ WNN-based Phase 3 refinement complete.")
+        print("✅ Cell-type-level WNN Phase 3 refinement complete.")
 
     def get_adata(self):
         """
