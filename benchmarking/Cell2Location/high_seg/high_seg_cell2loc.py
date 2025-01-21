@@ -1,3 +1,5 @@
+print("Loading packages...")
+
 import os
 import sys
 import gc
@@ -12,6 +14,7 @@ ref_run_name   = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/S
 results_folder = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/cell2location/high_seg'
 input_folder   = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/replicates/high_seg/h5ad_objects'
 
+print("Loading reference signatures...")
 # Load reference signatures
 adata_file = f"{ref_run_name}/reference_major.h5ad"
 adata_ref  = sc.read_h5ad(adata_file)
@@ -122,4 +125,5 @@ def process_replicate(replicate_name):
 
 if __name__ == "__main__":
     replicate_name = sys.argv[1]  # Get replicate name from command-line arguments
+    print(f"Starting processing for {replicate_name}")
     process_replicate(replicate_name)
