@@ -25,7 +25,7 @@ echo "Changed to working directory"
 
 # Define parameter arrays
 radii=(4 6 8)
-lambda_prior_weights=(0.1 0.3 0.5 0.7 0.9)
+lambda_prior_weights=(1.0 10.0 50.0 100.0 500.0)
 TEST_SETS=("mixed" "high_seg")
 
 # Calculate indices for each parameter based on array task ID
