@@ -164,109 +164,112 @@ def suggest_zero_inflation_threshold(patterns, quantile=0.75):
     return 0.5  # Default fallback
 
 def compute_global_prior(
-    spotwise_gene_expression_profiles,
-    cell_type_numbers_array,
-    lambda_prior=1.0,
-    zero_inflation_threshold=0.9
-):
+    spotwise_gene_expression_profiles: Dict[int, np.ndarray],
+    cell_type_numbers_array: np.ndarray,
+    lambda_prior: float = 1.0,
+    min_expression_threshold: float = 0.1
+) -> Dict[str, Any]:
     """
-    Compute a global prior from pass 1 results using a custom zero-inflation metric.
-    ...
+    Compute global prior from pass 1 results using normalized expression patterns.
+    
+    Args:
+        spotwise_gene_expression_profiles: Dictionary mapping spot indices to profile matrices
+        cell_type_numbers_array: Array of cell type proportions (N_spots × T_celltypes)
+        lambda_prior: Strength of prior (default: 1.0)
+        min_expression_threshold: Minimum expression to consider "active" (default: 0.1)
+    
+    Returns:
+        Dict containing:
+            - global_prior: Prior matrix (T_celltypes × M_genes)
+            - confidence_scores: Confidence in each prior value
+            - expression_patterns: Summary of expression patterns
     """
-    import logging
-    import numpy as np
-
-    # ------------------------------------------------------------------------
-    # NEW LINES: Validate that the dictionary keys match the shape of cell_type_numbers_array
-    # ------------------------------------------------------------------------
+    # Validate inputs
     N = cell_type_numbers_array.shape[0]
     T = cell_type_numbers_array.shape[1]
-
+    
     spot_keys = sorted(spotwise_gene_expression_profiles.keys())
     if len(spot_keys) != N:
-        raise ValueError(
-            f"Mismatch in number of spots between cell_type_numbers_array (N={N}) "
-            f"and spotwise profiles (len={len(spot_keys)}). Ensure pass1 spot keys "
-            f"match 0..{N-1} or restructure code accordingly."
-        )
-    # Optionally enforce that the dictionary keys are exactly range(N)
-    if spot_keys != list(range(N)):
-        raise ValueError(
-            "spotwise_gene_expression_profiles keys do not match 0..N-1. "
-            "Either re-map them or ensure the model uses contiguous spot indices."
-        )
-    # ------------------------------------------------------------------------
-    # END NEW LINES
-    # ------------------------------------------------------------------------
-
-    # Build usage_array shaped [N, T, M]
-    example_profile = next(iter(spotwise_gene_expression_profiles.values()))
-    M = example_profile.shape[1]
-    usage_array = np.zeros((N, T, M), dtype=float)
-
+        raise ValueError(f"Mismatch in number of spots: {len(spot_keys)} vs {N}")
+    
+    # Get dimensions from first profile
+    example_profile = spotwise_gene_expression_profiles[spot_keys[0]]
+    M = example_profile.shape[1]  # number of genes
+    
+    # Initialize arrays
+    usage_array = np.zeros((N, T, M))
     for i, profile in spotwise_gene_expression_profiles.items():
-        # profile is shape (T, M)
         usage_array[i] = profile
-
-    zero_inflation_probs = np.zeros((T, M), dtype=float)
-    zinb_matrix = np.zeros((T, M), dtype=float)
-
-    # Evaluate each cell type and gene
-    for t_idx in range(T):
-        ct_proportions = cell_type_numbers_array[:, t_idx]
-
-        for m_idx in range(M):
-            usage_vec = usage_array[:, t_idx, m_idx]
-            try:
-                # Fit ZINB or any relevant model (see truncated code for details).
-                pi, mu, theta = fit_zinb(usage_vec, ct_proportions)
-                zero_inflation_probs[t_idx, m_idx] = pi
-
-                if pi > zero_inflation_threshold:
-                    zinb_score = 0.0
-                else:
-                    # ...
-                    # No changes to existing logic
-                    # ...
-                    pass
-
-                zinb_matrix[t_idx, m_idx] = zinb_score
-            except Exception:
-                zinb_matrix[t_idx, m_idx] = 0.0
-                zero_inflation_probs[t_idx, m_idx] = 1.0
-
-    # Normalize matrix to [0,1] range per gene
-    max_scores = np.maximum(np.max(zinb_matrix, axis=0), 1e-10)
-    zinb_matrix = zinb_matrix / max_scores
-
-    # Modify prior computation to create stronger signals
-    global_prior = np.zeros((T, M), dtype=float)
-    for m_idx in range(M):
-        scores = zinb_matrix[:, m_idx]
-        scores = np.power(scores, 2)
-        scaled = scores * lambda_prior * 4
-
-        exps = np.exp(scaled - np.max(scaled))
-        denom = np.sum(exps)
-        if denom < 1e-12:
-            global_prior[:, m_idx] = 1.0 / T
-        else:
-            global_prior[:, m_idx] = exps / denom
-
+    
+    # Calculate expression statistics per cell type
+    mean_expression = np.zeros((T, M))
+    expression_frequency = np.zeros((T, M))
+    expression_consistency = np.zeros((T, M))
+    
+    for t in range(T):
+        # Weight profiles by cell type abundance
+        weights = cell_type_numbers_array[:, t]  # Now 1D array of shape (N,)
+        
+        # Calculate weighted statistics
+        active_expression = usage_array[:, t, :] > min_expression_threshold
+        weighted_expression = usage_array[:, t, :]  # Shape: (N, M)
+        
+        # Mean expression when the cell type is present
+        present_mask = weights > 0
+        if np.any(present_mask):
+            # Ensure weights match the data shape for averaging
+            weights_for_average = weights[present_mask]  # 1D array of length n_present
+            expression_for_average = weighted_expression[present_mask, :]  # (n_present, M)
+            
+            mean_expression[t] = np.average(
+                expression_for_average,
+                weights=weights_for_average,
+                axis=0
+            )
+        
+            # Expression consistency (coefficient of variation, inverse)
+            # Calculate weighted std dev properly
+            diff_squared = (expression_for_average - mean_expression[t]) ** 2  # (n_present, M)
+            weighted_var = np.average(diff_squared, weights=weights_for_average, axis=0)  # (M,)
+            std = np.sqrt(weighted_var)  # (M,)
+            expression_consistency[t] = 1 / (1 + std / (mean_expression[t] + 1e-6))
+        
+        # Frequency of expression (properly weighted)
+        total_weight = np.sum(weights) + 1e-6
+        expression_frequency[t] = np.sum(active_expression * weights[:, np.newaxis], axis=0) / total_weight
+    
+    # Combine metrics into confidence scores
+    confidence_scores = expression_frequency * expression_consistency
+    
+    # Generate prior probabilities
+    # Scale mean expression to [0,1] per gene
+    scaled_expression = mean_expression / (np.max(mean_expression, axis=0) + 1e-6)
+    
+    # Weight by confidence and apply prior strength
+    weighted_scores = scaled_expression * np.power(confidence_scores, lambda_prior)
+    
+    # Convert to probabilities via softmax
+    global_prior = np.zeros((T, M))
+    for m in range(M):
+        scores = weighted_scores[:, m]
+        exp_scores = np.exp(scores - np.max(scores))  # Numerical stability
+        global_prior[:, m] = exp_scores / (np.sum(exp_scores) + 1e-6)
+    
+    # Log statistics
     logging.info("Prior computation statistics:")
-    logging.info(f" - Mean: {np.mean(global_prior):.4f}")
-    logging.info(f" - Std: {np.std(global_prior):.4f}")
-    logging.info(f" - Max: {np.max(global_prior):.4f}")
+    logging.info(f" - Mean confidence score: {np.mean(confidence_scores):.4f}")
+    logging.info(f" - Mean prior strength: {np.mean(global_prior):.4f}")
     logging.info(f" - % Strong signals (>0.5): {100 * np.mean(global_prior > 0.5):.2f}%")
-    logging.info(f" - % Weak signals (<0.1): {100 * np.mean(global_prior < 0.1):.2f}%")
-
+    
     return {
         'global_prior': global_prior,
-        'zinb_matrix': zinb_matrix,
-        'zero_inflation_probs': zero_inflation_probs,
-        'zero_inflation_threshold': zero_inflation_threshold
+        'confidence_scores': confidence_scores,
+        'expression_patterns': {
+            'mean_expression': mean_expression,
+            'expression_frequency': expression_frequency,
+            'expression_consistency': expression_consistency
+        }
     }
-
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
@@ -328,9 +331,6 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         raise ValueError("NaN values detected in `profile_based_antibody_data` after mapping.")
 
     return profile_based_antibody_data, cell_type_names
-
-
-
 
 def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.7):
     """
@@ -409,8 +409,6 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
         iteration += 1
 
     return Y_values
-
-
 
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
@@ -540,7 +538,6 @@ def deconvolute_spot_with_neighbors_with_prior(
                 )
 
         # Only validate prior if both prior and weight are provided
-        print("global_prior", global_prior)
 
         if global_prior is not None:
             if lambda_prior_weight > 0:  # First check if we're using prior guidance at all
@@ -658,8 +655,6 @@ def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
     gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
     return (scaled_matrix * gene_ranges) + gene_mins
 
-
-
 def optimize_gene_expression(
     sample_name: str,
     deconvolution_expression_data: np.ndarray,
@@ -705,7 +700,6 @@ def optimize_gene_expression(
         logging.info("Using prior-guided deconvolution")
     else:
         logging.info("Using standard deconvolution")
-
 
     # Initialize futures as empty dict before try block
     futures = {}
@@ -790,9 +784,6 @@ def optimize_gene_expression(
             )
 
     return spotwise_gene_expression_profiles
-
-
-
 
 def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     """

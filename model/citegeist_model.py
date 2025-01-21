@@ -429,40 +429,44 @@ class CitegeistModel:
             'dimensions': dimensions
         }
 
-    def compute_expression_prior(self, spotwise_profiles_pass1, cell_type_numbers_array):
+    def compute_expression_prior(
+        self, 
+        spotwise_profiles_pass1: Dict[int, np.ndarray],
+        cell_type_numbers_array: np.ndarray,
+        lambda_prior: float = 1.0,
+        min_expression_threshold: float = 0.1
+    ) -> Dict[str, Any]:
         """
         Compute global prior from pass 1 results.
         
+        Args:
+            spotwise_profiles_pass1: Dictionary mapping spot indices to profile matrices
+            cell_type_numbers_array: Array of cell type proportions (N_spots × T_celltypes)
+            lambda_prior: Strength of prior influence (default: 1.0)
+            min_expression_threshold: Minimum expression to consider "active" (default: 0.1)
+            
         Returns:
             Dict[str, Any]: {
                 'global_prior': np.ndarray,  # shape (T_celltypes, M_genes)
-                'zinb_matrix': np.ndarray,
-                'zero_inflation_probs': np.ndarray,
-                'zero_inflation_threshold': float
+                'confidence_scores': np.ndarray,  # shape (T_celltypes, M_genes)
+                'expression_patterns': Dict containing detailed statistics
             }
         """
+        if not self.preprocessed_gex:
+            raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
+
         logging.info("Computing prior from pass 1 results...")
         
-        # Get gene and cell type names
+        # Get gene and cell type names for validation
         gene_names = self.gene_expression_adata.var_names
         cell_type_names = list(self.cell_profile_dict.keys())
         
-        patterns = analyze_zero_inflation_patterns(
-            spotwise_profiles_pass1,
-            cell_type_numbers_array,
-            gene_names,
-            cell_type_names
-        )
-        
-        # Get suggested threshold
-        threshold = suggest_zero_inflation_threshold(patterns)
-        
-        # Compute global prior
+        # Compute global prior with new approach
         prior_info = compute_global_prior(
             spotwise_profiles_pass1,
             cell_type_numbers_array,
-            lambda_prior=1.0,
-            zero_inflation_threshold=threshold
+            lambda_prior=lambda_prior,
+            min_expression_threshold=min_expression_threshold
         )
         
         # Validate prior shape
@@ -471,6 +475,27 @@ class CitegeistModel:
         
         if prior_info['global_prior'].shape != (T, M):
             raise ValueError(f"Prior shape {prior_info['global_prior'].shape} does not match expected ({T}, {M})")
+        
+        # Log detailed statistics about the prior
+        logging.info("\nPrior computation details:")
+        logging.info(f"Number of cell types: {T}")
+        logging.info(f"Number of genes: {M}")
+        
+        # Per cell-type statistics
+        for t, cell_type in enumerate(cell_type_names):
+            mean_conf = np.mean(prior_info['confidence_scores'][t])
+            strong_signals = np.mean(prior_info['global_prior'][t] > 0.5)
+            logging.info(f"\n{cell_type}:")
+            logging.info(f" - Mean confidence score: {mean_conf:.4f}")
+            logging.info(f" - % Strong signals: {100 * strong_signals:.2f}%")
+            
+            # Expression pattern summary
+            mean_exp = np.mean(prior_info['expression_patterns']['mean_expression'][t])
+            freq = np.mean(prior_info['expression_patterns']['expression_frequency'][t])
+            cons = np.mean(prior_info['expression_patterns']['expression_consistency'][t])
+            logging.info(f" - Mean expression: {mean_exp:.4f}")
+            logging.info(f" - Mean expression frequency: {freq:.4f}")
+            logging.info(f" - Mean expression consistency: {cons:.4f}")
         
         return prior_info
 
