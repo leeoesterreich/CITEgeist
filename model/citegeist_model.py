@@ -2,6 +2,8 @@
 import os
 import logging
 from typing import Dict, Any, Optional, Tuple, List, Union
+import json
+
 
 # Third-party imports
 import numpy as np
@@ -368,7 +370,7 @@ class CitegeistModel:
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
             lambda_prior_weight=0,  # No prior in pass 1
-            global_prior=None,
+            global_prior= None,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
@@ -462,6 +464,13 @@ class CitegeistModel:
             lambda_prior=1.0,
             zero_inflation_threshold=threshold
         )
+        
+        # Validate prior shape
+        T = cell_type_numbers_array.shape[1]  # num cell types
+        M = self.gene_expression_adata.shape[1]  # num genes
+        
+        if prior_info['global_prior'].shape != (T, M):
+            raise ValueError(f"Prior shape {prior_info['global_prior'].shape} does not match expected ({T}, {M})")
         
         return prior_info
 
