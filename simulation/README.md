@@ -13,7 +13,7 @@ The simulation framework generates synthetic spatial transcriptomics data with k
 
 The simulations are based on:
 - Single-cell RNA sequencing reference data from Wu et al. 2021 breast cancer dataset
-- Spatial coordinates from 10x Visium spatial transcriptomics platform
+- Spatial coordinates from 10x Visium spatial transcriptomics platform, generated using scCube's hex-based Visium profile
 
 ## Simulation Parameters
 
