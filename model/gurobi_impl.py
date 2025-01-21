@@ -809,26 +809,51 @@ def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     # We want gene-gene correlation, so transpose to G (genes) × N (spots)
     gex_data_t = gex_data.T  # shape: G × N
 
-    # 2) Compute gene-gene correlation
+    # Handle potential NaN or inf values
+    gex_data_t = np.nan_to_num(gex_data_t, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # 2) Compute gene-gene correlation with proper handling of NaN values
     if correlation_method == 'spearman':
-        from scipy.stats import spearmanr
-        corr, _ = spearmanr(gex_data_t, axis=1)
+        corr = np.zeros((gex_data_t.shape[0], gex_data_t.shape[0]))
+        for i in range(gex_data_t.shape[0]):
+            for j in range(i+1):
+                if i == j:
+                    corr[i,j] = 1.0
+                else:
+                    # Calculate correlation only on finite values
+                    mask = np.isfinite(gex_data_t[i]) & np.isfinite(gex_data_t[j])
+                    if np.sum(mask) > 1:  # Need at least 2 points for correlation
+                        rho, _ = spearmanr(gex_data_t[i][mask], gex_data_t[j][mask])
+                        corr[i,j] = rho if np.isfinite(rho) else 0.0
+                        corr[j,i] = corr[i,j]
+                    else:
+                        corr[i,j] = corr[j,i] = 0.0
     else:
+        # Use numpy corrcoef with proper handling
         corr = np.corrcoef(gex_data_t)
+        corr = np.nan_to_num(corr, nan=0.0)  # Replace NaN with 0
 
     # 3) Convert correlation to distance for clustering
-    #    distance = 1 - corr
-    distance_matrix = 1.0 - corr
+    distance_matrix = 1.0 - np.abs(corr)  # Use absolute correlation
+    distance_matrix = np.clip(distance_matrix, 0, 1)  # Ensure distances are in [0,1]
 
-    # 4) Perform hierarchical clustering on distance_matrix
-    #    Convert square distance to condensed form
+    # 4) Convert square distance to condensed form
+    # Ensure the matrix is symmetric
+    distance_matrix = (distance_matrix + distance_matrix.T) / 2
     dist_condensed = squareform(distance_matrix, checks=False)
-    Z = linkage(dist_condensed, method='average')  # average linkage, or "ward"/"complete"
 
-    # 5) Cut into clusters (modules)
-    cluster_ids = fcluster(Z, t=max_clusters, criterion='maxclust')  # 1..max_clusters
+    # Verify no non-finite values
+    if not np.all(np.isfinite(dist_condensed)):
+        logging.warning("Non-finite values found in distance matrix. Replacing with max distance.")
+        dist_condensed = np.nan_to_num(dist_condensed, nan=1.0, posinf=1.0, neginf=0.0)
+
+    # 5) Perform hierarchical clustering
+    Z = linkage(dist_condensed, method='average')
+
+    # 6) Cut into clusters and create module matrix
+    cluster_ids = fcluster(Z, t=max_clusters, criterion='maxclust')
     unique_clusters = np.unique(cluster_ids)
-    K = len(unique_clusters)  # actual number of modules
+    K = len(unique_clusters)
 
     # 6) Build module_matrix (G × K), where entry=1 if gene in that module
     module_matrix = np.zeros((gex_data.shape[1], K), dtype=float)
@@ -838,188 +863,162 @@ def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     module_labels = [f"Module_{c}" for c in unique_clusters]
     return module_matrix, module_labels
 
-def optimize_multimodal_phase_3_wgcna(
+def optimize_multimodal_phase_3_wnn(
     adata_gex,
     adata_antibody,
     cell_prop_array,
     cell_profiles,
-    max_clusters=10,
-    alpha_gex=1.0,
-    alpha_antibody=1.0,
-    alpha_spatial=0.0,
-    lambda_reg_module=0.1,
-    spatial_adjacency=None,
-    random_seed=42
+    radius: float = 2.0,
+    n_neighbors: int = 30,
+    alpha_rna: float = 0.5,
+    alpha_protein: float = 0.5,
+    lambda_smooth: float = 0.1
 ):
     """
-    Integrate approximate WGCNA modules with an antibody-based term referencing 'cell_profiles'.
-
+    Integrate RNA and protein data using weighted nearest neighbors approach.
+    
     Args:
-        adata_gex (AnnData): Spots × Genes
-        adata_antibody (AnnData): Spots × Markers
-        cell_prop_array (np.ndarray): (N × T) existing cell-type proportions
-        cell_profiles (dict): e.g. your Major/Minor marker dictionary
-        max_clusters (int): upper bound on the number of gene modules
-        alpha_gex, alpha_antibody (float): weights for GEX vs. antibody alignment
-        alpha_spatial (float): weight for spatial term
-        lambda_reg_module (float): L2 or L1 penalty for module usage
-        spatial_adjacency (np.ndarray or None): (N × N) adjacency for spots
-        random_seed (int): random seed
-
+        adata_gex (AnnData): Gene expression data
+        adata_antibody (AnnData): Protein/antibody data
+        cell_prop_array (np.ndarray): Current cell type proportions (N × T)
+        cell_profiles (dict): Cell type marker profiles
+        radius (float): Radius for spatial neighbors
+        n_neighbors (int): Number of nearest neighbors to consider
+        alpha_rna (float): Weight for RNA modality
+        alpha_protein (float): Weight for protein modality
+        lambda_smooth (float): Smoothing parameter for spatial regularization
+        
     Returns:
-        results (dict):
-          - modules: (G × K) matrix of module memberships
-          - updated_cell_prop: (N × T) updated cell-type proportions
-          - layers: (N × T × G) final refined expression per (spot, celltype, gene)
+        dict: Contains refined cell proportions and gene expression profiles
     """
-    np.random.seed(random_seed)
-
-    # 1) Approximate WGCNA to get (G × K) module membership matrix
-    module_matrix, module_labels = approximate_wgcna(adata_gex, max_clusters=max_clusters)
-    G, K = module_matrix.shape  # G = #genes, K = #modules
-
-    # Data shapes
-    gex_data = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
-    antibody_data = adata_antibody.X.toarray() if hasattr(adata_antibody.X, 'toarray') else adata_antibody.X
-    N = gex_data.shape[0]  # spots
-    T = cell_prop_array.shape[1]  # cell types
-    M = antibody_data.shape[1]    # #markers
-
-    logging.info(f"[Phase 3 (WGCNA)] N={N}, G={G}, K={K}, T={T}, M={M}")
-
-    # 2) Optionally build a marker→celltype weighting from cell_profiles
-    #    For simplicity, we create W[m, c] = 1 if marker m belongs to cell c, else 0.
-    marker_var_names = list(adata_antibody.var_names)
-    cell_type_names = list(cell_profiles.keys())
-    marker_celltype_map = np.zeros((M, T), dtype=float)
-
-    for t_idx, ct_name in enumerate(cell_type_names):
-        major_markers = cell_profiles[ct_name].get("Major", [])
-        # Convert your marker naming to var_names
-        for mk in major_markers:
-            # example mk = "CD68-1"
-            if mk in marker_var_names:
-                m_idx = marker_var_names.index(mk)
-                marker_celltype_map[m_idx, t_idx] = 1.0
-
-    # 3) Create Gurobi model
-    model = gp.Model("Phase3_WGCNA")
+    from sklearn.neighbors import NearestNeighbors
+    from scipy.sparse import csr_matrix
+    import numpy as np
+    
+    # 1. Compute normalized feature matrices
+    # RNA: Use highly variable genes or all genes
+    X_rna = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
+    X_rna = (X_rna - X_rna.mean(axis=0)) / (X_rna.std(axis=0) + 1e-6)
+    
+    # Protein: Use all antibody features
+    X_protein = adata_antibody.X.toarray() if hasattr(adata_antibody.X, 'toarray') else adata_antibody.X
+    X_protein = (X_protein - X_protein.mean(axis=0)) / (X_protein.std(axis=0) + 1e-6)
+    
+    # 2. Compute modality-specific neighbors
+    nbrs_rna = NearestNeighbors(n_neighbors=n_neighbors).fit(X_rna)
+    nbrs_protein = NearestNeighbors(n_neighbors=n_neighbors).fit(X_protein)
+    
+    # Get distances and indices for both modalities
+    dists_rna, idx_rna = nbrs_rna.kneighbors(X_rna)
+    dists_protein, idx_protein = nbrs_protein.kneighbors(X_protein)
+    
+    # 3. Compute weights for each modality
+    weights_rna = np.exp(-dists_rna / dists_rna.mean())
+    weights_protein = np.exp(-dists_protein / dists_protein.mean())
+    
+    # 4. Get spatial neighbors
+    N = adata_gex.shape[0]
+    spatial_coords = adata_gex.obsm['spatial']
+    nbrs_spatial = NearestNeighbors(radius=radius).fit(spatial_coords)
+    spatial_graph = nbrs_spatial.radius_neighbors_graph(spatial_coords)
+    
+    # 5. Create Gurobi model for refined proportions
+    model = gp.Model("Phase3_WNN")
     model.setParam('OutputFlag', 0)
-    model.setParam('Seed', random_seed)
-
-    # 4) Create variables:
-    #    - X_module[i, k]: usage of module k in spot i
-    #    - Y[i, c]: refined cell-type proportions
-    #    (We also rely on module_matrix[G×K] for membership of gene→module.)
-    X_module = {}
-    for i in range(N):
-        for k_ in range(K):
-            X_module[(i, k_)] = model.addVar(lb=0.0, ub=GRB.INFINITY, vtype=GRB.CONTINUOUS,
-                                             name=f"X_module_{i}_{k_}")
-
+    
+    # Variables for refined cell proportions
+    T = cell_prop_array.shape[1]
     Y_refined = {}
     for i in range(N):
-        for c in range(T):
-            Y_refined[(i, c)] = model.addVar(lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS,
-                                             name=f"Y_{i}_{c}")
-
-    model.update()
-
-    # 5) Objective Terms
-    # a) GEX reconstruction error
-    gex_residuals = []
+        for t in range(T):
+            Y_refined[i,t] = model.addVar(lb=0, ub=1, name=f'Y_{i}_{t}')
+    
+    # 6. Objective terms
+    obj_terms = []
+    
+    # RNA-based neighbor consistency
     for i in range(N):
-        for g_ in range(G):
-            # predicted expression for gene g_ in spot i = sum_k( X_module[i,k] * module_matrix[g_,k] )
-            pred_gex = gp.quicksum(X_module[(i, k_)] * module_matrix[g_, k_] for k_ in range(K))
-            diff = gex_data[i, g_] - pred_gex
-            gex_residuals.append(diff * diff)
-
-    # b) Antibody-based constraints
-    #    predicted antibody for marker m in spot i = sum_c( Y[i,c] * marker_celltype_map[m,c] ).
-    #    We keep it simple, but you might do something more advanced.
-    ab_residuals = []
+        for k in range(n_neighbors):
+            j = idx_rna[i,k]
+            w = weights_rna[i,k] * alpha_rna
+            for t in range(T):
+                diff = Y_refined[i,t] - Y_refined[j,t]
+                obj_terms.append(w * diff * diff)
+    
+    # Protein-based neighbor consistency
     for i in range(N):
-        for m_ in range(M):
-            pred_ab = gp.quicksum(Y_refined[(i, c_)] * marker_celltype_map[m_, c_] for c_ in range(T))
-            diff = antibody_data[i, m_] - pred_ab
-            ab_residuals.append(diff * diff)
-
-    # c) Spatial smoothing for Y
-    spatial_terms = []
-    if spatial_adjacency is not None and alpha_spatial > 0.0:
-        # adjacency is NxN
-        for i in range(N):
-            for j in range(N):
-                if spatial_adjacency[i, j] > 0:
-                    for c_ in range(T):
-                        delta = Y_refined[(i, c_)] - Y_refined[(j, c_)]
-                        spatial_terms.append(delta * delta * spatial_adjacency[i, j])
-
-    # d) Regularization on X_module usage
-    #    L2 penalty: sum(X_module[i,k]^2)
-    reg_module = []
+        for k in range(n_neighbors):
+            j = idx_protein[i,k]
+            w = weights_protein[i,k] * alpha_protein
+            for t in range(T):
+                diff = Y_refined[i,t] - Y_refined[j,t]
+                obj_terms.append(w * diff * diff)
+    
+    # Spatial smoothing
+    spatial_indices = spatial_graph.nonzero()
+    for idx in range(len(spatial_indices[0])):
+        i, j = spatial_indices[0][idx], spatial_indices[1][idx]
+        for t in range(T):
+            diff = Y_refined[i,t] - Y_refined[j,t]
+            obj_terms.append(lambda_smooth * diff * diff)
+    
+    # Add objective
+    model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
+    
+    # 7. Constraints
+    # Sum to 1 constraint
     for i in range(N):
-        for k_ in range(K):
-            reg_module.append(X_module[(i, k_)] * X_module[(i, k_)])
-
-    # Combine objectives
-    obj = (
-        alpha_gex * gp.quicksum(gex_residuals) +
-        alpha_antibody * gp.quicksum(ab_residuals) +
-        alpha_spatial * gp.quicksum(spatial_terms) +
-        lambda_reg_module * gp.quicksum(reg_module))
-        
-
-    model.setObjective(obj, GRB.MINIMIZE)
-
-    # 6) Constraints
-    # Force sum of Y[i,c] ~ 1
-    for i in range(N):
-        model.addConstr(
-            gp.quicksum(Y_refined[(i, c_)] for c_ in range(T)) == 1.0,
-            name=f"SumToOne_spot_{i}"
-        )
-        # Initialize Y with existing cell_prop_array
-        for c_ in range(T):
-            Y_refined[(i, c_)].start = float(cell_prop_array[i, c_])
-
-    model.update()
-
-    # 7) Optimize
+        model.addConstr(gp.quicksum(Y_refined[i,t] for t in range(T)) == 1)
+    
+    # 8. Optimize
     model.optimize()
+    
     if model.status != GRB.OPTIMAL:
-        logging.warning(f"WGCNA Phase 3: Model ended with status {model.status}")
-
-    # 8) Extract results
-    X_mod_sol = np.zeros((N, K), dtype=float)
+        raise RuntimeError("Failed to find optimal solution")
+    
+    # 9. Extract refined proportions
+    refined_props = np.zeros((N, T))
     for i in range(N):
-        for k_ in range(K):
-            X_mod_sol[i, k_] = X_module[(i, k_)].X
-
-    Y_sol = np.zeros((N, T), dtype=float)
+        for t in range(T):
+            refined_props[i,t] = Y_refined[i,t].X
+            
+    # 10. Update gene expression profiles using refined proportions
+    G = adata_gex.shape[1]  # number of genes
+    refined_profiles = np.zeros((N, T, G))
+    
+    # For each spot, update expression profiles using WNN
     for i in range(N):
-        for c_ in range(T):
-            Y_sol[i, c_] = Y_refined[(i, c_)].X
-
-    # 9) Construct updated layers: shape (N x T x G)
-    #    e.g. each cell type's expression for gene g in spot i
-    #    could be cell proportion * fraction of X_module usage for that gene's module.
-    layers = np.zeros((N, T, G), dtype=float)
-    for i in range(N):
-        for c_ in range(T):
-            for g_ in range(G):
-                # sum across modules that gene belongs to
-                # gene g_ is in module k_ if module_matrix[g_, k_] > 0
-                val_mod = sum(X_mod_sol[i, k_] * module_matrix[g_, k_] for k_ in range(K))
-                layers[i, c_, g_] = Y_sol[i, c_] * float(val_mod)
-
-    results = {
-        "modules": module_matrix,       # G x K
-        "updated_cell_prop": Y_sol,     # N x T
-        "layers": layers                # N x T x G
+        # Get RNA neighbors and their weights
+        rna_weights = weights_rna[i]
+        rna_neighbors = idx_rna[i]
+        
+        # Get protein neighbors and their weights
+        protein_weights = weights_protein[i]
+        protein_neighbors = idx_protein[i]
+        
+        # Combine neighbor information
+        combined_weights = alpha_rna * rna_weights + alpha_protein * protein_weights
+        combined_neighbors = np.union1d(rna_neighbors, protein_neighbors)
+        
+        # Update profiles using weighted combinations
+        for t in range(T):
+            neighbor_profiles = np.array([
+                X_rna[j] * refined_props[j,t] for j in combined_neighbors
+            ])
+            refined_profiles[i,t] = np.average(
+                neighbor_profiles, 
+                weights=combined_weights[:len(combined_neighbors)],
+                axis=0
+            )
+    
+    return {
+        'refined_proportions': refined_props,
+        'refined_profiles': refined_profiles,
+        'rna_neighbors': idx_rna,
+        'protein_neighbors': idx_protein,
+        'rna_weights': weights_rna,
+        'protein_weights': weights_protein
     }
-    return results
 
 def normalize_counts(adata, target_sum=10000):
     """
