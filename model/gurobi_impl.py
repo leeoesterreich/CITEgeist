@@ -873,7 +873,9 @@ def optimize_multimodal_phase_3_celltype_wnn(
     alpha_rna: float = 0.5,
     alpha_protein: float = 0.5,
     lambda_smooth: float = 0.1,
-    min_cells_per_cluster: int = 5
+    min_cells_per_cluster: int = 5,
+    pass_number: int = 2,
+    n_jobs: int = -1  # Add parallel processing parameter
 ):
     """
     Integrate RNA and protein data using cell-type-level WNN approach.
@@ -883,168 +885,209 @@ def optimize_multimodal_phase_3_celltype_wnn(
         adata_antibody (AnnData): Protein/antibody data
         cell_prop_array (np.ndarray): Current cell type proportions (N × T)
         cell_profiles (dict): Cell type marker profiles
+        radius (float): Radius for spatial neighbors
+        n_neighbors (int): Number of nearest neighbors
+        alpha_rna (float): Weight for RNA modality
+        alpha_protein (float): Weight for protein modality
+        lambda_smooth (float): Smoothing parameter
+        min_cells_per_cluster (int): Minimum cells per cluster
+        pass_number (int): Which pass layers to use (1 or 2)
     """
     from sklearn.neighbors import NearestNeighbors
     from sklearn.cluster import KMeans
     import numpy as np
+    from joblib import Parallel, delayed
+    from concurrent.futures import ThreadPoolExecutor
+    import multiprocessing
     
-    N = adata_gex.shape[0]  # number of spots
-    T = cell_prop_array.shape[1]  # number of cell types
+    # Use all cores if n_jobs is -1
+    if n_jobs == -1:
+        n_jobs = multiprocessing.cpu_count()
+    
+    logging.info(f"Starting Phase 3 WNN optimization using {n_jobs} cores...")
+    
+    N = adata_gex.shape[0]
+    T = cell_prop_array.shape[1]
+    M = adata_gex.shape[1]  # number of genes
     cell_type_names = list(cell_profiles.keys())
     
-    # 1. Extract features for clustering
+    # 1. Vectorized feature extraction
+    logging.info("Extracting features...")
     
-    # Cell type proportions features
-    prop_features = cell_prop_array  # (N x T)
+    # Pre-allocate array for gene expression features
+    gex_features = np.zeros((N, T * M))
     
-    # Cell type-specific gene expression features
-    gex_features = []
-    for t, ct_name in enumerate(cell_type_names):
-        # Get layer name for this cell type
-        layer_key = f"{ct_name.replace(' ', '_')}_genes_pass2"
-        if layer_key not in adata_gex.layers:
-            raise ValueError(f"Layer {layer_key} not found in adata_gex")
+    def process_cell_type(t):
+        ct_name = cell_type_names[t]
+        layer_key = f"{ct_name.replace(' ', '_')}_genes_pass{pass_number}"
         
-        # Extract and normalize cell type-specific expression
+        if layer_key not in adata_gex.layers:
+            raise ValueError(f"Layer {layer_key} not found")
+            
         ct_expression = adata_gex.layers[layer_key]
         if hasattr(ct_expression, 'toarray'):
             ct_expression = ct_expression.toarray()
-        
-        # Weight by cell type proportion
+            
         ct_prop = cell_prop_array[:, t].reshape(-1, 1)
-        weighted_expression = ct_expression * ct_prop
-        gex_features.append(weighted_expression)
+        return ct_expression * ct_prop, t
     
-    # Combine features
-    gex_features = np.hstack(gex_features)  # (N x (T*G))
+    # Parallel feature extraction
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(process_cell_type)(t) for t in range(T)
+    )
     
-    # 2. Cluster spots based on both proportions and expression
+    # Assemble features
+    for weighted_expr, t in results:
+        start_idx = t * M
+        end_idx = (t + 1) * M
+        gex_features[:, start_idx:end_idx] = weighted_expr
+    
+    # 2. Parallel clustering
+    logging.info("Running parallel clustering...")
     n_clusters = max(int(N / min_cells_per_cluster), T)
     
-    # Normalize features before clustering
-    prop_features = (prop_features - prop_features.mean(axis=0)) / (prop_features.std(axis=0) + 1e-6)
+    # Normalize features (vectorized)
+    prop_features = (cell_prop_array - cell_prop_array.mean(axis=0)) / (cell_prop_array.std(axis=0) + 1e-6)
     gex_features = (gex_features - gex_features.mean(axis=0)) / (gex_features.std(axis=0) + 1e-6)
     
-    # Cluster using proportions
-    prop_clusters = KMeans(n_clusters=n_clusters).fit_predict(prop_features)
+    # Update KMeans initialization to be compatible with newer scikit-learn versions
+    try:
+        # Try newer scikit-learn version syntax
+        kmeans_prop = KMeans(n_clusters=n_clusters, n_init='auto')
+        kmeans_gex = KMeans(n_clusters=n_clusters, n_init='auto')
+    except TypeError:
+        # Fallback for older versions
+        kmeans_prop = KMeans(n_clusters=n_clusters)
+        kmeans_gex = KMeans(n_clusters=n_clusters)
     
-    # Cluster using gene expression
-    gex_clusters = KMeans(n_clusters=n_clusters).fit_predict(gex_features)
+    logging.info("Running KMeans clustering on proportion features...")
+    prop_clusters = kmeans_prop.fit_predict(prop_features)
     
-    # 3. Compute cluster centroids
-    def get_cluster_centroids(data, clusters):
+    logging.info("Running KMeans clustering on gene expression features...")
+    gex_clusters = kmeans_gex.fit_predict(gex_features)
+    
+    # 3. Vectorized centroid computation
+    def compute_centroids_vectorized(data, clusters):
         centroids = np.zeros((n_clusters, data.shape[1]))
         for k in range(n_clusters):
             mask = clusters == k
             if np.any(mask):
-                centroids[k] = np.mean(data[mask], axis=0)
+                centroids[k] = data[mask].mean(axis=0)
         return centroids
     
-    prop_centroids = get_cluster_centroids(prop_features, prop_clusters)
-    gex_centroids = get_cluster_centroids(gex_features, gex_clusters)
+    prop_centroids = compute_centroids_vectorized(prop_features, prop_clusters)
+    gex_centroids = compute_centroids_vectorized(gex_features, gex_clusters)
     
-    # 4. Find nearest neighbors between clusters
-    nbrs_prop = NearestNeighbors(n_neighbors=n_neighbors).fit(prop_centroids)
-    nbrs_gex = NearestNeighbors(n_neighbors=n_neighbors).fit(gex_centroids)
+    # 4. Parallel nearest neighbor search
+    nbrs_prop = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
+    nbrs_gex = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
     
-    dists_prop, idx_prop = nbrs_prop.kneighbors(prop_centroids)
-    dists_gex, idx_gex = nbrs_gex.kneighbors(gex_centroids)
+    dists_prop, idx_prop = nbrs_prop.fit(prop_centroids).kneighbors(prop_centroids)
+    dists_gex, idx_gex = nbrs_gex.fit(gex_centroids).kneighbors(gex_centroids)
     
-    # 5. Create Gurobi model for refinement
+    # 5. Optimize with Gurobi (using threads)
+    logging.info("Setting up optimization model...")
     model = gp.Model("Phase3_CellType_WNN")
     model.setParam('OutputFlag', 0)
+    model.setParam('Threads', n_jobs)  # Use multiple threads for Gurobi
     
-    # Variables for refined proportions and expression
-    Y_refined = {}  # Refined proportions
-    X_refined = {}  # Refined expression
+    # Create variables (vectorized where possible)
+    Y_refined = model.addVars(N, T, lb=0, ub=1, name="Y")
+    X_refined = model.addVars(N, T, M, lb=0, name="X")
     
-    for i in range(N):
-        for t in range(T):
-            Y_refined[i,t] = model.addVar(lb=0, ub=1, name=f'Y_{i}_{t}')
-            for g in range(adata_gex.shape[1]):
-                X_refined[i,t,g] = model.addVar(lb=0, name=f'X_{i}_{t}_{g}')
-    
-    # 6. Objective terms
+    # 6. Build objective terms efficiently
+    logging.info("Building objective function...")
     obj_terms = []
     
-    # Proportion-based consistency
-    for i in range(N):
-        prop_cluster = prop_clusters[i]
+    def add_proportion_terms(spot_idx):
+        prop_cluster = prop_clusters[spot_idx]
         neighbor_clusters = idx_prop[prop_cluster]
         weights = np.exp(-dists_prop[prop_cluster] / dists_prop[prop_cluster].mean())
         
+        terms = []
         for k, n_cluster in enumerate(neighbor_clusters):
             neighbor_spots = np.where(prop_clusters == n_cluster)[0]
             if len(neighbor_spots) > 0:
                 w = weights[k] * alpha_protein
                 for t in range(T):
                     for j in neighbor_spots:
-                        diff = Y_refined[i,t] - Y_refined[j,t]
-                        obj_terms.append(w * diff * diff)
+                        diff = Y_refined[spot_idx,t] - Y_refined[j,t]
+                        terms.append(w * diff * diff)
+        return terms
     
-    # Expression-based consistency
-    for i in range(N):
-        gex_cluster = gex_clusters[i]
+    def add_expression_terms(spot_idx):
+        gex_cluster = gex_clusters[spot_idx]
         neighbor_clusters = idx_gex[gex_cluster]
         weights = np.exp(-dists_gex[gex_cluster] / dists_gex[gex_cluster].mean())
         
+        terms = []
         for k, n_cluster in enumerate(neighbor_clusters):
             neighbor_spots = np.where(gex_clusters == n_cluster)[0]
             if len(neighbor_spots) > 0:
                 w = weights[k] * alpha_rna
                 for t in range(T):
-                    for g in range(adata_gex.shape[1]):
+                    for g in range(M):
                         for j in neighbor_spots:
-                            diff = X_refined[i,t,g] - X_refined[j,t,g]
-                            obj_terms.append(w * diff * diff)
+                            diff = X_refined[spot_idx,t,g] - X_refined[j,t,g]
+                            terms.append(w * diff * diff)
+        return terms
     
-    # Spatial smoothing if available
-    if 'spatial' in adata_gex.obsm:
-        spatial_coords = adata_gex.obsm['spatial']
-        nbrs_spatial = NearestNeighbors(radius=radius).fit(spatial_coords)
-        spatial_graph = nbrs_spatial.radius_neighbors_graph(spatial_coords)
+    # Parallel objective term computation
+    with ThreadPoolExecutor(max_workers=n_jobs) as executor:
+        prop_futures = [executor.submit(add_proportion_terms, i) for i in range(N)]
+        expr_futures = [executor.submit(add_expression_terms, i) for i in range(N)]
         
-        spatial_indices = spatial_graph.nonzero()
-        for idx in range(len(spatial_indices[0])):
-            i, j = spatial_indices[0][idx], spatial_indices[1][idx]
-            # Smooth proportions
+        for future in prop_futures:
+            obj_terms.extend(future.result())
+        for future in expr_futures:
+            obj_terms.extend(future.result())
+    
+    # Add spatial smoothing if available
+    if 'spatial' in adata_gex.obsm:
+        logging.info("Adding spatial smoothing...")
+        spatial_coords = adata_gex.obsm['spatial']
+        nbrs_spatial = NearestNeighbors(radius=radius, n_jobs=n_jobs)
+        spatial_graph = nbrs_spatial.fit(spatial_coords).radius_neighbors_graph(spatial_coords)
+        
+        rows, cols = spatial_graph.nonzero()
+        for i, j in zip(rows, cols):
             for t in range(T):
                 diff_prop = Y_refined[i,t] - Y_refined[j,t]
                 obj_terms.append(lambda_smooth * diff_prop * diff_prop)
-                # Smooth expression
-                for g in range(adata_gex.shape[1]):
+                for g in range(M):
                     diff_expr = X_refined[i,t,g] - X_refined[j,t,g]
                     obj_terms.append(lambda_smooth * diff_expr * diff_expr)
     
-    # Add objective
+    # Set objective and constraints
     model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
     
-    # 7. Constraints
-    # Sum-to-one for proportions
+    # Add constraints (vectorized where possible)
     for i in range(N):
         model.addConstr(gp.quicksum(Y_refined[i,t] for t in range(T)) == 1)
-    
-    # Expression must be proportional to cell type abundance
+        
+    # Vectorized expression constraints
     for i in range(N):
         for t in range(T):
-            for g in range(adata_gex.shape[1]):
-                model.addConstr(X_refined[i,t,g] <= adata_gex.X[i,g] * Y_refined[i,t])
+            model.addConstrs(
+                (X_refined[i,t,g] <= adata_gex.X[i,g] * Y_refined[i,t] 
+                 for g in range(M)),
+                name=f"expr_constr_{i}_{t}"
+            )
     
-    # 8. Optimize
+    # Optimize
+    logging.info("Starting optimization...")
     model.optimize()
     
     if model.status != GRB.OPTIMAL:
+        logging.error("Failed to find optimal solution")
         raise RuntimeError("Failed to find optimal solution")
     
-    # 9. Extract results
-    refined_props = np.zeros((N, T))
-    refined_profiles = np.zeros((N, T, adata_gex.shape[1]))
+    # Extract results (vectorized)
+    refined_props = np.array([[Y_refined[i,t].X for t in range(T)] for i in range(N)])
+    refined_profiles = np.array([[[X_refined[i,t,g].X for g in range(M)] 
+                                for t in range(T)] for i in range(N)])
     
-    for i in range(N):
-        for t in range(T):
-            refined_props[i,t] = Y_refined[i,t].X
-            for g in range(adata_gex.shape[1]):
-                refined_profiles[i,t,g] = X_refined[i,t,g].X
+    logging.info("Phase 3 WNN optimization completed successfully")
     
     return {
         'refined_proportions': refined_props,
@@ -1055,52 +1098,57 @@ def optimize_multimodal_phase_3_celltype_wnn(
         }
     }
 
-def normalize_counts(adata, target_sum=10000):
+def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, max_fraction=0.05):
     """
     Normalize counts while preserving integer values and relative proportions.
     
     Args:
         adata: AnnData object
         target_sum: Target sum for each cell/spot
-    
-    Returns:
-        Normalized AnnData object with counts scaled to target_sum
+        exclude_highly_expressed: Whether to exclude highly expressed genes
+        max_fraction: Maximum fraction for highly expressed genes
     """
     # Get matrix
-    X = adata.X.toarray() if scipy.sparse.issparse(adata.X) else adata.X
+    X = adata.X.toarray() if scipy.sparse.issparse(adata.X) else adata.X.copy()
     
-    # Calculate scaling factors
-    size_factors = np.maximum(X.sum(axis=1), 1)  # Avoid division by zero
-    median_size = max(np.median(size_factors), 1)  # Ensure positive median
+    # Handle highly expressed genes if requested
+    if exclude_highly_expressed:
+        counts_per_cell = X.sum(axis=1)
+        gene_subset = ~(X > counts_per_cell[:, None] * max_fraction).any(axis=0)
+        size_factors = X[:, gene_subset].sum(axis=1)
+    else:
+        size_factors = X.sum(axis=1)
     
-    # Calculate scaling factors with bounds
-    scaling_factors = np.clip(size_factors / median_size, 0.1, 10.0)  # Limit scaling range
+    # Ensure positive values
+    size_factors = np.maximum(size_factors, 1)
+    median_size = max(np.median(size_factors), 1)
     
-    # Scale to target sum while preserving integers
-    # Use a more controlled scaling approach
-    scaled_factors = (target_sum / np.maximum(size_factors, 1))
+    # Calculate bounded scaling factors
+    scaling_factors = np.clip(size_factors / median_size, 0.1, 10.0)
+    scaled_factors = (target_sum / size_factors)
+    
+    # Scale and round to integers
     X_scaled = np.round(X * scaled_factors[:, None]).astype(int)
     
-    # Add safety check for extreme values
-    max_allowed = target_sum * 2  # Set reasonable maximum
+    # Safety bounds
+    max_allowed = target_sum * 2
     X_scaled = np.clip(X_scaled, 0, max_allowed)
     
     # Create new AnnData with scaled counts
     adata_norm = adata.copy()
     adata_norm.X = X_scaled
     
-    # Store size factors and scaling info
+    # Store normalization info
     adata_norm.obs['size_factors'] = scaling_factors
     adata_norm.obs['original_total'] = size_factors
     adata_norm.obs['scaled_total'] = X_scaled.sum(axis=1)
     
-    # Log statistics for validation
+    # Log statistics
     logging.info(f"Normalization stats:")
     logging.info(f"Original median total: {median_size:.2f}")
     logging.info(f"Mean scaled total: {X_scaled.sum(axis=1).mean():.2f}")
     logging.info(f"Max scaled value: {X_scaled.max():.2f}")
     
-
     return adata_norm
 
 

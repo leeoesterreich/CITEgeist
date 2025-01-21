@@ -62,6 +62,6 @@ python tests/test_citegeist_simulated.py \
     --radius $radius \
     --lambda_prior_weight $lambda_prior_weight \
     --input_folder $INPUT_FOLDER \
-    --output_folder $OUTPUT_FOLDER
-
+    --output_folder $OUTPUT_FOLDER \
+    --skip_pass2
 echo "Job completed at $(date)"

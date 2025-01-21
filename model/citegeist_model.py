@@ -209,7 +209,7 @@ class CitegeistModel:
     # Preprocessing Functions
     # -----------------------------------------
     
-    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1):
+    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=100):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
 
@@ -252,9 +252,34 @@ class CitegeistModel:
 
         self.gene_expression_adata = self.gene_expression_adata[:, col_filter].copy()
 
+        sc.pp.filter_cells(self.gene_expression_adata, min_counts=min_counts)
+        
+
         print(f"Filtered gene expression data: {initial_gene_count} → {filtered_gene_count} genes "
               f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
-              f"in nonzero spots).")
+              f"in nonzero spots). Remaining spots: {self.gene_expression_adata.shape[0]}")
+
+    def copy_gex_to_protein_adata(self):
+        """
+        Copy the number of spots in the gene expression AnnData object to the antibody capture AnnData object.
+        """
+        if self.antibody_capture_adata is None:
+            raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
+
+        # Get the spot names from gene expression data
+        gex_spots = set(self.gene_expression_adata.obs_names)
+
+        # Filter antibody capture data to keep only spots present in gene expression data
+        filtered_spots = [spot for spot in self.antibody_capture_adata.obs_names if spot in gex_spots]
+
+        if not filtered_spots:
+            raise ValueError("No matching spots found between gene expression and antibody capture data.")
+
+        self.antibody_capture_adata = self.antibody_capture_adata[filtered_spots, :].copy()
+
+        logging.info(f"Filtered antibody capture data to {len(filtered_spots)} spots present in gene expression data.")
     
     def preprocess_gex(self, target_sum=10000):
         """
@@ -746,9 +771,15 @@ class CitegeistModel:
                     celltype_matrix[idx] = celltype_data.loc[spot].values
             
             # Add as layer with consistent naming
-            layer_name = f"{cell_type}_genes_pass{pass_number}"
+            layer_name = f"{cell_type.replace(' ', '_')}_genes_pass{pass_number}"
             self.gene_expression_adata.layers[layer_name] = celltype_matrix
             print(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
+
+            # After adding each layer, verify it was added correctly
+            if layer_name not in self.gene_expression_adata.layers:
+                logging.error(f"Failed to add layer: {layer_name}")
+            else:
+                logging.info(f"Successfully added layer: {layer_name}")
 
     def run_multimodal_phase_3_celltype_wnn(
         self,
@@ -757,7 +788,8 @@ class CitegeistModel:
         alpha_rna: float = 0.5,
         alpha_protein: float = 0.5,
         lambda_smooth: float = 0.1,
-        min_cells_per_cluster: int = 5
+        min_cells_per_cluster: int = 5,
+        use_pass: int = None
     ):
         """
         Run Phase 3 optimization using cell-type-level WNN approach.
@@ -769,6 +801,8 @@ class CitegeistModel:
             alpha_protein (float): Weight for protein modality
             lambda_smooth (float): Spatial smoothing strength
             min_cells_per_cluster (int): Minimum cells per cluster
+            use_pass (int, optional): Explicitly use Pass 1 or 2 (if None, tries Pass 2 first, falls back to Pass 1).
+                                     This will be passed to the optimization function to select appropriate layers.
         """
         # Ensure data is present
         if self.gene_expression_adata is None or self.antibody_capture_adata is None:
@@ -780,12 +814,53 @@ class CitegeistModel:
         if 'spatial' not in self.gene_expression_adata.obsm:
             raise ValueError("Spatial coordinates required for WNN analysis")
         
-        # Verify cell type layers exist from pass 2
+        # Debug: Print all available layers
+        logging.info("Available layers in AnnData:")
+        for layer_name in self.gene_expression_adata.layers.keys():
+            logging.info(f" - {layer_name}")
+        
+        # Determine which pass to use
         cell_type_names = list(self.cell_profile_dict.keys())
+        pass_to_use = use_pass
+        
+        if pass_to_use is None:
+            # Check if Pass 2 layers exist
+            pass2_layers = [f"{ct_name.replace(' ', '_')}_genes_pass2" for ct_name in cell_type_names]
+            pass1_layers = [f"{ct_name.replace(' ', '_')}_genes_pass1" for ct_name in cell_type_names]
+            
+            # Debug: Print expected layer names
+            logging.info("Looking for Pass 2 layers:")
+            for layer in pass2_layers:
+                logging.info(f" - {layer}")
+            logging.info("Looking for Pass 1 layers:")
+            for layer in pass1_layers:
+                logging.info(f" - {layer}")
+            
+            has_pass2 = all(layer in self.gene_expression_adata.layers for layer in pass2_layers)
+            has_pass1 = all(layer in self.gene_expression_adata.layers for layer in pass1_layers)
+            
+            # Debug: Print which layers were found
+            if not has_pass2:
+                missing_pass2 = [layer for layer in pass2_layers if layer not in self.gene_expression_adata.layers]
+                logging.warning(f"Missing Pass 2 layers: {missing_pass2}")
+            if not has_pass1:
+                missing_pass1 = [layer for layer in pass1_layers if layer not in self.gene_expression_adata.layers]
+                logging.warning(f"Missing Pass 1 layers: {missing_pass1}")
+            
+            if has_pass2:
+                pass_to_use = 2
+                logging.info("Using Pass 2 layers for Phase 3 WNN")
+            elif has_pass1:
+                pass_to_use = 1
+                logging.info("Using Pass 1 layers for Phase 3 WNN")
+            else:
+                raise ValueError("Neither Pass 1 nor Pass 2 layers found for all cell types")
+        
+        # Get the appropriate layers for each cell type
         for ct_name in cell_type_names:
-            layer_key = f"{ct_name.replace(' ', '_')}_genes_pass2"
+            layer_key = f"{ct_name.replace(' ', '_')}_genes_pass{pass_to_use}"
             if layer_key not in self.gene_expression_adata.layers:
-                raise ValueError(f"Missing pass 2 layer for cell type: {ct_name}")
+                raise ValueError(f"Missing Pass {pass_to_use} layer for cell type: {ct_name}")
         
         # Run cell-type-level WNN optimization
         phase3_result = optimize_multimodal_phase_3_celltype_wnn(
@@ -798,7 +873,8 @@ class CitegeistModel:
             alpha_rna=alpha_rna,
             alpha_protein=alpha_protein,
             lambda_smooth=lambda_smooth,
-            min_cells_per_cluster=min_cells_per_cluster
+            min_cells_per_cluster=min_cells_per_cluster,
+            pass_number=pass_to_use  # Pass this to the optimization function
         )
         
         # Extract results
@@ -828,8 +904,9 @@ class CitegeistModel:
         
         # Store clustering info for potential downstream analysis
         self.results['phase3_clusters'] = phase3_result['cluster_assignments']
+        self.results['phase3_pass_used'] = pass_to_use
         
-        print("✅ Cell-type-level WNN Phase 3 refinement complete.")
+        print(f"✅ Cell-type-level WNN Phase 3 refinement complete (using Pass {pass_to_use} layers)")
 
     def get_adata(self):
         """
