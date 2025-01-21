@@ -22,7 +22,8 @@ from .gurobi_impl import (
     compute_global_prior,
     optimize_multimodal_phase_3_wgcna,
     normalize_counts,
-    validate_prior_effect
+    validate_prior_effect,
+    optimize_multimodal_phase_3_wnn
 )
 from .utils import (
     validate_cell_profile_dict, 
@@ -750,69 +751,82 @@ class CitegeistModel:
             self.gene_expression_adata.layers[layer_name] = celltype_matrix
             print(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
 
-    def run_multimodal_phase_3_wgcna(
+    def run_multimodal_phase_3_wnn(
         self,
-        max_clusters=10,
-        alpha_gex=1.0,
-        alpha_antibody=1.0,
-        alpha_spatial=0.0,
-        lambda_reg_module=0.1,
-        spatial_adjacency=None
+        radius: float = 2.0,
+        n_neighbors: int = 30,
+        alpha_rna: float = 0.5,
+        alpha_protein: float = 0.5,
+        lambda_smooth: float = 0.1
     ):
         """
-        Run Phase 3 optimization using WGCNA-like module detection and multimodal integration.
+        Run Phase 3 optimization using weighted nearest neighbors approach.
         
         Args:
-            max_clusters (int): Maximum number of gene modules to detect
-            alpha_gex (float): Weight for gene expression reconstruction term
-            alpha_antibody (float): Weight for antibody-based term
-            alpha_spatial (float): Weight for spatial smoothing term
-            lambda_reg_module (float): Regularization strength for module usage
-            spatial_adjacency (np.ndarray, optional): NxN adjacency matrix for spatial smoothing
+            radius (float): Radius for spatial neighbors
+            n_neighbors (int): Number of nearest neighbors
+            alpha_rna (float): Weight for RNA modality
+            alpha_protein (float): Weight for protein modality
+            lambda_smooth (float): Spatial smoothing strength
         """
         # Ensure data is present
         if self.gene_expression_adata is None or self.antibody_capture_adata is None:
-            raise ValueError("Gene expression & antibody data not loaded or split. Cannot run WGCNA-based Phase 3.")
+            raise ValueError("Gene expression & antibody data required for WNN analysis")
+        
         if 'cell_prop' not in self.results:
-            raise ValueError("Cell proportions not found in results. Run Phase 1 or 2 first.")
-
-        # Extract input arrays
-        cell_prop_array = self.results['cell_prop'].values  # (N x T)
-        from model.gurobi_impl import optimize_multimodal_phase_3_wgcna
-
-        # Run Phase 3 optimization
-        phase3_result = optimize_multimodal_phase_3_wgcna(
+            raise ValueError("Cell proportions not found. Run Phase 1 first.")
+        
+        if 'spatial' not in self.gene_expression_adata.obsm:
+            raise ValueError("Spatial coordinates required for WNN analysis")
+        
+        # Run WNN optimization
+        phase3_result = optimize_multimodal_phase_3_wnn(
             adata_gex=self.gene_expression_adata,
             adata_antibody=self.antibody_capture_adata,
-            cell_prop_array=cell_prop_array,
+            cell_prop_array=self.results['cell_prop'].values,
             cell_profiles=self.cell_profile_dict,
-            max_clusters=max_clusters,
-            alpha_gex=alpha_gex,
-            alpha_antibody=alpha_antibody,
-            alpha_spatial=alpha_spatial,
-            lambda_reg_module=lambda_reg_module,
-            spatial_adjacency=spatial_adjacency
+            radius=radius,
+            n_neighbors=n_neighbors,
+            alpha_rna=alpha_rna,
+            alpha_protein=alpha_protein,
+            lambda_smooth=lambda_smooth
         )
-
-        # Unpack results
-        updated_cell_prop = phase3_result["updated_cell_prop"]
-        layers = phase3_result["layers"]
+        
+        # Extract results
+        refined_props = phase3_result['refined_proportions']
+        refined_profiles = phase3_result['refined_profiles']
+        
+        # Save refined cell proportions
         spot_names = self.gene_expression_adata.obs_names
         cell_type_names = list(self.cell_profile_dict.keys())
-
-        # Save refined cell props
-        refined_df = pd.DataFrame(updated_cell_prop, index=spot_names, columns=cell_type_names)
+        refined_df = pd.DataFrame(
+            refined_props,
+            index=spot_names,
+            columns=cell_type_names
+        )
         self.results['cell_prop_phase3'] = refined_df
-        refined_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_phase3_results.csv"))
-
-        # Create layers in gene_expression_adata
-        # layers shape: N x T x G
+        refined_df.to_csv(
+            os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_phase3_results.csv")
+        )
+        
+        # Add refined profiles as layers
         for t_idx, ct_name in enumerate(cell_type_names):
             layer_key = ct_name.replace(" ", "_") + "_phase3"
-            # each cell type: shape (N, G)
-            self.gene_expression_adata.layers[layer_key] = layers[:, t_idx, :]
-
-        print("✅ WGCNA-based Phase 3 refinement complete.")
+            self.gene_expression_adata.layers[layer_key] = refined_profiles[:, t_idx, :]
+        
+        # Export layers
+        layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass3/layers")
+        export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=3)
+        
+        # Store neighbor graphs for potential downstream analysis
+        self.results['phase3_neighbors'] = {
+            'rna_neighbors': phase3_result['rna_neighbors'],
+            'protein_neighbors': phase3_result['protein_neighbors'],
+            'rna_weights': phase3_result['rna_weights'],
+            'protein_weights': phase3_result['protein_weights']
+        }
+        
+        print("✅ WNN-based Phase 3 refinement complete.")
 
     def get_adata(self):
         """
