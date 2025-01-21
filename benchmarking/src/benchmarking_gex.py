@@ -21,8 +21,15 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
             
             # Check if the prediction file exists
             if not os.path.exists(pred_filepath):
-                print(f"Prediction file for {cell_type} not found. Skipping.")
-                continue
+                # Try alternative filename with underscores replacing spaces
+                cell_type_underscore = cell_type.replace(" ", "_")
+                alt_pred_filepath = os.path.join(predictions_dir, f"{cell_type_underscore}_layer.csv")
+                
+                if not os.path.exists(alt_pred_filepath):
+                    print(f"Prediction file for {cell_type} not found (tried both '{cell_type}_layer.csv' and '{cell_type_underscore}_layer.csv'). Skipping.")
+                    continue
+                    
+                pred_filepath = alt_pred_filepath
             
             # Load the ground-truth and prediction data
             gt_df   = pd.read_csv(gt_filepath, index_col=0)
