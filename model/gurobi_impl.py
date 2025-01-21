@@ -3,6 +3,7 @@ import os
 import logging
 import traceback
 import gc
+import concurrent
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Any, Optional, List, Tuple, Union
 import json
@@ -24,7 +25,7 @@ from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
 # Local imports
-from .utils import get_neighbors_with_fixed_radius, huber_loss
+from .utils import get_neighbors_with_fixed_radius
 from .checkpoints import CheckpointManager
 
 def fit_zinb(x, p):
@@ -163,105 +164,112 @@ def suggest_zero_inflation_threshold(patterns, quantile=0.75):
     return 0.5  # Default fallback
 
 def compute_global_prior(
-    spotwise_gene_expression_profiles,
-    cell_type_numbers_array,
-    lambda_prior=1.0,
-    zero_inflation_threshold=0.9
-):
+    spotwise_gene_expression_profiles: Dict[int, np.ndarray],
+    cell_type_numbers_array: np.ndarray,
+    lambda_prior: float = 1.0,
+    min_expression_threshold: float = 0.1
+) -> Dict[str, Any]:
     """
-    Compute global prior using ZINB fitting for discrete count data.
+    Compute global prior from pass 1 results using normalized expression patterns.
     
     Args:
-        spotwise_gene_expression_profiles: Dict of spot profiles from first pass (now contains discrete counts)
-        cell_type_numbers_array: Array of cell type proportions
-        lambda_prior: Scaling factor for prior
-        zero_inflation_threshold: Threshold for considering a gene zero-inflated
+        spotwise_gene_expression_profiles: Dictionary mapping spot indices to profile matrices
+        cell_type_numbers_array: Array of cell type proportions (N_spots × T_celltypes)
+        lambda_prior: Strength of prior (default: 1.0)
+        min_expression_threshold: Minimum expression to consider "active" (default: 0.1)
+    
+    Returns:
+        Dict containing:
+            - global_prior: Prior matrix (T_celltypes × M_genes)
+            - confidence_scores: Confidence in each prior value
+            - expression_patterns: Summary of expression patterns
     """
-    spot_indices = sorted(spotwise_gene_expression_profiles.keys())
-    if not spot_indices:
-        raise ValueError("No spotwise profiles found. Did the first pass run correctly?")
-    T, M = spotwise_gene_expression_profiles[spot_indices[0]].shape
-    N = len(spot_indices)
-
-    # Construct usage array (now contains discrete counts)
-    usage_array = np.zeros((N, T, M), dtype=float)
-    for idx, spot_id in enumerate(spot_indices):
-        usage_array[idx, :, :] = spotwise_gene_expression_profiles[spot_id]
-
-    # Initialize matrices
-    zinb_matrix = np.zeros((T, M), dtype=float)
-    zero_inflation_probs = np.zeros((T, M), dtype=float)
-
-    # For each cell type and gene
-    for t_idx in range(T):
-        ct_proportions = cell_type_numbers_array[:, t_idx]
-
-        for m_idx in range(M):
-            usage_vec = usage_array[:, t_idx, m_idx]
+    # Validate inputs
+    N = cell_type_numbers_array.shape[0]
+    T = cell_type_numbers_array.shape[1]
+    
+    spot_keys = sorted(spotwise_gene_expression_profiles.keys())
+    if len(spot_keys) != N:
+        raise ValueError(f"Mismatch in number of spots: {len(spot_keys)} vs {N}")
+    
+    # Get dimensions from first profile
+    example_profile = spotwise_gene_expression_profiles[spot_keys[0]]
+    M = example_profile.shape[1]  # number of genes
+    
+    # Initialize arrays
+    usage_array = np.zeros((N, T, M))
+    for i, profile in spotwise_gene_expression_profiles.items():
+        usage_array[i] = profile
+    
+    # Calculate expression statistics per cell type
+    mean_expression = np.zeros((T, M))
+    expression_frequency = np.zeros((T, M))
+    expression_consistency = np.zeros((T, M))
+    
+    for t in range(T):
+        # Weight profiles by cell type abundance
+        weights = cell_type_numbers_array[:, t]  # Now 1D array of shape (N,)
+        
+        # Calculate weighted statistics
+        active_expression = usage_array[:, t, :] > min_expression_threshold
+        weighted_expression = usage_array[:, t, :]  # Shape: (N, M)
+        
+        # Mean expression when the cell type is present
+        present_mask = weights > 0
+        if np.any(present_mask):
+            # Ensure weights match the data shape for averaging
+            weights_for_average = weights[present_mask]  # 1D array of length n_present
+            expression_for_average = weighted_expression[present_mask, :]  # (n_present, M)
             
-            try:
-                # Fit ZINB and compute score
-                pi, mu, theta = fit_zinb(usage_vec, ct_proportions)
-                zero_inflation_probs[t_idx, m_idx] = pi
-                
-                if pi > zero_inflation_threshold:
-                    zinb_score = 0.0  # Strong penalty for high zero-inflation
-                else:
-                    # Modified scoring for discrete counts
-                    # Consider both frequency of expression and magnitude
-                    nonzero_freq = np.mean(usage_vec > 0)
-                    mean_magnitude = np.mean(usage_vec[usage_vec > 0]) if np.any(usage_vec > 0) else 0
-                    
-                    # Combined score considering both aspects
-                    zinb_score = (1 - pi) * nonzero_freq * (mean_magnitude / (mean_magnitude + theta))
-                    
-                    # Additional boost for consistent expression
-                    if nonzero_freq > 0.3:  # If expressed in >30% of spots
-                        zinb_score *= 1.5
-                        
-                zinb_matrix[t_idx, m_idx] = zinb_score
-            except:
-                zinb_matrix[t_idx, m_idx] = 0.0
-                zero_inflation_probs[t_idx, m_idx] = 1.0
-
-    # Normalize matrix to [0,1] range per gene
-    max_scores = np.maximum(np.max(zinb_matrix, axis=0), 1e-10)
-    zinb_matrix = zinb_matrix / max_scores
-
-    # Modify prior computation to create stronger signals
-    global_prior = np.zeros((T, M), dtype=float)
-    for m_idx in range(M):
-        scores = zinb_matrix[:, m_idx]
+            mean_expression[t] = np.average(
+                expression_for_average,
+                weights=weights_for_average,
+                axis=0
+            )
         
-        # Increase contrast in scores
-        scores = np.power(scores, 2)  # Square scores to increase contrast
+            # Expression consistency (coefficient of variation, inverse)
+            # Calculate weighted std dev properly
+            diff_squared = (expression_for_average - mean_expression[t]) ** 2  # (n_present, M)
+            weighted_var = np.average(diff_squared, weights=weights_for_average, axis=0)  # (M,)
+            std = np.sqrt(weighted_var)  # (M,)
+            expression_consistency[t] = 1 / (1 + std / (mean_expression[t] + 1e-6))
         
-        # Apply stronger scaling
-        scaled = scores * lambda_prior * 4  # Increased scaling factor
-        
-        # Sharper softmax
-        exps = np.exp(scaled - np.max(scaled))
-        denom = np.sum(exps)
-        if denom < 1e-12:
-            global_prior[:, m_idx] = 1.0 / T
-        else:
-            global_prior[:, m_idx] = exps / denom
-
-    # Add more detailed logging
+        # Frequency of expression (properly weighted)
+        total_weight = np.sum(weights) + 1e-6
+        expression_frequency[t] = np.sum(active_expression * weights[:, np.newaxis], axis=0) / total_weight
+    
+    # Combine metrics into confidence scores
+    confidence_scores = expression_frequency * expression_consistency
+    
+    # Generate prior probabilities
+    # Scale mean expression to [0,1] per gene
+    scaled_expression = mean_expression / (np.max(mean_expression, axis=0) + 1e-6)
+    
+    # Weight by confidence and apply prior strength
+    weighted_scores = scaled_expression * np.power(confidence_scores, lambda_prior)
+    
+    # Convert to probabilities via softmax
+    global_prior = np.zeros((T, M))
+    for m in range(M):
+        scores = weighted_scores[:, m]
+        exp_scores = np.exp(scores - np.max(scores))  # Numerical stability
+        global_prior[:, m] = exp_scores / (np.sum(exp_scores) + 1e-6)
+    
+    # Log statistics
     logging.info("Prior computation statistics:")
-    logging.info(f" - Mean: {np.mean(global_prior):.4f}")
-    logging.info(f" - Std: {np.std(global_prior):.4f}")
-    logging.info(f" - Max: {np.max(global_prior):.4f}")
+    logging.info(f" - Mean confidence score: {np.mean(confidence_scores):.4f}")
+    logging.info(f" - Mean prior strength: {np.mean(global_prior):.4f}")
     logging.info(f" - % Strong signals (>0.5): {100 * np.mean(global_prior > 0.5):.2f}%")
-    logging.info(f" - % Weak signals (<0.1): {100 * np.mean(global_prior < 0.1):.2f}%")
-
+    
     return {
         'global_prior': global_prior,
-        'zinb_matrix': zinb_matrix,
-        'zero_inflation_probs': zero_inflation_probs,
-        'zero_inflation_threshold': zero_inflation_threshold
+        'confidence_scores': confidence_scores,
+        'expression_patterns': {
+            'mean_expression': mean_expression,
+            'expression_frequency': expression_frequency,
+            'expression_consistency': expression_consistency
+        }
     }
-
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
@@ -323,9 +331,6 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         raise ValueError("NaN values detected in `profile_based_antibody_data` after mapping.")
 
     return profile_based_antibody_data, cell_type_names
-
-
-
 
 def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.7):
     """
@@ -405,34 +410,45 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
 
     return Y_values
 
-
-
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################
 def deconvolute_spot_with_neighbors_with_prior(
-    i, 
-    filtered_adata, 
-    cell_type_numbers_array, 
-    radius,
-    global_prior,
-    lambda_prior_weight=0.5,
-    alpha=0.5, 
-    lambda_reg_gex=0.0001,
-    local_weight=0.5,
-    global_weight=0.5
-):
+    spot_idx: int,
+    adata: sc.AnnData,
+    cell_type_numbers_array: np.ndarray,
+    radius: float,
+    alpha: float = 0.5,
+    lambda_reg_gex: float = 0.001,
+    global_prior: Optional[np.ndarray] = None,
+    lambda_prior_weight: float = 0.0,
+    local_weight: float = 0.5,
+    global_weight: float = 0.5
+) -> Optional[np.ndarray]:
     """
-    Error-minimizing discrete deconvolution with optional prior guidance.
+    Deconvolute a spot with its neighbors, optionally using a prior.
+    
+    Args:
+        spot_idx: Index of spot to deconvolute
+        adata: AnnData object containing gene expression
+        cell_type_numbers_array: Array of cell type numbers
+        radius: Radius for neighbor search
+        alpha: Weight for spatial term
+        lambda_reg_gex: L1/L2 regularization weight
+        global_prior: Optional prior matrix (T x M)
+        lambda_prior_weight: Weight for prior guidance (0.0 means no prior)
+        
+    Returns:
+        Optional[np.ndarray]: Deconvoluted profile matrix or None if error
     """
     model = None
     try:
         # Get neighborhood data first to establish dimensions
         neighborhood_indices = get_neighbors_with_fixed_radius(
-            i, filtered_adata, radius=radius, include_center=True
+            spot_idx, adata, radius=radius, include_center=True
         )
         if not neighborhood_indices:
-            logging.error(f"No valid neighbors found for spot {i}.")
+            logging.error(f"No valid neighbors found for spot {spot_idx}.")
             return None
 
         neighborhood_indices = np.array([
@@ -441,7 +457,7 @@ def deconvolute_spot_with_neighbors_with_prior(
         ], dtype=int)
 
         # Extract expression data
-        deconvolution_expression_data = filtered_adata.X
+        deconvolution_expression_data = adata.X
         if hasattr(deconvolution_expression_data, 'toarray'):
             deconvolution_expression_data = deconvolution_expression_data.toarray()
         
@@ -452,14 +468,10 @@ def deconvolute_spot_with_neighbors_with_prior(
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
 
-        # Now we can safely create gene_specific_enrichment
+        # Compute expression-aware enrichment for each gene
         gene_specific_enrichment = np.zeros((M, T))
 
         def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
-            """
-            Compute enrichment scores that account for both cell type presence
-            and their gene expression patterns.
-            """
             gene_expr = expression_data[:, gene_idx]
             expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
             high_expr_spots = gene_expr >= expr_threshold
@@ -473,9 +485,10 @@ def deconvolute_spot_with_neighbors_with_prior(
             epsilon = 1e-10
             enrichment = high_expr_props / (background_props + epsilon)
             smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
+            
             return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
-        # Calculate enrichment scores for each gene
+        # Compute enrichment scores
         for k in range(M):
             local_enrich = compute_expression_aware_enrichment(
                 neighborhood_expression_data,
@@ -494,96 +507,19 @@ def deconvolute_spot_with_neighbors_with_prior(
                 global_weight * global_enrich
             )
 
-        # Build Gurobi model with relaxed parameters
-        model = gp.Model(f"discrete_gene_expression_spot_{i}")
+        # Build Gurobi model
+        model = gp.Model(f"discrete_gene_expression_spot_{spot_idx}")
         model.setParam('OutputFlag', 0)
         model.setParam('Threads', 1)
         model.setParam('NodefileStart', 0.5)
-        model.setParam('MIPGap', 0.1)  # Relaxed MIPGap for phase 2
-        model.setParam('TimeLimit', 60)  # Shorter time limit per spot
-        model.setParam('NodeLimit', 100000)
-        model.setParam('FeasibilityTol', 1e-5)  # Slightly relaxed tolerance
-        model.setParam('IntFeasTol', 1e-4)  # Slightly relaxed integer tolerance
+        model.setParam('MIPGap', 0.01)
+        model.setParam('TimeLimit', 600)
+        model.setParam('NodeLimit', 1000000)
 
         # Variables for count assignment
         X = {}
-        center_counts = deconvolution_expression_data[i, :]
+        center_counts = deconvolution_expression_data[spot_idx, :]
 
-        # 1. Create error variables for each neighbor and gene
-        error_vars = model.addVars(
-            len(neighborhood_indices),
-            M,
-            lb=0, 
-            ub=GRB.INFINITY,
-            vtype=GRB.CONTINUOUS,
-            name="error"
-        )
-
-        # 2. Define predicted expression for neighbors
-        for n, spot_idx in enumerate(neighborhood_indices):
-            total_prop_n = np.sum(neighborhood_cell_type_numbers[n, :])
-            if total_prop_n < 1e-10:
-                total_prop_n = 1e-10
-
-            for k in range(M):
-                if int(center_counts[k]) > 0:  # Only process non-zero genes
-                    predicted_expr = gp.quicksum(
-                        (neighborhood_cell_type_numbers[n, j] / total_prop_n) * X[j, k]
-                        for j in range(T)
-                    )
-                    
-                    observed_expr_nk = neighborhood_expression_data[n, k]
-                    
-                    # 3. Add absolute difference constraints
-                    model.addConstr(error_vars[n, k] >= observed_expr_nk - predicted_expr)
-                    model.addConstr(error_vars[n, k] >= predicted_expr - observed_expr_nk)
-
-        # 4. Build minimization objective
-        total_error = gp.quicksum(error_vars[n, k] 
-                                 for n in range(len(neighborhood_indices)) 
-                                 for k in range(M))
-
-        # Optional regularization
-        l1_term = gp.quicksum(X[j,k] for j in range(T) for k in range(M) 
-                             if int(center_counts[k]) > 0)
-        l2_term = gp.quicksum(X[j,k]*X[j,k] for j in range(T) for k in range(M) 
-                             if int(center_counts[k]) > 0)
-        regularization_term = lambda_reg_gex * (alpha*l1_term + (1-alpha)*l2_term)
-
-        # Optional prior penalty (only used in pass 2)
-        if global_prior is not None and lambda_prior_weight > 0:
-            # Scale prior weight by total counts to match error term scale
-            scale_factor = np.mean([c for c in center_counts if c > 0])
-            lambda_prior_weight_adjusted = lambda_prior_weight * scale_factor
-            
-            prior_penalty = gp.quicksum(
-                lambda_prior_weight_adjusted * (1 - global_prior[j, k]) * X[j, k] / max(center_counts[k], 1)
-                for j in range(T) 
-                for k in range(M)
-                if int(center_counts[k]) > 0
-            )
-            
-            logging.info(f"Prior penalty scale - lambda: {lambda_prior_weight_adjusted:.4f}, "
-                        f"mean prior value: {np.mean(global_prior):.4f}")
-        else:
-            prior_penalty = 0
-
-        # Set objective once, at the end
-        total_objective = (
-            total_error +  # Main reconstruction error
-            regularization_term +  # L1/L2 regularization
-            prior_penalty  # Prior guidance term
-        )
-        
-        model.setObjective(total_objective, GRB.MINIMIZE)
-
-        # Add logging to check objective terms
-        logging.info(f"Spot {i} objective components:")
-        logging.info(f" - Error term magnitude: {total_error.getValue():.4f}")
-        logging.info(f" - Regularization magnitude: {regularization_term.getValue():.4f}")
-        logging.info(f" - Prior penalty magnitude: {prior_penalty.getValue() if prior_penalty else 0:.4f}")
-
-        # Create variables and basic constraints
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
@@ -601,28 +537,53 @@ def deconvolute_spot_with_neighbors_with_prior(
                     name=f"count_conservation_{k}"
                 )
 
-        # Add ZINB constraints with relaxed thresholds
-        zero_inflation_threshold = 0.95  # Relaxed threshold
-        max_allocation_fraction = 0.4  # Relaxed allocation limit
-        
+        # Only validate prior if both prior and weight are provided
+
+        if global_prior is not None:
+            if lambda_prior_weight > 0:  # First check if we're using prior guidance at all
+                if global_prior is None:
+                    raise ValueError("lambda_prior_weight > 0 but no global_prior provided")
+            if not isinstance(global_prior, np.ndarray):
+                raise ValueError("global_prior must be a numpy array")
+            if global_prior.shape != (T, M):
+                raise ValueError(f"Prior matrix shape {global_prior.shape} does not match expected shape ({T}, {M})")
+
+        # Objective terms
+        obj_terms = []
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    if global_prior[j, k] < zero_inflation_threshold:
-                        # Instead of modifying objective, add a constraint
-                        max_count = int(total_counts * max_allocation_fraction)
-                        model.addConstr(X[j,k] <= max_count)
+                    # Base enrichment term
+                    enrichment_weight = gene_specific_enrichment[k, j]
+                    cell_type_weight = neighborhood_cell_type_numbers[
+                        len(neighborhood_indices)//2, j
+                    ]
+                    randomness = 0.9 + 0.2 * np.random.random()
+                    
+                    base_term = enrichment_weight * cell_type_weight * randomness * X[j,k]
+                    obj_terms.append(base_term)
+                    
+                    # Add prior-based penalty only if we have both prior and positive weight
+                    if global_prior is not None and lambda_prior_weight > 0:
+                        try:
+                            prior_value = float(global_prior[j, k])
+                            prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j,k]
+                            obj_terms.append(-prior_penalty)  # Subtract penalty
+                        except Exception as e:
+                            logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
+                            continue
 
-        # Optimize with try-catch for numerical issues
-        try:
-            model.optimize()
-        except Exception as e:
-            logging.warning(f"Optimization error for spot {i}: {str(e)}")
-            model.setParam('NumericFocus', 3)  # Try again with higher numeric focus
-            model.optimize()
+        model.setObjective(
+            gp.quicksum(obj_terms),
+            GRB.MAXIMIZE
+        )
 
-        if model.status == GRB.OPTIMAL or model.status == GRB.SUBOPTIMAL:
+        # Optimize
+        model.optimize()
+
+        if model.status == GRB.OPTIMAL:
+            logging.info(f"Solution found for spot {spot_idx}")
             result = np.zeros((T, M))
             for k in range(M):
                 total_counts = int(center_counts[k])
@@ -631,11 +592,11 @@ def deconvolute_spot_with_neighbors_with_prior(
                         result[j,k] = X[j,k].X
             return result
         else:
-            logging.error(f"No feasible solution found for spot {i}.")
+            logging.error(f"No feasible solution found for spot {spot_idx}.")
             return None
 
     except Exception as e:
-        logging.error(f"Error during deconvolution of spot {i} with prior: {str(e)}")
+        logging.error(f"Error during deconvolution of spot {spot_idx}: {str(e)}")
         logging.error(traceback.format_exc())
         return None
 
@@ -643,8 +604,6 @@ def deconvolute_spot_with_neighbors_with_prior(
         if model:
             del model
         gc.collect()
-
-
 
 def log_marker_gene_patterns(zero_patterns, marker_genes):
     """
@@ -696,8 +655,6 @@ def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
     gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
     return (scaled_matrix * gene_ranges) + gene_mins
 
-
-
 def optimize_gene_expression(
     sample_name: str,
     deconvolution_expression_data: np.ndarray,
@@ -706,15 +663,13 @@ def optimize_gene_expression(
     radius: float = 2,
     alpha: float = 0.5,
     lambda_reg_gex: float = 0.001,
-    lambda_prior_weight: float = 0,
     global_prior: Optional[np.ndarray] = None,
+    lambda_prior_weight: float = 0.0,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False
 ) -> Dict[str, Any]:
-
-
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -739,6 +694,12 @@ def optimize_gene_expression(
 
     logging.info(f"Starting analysis for {sample_name}")
     logging.info(f"Already completed spots: {len(completed_spots)}")
+    
+    # Log whether using prior-guided deconvolution
+    if global_prior is not None and lambda_prior_weight > 0:
+        logging.info("Using prior-guided deconvolution")
+    else:
+        logging.info("Using standard deconvolution")
 
     # Initialize futures as empty dict before try block
     futures = {}
@@ -759,14 +720,17 @@ def optimize_gene_expression(
                 with ProcessPoolExecutor(max_workers=workers) as executor:
                     futures.clear()
                     for spot_idx in remaining_spots:
+                        # Always use the same function with consistent args
                         future = executor.submit(
-                            deconvolute_spot_with_neighbors,
+                            deconvolute_spot_with_neighbors_with_prior,
                             spot_idx,
                             filtered_adata,
                             cell_type_numbers_array,
                             radius,
                             alpha,
-                            lambda_reg_gex
+                            lambda_reg_gex,
+                            global_prior,  # Will be None if not using prior
+                            lambda_prior_weight  # Will be 0.0 if not using prior
                         )
                         futures[future] = spot_idx
 
@@ -820,187 +784,6 @@ def optimize_gene_expression(
             )
 
     return spotwise_gene_expression_profiles
-
-def deconvolute_spot_with_neighbors(
-    i, 
-    filtered_adata, 
-    cell_type_numbers_array, 
-    radius, 
-    alpha=0.5, 
-    lambda_reg_gex=0.0001,
-    local_weight=0.5,
-    global_weight=0.5
-):
-    """
-    Deconvolution with robustness to gene expression heterogeneity within cell types.
-    """
-    model = None
-    try:
-        # Get neighborhood data first to establish dimensions
-        neighborhood_indices = get_neighbors_with_fixed_radius(
-            i, filtered_adata, radius=radius, include_center=True
-        )
-        if not neighborhood_indices:
-            logging.error(f"No valid neighbors found for spot {i}.")
-            return None
-
-        neighborhood_indices = np.array([
-            int(idx) for idx in neighborhood_indices 
-            if isinstance(idx, (int, np.integer))
-        ], dtype=int)
-
-        # Extract expression data
-        deconvolution_expression_data = filtered_adata.X
-        if hasattr(deconvolution_expression_data, 'toarray'):
-            deconvolution_expression_data = deconvolution_expression_data.toarray()
-        
-        # Get dimensions from the data
-        T = cell_type_numbers_array.shape[1]  # number of cell types
-        M = deconvolution_expression_data.shape[1]  # number of genes
-        
-        neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
-        neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
-
-        # Now we can safely create gene_specific_enrichment
-        gene_specific_enrichment = np.zeros((M, T))
-
-        # Compute expression-aware enrichment for each gene
-        def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
-            """
-            Compute enrichment scores that account for both cell type presence
-            and their gene expression patterns.
-            """
-            gene_expr = expression_data[:, gene_idx]
-            expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
-            high_expr_spots = gene_expr >= expr_threshold
-            
-            if not np.any(high_expr_spots):
-                return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
-            
-            # Calculate cell type proportions in high-expression spots
-            high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
-            background_props = np.mean(cell_type_props, axis=0)
-            
-            # Compute enrichment scores
-            epsilon = 1e-10
-            enrichment = high_expr_props / (background_props + epsilon)
-            
-            # Smooth the enrichment scores
-            smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
-            
-            # Normalize
-            return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
-
-        # Compute expression-aware enrichment for each gene
-        gene_specific_enrichment = np.zeros((M, T))
-
-        for k in range(M):
-            # Local enrichment (in neighborhood)
-            local_enrich = compute_expression_aware_enrichment(
-                neighborhood_expression_data,
-                neighborhood_cell_type_numbers,
-                k
-            )
-            
-            # Global enrichment (across all spots)
-            global_enrich = compute_expression_aware_enrichment(
-                deconvolution_expression_data,
-                cell_type_numbers_array,
-                k
-            )
-            
-            # Combine local and global enrichment
-            gene_specific_enrichment[k] = (
-                local_weight * local_enrich +
-                global_weight * global_enrich
-            )
-
-        # Build Gurobi model (similar to before)
-        model = gp.Model(f"discrete_gene_expression_spot_{i}")
-        model.setParam('OutputFlag', 0)
-        model.setParam('Threads', 1)
-        model.setParam('NodefileStart', 0.5)
-        model.setParam('MIPGap', 0.01)
-        model.setParam('TimeLimit', 600)
-        model.setParam('NodeLimit', 1000000)
-
-        T = neighborhood_cell_type_numbers.shape[1]
-        M = neighborhood_expression_data.shape[1]
-
-        # Variables for count assignment
-        X = {}
-        center_counts = deconvolution_expression_data[i, :]
-
-        for k in range(M):
-            total_counts = int(center_counts[k])
-            if total_counts > 0:
-                for j in range(T):
-                    X[j,k] = model.addVar(
-                        vtype=GRB.INTEGER,
-                        lb=0,
-                        ub=total_counts,
-                        name=f"X_{j}_{k}"
-                    )
-
-                # Count conservation constraint
-                model.addConstr(
-                    gp.quicksum(X[j,k] for j in range(T)) == total_counts,
-                    name=f"count_conservation_{k}"
-                )
-
-        # Modified objective using gene-specific enrichment
-        obj_terms = []
-        for k in range(M):
-            total_counts = int(center_counts[k])
-            if total_counts > 0:
-                for j in range(T):
-                    # Use gene-specific enrichment scores
-                    enrichment_weight = gene_specific_enrichment[k, j]
-                    
-                    # Current spot's cell type proportion
-                    cell_type_weight = neighborhood_cell_type_numbers[
-                        len(neighborhood_indices)//2, j
-                    ]
-                    
-                    # Add stochasticity to allow for heterogeneity
-                    randomness = 0.9 + 0.2 * np.random.random()  # Random factor between 0.9 and 1.1
-                    
-                    obj_terms.append(
-                        enrichment_weight * cell_type_weight * randomness * X[j,k]
-                    )
-
-        model.setObjective(
-            gp.quicksum(obj_terms),
-            GRB.MAXIMIZE
-        )
-
-        # Optimize
-        model.optimize()
-
-        if model.status == GRB.OPTIMAL:
-            logging.info(f"Solution found for spot {i}")
-            # Convert solution to array format
-            result = np.zeros((T, M))
-            for k in range(M):
-                total_counts = int(center_counts[k])
-                if total_counts > 0:
-                    for j in range(T):
-                        result[j,k] = X[j,k].X
-            return result
-        else:
-            logging.error(f"No feasible solution found for spot {i}.")
-            return None
-
-    except Exception as e:
-        logging.error(f"Error during discrete deconvolution of spot {i}: {str(e)}")
-        logging.error(traceback.format_exc())
-        return None
-
-    finally:
-        if model:
-            del model
-        gc.collect()
-
 
 def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
     """
@@ -1185,8 +968,9 @@ def optimize_multimodal_phase_3_wgcna(
         alpha_gex * gp.quicksum(gex_residuals) +
         alpha_antibody * gp.quicksum(ab_residuals) +
         alpha_spatial * gp.quicksum(spatial_terms) +
-        lambda_reg_module * gp.quicksum(reg_module)
-    )
+        lambda_reg_module * gp.quicksum(reg_module))
+        
+
     model.setObjective(obj, GRB.MINIMIZE)
 
     # 6) Constraints
@@ -1298,6 +1082,17 @@ def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, glob
     Returns:
         dict: Dictionary containing validation metrics
     """
+    # Validate shapes
+    if not spotwise_profiles_pass1 or not spotwise_profiles_pass2:
+        raise ValueError("Empty profile dictionaries provided")
+        
+    # Get shapes from first profile
+    first_profile1 = next(iter(spotwise_profiles_pass1.values()))
+    T, M = first_profile1.shape
+    
+    if global_prior.shape != (T, M):
+        raise ValueError(f"Prior shape {global_prior.shape} does not match profiles shape ({T}, {M})")
+    
     prior_guided_changes = []
     spot_metrics = {}
     
