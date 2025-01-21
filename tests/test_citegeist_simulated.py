@@ -357,14 +357,15 @@ def main():
             ##############################################################################
             logging.info("Running Phase 3 cell-type-level WNN optimization...")
 
-            # Run Phase 3
+            # Run Phase 3 (will automatically use Pass 2 if available, otherwise Pass 1)
             model.run_multimodal_phase_3_celltype_wnn(
-                radius=radius,  # Use same radius as previous passes
-                n_neighbors=30,  # Number of neighbors for WNN
-                alpha_rna=0.5,  # Equal weight to RNA and protein
+                radius=radius,
+                n_neighbors=30,
+                alpha_rna=0.5,
                 alpha_protein=0.5,
-                lambda_smooth=0.1,  # Spatial smoothing strength
-                min_cells_per_cluster=5  # Minimum cluster size
+                lambda_smooth=0.1,
+                min_cells_per_cluster=5,
+                use_pass=None  # Let it automatically determine which pass to use
             )
 
             # Calculate Phase 3 metrics for cell proportions
@@ -410,7 +411,6 @@ def main():
                 }
                 with open(os.path.join(output_folder, f"{sample_name}_phase3_clusters.json"), 'w') as f:
                     json.dump(cluster_info, f)
-
         else:
             logging.warning(f"Ground truth directory not found: {ground_truth_dir}")
             logging.warning("Skipping metric calculations and subsequent phases.")
