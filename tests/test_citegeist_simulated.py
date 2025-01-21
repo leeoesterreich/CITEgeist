@@ -127,6 +127,8 @@ def main():
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
     parser.add_argument('--profiling_only', action='store_true', default=False, 
                         help='If set, only compute cell-type proportions (no gene expression deconvolution).')
+    parser.add_argument('--skip_pass2', action='store_true', default=False, 
+                        help='If set, skip pass 2 and only run pass 1.')
     args = parser.parse_args()
 
     radius = args.radius
@@ -300,48 +302,55 @@ def main():
                 cell_type_numbers_array=model.results['cell_prop'].values
             )
 
-            # Run pass 2 with prior guidance
-            pass2_results = model.run_cell_expression_pass2(
-                global_prior=prior_info['global_prior'],
-                dimensions=pass1_results['dimensions'],
-                radius=radius,
-                alpha=0.5,
-                lambda_reg_gex=0.001,
-                lambda_prior_weight=lambda_prior_weight,
-                max_workers=None,
-                checkpoint_interval=100,
-                output_dir="checkpoints",
-                rerun=True
-            )
+            if not args.skip_pass2:
+                # Run pass 2 with prior guidance
+                pass2_results = model.run_cell_expression_pass2(
+                    global_prior=prior_info['global_prior'],
+                    dimensions=pass1_results['dimensions'],
+                    radius=radius,
+                    alpha=0.5,
+                    lambda_reg_gex=0.001,
+                    lambda_prior_weight=lambda_prior_weight,
+                    max_workers=None,
+                    checkpoint_interval=100,
+                    output_dir="checkpoints",
+                    rerun=True
+                )
 
-            # Calculate pass 2 metrics
-            layer_dir_pass2 = os.path.join(output_folder, f"{sample_name}_pass2/layers")
+                # Calculate pass 2 metrics
+                layer_dir_pass2 = os.path.join(output_folder, f"{sample_name}_pass2/layers")
 
-            pass2_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass2, pass_number=2)
-            logging.info(f"Pass 2 metrics:\n{pass2_metrics}")
+                pass2_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass2, pass_number=2)
+                logging.info(f"Pass 2 metrics:\n{pass2_metrics}")
+                
+                # Save pass 2 metrics
+                metrics_path_pass2 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass2.csv")
+                pass2_metrics.to_csv(metrics_path_pass2, index=False)
+
+                # Calculate and save improvements
+                improvements_df = calculate_improvements(pass1_metrics, pass2_metrics)
+                logging.info("Improvements from pass 1 to pass 2:")
+                for _, row in improvements_df.iterrows():
+                    logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
+
+                # Save improvements
+                improvements_df.to_csv(
+                    os.path.join(output_folder, f"{sample_name}_gex_improvements.csv"),
+                    index=False
+                )
+
+                # Save combined metrics
+                pd.concat([pass1_metrics, pass2_metrics]).to_csv(
+                    os.path.join(output_folder, f"{sample_name}_gex_metrics_combined.csv"),
+                    index=False
+                )
+                phase2_metrics = pass2_metrics
+            else:
+                logging.info("Skipping pass 2 due to --skip_pass2 flag.")
+                phase2_metrics = pass1_metrics
+
+
             
-            # Save pass 2 metrics
-            metrics_path_pass2 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass2.csv")
-            pass2_metrics.to_csv(metrics_path_pass2, index=False)
-
-            # Calculate and save improvements
-            improvements_df = calculate_improvements(pass1_metrics, pass2_metrics)
-            logging.info("Improvements from pass 1 to pass 2:")
-            for _, row in improvements_df.iterrows():
-                logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
-
-            # Save improvements
-            improvements_df.to_csv(
-                os.path.join(output_folder, f"{sample_name}_gex_improvements.csv"),
-                index=False
-            )
-
-            # Save combined metrics
-            pd.concat([pass1_metrics, pass2_metrics]).to_csv(
-                os.path.join(output_folder, f"{sample_name}_gex_metrics_combined.csv"),
-                index=False
-            )
-
             ##############################################################################
             # 4) Run Phase 3 WGCNA-based Optimization
             ##############################################################################
@@ -357,7 +366,7 @@ def main():
                 spatial_adjacency[distances > radius] = 0  # Threshold by radius
 
             # Run Phase 3
-            model.run_multimodal_phase_3_wgcna(
+            model.run_multimodal_phase_3_wnn(
                 max_clusters=30,  # Number of gene modules
                 alpha_gex=1.0,    # Weight for gene expression term
                 alpha_antibody=1.0,  # Weight for antibody term
@@ -389,21 +398,15 @@ def main():
             metrics_path_phase3 = os.path.join(output_folder, f"{sample_name}_gex_metrics_phase3.csv")
             phase3_metrics.to_csv(metrics_path_phase3, index=False)
 
-            # Calculate improvements from Pass 2 to Phase 3
-            phase3_improvements_df = calculate_improvements(pass2_metrics, phase3_metrics)
-            logging.info("Improvements from Pass 2 to Phase 3:")
+            # Calculate improvements from Phase 2 to Phase 3
+            phase3_improvements_df = calculate_improvements(phase2_metrics, phase3_metrics)
+            logging.info("Improvements from Phase 2 to Phase 3:")
             for _, row in phase3_improvements_df.iterrows():
                 logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
 
             # Save Phase 3 improvements
             phase3_improvements_df.to_csv(
                 os.path.join(output_folder, f"{sample_name}_gex_improvements_phase3.csv"),
-                index=False
-            )
-
-            # Save all metrics combined
-            pd.concat([pass1_metrics, pass2_metrics, phase3_metrics]).to_csv(
-                os.path.join(output_folder, f"{sample_name}_gex_metrics_all_phases.csv"),
                 index=False
             )
 
