@@ -370,21 +370,33 @@ class CitegeistModel:
             print(f"Cell type proportions saved to '{output_file}'.")
             
     def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
+                            global_enrichment_weight=0.5, local_enrichment_weight=0.5,
                             max_workers=None, checkpoint_interval=100, 
                             output_dir="checkpoints", rerun=True):
         """
         Run first pass of gene expression deconvolution.
         
+        Args:
+            radius (float): Radius for neighbor detection
+            alpha (float): Weight for spatial regularization
+            lambda_reg_gex (float): Weight for gene expression regularization
+            global_enrichment_weight (float): Weight for global expression enrichment (0-1)
+            local_enrichment_weight (float): Weight for local expression enrichment (0-1)
+            max_workers (int, optional): Maximum number of parallel workers
+            checkpoint_interval (int): Number of spots between checkpoints
+            output_dir (str): Directory for checkpoints
+            rerun (bool): Whether to rerun if results exist
+            
         Returns:
             Dict[str, Any]: {
-                'spotwise_profiles': Dict[int, np.ndarray],  # spot_idx -> profile matrix
-                'dimensions': Tuple[int, int, int]  # (N_spots, T_celltypes, M_genes)
+                'spotwise_profiles': Dict[int, np.ndarray],
+                'dimensions': Tuple[int, int, int]
             }
         """
         if not self.preprocessed_gex:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
-        logging.info("Starting Pass 1: Error minimization without prior...")
+        logging.info("Starting Pass 1: Error minimization with enrichment weights...")
         
         spotwise_profiles = optimize_gene_expression(
             sample_name=self.sample_name,
@@ -394,8 +406,10 @@ class CitegeistModel:
             radius=radius,
             alpha=alpha,
             lambda_reg_gex=lambda_reg_gex,
-            lambda_prior_weight=0,  # No prior in pass 1
-            global_prior= None,
+            global_enrichment_weight=global_enrichment_weight,
+            local_enrichment_weight=local_enrichment_weight,
+            global_prior=None,  # No prior in pass 1
+            lambda_prior_weight=0.0,  # No prior weight in pass 1
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
@@ -789,7 +803,8 @@ class CitegeistModel:
         alpha_protein: float = 0.5,
         lambda_smooth: float = 0.1,
         min_cells_per_cluster: int = 5,
-        use_pass: int = None
+        use_pass: int = None,
+        batch_size: int = 1000
     ):
         """
         Run Phase 3 optimization using cell-type-level WNN approach.
@@ -803,6 +818,7 @@ class CitegeistModel:
             min_cells_per_cluster (int): Minimum cells per cluster
             use_pass (int, optional): Explicitly use Pass 1 or 2 (if None, tries Pass 2 first, falls back to Pass 1).
                                      This will be passed to the optimization function to select appropriate layers.
+            batch_size (int): Batch size for memory optimization
         """
         # Ensure data is present
         if self.gene_expression_adata is None or self.antibody_capture_adata is None:
@@ -874,7 +890,8 @@ class CitegeistModel:
             alpha_protein=alpha_protein,
             lambda_smooth=lambda_smooth,
             min_cells_per_cluster=min_cells_per_cluster,
-            pass_number=pass_to_use  # Pass this to the optimization function
+            pass_number=pass_to_use,
+            batch_size=batch_size
         )
         
         # Extract results

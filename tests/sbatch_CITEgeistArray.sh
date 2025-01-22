@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=0-29  # 3 radii * 5 lambda_prior_weights * 2 test sets = 30 combinations
+#SBATCH --array=0-29  # 3 radii * 5 weight pairs * 2 test sets = 30 combinations
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -25,25 +25,23 @@ echo "Changed to working directory"
 
 # Define parameter arrays
 radii=(4 6 8)
-lambda_prior_weights=(1.0 10.0 50.0 100.0 500.0)
+# Define global/local weight pairs (global_weight,local_weight)
+weight_pairs=("0.2,0.8" "0.4,0.6" "0.5,0.5" "0.6,0.4" "0.8,0.2")
 TEST_SETS=("mixed" "high_seg")
 
 # Calculate indices for each parameter based on array task ID
-# We have 3 radii * 5 lambda_prior_weights * 2 test sets = 30 total combinations
-# First, get the test set index (0 or 1)
 test_set_index=$((SLURM_ARRAY_TASK_ID % 2))
-
-# Then, get the combined radius and lambda index
 combined_index=$((SLURM_ARRAY_TASK_ID / 2))
-
-# Finally, separate radius and lambda indices
-radius_index=$((combined_index / 5))  # Integer division by number of lambda values
-lambda_index=$((combined_index % 5))  # Modulo by number of lambda values
+radius_index=$((combined_index / 5))
+weight_index=$((combined_index % 5))
 
 # Get the actual parameter values
 radius=${radii[$radius_index]}
-lambda_prior_weight=${lambda_prior_weights[$lambda_index]}
+weight_pair=${weight_pairs[$weight_index]}
 TEST_SET=${TEST_SETS[$test_set_index]}
+
+# Split weight pair into global and local weights
+IFS=',' read -r global_weight local_weight <<< "${weight_pair}"
 
 INPUT_FOLDER="replicates/${TEST_SET}/"
 OUTPUT_FOLDER="test_results/${TEST_SET}/"
@@ -52,7 +50,8 @@ mkdir -p "$OUTPUT_FOLDER"
 
 echo "Running with parameters:"
 echo "  - radius=$radius"
-echo "  - lambda_prior_weight=$lambda_prior_weight"
+echo "  - global_weight=$global_weight"
+echo "  - local_weight=$local_weight"
 echo "  - test_set=$TEST_SET"
 echo "Input folder: $INPUT_FOLDER"
 echo "Output folder: $OUTPUT_FOLDER"
@@ -60,7 +59,8 @@ echo "Output folder: $OUTPUT_FOLDER"
 # Run the Python script with these parameters
 python tests/test_citegeist_simulated.py \
     --radius $radius \
-    --lambda_prior_weight $lambda_prior_weight \
+    --global_enrichment_weight $global_weight \
+    --local_enrichment_weight $local_weight \
     --input_folder $INPUT_FOLDER \
     --output_folder $OUTPUT_FOLDER \
     --skip_pass2

@@ -122,7 +122,10 @@ def main():
 
     parser = argparse.ArgumentParser(description='Run CITEgeist on simulated data.')
     parser.add_argument('--radius', type=float, required=True, help='Radius for neighbor detection')
-    parser.add_argument('--lambda_prior_weight', type=float, default=0.5, help='Weight for prior guidance in pass 2')
+    parser.add_argument('--global_enrichment_weight', type=float, default=0.5, 
+                       help='Weight for global expression enrichment')
+    parser.add_argument('--local_enrichment_weight', type=float, default=0.5, 
+                       help='Weight for local expression enrichment')
     parser.add_argument('--input_folder', type=str, default='.', help='Folder all requisite samples and ground truth')
     parser.add_argument('--output_folder', type=str, default='citegeist_output', help='Output folder')
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
@@ -133,9 +136,10 @@ def main():
     args = parser.parse_args()
 
     radius = args.radius
-    lambda_prior_weight = args.lambda_prior_weight
+    global_enrichment_weight = args.global_enrichment_weight
+    local_enrichment_weight = args.local_enrichment_weight
     
-    variables = f"radius_{radius}_lambda_prior_weight_{lambda_prior_weight}"
+    variables = f"radius_{radius}_global_{global_enrichment_weight}_local_{local_enrichment_weight}"
 
     input_folder = args.input_folder
     output_folder = args.output_folder
@@ -148,7 +152,7 @@ def main():
     os.makedirs(output_folder, exist_ok=True)
 
     # Initialize logging
-    log_file = f"Simulated_CITEgeist_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{radius}_{lambda_prior_weight}.log"
+    log_file = f"Simulated_CITEgeist_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{radius}_{global_enrichment_weight}_{local_enrichment_weight}.log"
     log_path = os.path.join(args.output_folder, log_file)
     logging.basicConfig(
         filename=log_path,
@@ -156,7 +160,7 @@ def main():
         format='%(asctime)s - %(levelname)s - %(message)s',
         level=logging.DEBUG
     )
-    logging.info(f"Starting CITEgeist run with parameters: radius={radius}, lambda_prior_weight={lambda_prior_weight}")
+    logging.info(f"Starting CITEgeist run with parameters: radius={radius}, global_enrichment_weight={global_enrichment_weight}, local_enrichment_weight={local_enrichment_weight}")
 
     # Find all unique sample numbers for Wu_rep_{number} pairs
     h5ad_dir = os.path.join(args.input_folder, "h5ad_objects")
@@ -269,11 +273,13 @@ def main():
         ##############################################################################
         logging.info(f"Running pass 1 gene expression optimization for {sample_name} ...")
 
-        # Run first pass
+        # Run first pass with weight parameters
         pass1_results = model.run_cell_expression_pass1(
             radius=radius, 
             alpha=0.5, 
             lambda_reg_gex=0.001,
+            global_enrichment_weight=global_enrichment_weight,
+            local_enrichment_weight=local_enrichment_weight,
             max_workers=None, 
             checkpoint_interval=100, 
             output_dir="checkpoints", 
@@ -303,6 +309,7 @@ def main():
                 cell_type_numbers_array=model.results['cell_prop'].values
             )
 
+            continue 
             if not args.skip_pass2:
                 # Run pass 2 with prior guidance
                 pass2_results = model.run_cell_expression_pass2(
@@ -311,7 +318,7 @@ def main():
                     radius=radius,
                     alpha=0.5,
                     lambda_reg_gex=0.001,
-                    lambda_prior_weight=lambda_prior_weight,
+                    lambda_prior_weight=0.5,
                     max_workers=None,
                     checkpoint_interval=100,
                     output_dir="checkpoints",
