@@ -7,6 +7,8 @@ import concurrent
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from typing import Dict, Any, Optional, List, Tuple, Union
 import json
+import psutil
+import time
 
 # Third-party imports
 import numpy as np
@@ -422,28 +424,14 @@ def deconvolute_spot_with_neighbors_with_prior(
     lambda_reg_gex: float = 0.001,
     global_prior: Optional[np.ndarray] = None,
     lambda_prior_weight: float = 0.0,
-    local_weight: float = 0.5,
-    global_weight: float = 0.5
+    local_enrichment_weight: float = 0.5,
+    global_enrichment_weight: float = 0.5,
 ) -> Optional[np.ndarray]:
     """
-    Deconvolute a spot with its neighbors, optionally using a prior.
-    
-    Args:
-        spot_idx: Index of spot to deconvolute
-        adata: AnnData object containing gene expression
-        cell_type_numbers_array: Array of cell type numbers
-        radius: Radius for neighbor search
-        alpha: Weight for spatial term
-        lambda_reg_gex: L1/L2 regularization weight
-        global_prior: Optional prior matrix (T x M)
-        lambda_prior_weight: Weight for prior guidance (0.0 means no prior)
-        
-    Returns:
-        Optional[np.ndarray]: Deconvoluted profile matrix or None if error
+    Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
     """
     model = None
     try:
-        # Get neighborhood data first to establish dimensions
         neighborhood_indices = get_neighbors_with_fixed_radius(
             spot_idx, adata, radius=radius, include_center=True
         )
@@ -452,7 +440,7 @@ def deconvolute_spot_with_neighbors_with_prior(
             return None
 
         neighborhood_indices = np.array([
-            int(idx) for idx in neighborhood_indices 
+            int(idx) for idx in neighborhood_indices
             if isinstance(idx, (int, np.integer))
         ], dtype=int)
 
@@ -460,11 +448,11 @@ def deconvolute_spot_with_neighbors_with_prior(
         deconvolution_expression_data = adata.X
         if hasattr(deconvolution_expression_data, 'toarray'):
             deconvolution_expression_data = deconvolution_expression_data.toarray()
-        
-        # Get dimensions from the data
+
+        # Dimensions
         T = cell_type_numbers_array.shape[1]  # number of cell types
         M = deconvolution_expression_data.shape[1]  # number of genes
-        
+
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
 
@@ -472,20 +460,30 @@ def deconvolute_spot_with_neighbors_with_prior(
         gene_specific_enrichment = np.zeros((M, T))
 
         def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
+            """
+            Compute expression-aware enrichment scores.
+            
+            Args:
+                expression_data (np.ndarray): Expression matrix
+                cell_type_props (np.ndarray): Cell type proportions
+                gene_idx (int): Gene index
+                
+            Returns:
+                np.ndarray: Enrichment scores for each cell type
+            """
             gene_expr = expression_data[:, gene_idx]
             expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
             high_expr_spots = gene_expr >= expr_threshold
-            
+
             if not np.any(high_expr_spots):
                 return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
-            
+
             high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
             background_props = np.mean(cell_type_props, axis=0)
-            
+
             epsilon = 1e-10
             enrichment = high_expr_props / (background_props + epsilon)
             smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
-            
             return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
         # Compute enrichment scores
@@ -495,16 +493,14 @@ def deconvolute_spot_with_neighbors_with_prior(
                 neighborhood_cell_type_numbers,
                 k
             )
-            
             global_enrich = compute_expression_aware_enrichment(
                 deconvolution_expression_data,
                 cell_type_numbers_array,
                 k
             )
-            
             gene_specific_enrichment[k] = (
-                local_weight * local_enrich +
-                global_weight * global_enrich
+                local_enrichment_weight * local_enrich +
+                global_enrichment_weight * global_enrich
             )
 
         # Build Gurobi model
@@ -524,23 +520,21 @@ def deconvolute_spot_with_neighbors_with_prior(
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    X[j,k] = model.addVar(
+                    X[j, k] = model.addVar(
                         vtype=GRB.INTEGER,
                         lb=0,
                         ub=total_counts,
                         name=f"X_{j}_{k}"
                     )
-
                 # Count conservation constraint
                 model.addConstr(
-                    gp.quicksum(X[j,k] for j in range(T)) == total_counts,
+                    gp.quicksum(X[j, k] for j in range(T)) == total_counts,
                     name=f"count_conservation_{k}"
                 )
 
-        # Only validate prior if both prior and weight are provided
-
+        # Validate prior if asked
         if global_prior is not None:
-            if lambda_prior_weight > 0:  # First check if we're using prior guidance at all
+            if lambda_prior_weight > 0:
                 if global_prior is None:
                     raise ValueError("lambda_prior_weight > 0 but no global_prior provided")
             if not isinstance(global_prior, np.ndarray):
@@ -550,36 +544,51 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         # Objective terms
         obj_terms = []
+        total_prop = np.sum(cell_type_numbers_array[spot_idx, :]) + 1e-10  # For normalizing
+        
+        # Add base terms
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
                     # Base enrichment term
                     enrichment_weight = gene_specific_enrichment[k, j]
-                    cell_type_weight = neighborhood_cell_type_numbers[
-                        len(neighborhood_indices)//2, j
-                    ]
-                    randomness = 0.9 + 0.2 * np.random.random()
-                    
-                    base_term = enrichment_weight * cell_type_weight * randomness * X[j,k]
+                    cell_type_weight = neighborhood_cell_type_numbers[len(neighborhood_indices) // 2, j]
+                    base_term = enrichment_weight * cell_type_weight * X[j, k]
                     obj_terms.append(base_term)
-                    
-                    # Add prior-based penalty only if we have both prior and positive weight
+
+                    # Add prior-based penalty if available
                     if global_prior is not None and lambda_prior_weight > 0:
                         try:
                             prior_value = float(global_prior[j, k])
-                            prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j,k]
-                            obj_terms.append(-prior_penalty)  # Subtract penalty
+                            prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j, k]
+                            obj_terms.append(-prior_penalty)
                         except Exception as e:
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
 
+        # L1 term (sparsity)
+        l1_terms = []
+        for j in range(T):
+            for k in range(M):
+                if (j, k) in X:
+                    l1_terms.append(X[j, k])
+        obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
+        
+        # L2 term (smoothing)
+        l2_terms = []
+        for j in range(T):
+            for k in range(M):
+                if (j, k) in X:
+                    l2_terms.append(X[j, k] * X[j, k])
+        obj_terms.append(-lambda_reg_gex * (1 - alpha) * gp.quicksum(l2_terms))
+
+        # Maximize the sum of all terms
         model.setObjective(
             gp.quicksum(obj_terms),
             GRB.MAXIMIZE
         )
 
-        # Optimize
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
@@ -589,7 +598,7 @@ def deconvolute_spot_with_neighbors_with_prior(
                 total_counts = int(center_counts[k])
                 if total_counts > 0:
                     for j in range(T):
-                        result[j,k] = X[j,k].X
+                        result[j, k] = X[j, k].X
             return result
         else:
             logging.error(f"No feasible solution found for spot {spot_idx}.")
@@ -663,6 +672,8 @@ def optimize_gene_expression(
     radius: float = 2,
     alpha: float = 0.5,
     lambda_reg_gex: float = 0.001,
+    global_enrichment_weight: float = 0.5,
+    local_enrichment_weight: float = 0.5,
     global_prior: Optional[np.ndarray] = None,
     lambda_prior_weight: float = 0.0,
     max_workers: Optional[int] = None,
@@ -670,6 +681,32 @@ def optimize_gene_expression(
     output_dir: str = "checkpoints",
     rerun: bool = False
 ) -> Dict[str, Any]:
+    """
+    Optimize gene expression with enrichment weights and prior guidance.
+    
+    Args:
+        sample_name (str): Name of the sample
+        deconvolution_expression_data (np.ndarray): Gene expression data (N_spots x M_genes)
+        cell_type_numbers_array (np.ndarray): Cell type proportions (N_spots x T_celltypes)
+        filtered_adata (sc.AnnData): Filtered AnnData object containing gene expression data
+        radius (float): Radius for neighbor detection
+        alpha (float): Weight for spatial regularization
+        lambda_reg_gex (float): Weight for gene expression regularization
+        global_enrichment_weight (float): Weight for global expression enrichment (0-1)
+        local_enrichment_weight (float): Weight for local expression enrichment (0-1)
+        global_prior (np.ndarray, optional): Global prior matrix for guidance
+        lambda_prior_weight (float): Weight for prior guidance
+        max_workers (int, optional): Maximum number of parallel workers
+        checkpoint_interval (int): Number of spots between checkpoints
+        output_dir (str): Directory for checkpoints
+        rerun (bool): Whether to rerun if results exist
+        
+    Returns:
+        Dict[str, Any]: {
+            'spotwise_profiles': Dict[int, np.ndarray],
+            'dimensions': Tuple[int, int, int]
+        }
+    """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
@@ -695,11 +732,11 @@ def optimize_gene_expression(
     logging.info(f"Starting analysis for {sample_name}")
     logging.info(f"Already completed spots: {len(completed_spots)}")
     
-    # Log whether using prior-guided deconvolution
+    # Log configuration
+    if global_enrichment_weight + local_enrichment_weight > 0:
+        logging.info(f"Using enrichment weights - Global: {global_enrichment_weight}, Local: {local_enrichment_weight}")
     if global_prior is not None and lambda_prior_weight > 0:
         logging.info("Using prior-guided deconvolution")
-    else:
-        logging.info("Using standard deconvolution")
 
     # Initialize futures as empty dict before try block
     futures = {}
@@ -729,8 +766,10 @@ def optimize_gene_expression(
                             radius,
                             alpha,
                             lambda_reg_gex,
-                            global_prior,  # Will be None if not using prior
-                            lambda_prior_weight  # Will be 0.0 if not using prior
+                            global_prior,
+                            lambda_prior_weight,
+                            local_enrichment_weight,
+                            global_enrichment_weight,
                         )
                         futures[future] = spot_idx
 
@@ -769,6 +808,7 @@ def optimize_gene_expression(
                 logging.warning(f"Process pool broken, retry {retry_count}/{max_retries}")
                 if retry_count == max_retries:
                     logging.error("Max retries reached, saving current progress")
+                import time
                 time.sleep(5)
 
     finally:
@@ -875,30 +915,18 @@ def optimize_multimodal_phase_3_celltype_wnn(
     lambda_smooth: float = 0.1,
     min_cells_per_cluster: int = 5,
     pass_number: int = 2,
-    n_jobs: int = -1  # Add parallel processing parameter
+    n_jobs: int = -1,
+    batch_size: int = 1000  # Add batch processing
 ):
     """
-    Integrate RNA and protein data using cell-type-level WNN approach.
-    
-    Args:
-        adata_gex (AnnData): Gene expression data with cell-type-specific layers
-        adata_antibody (AnnData): Protein/antibody data
-        cell_prop_array (np.ndarray): Current cell type proportions (N × T)
-        cell_profiles (dict): Cell type marker profiles
-        radius (float): Radius for spatial neighbors
-        n_neighbors (int): Number of nearest neighbors
-        alpha_rna (float): Weight for RNA modality
-        alpha_protein (float): Weight for protein modality
-        lambda_smooth (float): Smoothing parameter
-        min_cells_per_cluster (int): Minimum cells per cluster
-        pass_number (int): Which pass layers to use (1 or 2)
+    Integrate RNA and protein data using cell-type-level WNN approach with memory optimization.
     """
     from sklearn.neighbors import NearestNeighbors
     from sklearn.cluster import KMeans
     import numpy as np
     from joblib import Parallel, delayed
-    from concurrent.futures import ThreadPoolExecutor
     import multiprocessing
+    import gc
     
     # Use all cores if n_jobs is -1
     if n_jobs == -1:
@@ -908,187 +936,246 @@ def optimize_multimodal_phase_3_celltype_wnn(
     
     N = adata_gex.shape[0]
     T = cell_prop_array.shape[1]
-    M = adata_gex.shape[1]  # number of genes
+    M = adata_gex.shape[1]
     cell_type_names = list(cell_profiles.keys())
     
-    # 1. Vectorized feature extraction
-    logging.info("Extracting features...")
-    
-    # Pre-allocate array for gene expression features
+    logging.info(f"Data dimensions: {N} spots, {T} cell types, {M} genes")
+    logging.info(f"Memory usage before feature extraction: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
+    # Process in batches to reduce memory usage
+    n_batches = (N + batch_size - 1) // batch_size
     gex_features = np.zeros((N, T * M))
     
-    def process_cell_type(t):
-        ct_name = cell_type_names[t]
-        layer_key = f"{ct_name.replace(' ', '_')}_genes_pass{pass_number}"
+    logging.info(f"Processing features in {n_batches} batches of size {batch_size}")
+
+    for batch_idx in range(n_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min((batch_idx + 1) * batch_size, N)
+        logging.info(f"Processing batch {batch_idx + 1}/{n_batches} (spots {start_idx}-{end_idx})")
+
+        def process_cell_type(t):
+            ct_name = cell_type_names[t]
+            layer_key = f"{ct_name.replace(' ', '_')}_genes_pass{pass_number}"
+            
+            if layer_key not in adata_gex.layers:
+                raise ValueError(f"Layer {layer_key} not found")
+                
+            ct_expression = adata_gex.layers[layer_key][start_idx:end_idx]
+            if hasattr(ct_expression, 'toarray'):
+                ct_expression = ct_expression.toarray()
+                
+            ct_prop = cell_prop_array[start_idx:end_idx, t].reshape(-1, 1)
+            return ct_expression * ct_prop, t
+
+        # Process batch
+        results = Parallel(n_jobs=n_jobs)(
+            delayed(process_cell_type)(t) for t in range(T))
         
-        if layer_key not in adata_gex.layers:
-            raise ValueError(f"Layer {layer_key} not found")
+        # Assemble features for this batch
+        for weighted_expr, t in results:
+            feature_start = t * M
+            feature_end = (t + 1) * M
+            gex_features[start_idx:end_idx, feature_start:feature_end] = weighted_expr
             
-        ct_expression = adata_gex.layers[layer_key]
-        if hasattr(ct_expression, 'toarray'):
-            ct_expression = ct_expression.toarray()
-            
-        ct_prop = cell_prop_array[:, t].reshape(-1, 1)
-        return ct_expression * ct_prop, t
-    
-    # Parallel feature extraction
-    results = Parallel(n_jobs=n_jobs)(
-        delayed(process_cell_type)(t) for t in range(T)
-    )
-    
-    # Assemble features
-    for weighted_expr, t in results:
-        start_idx = t * M
-        end_idx = (t + 1) * M
-        gex_features[:, start_idx:end_idx] = weighted_expr
-    
-    # 2. Parallel clustering
-    logging.info("Running parallel clustering...")
-    n_clusters = max(int(N / min_cells_per_cluster), T)
-    
-    # Normalize features (vectorized)
+        gc.collect()
+        logging.info(f"Batch {batch_idx + 1} complete. Memory usage: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
+    logging.info("Feature extraction complete. Starting clustering...")
+    logging.info(f"Memory usage before clustering: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
+    # Normalize features in batches
+    for batch_idx in range(n_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min((batch_idx + 1) * batch_size, N)
+        
+        batch_mean = np.mean(gex_features[start_idx:end_idx], axis=0)
+        batch_std = np.std(gex_features[start_idx:end_idx], axis=0) + 1e-6
+        gex_features[start_idx:end_idx] = (gex_features[start_idx:end_idx] - batch_mean) / batch_std
+        
     prop_features = (cell_prop_array - cell_prop_array.mean(axis=0)) / (cell_prop_array.std(axis=0) + 1e-6)
-    gex_features = (gex_features - gex_features.mean(axis=0)) / (gex_features.std(axis=0) + 1e-6)
-    
-    # Update KMeans initialization to be compatible with newer scikit-learn versions
+
+    # Clustering with memory-efficient implementation
+    n_clusters = max(int(N / min_cells_per_cluster), T)
+    logging.info(f"Running KMeans with {n_clusters} clusters")
+
     try:
-        # Try newer scikit-learn version syntax
         kmeans_prop = KMeans(n_clusters=n_clusters, n_init='auto')
         kmeans_gex = KMeans(n_clusters=n_clusters, n_init='auto')
     except TypeError:
-        # Fallback for older versions
         kmeans_prop = KMeans(n_clusters=n_clusters)
         kmeans_gex = KMeans(n_clusters=n_clusters)
-    
-    logging.info("Running KMeans clustering on proportion features...")
+
     prop_clusters = kmeans_prop.fit_predict(prop_features)
-    
-    logging.info("Running KMeans clustering on gene expression features...")
     gex_clusters = kmeans_gex.fit_predict(gex_features)
     
-    # 3. Vectorized centroid computation
-    def compute_centroids_vectorized(data, clusters):
+    logging.info("Clustering complete. Computing centroids...")
+    logging.info(f"Memory usage after clustering: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
+    # Free memory
+    del kmeans_prop, kmeans_gex
+    gc.collect()
+
+    # Compute centroids in batches
+    def compute_centroids_batch(data, clusters, n_clusters, batch_size=1000):
+        N = data.shape[0]
         centroids = np.zeros((n_clusters, data.shape[1]))
+        counts = np.zeros(n_clusters)
+        
+        for start_idx in range(0, N, batch_size):
+            end_idx = min(start_idx + batch_size, N)
+            batch_data = data[start_idx:end_idx]
+            batch_clusters = clusters[start_idx:end_idx]
+            
+            for k in range(n_clusters):
+                mask = batch_clusters == k
+                if np.any(mask):
+                    centroids[k] += np.sum(batch_data[mask], axis=0)
+                    counts[k] += np.sum(mask)
+        
+        # Compute final centroids
         for k in range(n_clusters):
-            mask = clusters == k
-            if np.any(mask):
-                centroids[k] = data[mask].mean(axis=0)
+            if counts[k] > 0:
+                centroids[k] /= counts[k]
+                
         return centroids
+
+    prop_centroids = compute_centroids_batch(prop_features, prop_clusters, n_clusters)
+    gex_centroids = compute_centroids_batch(gex_features, gex_clusters, n_clusters)
+
+    logging.info("Centroids computed. Setting up nearest neighbors...")
     
-    prop_centroids = compute_centroids_vectorized(prop_features, prop_clusters)
-    gex_centroids = compute_centroids_vectorized(gex_features, gex_clusters)
-    
-    # 4. Parallel nearest neighbor search
+    # Nearest neighbor search
     nbrs_prop = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
     nbrs_gex = NearestNeighbors(n_neighbors=n_neighbors, n_jobs=n_jobs)
     
     dists_prop, idx_prop = nbrs_prop.fit(prop_centroids).kneighbors(prop_centroids)
     dists_gex, idx_gex = nbrs_gex.fit(gex_centroids).kneighbors(gex_centroids)
-    
-    # 5. Optimize with Gurobi (using threads)
+
     logging.info("Setting up optimization model...")
+    logging.info(f"Memory usage before optimization: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
+    # Clear more memory before optimization
+    del prop_features, gex_features
+    gc.collect()
+
+    # Initialize Gurobi model
     model = gp.Model("Phase3_CellType_WNN")
     model.setParam('OutputFlag', 0)
-    model.setParam('Threads', n_jobs)  # Use multiple threads for Gurobi
+    model.setParam('Threads', n_jobs)
+
+    # Create variables in batches
+    logging.info("Creating optimization variables...")
+    Y_refined = {}
+    X_refined = {}
     
-    # Create variables (vectorized where possible)
-    Y_refined = model.addVars(N, T, lb=0, ub=1, name="Y")
-    X_refined = model.addVars(N, T, M, lb=0, name="X")
+    for batch_start in range(0, N, batch_size):
+        batch_end = min(batch_start + batch_size, N)
+        logging.info(f"Creating variables for spots {batch_start}-{batch_end}")
+        
+        # Create Y variables (cell type proportions)
+        for i in range(batch_start, batch_end):
+            for t in range(T):
+                Y_refined[i,t] = model.addVar(lb=0, ub=1, name=f"Y_{i}_{t}")
+        
+        # Create X variables (gene expression)
+        for i in range(batch_start, batch_end):
+            for t in range(T):
+                for g in range(M):
+                    X_refined[i,t,g] = model.addVar(lb=0, name=f"X_{i}_{t}_{g}")
     
-    # 6. Build objective terms efficiently
     logging.info("Building objective function...")
     obj_terms = []
-    
-    def add_proportion_terms(spot_idx):
-        prop_cluster = prop_clusters[spot_idx]
-        neighbor_clusters = idx_prop[prop_cluster]
-        weights = np.exp(-dists_prop[prop_cluster] / dists_prop[prop_cluster].mean())
+
+    # Process objective terms in batches
+    for batch_start in range(0, N, batch_size):
+        batch_end = min(batch_start + batch_size, N)
+        logging.info(f"Processing objective terms for spots {batch_start}-{batch_end}")
         
-        terms = []
-        for k, n_cluster in enumerate(neighbor_clusters):
-            neighbor_spots = np.where(prop_clusters == n_cluster)[0]
-            if len(neighbor_spots) > 0:
-                w = weights[k] * alpha_protein
-                for t in range(T):
-                    for j in neighbor_spots:
-                        diff = Y_refined[spot_idx,t] - Y_refined[j,t]
-                        terms.append(w * diff * diff)
-        return terms
-    
-    def add_expression_terms(spot_idx):
-        gex_cluster = gex_clusters[spot_idx]
-        neighbor_clusters = idx_gex[gex_cluster]
-        weights = np.exp(-dists_gex[gex_cluster] / dists_gex[gex_cluster].mean())
-        
-        terms = []
-        for k, n_cluster in enumerate(neighbor_clusters):
-            neighbor_spots = np.where(gex_clusters == n_cluster)[0]
-            if len(neighbor_spots) > 0:
-                w = weights[k] * alpha_rna
-                for t in range(T):
-                    for g in range(M):
+        # Add proportion terms
+        for i in range(batch_start, batch_end):
+            prop_cluster = prop_clusters[i]
+            neighbor_clusters = idx_prop[prop_cluster]
+            weights = np.exp(-dists_prop[prop_cluster] / dists_prop[prop_cluster].mean())
+            
+            for k, n_cluster in enumerate(neighbor_clusters):
+                neighbor_spots = np.where(prop_clusters == n_cluster)[0]
+                if len(neighbor_spots) > 0:
+                    w = weights[k] * alpha_protein
+                    for t in range(T):
                         for j in neighbor_spots:
-                            diff = X_refined[spot_idx,t,g] - X_refined[j,t,g]
-                            terms.append(w * diff * diff)
-        return terms
-    
-    # Parallel objective term computation
-    with ThreadPoolExecutor(max_workers=n_jobs) as executor:
-        prop_futures = [executor.submit(add_proportion_terms, i) for i in range(N)]
-        expr_futures = [executor.submit(add_expression_terms, i) for i in range(N)]
+                            if j < i:  # Avoid duplicate terms
+                                diff = Y_refined[i,t] - Y_refined[j,t]
+                                obj_terms.append(w * diff * diff)
         
-        for future in prop_futures:
-            obj_terms.extend(future.result())
-        for future in expr_futures:
-            obj_terms.extend(future.result())
+        # Add expression terms
+        for i in range(batch_start, batch_end):
+            gex_cluster = gex_clusters[i]
+            neighbor_clusters = idx_gex[gex_cluster]
+            weights = np.exp(-dists_gex[gex_cluster] / dists_gex[gex_cluster].mean())
+            
+            for k, n_cluster in enumerate(neighbor_clusters):
+                neighbor_spots = np.where(gex_clusters == n_cluster)[0]
+                if len(neighbor_spots) > 0:
+                    w = weights[k] * alpha_rna
+                    for t in range(T):
+                        for g in range(M):
+                            for j in neighbor_spots:
+                                if j < i:  # Avoid duplicate terms
+                                    diff = X_refined[i,t,g] - X_refined[j,t,g]
+                                    obj_terms.append(w * diff * diff)
     
     # Add spatial smoothing if available
     if 'spatial' in adata_gex.obsm:
-        logging.info("Adding spatial smoothing...")
+        logging.info("Adding spatial smoothing terms...")
         spatial_coords = adata_gex.obsm['spatial']
         nbrs_spatial = NearestNeighbors(radius=radius, n_jobs=n_jobs)
         spatial_graph = nbrs_spatial.fit(spatial_coords).radius_neighbors_graph(spatial_coords)
         
         rows, cols = spatial_graph.nonzero()
         for i, j in zip(rows, cols):
-            for t in range(T):
-                diff_prop = Y_refined[i,t] - Y_refined[j,t]
-                obj_terms.append(lambda_smooth * diff_prop * diff_prop)
-                for g in range(M):
-                    diff_expr = X_refined[i,t,g] - X_refined[j,t,g]
-                    obj_terms.append(lambda_smooth * diff_expr * diff_expr)
-    
-    # Set objective and constraints
+            if j < i:  # Avoid duplicate terms
+                for t in range(T):
+                    diff_prop = Y_refined[i,t] - Y_refined[j,t]
+                    obj_terms.append(lambda_smooth * diff_prop * diff_prop)
+                    for g in range(M):
+                        diff_expr = X_refined[i,t,g] - X_refined[j,t,g]
+                        obj_terms.append(lambda_smooth * diff_expr * diff_expr)
+
+    # Set objective
     model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
     
-    # Add constraints (vectorized where possible)
-    for i in range(N):
-        model.addConstr(gp.quicksum(Y_refined[i,t] for t in range(T)) == 1)
+    logging.info("Adding constraints...")
+    # Add constraints in batches
+    for batch_start in range(0, N, batch_size):
+        batch_end = min(batch_start + batch_size, N)
         
-    # Vectorized expression constraints
-    for i in range(N):
-        for t in range(T):
-            model.addConstrs(
-                (X_refined[i,t,g] <= adata_gex.X[i,g] * Y_refined[i,t] 
-                 for g in range(M)),
-                name=f"expr_constr_{i}_{t}"
-            )
-    
-    # Optimize
+        for i in range(batch_start, batch_end):
+            # Sum of proportions = 1
+            model.addConstr(gp.quicksum(Y_refined[i,t] for t in range(T)) == 1)
+            
+            # Expression constraints
+            for t in range(T):
+                for g in range(M):
+                    model.addConstr(
+                        X_refined[i,t,g] <= adata_gex.X[i,g] * Y_refined[i,t]
+                    )
+
     logging.info("Starting optimization...")
     model.optimize()
-    
+
     if model.status != GRB.OPTIMAL:
         logging.error("Failed to find optimal solution")
         raise RuntimeError("Failed to find optimal solution")
-    
-    # Extract results (vectorized)
+
+    # Extract results
+    logging.info("Extracting optimization results...")
     refined_props = np.array([[Y_refined[i,t].X for t in range(T)] for i in range(N)])
     refined_profiles = np.array([[[X_refined[i,t,g].X for g in range(M)] 
                                 for t in range(T)] for i in range(N)])
-    
-    logging.info("Phase 3 WNN optimization completed successfully")
-    
+
+    logging.info("Optimization complete. Extracting results...")
+    logging.info(f"Final memory usage: {psutil.Process().memory_info().rss / 1024 / 1024:.2f} MB")
+
     return {
         'refined_proportions': refined_props,
         'refined_profiles': refined_profiles,
