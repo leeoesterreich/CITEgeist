@@ -30,140 +30,6 @@ from tqdm import tqdm
 from .utils import get_neighbors_with_fixed_radius
 from .checkpoints import CheckpointManager
 
-def fit_zinb(x, p):
-    """
-    Fit ZINB model for a gene's expression (x) against cell type proportion (p)
-    
-    Args:
-        x (np.ndarray): Gene expression values
-        p (np.ndarray): Cell type proportions
-    
-    Returns:
-        tuple: (π, μ, θ) - zero-inflation probability, mean, and dispersion
-    """
-    def zinb_nll(params):
-        pi, mu, theta = params
-        # Bound parameters to valid ranges more strictly
-        pi = np.clip(pi, 0.001, 0.999)
-        mu = np.clip(mu, 0.001, None)
-        theta = np.clip(theta, 0.001, None)
-        
-        # Zero and non-zero indices
-        zero_idx = x == 0
-        nonzero_idx = ~zero_idx
-        
-        if not np.any(nonzero_idx):
-            return 1e10  # Penalize all-zero cases
-        
-        # Log-likelihood calculation
-        ll_zeros = np.sum(np.log(pi + (1-pi) * np.power(theta/(theta+mu), theta))[zero_idx])
-        
-        ll_nonzeros = np.sum(
-            np.log(1-pi) + loggamma(x[nonzero_idx] + theta) - loggamma(theta) - 
-            loggamma(x[nonzero_idx] + 1) + theta * np.log(theta) + 
-            x[nonzero_idx] * np.log(mu) - (x[nonzero_idx] + theta) * np.log(theta + mu)
-        )
-        
-        return -(ll_zeros + ll_nonzeros)
-    
-    # Better initial guesses
-    zero_prop = np.mean(x == 0)
-    pi_init = min(0.9, zero_prop)  # Cap initial pi
-    mu_init = max(0.1, np.mean(x[x > 0])) if np.any(x > 0) else 0.1
-    theta_init = 1.0
-    
-    try:
-        # Optimize with stricter bounds on pi
-        result = minimize(
-            zinb_nll, 
-            [pi_init, mu_init, theta_init],
-            bounds=[(0.001, 0.95), (0.001, None), (0.001, None)],  # Cap maximum pi at 0.95
-            method='L-BFGS-B'
-        )
-        
-        # Validate results
-        if not result.success:
-            return (zero_prop, mu_init, theta_init)
-        
-        return result.x
-    except:
-        return (zero_prop, mu_init, theta_init)
-
-def analyze_zero_inflation_patterns(
-    usage_array,
-    cell_type_numbers,
-    gene_names,
-    cell_type_names,
-    min_proportion=0.01,
-    expression_threshold=1e-6
-):
-    """Analyze zero-inflation patterns in gene expression data."""
-    patterns = {}
-    
-    # Ensure we're working with numpy arrays
-    if isinstance(usage_array, dict):
-        # Convert dictionary to array with shape (T x M) for cell types x genes
-        T = len(cell_type_names)    # number of cell types
-        M = len(gene_names)         # number of genes
-        
-        # Take the first spot's profile as template for shape
-        first_profile = next(iter(usage_array.values()))
-        if first_profile.shape != (T, M):
-            raise ValueError(f"Expected profile shape (T={T}, M={M}), got {first_profile.shape}")
-            
-        usage_array = first_profile  # Use first spot's profile as reference
-    
-    # Convert to dense if sparse
-    if hasattr(usage_array, 'toarray'):
-        usage_array = usage_array.toarray()
-    
-    if usage_array.ndim != 2:
-        raise ValueError(f"Expected 2D array (cell_types x genes), got shape {usage_array.shape}")
-    
-    T, M = usage_array.shape  # T cell types, M genes
-    N = cell_type_numbers.shape[0]  # number of spots
-    
-    for m_idx, gene in enumerate(gene_names):
-        patterns[gene] = {}
-        
-        for t_idx, cell_type in enumerate(cell_type_names):
-            # Get spots where this cell type is present
-            ct_spots = cell_type_numbers[:, t_idx] > min_proportion
-            
-            if np.any(ct_spots):
-                # Get expression value for this cell type and gene
-                expr_value = usage_array[t_idx, m_idx]
-                n_spots = np.sum(ct_spots)
-                
-                # For a cell type's gene expression, we only have one value
-                zero_prop = 1.0 if expr_value <= expression_threshold else 0.0
-                patterns[gene][cell_type] = {
-                    'zero_proportion': zero_prop,
-                    'mean_nonzero': expr_value if expr_value > expression_threshold else 0,
-                    'n_spots': n_spots
-                }
-            else:
-                patterns[gene][cell_type] = {
-                    'zero_proportion': np.nan,
-                    'mean_nonzero': 0,
-                    'n_spots': 0
-                }
-    
-    return patterns
-
-def suggest_zero_inflation_threshold(patterns, quantile=0.75):
-    """
-    Suggest a zero-inflation threshold based on the analysis results.
-    """
-    all_zero_props = []
-    for gene_patterns in patterns.values():
-        for ct_data in gene_patterns.values():
-            if not np.isnan(ct_data['zero_proportion']):
-                all_zero_props.append(ct_data['zero_proportion'])
-    
-    if all_zero_props:
-        return np.quantile(all_zero_props, quantile)
-    return 0.5  # Default fallback
 
 def compute_global_prior(
     spotwise_gene_expression_profiles: Dict[int, np.ndarray],
@@ -334,24 +200,37 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
 
     return profile_based_antibody_data, cell_type_names
 
-def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.7):
+def optimize_cell_proportions(
+    profile_based_antibody_data: np.ndarray,
+    cell_type_names: List[str],
+    tolerance: float = 1e-4,
+    max_iterations: int = 50,
+    lambda_reg: float = 1,
+    alpha: float = 0.7
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Perform EM-based optimization for cell type proportions using Gurobi.
+    Perform EM-based optimization for cell type proportions using Gurobi, returning
+    both the cell proportion matrix (Y_values) and final beta estimates.
 
     Args:
         profile_based_antibody_data (np.ndarray): N x T matrix of mapped antibody data.
-        cell_type_names (list): List of cell type names.
+        cell_type_names (List[str]): List of cell type names.
         tolerance (float): Convergence tolerance for EM algorithm.
         max_iterations (int): Maximum number of iterations.
         lambda_reg (float): Regularization strength.
-        alpha (float): L1-L2 tradeoff.
+        alpha (float): L1-L2 tradeoff factor (0 = L2, 1 = L1).
 
     Returns:
-        pd.DataFrame: Cell type proportions per spot.
+        Tuple[np.ndarray, np.ndarray]:
+            - np.ndarray: Y_values (N x T), optimized cell proportions per spot.
+            - np.ndarray: beta_values (T,), final beta estimates per cell type.
     """
+    import gurobipy as gp
+    from gurobipy import GRB
+
     N, T = profile_based_antibody_data.shape
-    
-    # Initialize beta estimates
+
+    # Initialize beta estimates.
     beta_estimates = {ct: 1.0 for ct in cell_type_names}
     beta_prev = np.zeros(T)
     Y_prev = np.zeros((N, T))
@@ -361,10 +240,10 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
         logging.info(f"\nIteration {iteration + 1}")
         model = gp.Model("EM_Cell_Proportions")
         model.setParam('OutputFlag', 0)
-        
+
         # Define variables Y[i, j]
         Y = model.addVars(N, T, lb=0, ub=1, vtype=GRB.CONTINUOUS, name="Y")
-        
+
         # Objective: Total squared error + Elastic Net regularization
         error_terms = []
         for i in range(N):
@@ -378,39 +257,205 @@ def optimize_cell_proportions(profile_based_antibody_data, cell_type_names, tole
         l1_term = gp.quicksum(Y[i, j] for i in range(N) for j in range(T))
         l2_term = gp.quicksum(Y[i, j] * Y[i, j] for i in range(N) for j in range(T))
         regularization_term = lambda_reg * (alpha * l1_term + (1 - alpha) * l2_term)
-        
+
         model.setObjective(total_error + regularization_term, GRB.MINIMIZE)
-        
+
+        # Sum of proportions constraints
         for i in range(N):
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.9)
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.2)
-        
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.95)
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.05)
+
         model.optimize()
-        
+
         if model.status == GRB.OPTIMAL:
             Y_values = np.array([[Y[i, j].X for j in range(T)] for i in range(N)])
         else:
             raise ValueError("Gurobi optimization failed to converge.")
-        
+
+        # Update beta
         beta_new = np.array([
             np.dot(profile_based_antibody_data[:, j], Y_values[:, j]) / np.dot(Y_values[:, j], Y_values[:, j])
             if np.dot(Y_values[:, j], Y_values[:, j]) > 0 else 0.0
             for j in range(T)
         ])
-        
+
+        # Convergence checks
         beta_diff = np.linalg.norm(beta_new - beta_prev)
         Y_diff = np.linalg.norm(Y_values - Y_prev)
-        
+
         logging.info(f"Change in beta: {beta_diff:.6f}, Change in Y: {Y_diff:.6f}")
         if beta_diff < tolerance and Y_diff < tolerance:
             logging.info("Convergence achieved.")
             break
-        
+
+        for j, ct_name in enumerate(cell_type_names):
+            beta_estimates[ct_name] = beta_new[j]
+
         beta_prev = beta_new
         Y_prev = Y_values
         iteration += 1
 
-    return Y_values
+    # Convert final beta estimates to an array for clarity
+    final_beta_values = np.array([beta_estimates[ct] for ct in cell_type_names])
+
+    return Y_values, final_beta_values
+
+
+
+def finetune_cell_proportions(
+    profile_based_antibody_data: np.ndarray,
+    cell_type_names: List[str],
+    initial_Y_values: np.ndarray,
+    initial_beta_values: np.ndarray,
+    adata: sc.AnnData,
+    radius: float = 8.0,
+    tolerance: float = 1e-4,
+    lambda_reg: float = 1.0,
+    alpha: float = 0.7,
+    beta_vary: bool = True,
+    max_workers: Optional[int] = None,
+    checkpoint_interval: int = 100,
+    output_dir: str = "checkpoints",
+    rerun: bool = False
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Refine cell proportions using local neighborhood optimization with parallelization.
+
+    Args:
+        profile_based_antibody_data (np.ndarray):
+            (N x T) array of mapped antibody intensities.
+        cell_type_names (List[str]):
+            Ordered list of length T specifying cell type names.
+        initial_Y_values (np.ndarray):
+            Initial cell proportion matrix of shape (N, T).
+        initial_beta_values (np.ndarray):
+            Initial beta estimates (shape T,). This is passed for consistency,
+            but local solver decides how to use or ignore it based on beta_vary.
+        adata (sc.AnnData):
+            AnnData object with spot-level spatial coordinates in obsm['spatial'].
+        radius (float):
+            Radius for neighborhood-based local refinement.
+        tolerance (float):
+            Convergence tolerance for the local optimization loops.
+        lambda_reg (float):
+            Elastic net regularization strength for local solver.
+        alpha (float):
+            L1-L2 tradeoff (0 = purely L2, 1 = purely L1) in local solver.
+        beta_vary (bool):
+            If True, each spot's local solver is allowed to update betas;
+            if False, betas remain fixed at the values passed in initial_beta_values.
+        max_workers (int, optional):
+            Maximum number of parallel workers. If None, uses os.cpu_count().
+        checkpoint_interval (int):
+            Number of spots between checkpoints.
+        output_dir (str):
+            Directory for checkpoints.
+        rerun (bool):
+            Whether to rerun if results exist.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]:
+            - A new (N x T) array of refined Y-values, obtained from a single pass
+              of local refinements.
+            - The original beta_values array, returned for interface consistency.
+    """
+    import os
+    import gc
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+    from concurrent.futures.process import BrokenProcessPool
+    from tqdm import tqdm
+
+    if initial_Y_values.ndim != 2:
+        raise ValueError("initial_Y_values must be a 2D array (N x T).")
+    if initial_beta_values.ndim != 1:
+        raise ValueError("initial_beta_values must be a 1D array of length T.")
+
+    N, T = profile_based_antibody_data.shape
+    if initial_Y_values.shape != (N, T):
+        raise ValueError("Mismatch between profile_based_antibody_data and initial_Y_values shapes.")
+    if len(cell_type_names) != T:
+        raise ValueError("cell_type_names length must match the number of columns in profile_based_antibody_data.")
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Make a copy of the initial Y-values to store final refinements
+    Y_refined = initial_Y_values.copy()
+
+    # Calculate number of workers
+    workers = max_workers if max_workers is not None else os.cpu_count()
+    logging.info(f"Using {workers} workers for cell proportion refinement")
+
+    # Process all spots in parallel
+    futures = {}
+    retry_count = 0
+    max_retries = 3
+
+    while retry_count < max_retries:
+        try:
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures.clear()
+                for spot_idx in range(N):
+                    future = executor.submit(
+                        deconvolute_local_cell_proportions,
+                        spot_idx=spot_idx,
+                        adata=adata,
+                        profile_based_antibody_data=profile_based_antibody_data,
+                        radius=radius,
+                        tolerance=tolerance,
+                        lambda_reg=lambda_reg,
+                        alpha=alpha,
+                        beta_values=initial_beta_values,
+                        beta_vary=beta_vary
+                    )
+                    futures[future] = spot_idx
+
+                spots_processed = 0
+                with tqdm(total=N, desc="Refining Cell Proportions") as pbar:
+                    for future in as_completed(futures):
+                        spot_idx = futures[future]
+                        try:
+                            result = future.result(timeout=300)
+                            if result is not None:
+                                Y_refined[spot_idx, :] = result
+                                spots_processed += 1
+                                pbar.update(1)
+
+                                if spots_processed % checkpoint_interval == 0:
+                                    # Save checkpoint
+                                    checkpoint_path = os.path.join(output_dir, f"cell_prop_refinement_checkpoint_{spots_processed}.npy")
+                                    np.save(checkpoint_path, Y_refined)
+                                    logging.info(f"Saved checkpoint after {spots_processed} spots")
+
+                        except TimeoutError:
+                            logging.error(f"Timeout processing spot {spot_idx}")
+                            continue
+                        except Exception as e:
+                            logging.error(f"Error processing spot {spot_idx}: {str(e)}")
+                            continue
+
+                break
+
+        except BrokenProcessPool:
+            retry_count += 1
+            logging.warning(f"Process pool broken, retry {retry_count}/{max_retries}")
+            if retry_count == max_retries:
+                logging.error("Max retries reached, saving current progress")
+            import time
+            time.sleep(5)
+
+    # Cleanup
+    if futures:
+        futures.clear()
+    gc.collect()
+
+    # Save final results
+    final_path = os.path.join(output_dir, "cell_prop_refinement_final.npy")
+    np.save(final_path, Y_refined)
+    logging.info("Saved final refined cell proportions")
+
+    return Y_refined, initial_beta_values
+
 
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
@@ -433,7 +478,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     model = None
     try:
         neighborhood_indices = get_neighbors_with_fixed_radius(
-            spot_idx, adata, radius=radius, include_center=True
+            spot_idx, adata, radius=int(radius), include_center=True
         )
         if not neighborhood_indices:
             logging.error(f"No valid neighbors found for spot {spot_idx}.")
@@ -446,8 +491,10 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         # Extract expression data
         deconvolution_expression_data = adata.X
-        if hasattr(deconvolution_expression_data, 'toarray'):
-            deconvolution_expression_data = deconvolution_expression_data.toarray()
+        if scipy.sparse.issparse(deconvolution_expression_data):
+            deconvolution_expression_data = deconvolution_expression_data.toarray()  # type: ignore
+        elif not isinstance(deconvolution_expression_data, np.ndarray):
+            deconvolution_expression_data = np.array(deconvolution_expression_data)
 
         # Dimensions
         T = cell_type_numbers_array.shape[1]  # number of cell types
@@ -721,7 +768,7 @@ def optimize_gene_expression(
     if not rerun:
         complete_results = checkpoint_mgr.check_complete_run(N, T, M)
         if complete_results is not None:
-            return complete_results
+            return complete_results  # type: ignore
             
         # Load latest checkpoint if available
         completed_spots, spotwise_gene_expression_profiles = checkpoint_mgr.load_latest_checkpoint(N, T, M)
@@ -803,7 +850,7 @@ def optimize_gene_expression(
                 
                 break
                 
-            except concurrent.futures.process.BrokenProcessPool:
+            except concurrent.futures.process.BrokenProcessPool:  # type: ignore
                 retry_count += 1
                 logging.warning(f"Process pool broken, retry {retry_count}/{max_retries}")
                 if retry_count == max_retries:
@@ -825,85 +872,156 @@ def optimize_gene_expression(
 
     return spotwise_gene_expression_profiles
 
-def approximate_wgcna(adata_gex, max_clusters=10, correlation_method='pearson'):
+def deconvolute_local_cell_proportions(
+    spot_idx: int,
+    adata: sc.AnnData,
+    profile_based_antibody_data: np.ndarray,
+    radius: float = 2.0,
+    tolerance: float = 1e-4,
+    lambda_reg: float = 1.0,
+    alpha: float = 0.7,
+    beta_values: Optional[np.ndarray] = None,
+    beta_vary: bool = True,
+    max_iterations: int = 20
+) -> Optional[np.ndarray]:
     """
-    Approximate WGCNA-like approach in Python:
-      1) Compute gene-gene correlations
-      2) Convert to distance matrix
-      3) Cluster using hierarchical clustering
-      4) Define modules from clusters
-      5) Build a (genes x modules) binary membership matrix
+    Refine cell proportions for a single spot via local neighborhood optimization,
+    optionally allowing local beta updates. If beta_vary is False, the local solver
+    keeps beta fixed at the passed-in beta_values.
 
     Args:
-        adata_gex (AnnData): Spots × Genes
-        max_clusters (int): Maximum number of modules to cut from the tree
-        correlation_method (str): 'pearson' or 'spearman'
+        spot_idx (int):
+            Index of the spot to refine in the AnnData object.
+        adata (sc.AnnData):
+            AnnData containing spot-level spatial coordinates in obsm['spatial'].
+        profile_based_antibody_data (np.ndarray):
+            (N x T) global antibody intensities for N spots, T cell types.
+        radius (float):
+            Neighborhood radius for identifying neighbors.
+        tolerance (float):
+            Convergence threshold for Y- and beta-updates (if beta_vary=True).
+        lambda_reg (float):
+            Strength of elastic net regularization.
+        alpha (float):
+            L1-L2 tradeoff for the elastic net (0 = L2, 1 = L1).
+        beta_values (Optional[np.ndarray]):
+            Global or initial local beta values (length T). If None and beta_vary=True,
+            local betas initialize at 1.0 each.
+        beta_vary (bool):
+            If True, local betas are iteratively updated.
+            If False, beta_values remain fixed throughout optimization.
+        max_iterations (int):
+            Maximum iterations allowed for EM-like steps within this local function.
 
     Returns:
-        module_matrix (np.ndarray): shape=(G, K), where G=number of genes, K=actual modules found
-        module_labels (List[str]): names or IDs for the modules
+        Optional[np.ndarray]:
+            Refined proportions (T,) for the specified spot, or None on failure.
     """
-    # 1) Extract gene expression matrix
-    gex_data = adata_gex.X.toarray() if hasattr(adata_gex.X, 'toarray') else adata_gex.X
-    # shape: N (spots) × G (genes)
-    # We want gene-gene correlation, so transpose to G (genes) × N (spots)
-    gex_data_t = gex_data.T  # shape: G × N
+    import gurobipy as gp
+    from gurobipy import GRB
 
-    # Handle potential NaN or inf values
-    gex_data_t = np.nan_to_num(gex_data_t, nan=0.0, posinf=0.0, neginf=0.0)
+    # Identify indices of spot's local neighborhood
+    neighbor_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
+    if not neighbor_indices:
+        logging.error(f"[Local Cell Props] No valid neighbors for spot {spot_idx}.")
+        return None
+    neighbor_indices = np.array(neighbor_indices, dtype=int)
 
-    # 2) Compute gene-gene correlation with proper handling of NaN values
-    if correlation_method == 'spearman':
-        corr = np.zeros((gex_data_t.shape[0], gex_data_t.shape[0]))
-        for i in range(gex_data_t.shape[0]):
-            for j in range(i+1):
-                if i == j:
-                    corr[i,j] = 1.0
-                else:
-                    # Calculate correlation only on finite values
-                    mask = np.isfinite(gex_data_t[i]) & np.isfinite(gex_data_t[j])
-                    if np.sum(mask) > 1:  # Need at least 2 points for correlation
-                        rho, _ = spearmanr(gex_data_t[i][mask], gex_data_t[j][mask])
-                        corr[i,j] = rho if np.isfinite(rho) else 0.0
-                        corr[j,i] = corr[i,j]
-                    else:
-                        corr[i,j] = corr[j,i] = 0.0
+    local_antibody_data = profile_based_antibody_data[neighbor_indices, :]
+    local_N, T = local_antibody_data.shape
+
+    if local_N == 0:
+        logging.error(f"[Local Cell Props] Spot {spot_idx} has empty local antibody data.")
+        return None
+
+    # Identify center spot's position in neighbor list
+    try:
+        center_local_idx = np.where(neighbor_indices == spot_idx)[0][0]
+    except IndexError:
+        logging.error(f"[Local Cell Props] Could not find spot {spot_idx} in neighbor list.")
+        return None
+
+    # Initialize local betas
+    if beta_values is not None and len(beta_values) == T:
+        local_beta = beta_values.copy()
     else:
-        # Use numpy corrcoef with proper handling
-        corr = np.corrcoef(gex_data_t)
-        corr = np.nan_to_num(corr, nan=0.0)  # Replace NaN with 0
+        local_beta = np.ones(T, dtype=float)
 
-    # 3) Convert correlation to distance for clustering
-    distance_matrix = 1.0 - np.abs(corr)  # Use absolute correlation
-    distance_matrix = np.clip(distance_matrix, 0, 1)  # Ensure distances are in [0,1]
+    beta_prev = local_beta.copy()
 
-    # 4) Convert square distance to condensed form
-    # Ensure the matrix is symmetric
-    distance_matrix = (distance_matrix + distance_matrix.T) / 2
-    dist_condensed = squareform(distance_matrix, checks=False)
+    # Initialize local Y to something uniform
+    Y_prev = np.full((local_N, T), 1.0 / T)
 
-    # Verify no non-finite values
-    if not np.all(np.isfinite(dist_condensed)):
-        logging.warning("Non-finite values found in distance matrix. Replacing with max distance.")
-        dist_condensed = np.nan_to_num(dist_condensed, nan=1.0, posinf=1.0, neginf=0.0)
+    iteration = 0
+    while iteration < max_iterations:
+        model = gp.Model(f"Local_Cell_Props_spot_{spot_idx}")
+        model.setParam('OutputFlag', 0)
 
-    # 5) Perform hierarchical clustering
-    Z = linkage(dist_condensed, method='average')
+        # Build Y variables in [0, 1]
+        Y_vars = model.addVars(local_N, T, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="Y")
 
-    # 6) Cut into clusters and create module matrix
-    cluster_ids = fcluster(Z, t=max_clusters, criterion='maxclust')
-    unique_clusters = np.unique(cluster_ids)
-    K = len(unique_clusters)
+        # Summation constraints on each row
+        for i in range(local_N):
+            model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) >= 0.9)
+            model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) <= 1.2)
 
-    # 6) Build module_matrix (G × K), where entry=1 if gene in that module
-    module_matrix = np.zeros((gex_data.shape[1], K), dtype=float)
-    for i_gene, cluster_id in enumerate(cluster_ids):
-        module_matrix[i_gene, cluster_id - 1] = 1.0
+        # Objective: sum of squared differences + elastic net
+        error_terms = []
+        for i in range(local_N):
+            for j in range(T):
+                S_ij = local_antibody_data[i, j]
+                # If beta_vary, we use local_beta to be updated below
+                # If not, local_beta is just (in effect) "fixed"
+                error_terms.append((S_ij - local_beta[j] * Y_vars[i, j]) ** 2)
 
-    module_labels = [f"Module_{c}" for c in unique_clusters]
-    return module_matrix, module_labels
+        total_error = gp.quicksum(error_terms)
+        l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
+        l2 = gp.quicksum(Y_vars[i, j] * Y_vars[i, j] for i in range(local_N) for j in range(T))
+        reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
+        model.setObjective(total_error + reg_term, GRB.MINIMIZE)
 
+        model.optimize()
+        if model.status != GRB.OPTIMAL:
+            logging.warning(f"[Local Cell Props] Spot {spot_idx} local optimization not optimal.")
+            return None
 
+        # Extract current Y solution
+        Y_values = np.array([[Y_vars[i, j].X for j in range(T)] for i in range(local_N)])
+
+        # Update local beta if allowed
+        if beta_vary:
+            new_beta = np.zeros(T, dtype=float)
+            for j in range(T):
+                denom = np.dot(Y_values[:, j], Y_values[:, j])
+                if denom > 1e-15:
+                    new_beta[j] = np.dot(local_antibody_data[:, j], Y_values[:, j]) / denom
+                else:
+                    new_beta[j] = 0.0
+        else:
+            new_beta = local_beta.copy()
+
+        # Check convergence
+        beta_diff = np.linalg.norm(new_beta - beta_prev) if beta_vary else 0.0
+        Y_diff = np.linalg.norm(Y_values - Y_prev)
+
+        if beta_diff < tolerance and Y_diff < tolerance:
+            # Converged
+            Y_prev = Y_values
+            local_beta = new_beta
+            break
+
+        # Prepare for next iteration
+        Y_prev = Y_values
+        local_beta = new_beta
+        beta_prev = new_beta
+        iteration += 1
+
+        # Cleanup
+        del model
+        gc.collect()
+
+    # Return just the center row of Y for this spot
+    return Y_prev[center_local_idx, :]
 
 def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, max_fraction=0.05):
     """
@@ -957,7 +1075,6 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
     logging.info(f"Max scaled value: {X_scaled.max():.2f}")
     
     return adata_norm
-
 
 def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, global_prior):
     """
