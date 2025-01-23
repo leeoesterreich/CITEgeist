@@ -52,11 +52,12 @@ echo "Input folder: $INPUT_FOLDER"
 echo "Output folder: $OUTPUT_FOLDER"
 
 # Run the Python script with these parameters
-python tests/test_citegeist_simulated.py \
+/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/bin/python tests/test_citegeist_simulated.py \
     --radius 4 \
     --lambda_reg $lambda_reg \
     --alpha_elastic $alpha_elastic \
     --input_folder $INPUT_FOLDER \
     --output_folder $OUTPUT_FOLDER \
-    --skip_pass2
+    --skip_pass2 \
+    --profiling_only
 echo "Job completed at $(date)"
