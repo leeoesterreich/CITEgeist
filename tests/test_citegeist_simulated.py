@@ -12,6 +12,7 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import scanpy as sc
 import pandas as pd
+import scipy.sparse
 
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
@@ -194,13 +195,13 @@ def main():
         adata_gex = sc.read_h5ad(adata_gex_path)
         logging.info(f"Loaded {adata_gex_path} with shape {adata_gex.shape}")
 
-        if not np.issubdtype(adata_gex.X.dtype, np.number):
-            logging.warning("adata_gex.X contains non-numeric values. Please check the data.")
-        
-        if np.any(np.isnan(adata_gex.X)):
-            logging.warning("adata_gex.X contains NaN values. Please handle them before proceeding.")
-        
-        if np.any(adata_gex.X < 0):
+        X = adata_gex.X
+        if X is None:
+            logging.warning("adata_gex.X is None")
+            return
+        if scipy.sparse.issparse(X):
+            X = X.toarray()  # type: ignore
+        if isinstance(X, np.ndarray) and np.any(X < 0):
             logging.warning("adata_gex.X contains negative values, which is not expected in count data.")
         
 
@@ -228,40 +229,53 @@ def main():
         # 1) Cell Proportion Inference
         ##############################################################################
         logging.info(f"Running cell proportion model for {sample_name} ...")
-        model.run_cell_proportion_model()
+
+        global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model()
+
+        
         logging.info(f"Completed cell proportion inference for {sample_name}.")
 
-        # Plot cell proportions (Append cell proportions) 
-        model.append_proportions_to_adata()
+        # # Plot cell proportions (Append cell proportions) 
+        # model.append_proportions_to_adata()
 
-        # Benchmarking Cell Proportions
+        # # Benchmarking Cell Proportions
         st_folder = os.path.join(input_folder, "ST_sim")
-        proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_results.csv")
-        test_spots_df = pd.read_csv(proportions_path, index_col=0).sort_index().sort_index(axis=1)
+
+        # proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_results.csv")
+        # test_spots_df = pd.read_csv(proportions_path, index_col=0).sort_index().sort_index(axis=1)
+
+
         spot_composition_df = pd.read_csv(os.path.join(st_folder, f"Wu_ST_{number}_prop.csv"), index_col=0).sort_index().sort_index(axis=1)
         spot_composition_df = spot_composition_df.iloc[:, :-2]
 
-        # Check if columns match
-        if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
-            logging.warning(f"test_spots_df columns: {test_spots_df.columns}, spot_composition_df columns: {spot_composition_df.columns}")
-            raise ValueError("ERROR: The column names in the input CSV files do not match or are not in the same order!")
 
-        # Convert DataFrames to numpy arrays
-        test_spots_metadata_mtrx = test_spots_df.values
-        spot_composition_mtrx = spot_composition_df.values
-        column_names = test_spots_df.columns.tolist()
-
-        results = benchmark_cell_proportions(test_spots_metadata_mtrx, spot_composition_mtrx, column_names)
-        logging.info(f"Cell proportion benchmarking results: {results}")
-
-        # Save cell proportion results
-        prop_results_df = pd.DataFrame([results])
-        prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_{suffix}_{radius}_.csv')
         
-        
-        prop_results_df.to_csv(prop_results_name, index=False)
-        logging.info(f"Cell proportion results summary: \n{prop_results_df}")
-        print(f"Cell proportion results summary: \n{prop_results_df}")
+        results_dict = {
+            'global': global_cell_type_proportions_df,
+            'finetune': finetuned_cell_type_proportions_df
+        }
+
+        for key, test_spots_df in results_dict.items():
+            # Check if columns match
+            if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
+                logging.warning(f"test_spots_df columns: {test_spots_df.columns}, spot_composition_df columns: {spot_composition_df.columns}")
+                raise ValueError("ERROR: The column names in the input CSV files do not match or are not in the same order!")
+
+            # Convert DataFrames to numpy arrays
+            test_spots_metadata_mtrx = test_spots_df.values
+            spot_composition_mtrx = spot_composition_df.values
+            column_names = test_spots_df.columns.tolist()
+
+            results = benchmark_cell_proportions(test_spots_metadata_mtrx, spot_composition_mtrx, column_names)
+            logging.info(f"{key.capitalize()} Cell proportion benchmarking results: {results}")
+
+            # Save cell proportion results
+            prop_results_df = pd.DataFrame([results])
+            prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_summary_{key}_{suffix}_{radius}_.csv')
+            
+            prop_results_df.to_csv(prop_results_name, index=False)
+            logging.info(f"{key.capitalize()} Cell proportion results summary: \n{prop_results_df}")
+            print(f"{key.capitalize()} Cell proportion results summary: \n{prop_results_df}")
 
 
         if args.profiling_only:
@@ -313,16 +327,6 @@ def main():
             ##############################################################################
             logging.info("Running Phase 3 cell-type-level WNN optimization...")
 
-            # Run Phase 3 (will automatically use Pass 2 if available, otherwise Pass 1)
-            model.run_multimodal_phase_3_celltype_wnn(
-                radius=radius,
-                n_neighbors=30,
-                alpha_rna=0.5,
-                alpha_protein=0.5,
-                lambda_smooth=0.1,
-                min_cells_per_cluster=5,
-                use_pass=None  # Let it automatically determine which pass to use
-            )
 
             # Calculate Phase 3 metrics for cell proportions
             phase3_proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_phase3_results.csv")

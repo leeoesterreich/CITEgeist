@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=0-39  # 4 lambda_reg * 5 alpha_elastic * 2 test sets = 40 combinations
+#SBATCH --array=0-1  # 2 test sets only
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -23,20 +23,15 @@ echo "Loaded gurobi module"
 cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
-# Define parameter arrays
-lambda_reg_values=(0.0001 0.001 0.01 0.1)
-alpha_elastic_values=(0.0 0.2 0.5 0.8 1.0)  # 0=L2, 1=L1
+# Define parameter arrays (fixed values)
+lambda_reg=1
+alpha_elastic=0.5  # 0=L2, 1=L1
 TEST_SETS=("mixed" "high_seg")
 
-# Calculate indices for each parameter based on array task ID
-test_set_index=$((SLURM_ARRAY_TASK_ID % 2))
-combined_index=$((SLURM_ARRAY_TASK_ID / 2))
-lambda_index=$((combined_index / 5))
-alpha_index=$((combined_index % 5))
+# Calculate index for the test set based on array task ID
+test_set_index=$SLURM_ARRAY_TASK_ID
 
-# Get the actual parameter values
-lambda_reg=${lambda_reg_values[$lambda_index]}
-alpha_elastic=${alpha_elastic_values[$alpha_index]}
+# Get the test set
 TEST_SET=${TEST_SETS[$test_set_index]}
 
 INPUT_FOLDER="replicates/${TEST_SET}/"
@@ -54,8 +49,8 @@ echo "Output folder: $OUTPUT_FOLDER"
 # Run the Python script with these parameters
 /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/bin/python tests/test_citegeist_simulated.py \
     --radius 4 \
-    --lambda_reg $lambda_reg \
-    --alpha_elastic $alpha_elastic \
+    --lambda_reg 1 \
+    --alpha_elastic 0.5 \
     --input_folder $INPUT_FOLDER \
     --output_folder $OUTPUT_FOLDER \
     --skip_pass2 \
