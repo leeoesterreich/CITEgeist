@@ -17,12 +17,10 @@ from .gurobi_impl import (
     map_antibodies_to_profiles, 
     optimize_cell_proportions, 
     optimize_gene_expression, 
-    analyze_zero_inflation_patterns,
-    suggest_zero_inflation_threshold,
     compute_global_prior,
     normalize_counts,
     validate_prior_effect,
-    optimize_multimodal_phase_3_celltype_wnn
+    finetune_cell_proportions
 )
 from .utils import (
     validate_cell_profile_dict, 
@@ -65,7 +63,10 @@ class CitegeistModel:
 
         self.sample_name = sample_name
             
-        self.output_folder = output_folder
+        if output_folder is None:
+            raise ValueError("output_folder must be provided")
+        self.output_folder = str(output_folder)  # Ensure string type
+        
         os.makedirs(self.output_folder, exist_ok=True)
         setup_logging(self.output_folder, self.sample_name)
         
@@ -135,9 +136,15 @@ class CitegeistModel:
         Returns:
             None
         """
+        if self.adata is None:
+            raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
+        
         if 'feature_types' not in self.adata.var.columns:
             raise ValueError("The 'feature_types' column is missing in `adata.var`. Cannot split data.")
         
+        if self.adata is None:
+            raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
+
         self.adata.var_names_make_unique()
         
         if self.gene_expression_adata or self.antibody_capture_adata :
@@ -345,30 +352,58 @@ class CitegeistModel:
 
         print("Antibody capture data preprocessing completed: Winsorized, Gaussian smoothed, CLR applied, no NaNs detected.")
 
-    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5):
-            """
-            Orchestrates the cell proportion optimization workflow.
-            Delegates optimization to `optimize_cell_proportions` in `gurobi_impl.py`.
-            """
-            if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
-                raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
+    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5, max_workers=None, checkpoint_interval=100):
+        """
+        Orchestrates the cell proportion optimization workflow.
+        Delegates optimization to `optimize_cell_proportions` and `finetune_cell_proportions` in `gurobi_impl.py`.
 
-            if self.cell_profile_dict is None:
-                raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
+        Args:
+            tolerance (float): Convergence tolerance for EM algorithm
+            max_iterations (int): Maximum number of iterations
+            lambda_reg (float): Regularization strength
+            alpha (float): L1-L2 tradeoff factor (0 = L2, 1 = L1)
+            max_workers (int, optional): Maximum number of parallel workers for finetuning
+            checkpoint_interval (int): Number of spots between checkpoints during finetuning
+        """
+        if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
+            raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
 
-            profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(self.antibody_capture_adata, self.cell_profile_dict)
-            
-            Y_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
-            
-            spot_names = self.antibody_capture_adata.obs_names
-            cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-            
-            # Store and save results
-            self.results['cell_prop'] = cell_type_proportions_df
-            output_file = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
-            save_results_to_output(cell_type_proportions_df, output_file)
-            print(f"Cell type proportions saved to '{output_file}'.")
-            
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
+
+        profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(self.antibody_capture_adata, self.cell_profile_dict)
+        
+        Y_values, beta_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
+        
+        # Create finetuning output directory
+        finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+        
+        os.makedirs(finetune_output_dir, exist_ok=True)
+        
+        if self.antibody_capture_adata is None:
+            raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+        
+        Y_prev, beta_prev = finetune_cell_proportions(
+            profile_based_antibody_data, 
+            cell_type_names, 
+            Y_values, 
+            beta_values, 
+            self.antibody_capture_adata, 
+            radius=8,
+            max_workers=max_workers,
+            checkpoint_interval=checkpoint_interval,
+            output_dir=finetune_output_dir,
+            rerun=True,
+            beta_vary=False
+        )
+
+        spot_names = self.antibody_capture_adata.obs_names
+        
+        global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+        finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+
+        return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
+
     def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
                             global_enrichment_weight=0.5, local_enrichment_weight=0.5,
                             max_workers=None, checkpoint_interval=100, 
@@ -398,6 +433,9 @@ class CitegeistModel:
 
         logging.info("Starting Pass 1: Error minimization with enrichment weights...")
         
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
+        
         spotwise_profiles = optimize_gene_expression(
             sample_name=self.sample_name,
             deconvolution_expression_data=self.gene_expression_adata.X,
@@ -416,9 +454,16 @@ class CitegeistModel:
             rerun=rerun
         )
 
+       
+       
         # Get dimensions for NaN imputation
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not available")
+        if 'cell_prop' not in self.results or self.results['cell_prop'] is None:
+            raise ValueError("Cell proportions not computed. Run cell proportion model first.")
+            
         N = self.gene_expression_adata.shape[0]  # number of spots
-        T = self.results.get('cell_prop').values.shape[1]  # number of cell types
+        T = self.results['cell_prop'].values.shape[1]  # number of cell types
         M = self.gene_expression_adata.shape[1]  # number of genes
         
         # Impute NaN spots for first pass
@@ -431,8 +476,11 @@ class CitegeistModel:
                 include_center=False
             )
 
+            if spotwise_profiles is None:
+                raise ValueError("Spotwise profiles not computed. Run cell expression pass 1 first.")
+
             neighbor_profiles = [
-                spotwise_profiles[i]
+                spotwise_profiles[str(i)]
                 for i in neighbor_indices
                 if i in spotwise_profiles
             ]
@@ -440,7 +488,7 @@ class CitegeistModel:
             if neighbor_profiles:
                 # Round to nearest integer for count data
                 imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles[nan_spot] = imputed_profile
+                spotwise_profiles[str(nan_spot)] = imputed_profile
                 logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 1).")
             else:
                 logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 1). Leaving as NaN.")
@@ -497,7 +545,12 @@ class CitegeistModel:
         logging.info("Computing prior from pass 1 results...")
         
         # Get gene and cell type names for validation
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not available")
         gene_names = self.gene_expression_adata.var_names
+
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
         cell_type_names = list(self.cell_profile_dict.keys())
         
         # Compute global prior with new approach
@@ -559,6 +612,10 @@ class CitegeistModel:
         if global_prior.shape != (T, M):
             raise ValueError(f"global_prior shape {global_prior.shape} does not match expected ({T}, {M})")
         
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not available")
+
+
         spotwise_profiles = optimize_gene_expression(
             sample_name=self.sample_name,
             deconvolution_expression_data=self.gene_expression_adata.X,
@@ -589,7 +646,7 @@ class CitegeistModel:
             )
 
             neighbor_profiles = [
-                spotwise_profiles[i]
+                spotwise_profiles[str(i)]
                 for i in neighbor_indices
                 if i in spotwise_profiles
             ]
@@ -597,7 +654,7 @@ class CitegeistModel:
             if neighbor_profiles:
                 # Round to nearest integer for count data
                 imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles[nan_spot] = imputed_profile
+                spotwise_profiles[str(nan_spot)] = imputed_profile
                 logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 2).")
             else:
                 logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 2). Leaving as NaN.")
@@ -651,11 +708,19 @@ class CitegeistModel:
         T = profiles[0].shape[0]
         M = profiles[0].shape[1]
         
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
+
         # Get cell type names from the dictionary
         cell_type_names = list(self.cell_profile_dict.keys())
         
         # Create combined matrix with proper cell type names and spot formatting
         spot_celltype_indices = []
+
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not available")
+
+
         for i in range(N):
             spot_name = self.gene_expression_adata.obs_names[i]  # Use actual spot names from AnnData
             for cell_type in cell_type_names:
@@ -685,6 +750,10 @@ class CitegeistModel:
 
         # Load proportions CSV
         spot_by_celltype_df = pd.read_csv(proportions_path, index_col=0)
+
+
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not available")
         
         # Debug prints before sorting
         print("\nBefore sorting:")
@@ -749,6 +818,9 @@ class CitegeistModel:
         print("Parquet spot names format:", df['Spot'].unique()[:5])
 
         # Get cell type names from the dictionary for validation
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
+        
         expected_cell_types = set(self.cell_profile_dict.keys())
         found_cell_types = set(df['CellType'].unique())
         
