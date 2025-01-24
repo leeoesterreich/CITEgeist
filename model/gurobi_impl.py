@@ -416,7 +416,7 @@ def finetune_cell_proportions(
                         profile_based_antibody_data=profile_based_antibody_data,
                         radius=radius,
                         tolerance=tolerance,
-                        lambda_reg=lambda_reg*100,
+                        lambda_reg=lambda_reg,
                         alpha=0.9,
                         beta_values=initial_beta_values,
                         beta_vary=True
