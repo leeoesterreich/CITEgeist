@@ -690,7 +690,7 @@ class CitegeistModel:
         for cell_type in spot_by_celltype_df.columns:
             self.gene_expression_adata.obs[cell_type] = spot_by_celltype_df[cell_type]
 
-        self.results['cell_prop'].values = spot_by_celltype_df.values
+        self.results['cell_prop'] = spot_by_celltype_df
         
         print("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
         
