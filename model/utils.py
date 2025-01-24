@@ -357,6 +357,11 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         else:
             raise ValueError("Normalization type must be 'range' or 'mean'")
 
+        # Assertions that also print the celltype
+        assert nrmse is not None and nrmse != np.nan, f"NRMSE is None for {cell_type}"
+        assert rmse is not None and rmse != np.nan, f"RMSE is None for {cell_type}"
+        assert mae is not None and mae != np.nan, f"MAE is None for {cell_type}"
+
         metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
         logging.info(f"Metrics for {cell_type}: RMSE={rmse:.4f}, NRMSE={nrmse:.4f}, MAE={mae:.4f}")
         
