@@ -352,7 +352,7 @@ class CitegeistModel:
 
         print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
 
-    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=20, lambda_reg=1, alpha=0.5, max_y_change=0.4, max_workers=None, checkpoint_interval=100):
+    def run_cell_proportion_model(self, radius=None, tolerance=1e-4, max_iterations=20, lambda_reg=1, alpha=0.5, max_y_change=0.4, max_workers=None, checkpoint_interval=100):
         """
         Orchestrates the cell proportion optimization workflow.
         Delegates optimization to `optimize_cell_proportions` and `finetune_cell_proportions` in `gurobi_impl.py`.
@@ -365,6 +365,10 @@ class CitegeistModel:
             max_workers (int, optional): Maximum number of parallel workers for finetuning
             checkpoint_interval (int): Number of spots between checkpoints during finetuning
         """
+
+        if radius is None:
+            raise ValueError("Radius must be provided. Run `run_cell_proportion_model` with a radius argument.")
+
         if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
 
@@ -389,7 +393,7 @@ class CitegeistModel:
             Y_values, 
             beta_values, 
             self.antibody_capture_adata, 
-            radius=4,
+            radius=radius,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=finetune_output_dir,
