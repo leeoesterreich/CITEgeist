@@ -416,8 +416,8 @@ def finetune_cell_proportions(
                         profile_based_antibody_data=profile_based_antibody_data,
                         radius=radius,
                         tolerance=tolerance,
-                        lambda_reg=lambda_reg,
-                        alpha=alpha,
+                        lambda_reg=lambda_reg*100,
+                        alpha=0.9,
                         beta_values=initial_beta_values,
                         beta_vary=True
                     )
@@ -483,7 +483,7 @@ def deconvolute_local_cell_proportions(
     beta_vary: bool = True,
     normalize_beta: bool = True,
     max_iterations: int = 20,
-    max_y_change: float = 0.2
+    max_y_change: float = 0.4
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization.
