@@ -127,6 +127,8 @@ def main():
                        help='Regularization strength for elastic net')
     parser.add_argument('--alpha_elastic', type=float, required=True, 
                        help='Elastic net mixing parameter (0=L2, 1=L1)')
+    parser.add_argument('--max_y_change', type=float, required=True, 
+                       help='Maximum allowed change in Y values between iterations (0,1)')
     parser.add_argument('--input_folder', type=str, default='.', help='Folder all requisite samples and ground truth')
     parser.add_argument('--output_folder', type=str, default='citegeist_output', help='Output folder')
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
@@ -139,8 +141,8 @@ def main():
     radius = args.radius
     lambda_reg = args.lambda_reg
     alpha_elastic = args.alpha_elastic
-    
-    variables = f"radius_{radius}_lambda_{lambda_reg}_alpha_{alpha_elastic}"
+    max_y_change = args.max_y_change
+    variables = f"radius_{radius}_lambda_{lambda_reg}_alpha_{alpha_elastic}_max_y_change_{max_y_change}"
 
     input_folder = args.input_folder
     output_folder = args.output_folder
@@ -236,7 +238,8 @@ def main():
             lambda_reg=lambda_reg,
             alpha=alpha_elastic,
             max_workers=None,
-            checkpoint_interval=100
+            checkpoint_interval=100,
+            max_y_change=max_y_change
         )
 
         

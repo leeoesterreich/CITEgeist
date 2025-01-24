@@ -326,10 +326,12 @@ def finetune_cell_proportions(
     lambda_reg: float = 1.0,
     alpha: float = 0.7,
     max_iterations: int = 20,
+    max_y_change: float = 0.4,
     beta_vary: bool = True,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
+
     rerun: bool = False
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -357,6 +359,9 @@ def finetune_cell_proportions(
             L1-L2 tradeoff (0 = purely L2, 1 = purely L1) in local solver.
         max_iterations (int):
             Maximum number of iterations for local solver.
+        max_y_change (float):
+            Maximum allowed change in Y values between iterations (default: 0.2).
+            Values are constrained to vary by at most this amount while staying in [0,1].
         beta_vary (bool):
             If True, each spot's local solver is allowed to update betas;
             if False, betas remain fixed at the values passed in initial_beta_values.
@@ -427,7 +432,8 @@ def finetune_cell_proportions(
                         alpha=alpha,
                         beta_values=initial_beta_values,
                         beta_vary=beta_vary,
-                        max_iterations=max_iterations
+                        max_iterations=max_iterations,
+                        max_y_change=max_y_change
                     )
                     futures[future] = spot_idx
 
