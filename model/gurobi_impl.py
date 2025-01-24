@@ -307,6 +307,9 @@ def optimize_cell_proportions(
         for j, ct_name in enumerate(cell_type_names):
             beta_estimates[ct_name] = beta_new[j]
 
+        # Assert that beta_new is within the range [0, 1]
+        assert np.all(beta_new >= 0) and np.all(beta_new <= 1), "Beta values must be within the range [0, 1]"
+
         beta_prev = beta_new.copy()
         Y_prev = Y_values.copy()
         iteration += 1
