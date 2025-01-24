@@ -35,6 +35,11 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
     """
     metrics = calculate_expression_metrics(ground_truth_dir, layer_dir, normalize="range", pass_number=pass_number)
     
+    # Check if all metrics are not None or Nan, if they are, print the celltype
+    for celltype, metric in metrics.items():
+        if metric['RMSE'] is None or metric['NRMSE'] is None or metric['MAE'] is None or np.isnan(metric['RMSE']) or np.isnan(metric['NRMSE']) or np.isnan(metric['MAE']):
+            print(f"Cell type {celltype} has None or NaN metrics")
+
     # Create DataFrame with metrics
     metrics_values = {
         'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
@@ -233,6 +238,7 @@ def main():
         logging.info(f"Running cell proportion model for {sample_name} ...")
 
         global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
+            radius=radius,
             tolerance=1e-4,
             max_iterations=20,
             lambda_reg=lambda_reg,
@@ -342,8 +348,13 @@ def main():
         if os.path.exists(ground_truth_dir):
             logging.info("Calculating metrics for pass 1...")
             pass1_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass1, pass_number=1)
-            logging.info(f"Pass 1 metrics:\n{pass1_metrics}")
+
+            
+            assert pass1_metrics is not None, "Pass 1 metrics are None"
+            
             print(f"Pass 1 metrics:\n{pass1_metrics}")
+            print(f"Pass 1 metrics:\n{pass1_metrics}")
+            logging.info(f"Pass 1 metrics:\n{pass1_metrics}")
             
             # Save pass 1 metrics
             metrics_path_pass1 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass1.csv")
