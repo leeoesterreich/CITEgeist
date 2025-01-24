@@ -389,7 +389,7 @@ class CitegeistModel:
             Y_values, 
             beta_values, 
             self.antibody_capture_adata, 
-            radius=8,
+            radius=4,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=finetune_output_dir,
@@ -689,8 +689,10 @@ class CitegeistModel:
         # Add cell type proportions to adata.obs
         for cell_type in spot_by_celltype_df.columns:
             self.gene_expression_adata.obs[cell_type] = spot_by_celltype_df[cell_type]
+
+        self.results['cell_prop'].values = spot_by_celltype_df.values
         
-        print("✅ Cell type proportions have been appended to adata.obs")
+        print("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
         
         
     def append_gex_to_adata(self, parquet_path=None, pass_number=2):

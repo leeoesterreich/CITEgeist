@@ -311,6 +311,9 @@ def main():
             print(f"{key.capitalize()} Cell proportion results summary: \n{prop_results_df}")
 
 
+        model.append_proportions_to_adata(key='finetuned')
+
+
         if args.profiling_only:
             logging.info("Skipping gene-expression deconvolution (profiling_only=True).")
             continue
@@ -323,8 +326,8 @@ def main():
         # Run first pass with weight parameters
         pass1_results = model.run_cell_expression_pass1(
             radius=radius,
-            alpha=alpha_elastic,  # Keep original alpha
-            lambda_reg_gex=lambda_reg,  # Use new lambda_reg parameter
+            alpha=0.5,  # Keep original alpha
+            lambda_reg_gex=0.001,  # Use new lambda_reg parameter
             max_workers=None, 
             checkpoint_interval=100, 
             output_dir="checkpoints", 
