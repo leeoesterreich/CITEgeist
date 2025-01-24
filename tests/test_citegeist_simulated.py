@@ -343,6 +343,7 @@ def main():
             logging.info("Calculating metrics for pass 1...")
             pass1_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_pass1, pass_number=1)
             logging.info(f"Pass 1 metrics:\n{pass1_metrics}")
+            print(f"Pass 1 metrics:\n{pass1_metrics}")
             
             # Save pass 1 metrics
             metrics_path_pass1 = os.path.join(output_folder, f"{sample_name}_gex_metrics_pass1.csv")
