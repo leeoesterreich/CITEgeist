@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=0-1  # 2 test sets only
+#SBATCH --array=0-69 # 2 test sets, 5 alphas, 7 lambda_regs = 70 combinations
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -24,18 +24,24 @@ cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
 # Define parameter arrays (fixed values)
-lambda_reg=1
-alpha_elastic=0.5  # 0=L2, 1=L1
+lambda_reg=(0.001 0.01 0.1 1 10 100 1000)
+alpha_elastic=(0.1 0.3 0.5 0.7 0.9)
 TEST_SETS=("mixed" "high_seg")
 
-# Calculate index for the test set based on array task ID
-test_set_index=$SLURM_ARRAY_TASK_ID
+# Calculate indices for the test set, lambda_reg, and alpha_elastic based on array task ID
+test_set_index=$((SLURM_ARRAY_TASK_ID / (5 * 7)))
+lambda_reg_index=$(( (SLURM_ARRAY_TASK_ID / 5) % 7 ))
+alpha_elastic_index=$(( SLURM_ARRAY_TASK_ID % 5 ))
 
-# Get the test set
+# Get the test set, lambda_reg, and alpha_elastic values
 TEST_SET=${TEST_SETS[$test_set_index]}
+lambda_reg=${lambda_reg[$lambda_reg_index]}
+alpha_elastic=${alpha_elastic[$alpha_elastic_index]}
 
 INPUT_FOLDER="replicates/${TEST_SET}/"
 OUTPUT_FOLDER="test_results/${TEST_SET}/"
+
+
 
 mkdir -p "$OUTPUT_FOLDER"
 
@@ -49,8 +55,8 @@ echo "Output folder: $OUTPUT_FOLDER"
 # Run the Python script with these parameters
 /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/bin/python tests/test_citegeist_simulated.py \
     --radius 4 \
-    --lambda_reg 1 \
-    --alpha_elastic 0.5 \
+    --lambda_reg $lambda_reg \
+    --alpha_elastic $alpha_elastic \
     --input_folder $INPUT_FOLDER \
     --output_folder $OUTPUT_FOLDER \
     --skip_pass2 \
