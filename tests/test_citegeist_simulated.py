@@ -248,7 +248,13 @@ def main():
         spot_composition_df = pd.read_csv(os.path.join(st_folder, f"Wu_ST_{number}_prop.csv"), index_col=0).sort_index().sort_index(axis=1)
         spot_composition_df = spot_composition_df.iloc[:, :-2]
 
+        # Sort indices numerically by spot number
+        def sort_spot_indices(df):
+            # Extract numbers from spot names and sort
+            df.index = pd.Index(df.index, name='spot')
+            return df.reindex(sorted(df.index, key=lambda x: int(x.split('_')[1]) if '_' in x else float('inf')))
 
+        spot_composition_df = sort_spot_indices(spot_composition_df)
         
         results_dict = {
             'global': global_cell_type_proportions_df,
@@ -256,6 +262,21 @@ def main():
         }
 
         for key, test_spots_df in results_dict.items():
+            # Sort test spots numerically
+            test_spots_df = sort_spot_indices(test_spots_df)
+
+            # Sort both DataFrames by index and ensure indices match
+            test_spots_df = test_spots_df.sort_index()
+            spot_composition_df = spot_composition_df.sort_index()
+
+            print(test_spots_df.index)
+            print(spot_composition_df.index)
+
+            # Verify that indices match
+            if not np.array_equal(test_spots_df.index, spot_composition_df.index):
+                logging.warning(f"test_spots_df indices: {test_spots_df.index}, spot_composition_df indices: {spot_composition_df.index}")
+                raise ValueError("ERROR: The row indices in the input CSV files do not match or are not in the same order!")
+
             # Check if columns match
             if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
                 logging.warning(f"test_spots_df columns: {test_spots_df.columns}, spot_composition_df columns: {spot_composition_df.columns}")
@@ -264,6 +285,8 @@ def main():
             # Convert DataFrames to numpy arrays
             test_spots_metadata_mtrx = test_spots_df.values
             spot_composition_mtrx = spot_composition_df.values
+
+
             column_names = test_spots_df.columns.tolist()
 
             results = benchmark_cell_proportions(test_spots_metadata_mtrx, spot_composition_mtrx, column_names)
@@ -322,63 +345,5 @@ def main():
             )
 
             
-            ##############################################################################
-            # 4) Run Phase 3 Cell-type-level WNN Optimization
-            ##############################################################################
-            logging.info("Running Phase 3 cell-type-level WNN optimization...")
-
-
-            # Calculate Phase 3 metrics for cell proportions
-            phase3_proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_phase3_results.csv")
-            phase3_spots_df = pd.read_csv(phase3_proportions_path, index_col=0).sort_index().sort_index(axis=1)
-            
-            # Convert to numpy arrays for benchmarking
-            phase3_spots_mtrx = phase3_spots_df.values
-            phase3_prop_results = benchmark_cell_proportions(phase3_spots_mtrx, spot_composition_mtrx, column_names)
-            logging.info(f"Phase 3 cell proportion benchmarking results: {phase3_prop_results}")
-
-            # Save Phase 3 cell proportion results
-            phase3_prop_results_df = pd.DataFrame([phase3_prop_results])
-            phase3_prop_results_name = os.path.join(output_folder, f'{sample_name}_cellprop_results_phase3_summary.csv')
-            phase3_prop_results_df.to_csv(phase3_prop_results_name, index=False)
-
-            # Calculate Phase 3 metrics for gene expression
-            layer_dir_phase3 = os.path.join(output_folder, f"{sample_name}_pass3/layers")
-            phase3_metrics = calculate_gex_metrics(ground_truth_dir, layer_dir_phase3, pass_number=3)
-            logging.info(f"Phase 3 metrics:\n{phase3_metrics}")
-            
-            # Save Phase 3 metrics
-            metrics_path_phase3 = os.path.join(output_folder, f"{sample_name}_gex_metrics_phase3.csv")
-            phase3_metrics.to_csv(metrics_path_phase3, index=False)
-
-            # Calculate improvements from Phase 2 to Phase 3
-            phase3_improvements_df = calculate_improvements(phase2_metrics, phase3_metrics)
-            logging.info("Improvements from Phase 2 to Phase 3:")
-            for _, row in phase3_improvements_df.iterrows():
-                logging.info(f"{row['Metric']}: {row['Improvement_Percentage']:.2f}% improvement")
-
-            # Save Phase 3 improvements
-            phase3_improvements_df.to_csv(
-                os.path.join(output_folder, f"{sample_name}_gex_improvements_phase3.csv"),
-                index=False
-            )
-
-            # Save clustering information
-            if 'phase3_clusters' in model.results:
-                cluster_info = {
-                    'proportion_clusters': model.results['phase3_clusters']['proportion_clusters'].tolist(),
-                    'expression_clusters': model.results['phase3_clusters']['expression_clusters'].tolist()
-                }
-                with open(os.path.join(output_folder, f"{sample_name}_phase3_clusters.json"), 'w') as f:
-                    json.dump(cluster_info, f)
-        else:
-            logging.warning(f"Ground truth directory not found: {ground_truth_dir}")
-            logging.warning("Skipping metric calculations and subsequent phases.")
-
-        # Clean up
-        gc.collect()
-
-    logging.info("All samples processed successfully.")
-
 if __name__ == "__main__":
     main()

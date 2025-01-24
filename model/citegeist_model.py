@@ -216,7 +216,7 @@ class CitegeistModel:
     # Preprocessing Functions
     # -----------------------------------------
     
-    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=100):
+    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=10):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
 
@@ -350,7 +350,7 @@ class CitegeistModel:
         # Update status flag
         self.preprocessed_antibody = True
 
-        print("Antibody capture data preprocessing completed: Winsorized, Gaussian smoothed, CLR applied, no NaNs detected.")
+        print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
 
     def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5, max_workers=None, checkpoint_interval=100):
         """
@@ -401,6 +401,12 @@ class CitegeistModel:
         
         global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
         finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+
+        global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
+        finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
+        
+        global_cell_type_proportions_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_global_results.csv"))
+        finetuned_cell_type_proportions_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_finetuned_results.csv"))
 
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 
@@ -591,112 +597,6 @@ class CitegeistModel:
         
         return prior_info
 
-    def run_cell_expression_pass2(self, global_prior, dimensions, radius, 
-                            alpha=0.5, lambda_reg_gex=0.001, lambda_prior_weight=0.5,
-                            max_workers=None, checkpoint_interval=100, 
-                            output_dir="checkpoints", rerun=True):
-        """
-        Run second pass with prior guidance.
-        
-        Returns:
-            Dict[str, Any]: {
-                'spotwise_profiles': Dict[int, np.ndarray],
-                'dimensions': Tuple[int, int, int]
-            }
-        """
-        # Input validation
-        if not isinstance(global_prior, np.ndarray):
-            raise TypeError("global_prior must be a numpy array")
-        
-        N, T, M = dimensions
-        if global_prior.shape != (T, M):
-            raise ValueError(f"global_prior shape {global_prior.shape} does not match expected ({T}, {M})")
-        
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression data not available")
-
-
-        spotwise_profiles = optimize_gene_expression(
-            sample_name=self.sample_name,
-            deconvolution_expression_data=self.gene_expression_adata.X,
-            cell_type_numbers_array=self.results['cell_prop'].values,
-            filtered_adata=self.gene_expression_adata,
-            radius=radius,
-            alpha=alpha,
-            lambda_reg_gex=lambda_reg_gex,
-            lambda_prior_weight=lambda_prior_weight,
-            global_prior=global_prior,
-            max_workers=max_workers,
-            checkpoint_interval=checkpoint_interval,
-            output_dir=output_dir,
-            rerun=rerun
-        )
-
-        # Get dimensions for NaN imputation
-        N = self.gene_expression_adata.shape[0]  # number of spots
-        
-        # Impute NaN spots for second pass
-        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
-        for nan_spot in nan_spots:
-            neighbor_indices = get_neighbors_with_fixed_radius(
-                nan_spot, 
-                self.gene_expression_adata, 
-                radius=radius, 
-                include_center=False
-            )
-
-            neighbor_profiles = [
-                spotwise_profiles[str(i)]
-                for i in neighbor_indices
-                if i in spotwise_profiles
-            ]
-
-            if neighbor_profiles:
-                # Round to nearest integer for count data
-                imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles[str(nan_spot)] = imputed_profile
-                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 2).")
-            else:
-                logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 2). Leaving as NaN.")
-
-        # Store second pass results
-        self.results['gene_expression_pass2'] = spotwise_profiles
-        
-        parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression_pass2.parquet")
-        self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
-        logging.info("✅ Second pass results saved.")
-
-        # Evaluate second pass
-        self.append_gex_to_adata(pass_number=2)
-        
-        layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass2/layers")
-        export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=2)
-        
-
-        # Validate prior influence
-        
-        # After completing pass 2, validate prior effect
-        validation_results = validate_prior_effect(
-            self.results['gene_expression_pass1'],
-            spotwise_profiles,
-            global_prior
-        )
-        
-        # Store validation results
-        if validation_results:
-            validation_path = os.path.join(
-                self.output_folder, 
-                f"{self.sample_name}_prior_validation_metrics.json"
-            )
-            with open(validation_path, 'w') as f:
-                json.dump(validation_results, f, indent=2)
-        
-        return {
-            'spotwise_profiles': spotwise_profiles,
-            'dimensions': dimensions,
-            'prior_validation': validation_results
-        }
-
 
     def _save_profiles_to_parquet(self, profiles, path):
         """Helper method to save profiles to parquet format with consistent naming."""
@@ -743,10 +643,10 @@ class CitegeistModel:
         df.to_parquet(path, compression="gzip")
         logging.info(f"Saved profiles to {path} with cell types: {cell_type_names}")
 
-    def append_proportions_to_adata(self, proportions_path=None):
+    def append_proportions_to_adata(self, proportions_path=None, key='finetuned'):
         """Append cell type proportions to AnnData object."""
         if proportions_path is None:
-            proportions_path = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_results.csv')
+            proportions_path = os.path.join(self.output_folder, f'{self.sample_name}_cell_prop_{key}_results.csv')
 
         # Load proportions CSV
         spot_by_celltype_df = pd.read_csv(proportions_path, index_col=0)

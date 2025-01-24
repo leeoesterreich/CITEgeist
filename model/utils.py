@@ -336,8 +336,11 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
             continue
 
         # Subset and normalize data
-        gt_df = np.log1p(gt_df.loc[common_genes, common_spots])
-        pred_df = np.log1p(pred_df.loc[common_genes, common_spots])
+        gt_subset = gt_df.reindex(index=common_genes, columns=common_spots)
+        pred_subset = pred_df.reindex(index=common_genes, columns=common_spots)
+        
+        gt_df = pd.DataFrame(np.log1p(gt_subset.values), index=common_genes, columns=common_spots)
+        pred_df = pd.DataFrame(np.log1p(pred_subset.values), index=common_genes, columns=common_spots)
 
         # Calculate metrics
         mse = mean_squared_error(gt_df.values, pred_df.values)

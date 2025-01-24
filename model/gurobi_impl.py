@@ -156,47 +156,49 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
     existing_markers = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
-        logging.info("Adata variables: ", adata.var_names)
-        logging.info("Antibody markers: ", all_markers)
+        logging.info("Adata variables: %s", adata.var_names)
+        logging.info("Antibody markers: %s", all_markers)
         raise ValueError("No matching antibody markers found in adata.var_names.")
     
     adata.var_names_make_unique()
-    
     adata = adata[:, existing_markers]
 
     # Step 2: Extract and prepare antibody capture data
     antibody_capture_data = adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X
     antibody_capture_var_names = np.array(adata.var_names)
 
-    cell_type_names = list(cell_profile_dict.keys())  # Cell type order
-    N = antibody_capture_data.shape[0]  # Number of spots
-    T = len(cell_type_names)  # Number of cell types
+    cell_type_names = list(cell_profile_dict.keys())
+    N = antibody_capture_data.shape[0]
+    T = len(cell_type_names)
 
     profile_based_antibody_data = np.zeros((N, T))
 
+    # Step 3: Map antibodies to profiles
     for profile_idx, (profile_name, profile_markers) in enumerate(cell_profile_dict.items()):
         major_markers = profile_markers.get("Major", [])
-        relevant_marker_indices = [
-            np.where(antibody_capture_var_names == marker)[0][0]
-            for marker in major_markers if marker in antibody_capture_var_names
-        ]
-        if relevant_marker_indices:
-            profile_based_antibody_data[:, profile_idx] = antibody_capture_data[:, relevant_marker_indices].mean(axis=1)
-        else:
-            logging.warning(f"⚠️ No valid markers found for profile '{profile_name}'.")
+        try:
+            relevant_marker_indices = [
+                np.where(antibody_capture_var_names == marker)[0][0]
+                for marker in major_markers if marker in antibody_capture_var_names
+            ]
+            if relevant_marker_indices:
+                profile_based_antibody_data[:, profile_idx] = antibody_capture_data[:, relevant_marker_indices].mean(axis=1)
+            else:
+                logging.warning(f"No valid markers found for profile '{profile_name}'")
+        except IndexError as e:
+            logging.warning(f"Error processing markers for profile '{profile_name}': {str(e)}")
 
-    # Step 3: Normalize columns to prevent zero-division
+    # Step 4: Normalize with safety checks
     column_max = np.max(profile_based_antibody_data, axis=0)
     zero_columns = column_max == 0
     if np.any(zero_columns):
-        logging.warning(f"⚠️ Warning: Zero columns detected. Adding epsilon to prevent NaNs.")
+        logging.warning("Zero columns detected. Adding epsilon to prevent NaNs.")
         column_max[zero_columns] = 1e-6
-
+    
     profile_based_antibody_data /= column_max
 
-    # Validate final data
     if np.isnan(profile_based_antibody_data).any():
-        raise ValueError("NaN values detected in `profile_based_antibody_data` after mapping.")
+        raise ValueError("NaN values detected in profile_based_antibody_data after mapping.")
 
     return profile_based_antibody_data, cell_type_names
 
@@ -206,31 +208,30 @@ def optimize_cell_proportions(
     tolerance: float = 1e-4,
     max_iterations: int = 50,
     lambda_reg: float = 1,
-    alpha: float = 0.7
+    alpha: float = 0.7,
+    normalize_beta: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Perform EM-based optimization for cell type proportions using Gurobi, returning
-    both the cell proportion matrix (Y_values) and final beta estimates.
+    Perform EM-based optimization for cell type proportions using Gurobi.
 
     Args:
-        profile_based_antibody_data (np.ndarray): N x T matrix of mapped antibody data.
-        cell_type_names (List[str]): List of cell type names.
-        tolerance (float): Convergence tolerance for EM algorithm.
-        max_iterations (int): Maximum number of iterations.
-        lambda_reg (float): Regularization strength.
-        alpha (float): L1-L2 tradeoff factor (0 = L2, 1 = L1).
+        profile_based_antibody_data: N x T matrix of mapped antibody data
+        cell_type_names: List of cell type names
+        tolerance: Convergence tolerance for EM algorithm
+        max_iterations: Maximum number of iterations
+        lambda_reg: Regularization strength
+        alpha: L1-L2 tradeoff factor (0 = L2, 1 = L1)
+        normalize_beta: Whether to normalize beta values
 
     Returns:
-        Tuple[np.ndarray, np.ndarray]:
-            - np.ndarray: Y_values (N x T), optimized cell proportions per spot.
-            - np.ndarray: beta_values (T,), final beta estimates per cell type.
+        Tuple[np.ndarray, np.ndarray]: Y_values (N x T), beta_values (T,)
     """
     import gurobipy as gp
     from gurobipy import GRB
 
     N, T = profile_based_antibody_data.shape
 
-    # Initialize beta estimates.
+    # Initialize beta estimates
     beta_estimates = {ct: 1.0 for ct in cell_type_names}
     beta_prev = np.zeros(T)
     Y_prev = np.zeros((N, T))
@@ -262,22 +263,36 @@ def optimize_cell_proportions(
 
         # Sum of proportions constraints
         for i in range(N):
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.95)
-            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.05)
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.9)
+            model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.2)
 
-        model.optimize()
+        try:
+            model.optimize()
+        except Exception as e:
+            logging.error(f"Optimization error: {str(e)}")
+            raise ValueError("Gurobi optimization failed") from e
 
         if model.status == GRB.OPTIMAL:
             Y_values = np.array([[Y[i, j].X for j in range(T)] for i in range(N)])
         else:
-            raise ValueError("Gurobi optimization failed to converge.")
+            raise ValueError("Gurobi optimization failed to converge")
 
         # Update beta
-        beta_new = np.array([
-            np.dot(profile_based_antibody_data[:, j], Y_values[:, j]) / np.dot(Y_values[:, j], Y_values[:, j])
-            if np.dot(Y_values[:, j], Y_values[:, j]) > 0 else 0.0
-            for j in range(T)
-        ])
+        beta_new = np.zeros(T)
+        for j in range(T):
+            Y_j = Y_values[:, j]
+            S_j = profile_based_antibody_data[:, j]
+            denominator = np.dot(Y_j, Y_j)
+            
+            if denominator > 0:
+                beta_new[j] = np.dot(S_j, Y_j) / denominator
+            beta_new[j] = max(beta_new[j], 0.0)  # Ensure non-negative
+
+        # Optionally normalize beta values
+        if normalize_beta:
+            max_beta = np.max(beta_new)
+            if max_beta > 0:
+                beta_new = beta_new / max_beta
 
         # Convergence checks
         beta_diff = np.linalg.norm(beta_new - beta_prev)
@@ -288,17 +303,15 @@ def optimize_cell_proportions(
             logging.info("Convergence achieved.")
             break
 
+        # Update estimates for next iteration
         for j, ct_name in enumerate(cell_type_names):
             beta_estimates[ct_name] = beta_new[j]
 
-        beta_prev = beta_new
-        Y_prev = Y_values
+        beta_prev = beta_new.copy()
+        Y_prev = Y_values.copy()
         iteration += 1
 
-    # Convert final beta estimates to an array for clarity
-    final_beta_values = np.array([beta_estimates[ct] for ct in cell_type_names])
-
-    return Y_values, final_beta_values
+    return Y_values, beta_new
 
 
 
