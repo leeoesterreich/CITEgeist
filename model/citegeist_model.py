@@ -389,7 +389,7 @@ class CitegeistModel:
             Y_values, 
             beta_values, 
             self.antibody_capture_adata, 
-            radius=8,
+            radius=4,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
             output_dir=finetune_output_dir,
