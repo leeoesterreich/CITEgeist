@@ -24,7 +24,7 @@ cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
 # Define parameter arrays (fixed values)
-lambda_reg=1000
+lambda_reg=1
 alpha_elastic=0.5  # 0=L2, 1=L1
 TEST_SETS=("mixed" "high_seg")
 

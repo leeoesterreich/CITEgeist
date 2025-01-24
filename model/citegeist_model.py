@@ -394,7 +394,7 @@ class CitegeistModel:
             checkpoint_interval=checkpoint_interval,
             output_dir=finetune_output_dir,
             rerun=True,
-            beta_vary=False
+            beta_vary=True
         )
 
         spot_names = self.antibody_capture_adata.obs_names
