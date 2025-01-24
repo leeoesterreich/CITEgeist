@@ -470,6 +470,180 @@ def finetune_cell_proportions(
     return Y_refined, initial_beta_values
 
 
+
+def deconvolute_local_cell_proportions(
+    spot_idx: int,
+    adata: sc.AnnData,
+    profile_based_antibody_data: np.ndarray,
+    radius: float = 2.0,
+    tolerance: float = 1e-4,
+    lambda_reg: float = 1.0,
+    alpha: float = 0.7,
+    beta_values: Optional[np.ndarray] = None,
+    beta_vary: bool = True,
+    normalize_beta: bool = True,
+    max_iterations: int = 20
+) -> Optional[np.ndarray]:
+    """
+    Refine cell proportions for a single spot via local neighborhood optimization,
+    optionally allowing local beta updates. If beta_vary is False, the local solver
+    keeps beta fixed at the passed-in beta_values.
+
+    Args:
+        spot_idx (int):
+            Index of the spot to refine in the AnnData object.
+        adata (sc.AnnData):
+            AnnData containing spot-level spatial coordinates in obsm['spatial'].
+        profile_based_antibody_data (np.ndarray):
+            (N x T) global antibody intensities for N spots, T cell types.
+        radius (float):
+            Neighborhood radius for identifying neighbors.
+        tolerance (float):
+            Convergence threshold for Y- and beta-updates (if beta_vary=True).
+        lambda_reg (float):
+            Strength of elastic net regularization.
+        alpha (float):
+            L1-L2 tradeoff for the elastic net (0 = L2, 1 = L1).
+        beta_values (Optional[np.ndarray]):
+            Global or initial local beta values (length T). If None and beta_vary=True,
+            local betas initialize at 1.0 each.
+        beta_vary (bool):
+            If True, local betas are iteratively updated.
+            If False, beta_values remain fixed throughout optimization.
+        normalize_beta (bool):
+            Whether to normalize beta values after updates.
+        max_iterations (int):
+            Maximum iterations allowed for EM-like steps within this local function.
+
+    Returns:
+        Optional[np.ndarray]:
+            Refined proportions (T,) for the specified spot, or None on failure.
+    """
+    import gurobipy as gp
+    from gurobipy import GRB
+
+    # Identify indices of spot's local neighborhood
+    neighbor_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
+    if not neighbor_indices:
+        logging.error(f"[Local Cell Props] No valid neighbors for spot {spot_idx}.")
+        return None
+    neighbor_indices = np.array(neighbor_indices, dtype=int)
+
+    local_antibody_data = profile_based_antibody_data[neighbor_indices, :]
+    local_N, T = local_antibody_data.shape
+
+    if local_N == 0:
+        logging.error(f"[Local Cell Props] Spot {spot_idx} has empty local antibody data.")
+        return None
+
+    # Identify center spot's position in neighbor list
+    try:
+        center_local_idx = np.where(neighbor_indices == spot_idx)[0][0]
+    except IndexError:
+        logging.error(f"[Local Cell Props] Could not find spot {spot_idx} in neighbor list.")
+        return None
+
+    # Initialize local betas
+    if beta_values is not None and len(beta_values) == T:
+        local_beta = beta_values.copy()
+    else:
+        local_beta = np.ones(T, dtype=float)
+
+    beta_prev = local_beta.copy()
+
+    # Initialize local Y to something uniform
+    Y_prev = np.full((local_N, T), 1.0 / T)
+
+    iteration = 0
+    while iteration < max_iterations:
+        try:
+            model = gp.Model(f"Local_Cell_Props_spot_{spot_idx}")
+            model.setParam('OutputFlag', 0)
+            model.setParam('TimeLimit', 60)  # Add reasonable time limit
+            model.setParam('MIPGap', 0.01)   # Add optimization gap tolerance
+
+            # Build Y variables in [0, 1]
+            Y_vars = model.addVars(local_N, T, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="Y")
+
+            # Summation constraints on each row
+            for i in range(local_N):
+                model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) >= 0.9)
+                model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) <= 1.2)
+
+            # Objective: sum of squared differences + elastic net
+            error_terms = []
+            for i in range(local_N):
+                for j in range(T):
+                    S_ij = local_antibody_data[i, j]
+                    error_terms.append((S_ij - local_beta[j] * Y_vars[i, j]) ** 2)
+
+            total_error = gp.quicksum(error_terms)
+            l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
+            l2 = gp.quicksum(Y_vars[i, j] * Y_vars[i, j] for i in range(local_N) for j in range(T))
+            reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
+            model.setObjective(total_error + reg_term, GRB.MINIMIZE)
+
+            model.optimize()
+
+            if model.status != GRB.OPTIMAL:
+                logging.warning(f"[Local Cell Props] Spot {spot_idx} local optimization not optimal (status: {model.status}).")
+                return None
+
+            # Extract current Y solution
+            Y_values = np.array([[Y_vars[i, j].X for j in range(T)] for i in range(local_N)])
+
+            # Update local beta if allowed
+            if beta_vary:
+                new_beta = np.zeros(T, dtype=float)
+                for j in range(T):
+                    Y_j = Y_values[:, j]
+                    S_j = local_antibody_data[:, j]
+                    denominator = np.dot(Y_j, Y_j)
+                    
+                    if denominator > 1e-15:
+                        new_beta[j] = np.dot(S_j, Y_j) / denominator
+                    new_beta[j] = max(new_beta[j], 0.0)  # Ensure non-negative
+
+                # Optionally normalize beta values
+                if normalize_beta:
+                    max_beta = np.max(new_beta)
+                    if max_beta > 0:
+                        new_beta = new_beta / max_beta
+            else:
+                new_beta = local_beta.copy()
+
+            # Check convergence
+            beta_diff = np.linalg.norm(new_beta - beta_prev) if beta_vary else 0.0
+            Y_diff = np.linalg.norm(Y_values - Y_prev)
+
+            logging.debug(f"Spot {spot_idx} - Iteration {iteration + 1}: "
+                        f"beta_diff={beta_diff:.6f}, Y_diff={Y_diff:.6f}")
+
+            if beta_diff < tolerance and Y_diff < tolerance:
+                logging.debug(f"Spot {spot_idx} converged after {iteration + 1} iterations")
+                Y_prev = Y_values
+                local_beta = new_beta
+                break
+
+            # Prepare for next iteration
+            Y_prev = Y_values.copy()
+            local_beta = new_beta.copy()
+            beta_prev = new_beta.copy()
+            iteration += 1
+
+        except Exception as e:
+            logging.error(f"Error in local optimization for spot {spot_idx}: {str(e)}")
+            return None
+
+        finally:
+            if 'model' in locals():
+                del model
+            gc.collect()
+
+    # Return just the center row of Y for this spot
+    return Y_prev[center_local_idx, :]
+
+
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################
@@ -885,177 +1059,6 @@ def optimize_gene_expression(
 
     return spotwise_gene_expression_profiles
 
-def deconvolute_local_cell_proportions(
-    spot_idx: int,
-    adata: sc.AnnData,
-    profile_based_antibody_data: np.ndarray,
-    radius: float = 2.0,
-    tolerance: float = 1e-4,
-    lambda_reg: float = 1.0,
-    alpha: float = 0.7,
-    beta_values: Optional[np.ndarray] = None,
-    beta_vary: bool = True,
-    normalize_beta: bool = True,
-    max_iterations: int = 20
-) -> Optional[np.ndarray]:
-    """
-    Refine cell proportions for a single spot via local neighborhood optimization,
-    optionally allowing local beta updates. If beta_vary is False, the local solver
-    keeps beta fixed at the passed-in beta_values.
-
-    Args:
-        spot_idx (int):
-            Index of the spot to refine in the AnnData object.
-        adata (sc.AnnData):
-            AnnData containing spot-level spatial coordinates in obsm['spatial'].
-        profile_based_antibody_data (np.ndarray):
-            (N x T) global antibody intensities for N spots, T cell types.
-        radius (float):
-            Neighborhood radius for identifying neighbors.
-        tolerance (float):
-            Convergence threshold for Y- and beta-updates (if beta_vary=True).
-        lambda_reg (float):
-            Strength of elastic net regularization.
-        alpha (float):
-            L1-L2 tradeoff for the elastic net (0 = L2, 1 = L1).
-        beta_values (Optional[np.ndarray]):
-            Global or initial local beta values (length T). If None and beta_vary=True,
-            local betas initialize at 1.0 each.
-        beta_vary (bool):
-            If True, local betas are iteratively updated.
-            If False, beta_values remain fixed throughout optimization.
-        normalize_beta (bool):
-            Whether to normalize beta values after updates.
-        max_iterations (int):
-            Maximum iterations allowed for EM-like steps within this local function.
-
-    Returns:
-        Optional[np.ndarray]:
-            Refined proportions (T,) for the specified spot, or None on failure.
-    """
-    import gurobipy as gp
-    from gurobipy import GRB
-
-    # Identify indices of spot's local neighborhood
-    neighbor_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
-    if not neighbor_indices:
-        logging.error(f"[Local Cell Props] No valid neighbors for spot {spot_idx}.")
-        return None
-    neighbor_indices = np.array(neighbor_indices, dtype=int)
-
-    local_antibody_data = profile_based_antibody_data[neighbor_indices, :]
-    local_N, T = local_antibody_data.shape
-
-    if local_N == 0:
-        logging.error(f"[Local Cell Props] Spot {spot_idx} has empty local antibody data.")
-        return None
-
-    # Identify center spot's position in neighbor list
-    try:
-        center_local_idx = np.where(neighbor_indices == spot_idx)[0][0]
-    except IndexError:
-        logging.error(f"[Local Cell Props] Could not find spot {spot_idx} in neighbor list.")
-        return None
-
-    # Initialize local betas
-    if beta_values is not None and len(beta_values) == T:
-        local_beta = beta_values.copy()
-    else:
-        local_beta = np.ones(T, dtype=float)
-
-    beta_prev = local_beta.copy()
-
-    # Initialize local Y to something uniform
-    Y_prev = np.full((local_N, T), 1.0 / T)
-
-    iteration = 0
-    while iteration < max_iterations:
-        try:
-            model = gp.Model(f"Local_Cell_Props_spot_{spot_idx}")
-            model.setParam('OutputFlag', 0)
-            model.setParam('TimeLimit', 60)  # Add reasonable time limit
-            model.setParam('MIPGap', 0.01)   # Add optimization gap tolerance
-
-            # Build Y variables in [0, 1]
-            Y_vars = model.addVars(local_N, T, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="Y")
-
-            # Summation constraints on each row
-            for i in range(local_N):
-                model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) >= 0.9)
-                model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) <= 1.2)
-
-            # Objective: sum of squared differences + elastic net
-            error_terms = []
-            for i in range(local_N):
-                for j in range(T):
-                    S_ij = local_antibody_data[i, j]
-                    error_terms.append((S_ij - local_beta[j] * Y_vars[i, j]) ** 2)
-
-            total_error = gp.quicksum(error_terms)
-            l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
-            l2 = gp.quicksum(Y_vars[i, j] * Y_vars[i, j] for i in range(local_N) for j in range(T))
-            reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
-            model.setObjective(total_error + reg_term, GRB.MINIMIZE)
-
-            model.optimize()
-
-            if model.status != GRB.OPTIMAL:
-                logging.warning(f"[Local Cell Props] Spot {spot_idx} local optimization not optimal (status: {model.status}).")
-                return None
-
-            # Extract current Y solution
-            Y_values = np.array([[Y_vars[i, j].X for j in range(T)] for i in range(local_N)])
-
-            # Update local beta if allowed
-            if beta_vary:
-                new_beta = np.zeros(T, dtype=float)
-                for j in range(T):
-                    Y_j = Y_values[:, j]
-                    S_j = local_antibody_data[:, j]
-                    denominator = np.dot(Y_j, Y_j)
-                    
-                    if denominator > 1e-15:
-                        new_beta[j] = np.dot(S_j, Y_j) / denominator
-                    new_beta[j] = max(new_beta[j], 0.0)  # Ensure non-negative
-
-                # Optionally normalize beta values
-                if normalize_beta:
-                    max_beta = np.max(new_beta)
-                    if max_beta > 0:
-                        new_beta = new_beta / max_beta
-            else:
-                new_beta = local_beta.copy()
-
-            # Check convergence
-            beta_diff = np.linalg.norm(new_beta - beta_prev) if beta_vary else 0.0
-            Y_diff = np.linalg.norm(Y_values - Y_prev)
-
-            logging.debug(f"Spot {spot_idx} - Iteration {iteration + 1}: "
-                        f"beta_diff={beta_diff:.6f}, Y_diff={Y_diff:.6f}")
-
-            if beta_diff < tolerance and Y_diff < tolerance:
-                logging.debug(f"Spot {spot_idx} converged after {iteration + 1} iterations")
-                Y_prev = Y_values
-                local_beta = new_beta
-                break
-
-            # Prepare for next iteration
-            Y_prev = Y_values.copy()
-            local_beta = new_beta.copy()
-            beta_prev = new_beta.copy()
-            iteration += 1
-
-        except Exception as e:
-            logging.error(f"Error in local optimization for spot {spot_idx}: {str(e)}")
-            return None
-
-        finally:
-            if 'model' in locals():
-                del model
-            gc.collect()
-
-    # Return just the center row of Y for this spot
-    return Y_prev[center_local_idx, :]
 
 def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, max_fraction=0.05):
     """
