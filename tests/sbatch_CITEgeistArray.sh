@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=0-69 # 2 test sets, 5 alphas, 7 lambda_regs = 70 combinations
+#SBATCH --array=0-209 # 2 test sets, 5 alphas, 7 lambda_regs, 3 max_y_changes = 210 combinations
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -26,17 +26,19 @@ echo "Changed to working directory"
 # Define parameter arrays (fixed values)
 lambda_reg=(0.001 0.01 0.1 1 10 100 1000)
 alpha_elastic=(0.1 0.3 0.5 0.7 0.9)
+max_y_change=(0.2 0.4 0.8)
 TEST_SETS=("mixed" "high_seg")
 
 # Calculate indices for the test set, lambda_reg, and alpha_elastic based on array task ID
 test_set_index=$((SLURM_ARRAY_TASK_ID / (5 * 7)))
 lambda_reg_index=$(( (SLURM_ARRAY_TASK_ID / 5) % 7 ))
 alpha_elastic_index=$(( SLURM_ARRAY_TASK_ID % 5 ))
-
+max_y_change_index=$(( SLURM_ARRAY_TASK_ID % 3 ))
 # Get the test set, lambda_reg, and alpha_elastic values
 TEST_SET=${TEST_SETS[$test_set_index]}
 lambda_reg=${lambda_reg[$lambda_reg_index]}
 alpha_elastic=${alpha_elastic[$alpha_elastic_index]}
+max_y_change=${max_y_change[$max_y_change_index]}
 
 INPUT_FOLDER="replicates/${TEST_SET}/"
 OUTPUT_FOLDER="test_results/${TEST_SET}/"
@@ -48,6 +50,7 @@ mkdir -p "$OUTPUT_FOLDER"
 echo "Running with parameters:"
 echo "  - lambda_reg=$lambda_reg"
 echo "  - alpha_elastic=$alpha_elastic"
+echo "  - max_y_change=$max_y_change"
 echo "  - test_set=$TEST_SET"
 echo "Input folder: $INPUT_FOLDER"
 echo "Output folder: $OUTPUT_FOLDER"
@@ -57,6 +60,7 @@ echo "Output folder: $OUTPUT_FOLDER"
     --radius 4 \
     --lambda_reg $lambda_reg \
     --alpha_elastic $alpha_elastic \
+    --max_y_change $max_y_change \
     --input_folder $INPUT_FOLDER \
     --output_folder $OUTPUT_FOLDER \
     --skip_pass2 \
