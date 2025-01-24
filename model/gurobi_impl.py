@@ -207,8 +207,8 @@ def optimize_cell_proportions(
     cell_type_names: List[str],
     tolerance: float = 1e-4,
     max_iterations: int = 50,
-    lambda_reg: float = 1,
-    alpha: float = 0.5,
+    lambda_reg: float = 0.1,
+    alpha: float = 0.1,
     normalize_beta: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
