@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=0-17 # 2 test sets, 3 alphas, 3 lambda_regs, 1 max_y_change = 18 combinations
+#SBATCH --array=0-1 # 2 test sets, 1 alpha, 1 lambda_reg, 1 max_y_change = 2 combinations
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -24,15 +24,15 @@ cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
 # Define parameter arrays (fixed values)
-lambda_reg=(0.1 1 10)
-alpha_elastic=(0.1 0.5 0.9)
+lambda_reg=(1)
+alpha_elastic=(0.9)
 max_y_change=(0.4)
 TEST_SETS=("mixed" "high_seg")
 
 # Calculate indices for the test set, lambda_reg, alpha_elastic, and max_y_change based on array task ID
-test_set_index=$((SLURM_ARRAY_TASK_ID / (3 * 3 * 1)))
-lambda_reg_index=$(((SLURM_ARRAY_TASK_ID / (3 * 1)) % 3))
-alpha_elastic_index=$(((SLURM_ARRAY_TASK_ID / 1) % 3))
+test_set_index=$((SLURM_ARRAY_TASK_ID / (1 * 1 * 1)))
+lambda_reg_index=$(((SLURM_ARRAY_TASK_ID / (1 * 1)) % 1))
+alpha_elastic_index=$(((SLURM_ARRAY_TASK_ID / 1) % 1))
 max_y_change_index=$((SLURM_ARRAY_TASK_ID % 1))
 # Get the test set, lambda_reg, and alpha_elastic values
 TEST_SET=${TEST_SETS[$test_set_index]}
