@@ -62,7 +62,9 @@ echo "Output folder: $OUTPUT_FOLDER"
     --alpha_elastic $alpha_elastic \
     --max_y_change $max_y_change \
     --input_folder $INPUT_FOLDER \
-    --output_folder $OUTPUT_FOLDER \
-    --skip_pass2 \
-    --profiling_only
+    --output_folder $OUTPUT_FOLDER 
+    
+    
+    
+
 echo "Job completed at $(date)"

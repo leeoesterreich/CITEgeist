@@ -207,8 +207,8 @@ def optimize_cell_proportions(
     cell_type_names: List[str],
     tolerance: float = 1e-4,
     max_iterations: int = 50,
-    lambda_reg: float = 0.1,
-    alpha: float = 0.1,
+    lambda_reg: float = 1.0,
+    alpha: float = 0.5,
     normalize_beta: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -324,10 +324,10 @@ def finetune_cell_proportions(
     initial_Y_values: np.ndarray,
     initial_beta_values: np.ndarray,
     adata: sc.AnnData,
-    radius: float = 8.0,
+    radius: float = 4.0,
     tolerance: float = 1e-4,
     lambda_reg: float = 1.0,
-    alpha: float = 0.7,
+    alpha: float = 0.5,
     max_iterations: int = 20,
     max_y_change: float = 0.4,
     beta_vary: bool = True,
@@ -495,7 +495,7 @@ def deconvolute_local_cell_proportions(
     radius: float = 2.0,
     tolerance: float = 1e-4,
     lambda_reg: float = 1.0,
-    alpha: float = 0.7,
+    alpha: float = 0.5,
     beta_values: Optional[np.ndarray] = None,
     beta_vary: bool = True,
     normalize_beta: bool = True,
