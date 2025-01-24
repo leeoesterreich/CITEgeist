@@ -352,7 +352,7 @@ class CitegeistModel:
 
         print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
 
-    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=50, lambda_reg=1, alpha=0.5, max_workers=None, checkpoint_interval=100):
+    def run_cell_proportion_model(self, tolerance=1e-4, max_iterations=20, lambda_reg=1, alpha=0.5, max_workers=None, checkpoint_interval=100):
         """
         Orchestrates the cell proportion optimization workflow.
         Delegates optimization to `optimize_cell_proportions` and `finetune_cell_proportions` in `gurobi_impl.py`.
@@ -394,7 +394,11 @@ class CitegeistModel:
             checkpoint_interval=checkpoint_interval,
             output_dir=finetune_output_dir,
             rerun=True,
-            beta_vary=True
+            beta_vary=True,
+            tolerance=tolerance,
+            max_iterations=max_iterations,
+            lambda_reg=lambda_reg,
+            alpha=alpha
         )
 
         spot_names = self.antibody_capture_adata.obs_names

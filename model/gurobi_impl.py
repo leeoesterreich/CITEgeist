@@ -208,7 +208,7 @@ def optimize_cell_proportions(
     tolerance: float = 1e-4,
     max_iterations: int = 50,
     lambda_reg: float = 1,
-    alpha: float = 0.7,
+    alpha: float = 0.5,
     normalize_beta: bool = True
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
@@ -325,6 +325,7 @@ def finetune_cell_proportions(
     tolerance: float = 1e-4,
     lambda_reg: float = 1.0,
     alpha: float = 0.7,
+    max_iterations: int = 20,
     beta_vary: bool = True,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
@@ -354,6 +355,8 @@ def finetune_cell_proportions(
             Elastic net regularization strength for local solver.
         alpha (float):
             L1-L2 tradeoff (0 = purely L2, 1 = purely L1) in local solver.
+        max_iterations (int):
+            Maximum number of iterations for local solver.
         beta_vary (bool):
             If True, each spot's local solver is allowed to update betas;
             if False, betas remain fixed at the values passed in initial_beta_values.
@@ -404,6 +407,10 @@ def finetune_cell_proportions(
     retry_count = 0
     max_retries = 3
 
+    logging.info("Starting local cell proportion refinement")
+    logging.info("Lambda reg: %s", lambda_reg)
+    logging.info("Alpha: %s", alpha)
+
     while retry_count < max_retries:
         try:
             with ProcessPoolExecutor(max_workers=workers) as executor:
@@ -417,9 +424,10 @@ def finetune_cell_proportions(
                         radius=radius,
                         tolerance=tolerance,
                         lambda_reg=lambda_reg,
-                        alpha=0.9,
+                        alpha=alpha,
                         beta_values=initial_beta_values,
-                        beta_vary=True
+                        beta_vary=beta_vary,
+                        max_iterations=max_iterations
                     )
                     futures[future] = spot_idx
 

@@ -230,7 +230,14 @@ def main():
         ##############################################################################
         logging.info(f"Running cell proportion model for {sample_name} ...")
 
-        global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model()
+        global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
+            tolerance=1e-4,
+            max_iterations=20,
+            lambda_reg=lambda_reg,
+            alpha=alpha_elastic,
+            max_workers=None,
+            checkpoint_interval=100
+        )
 
         
         logging.info(f"Completed cell proportion inference for {sample_name}.")
