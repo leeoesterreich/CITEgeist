@@ -482,12 +482,11 @@ def deconvolute_local_cell_proportions(
     beta_values: Optional[np.ndarray] = None,
     beta_vary: bool = True,
     normalize_beta: bool = True,
-    max_iterations: int = 20
+    max_iterations: int = 20,
+    max_y_change: float = 0.2
 ) -> Optional[np.ndarray]:
     """
-    Refine cell proportions for a single spot via local neighborhood optimization,
-    optionally allowing local beta updates. If beta_vary is False, the local solver
-    keeps beta fixed at the passed-in beta_values.
+    Refine cell proportions for a single spot via local neighborhood optimization.
 
     Args:
         spot_idx (int):
@@ -514,6 +513,9 @@ def deconvolute_local_cell_proportions(
             Whether to normalize beta values after updates.
         max_iterations (int):
             Maximum iterations allowed for EM-like steps within this local function.
+        max_y_change (float):
+            Maximum allowed change in Y values between iterations (default: 0.2).
+            Values are constrained to vary by at most this amount while staying in [0,1].
 
     Returns:
         Optional[np.ndarray]:
@@ -559,8 +561,8 @@ def deconvolute_local_cell_proportions(
         try:
             model = gp.Model(f"Local_Cell_Props_spot_{spot_idx}")
             model.setParam('OutputFlag', 0)
-            model.setParam('TimeLimit', 60)  # Add reasonable time limit
-            model.setParam('MIPGap', 0.01)   # Add optimization gap tolerance
+            model.setParam('TimeLimit', 60)
+            model.setParam('MIPGap', 0.01)
 
             # Build Y variables in [0, 1]
             Y_vars = model.addVars(local_N, T, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="Y")
@@ -569,6 +571,18 @@ def deconvolute_local_cell_proportions(
             for i in range(local_N):
                 model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) >= 0.9)
                 model.addConstr(gp.quicksum(Y_vars[i, j] for j in range(T)) <= 1.2)
+
+            # Add constraints to limit Y value changes from previous iteration
+            if iteration > 0:
+                for i in range(local_N):
+                    for j in range(T):
+                        prev_value = Y_prev[i, j]
+                        # Lower bound: max(0, prev_value - max_y_change)
+                        # Upper bound: min(1, prev_value + max_y_change)
+                        lb = max(0.0, prev_value - max_y_change)
+                        ub = min(1.0, prev_value + max_y_change)
+                        model.addConstr(Y_vars[i, j] >= lb)
+                        model.addConstr(Y_vars[i, j] <= ub)
 
             # Objective: sum of squared differences + elastic net
             error_terms = []
