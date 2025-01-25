@@ -40,7 +40,8 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
         if metric['RMSE'] is None or metric['NRMSE'] is None or metric['MAE'] is None or np.isnan(metric['RMSE']) or np.isnan(metric['NRMSE']) or np.isnan(metric['MAE']):
             print(f"Cell type {celltype} has None or NaN metrics")
 
-    # Create DataFrame with metrics
+    # Create DataFrame with metrics while excluding None or NaN values
+    
     metrics_values = {
         'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
         'Metric': [
@@ -48,12 +49,12 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
             'Median NRMSE', 'Average MAE', 'Median MAE'
         ],
         'Value': [
-            np.mean([m['RMSE'] for m in metrics.values()]),
-            np.median([m['RMSE'] for m in metrics.values()]),
-            np.mean([m['NRMSE'] for m in metrics.values()]),
-            np.median([m['NRMSE'] for m in metrics.values()]),
-            np.mean([m['MAE'] for m in metrics.values()]),
-            np.median([m['MAE'] for m in metrics.values()])
+            np.nanmean([m['RMSE'] for m in metrics.values() if m['RMSE'] is not None]),
+            np.nanmedian([m['RMSE'] for m in metrics.values() if m['RMSE'] is not None]),
+            np.nanmean([m['NRMSE'] for m in metrics.values() if m['NRMSE'] is not None]),
+            np.nanmedian([m['NRMSE'] for m in metrics.values() if m['NRMSE'] is not None]),
+            np.nanmean([m['MAE'] for m in metrics.values() if m['MAE'] is not None]),
+            np.nanmedian([m['MAE'] for m in metrics.values() if m['MAE'] is not None])
         ]
     }
     return pd.DataFrame(metrics_values)
