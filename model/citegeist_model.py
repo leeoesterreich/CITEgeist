@@ -699,7 +699,7 @@ class CitegeistModel:
         print("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
         
         
-    def append_gex_to_adata(self, parquet_path=None, pass_number=2):
+    def append_gex_to_adata(self, parquet_path=None, pass_number=1):
         """
         Append gene expression layers from a Parquet file back into the gene_expression_adata object.
         """
