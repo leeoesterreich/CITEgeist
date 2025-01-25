@@ -809,7 +809,7 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         # Objective terms
         obj_terms = []
-        total_prop = np.sum(cell_type_numbers_array[spot_idx, :]) + 1e-10  # For normalizing
+        # total_prop = np.sum(cell_type_numbers_array[spot_idx, :]) + 1e-10  # For normalizing
         
         # Add base terms
         for k in range(M):
@@ -819,8 +819,13 @@ def deconvolute_spot_with_neighbors_with_prior(
                     # Base enrichment term
                     enrichment_weight = gene_specific_enrichment[k, j]
                     cell_type_weight = neighborhood_cell_type_numbers[len(neighborhood_indices) // 2, j]
-                    base_term = enrichment_weight * cell_type_weight * X[j, k]
+
+                    randomness = 0.9 + 0.2 * np.random.random()
+                    
+                    base_term = enrichment_weight * cell_type_weight * randomness * X[j,k]
                     obj_terms.append(base_term)
+                    # base_term = enrichment_weight * cell_type_weight * X[j, k]
+                    # obj_terms.append(base_term)
 
                     # Add prior-based penalty if available
                     if global_prior is not None and lambda_prior_weight > 0:
@@ -832,21 +837,21 @@ def deconvolute_spot_with_neighbors_with_prior(
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
 
-        # L1 term (sparsity)
-        l1_terms = []
-        for j in range(T):
-            for k in range(M):
-                if (j, k) in X:
-                    l1_terms.append(X[j, k])
-        obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
+        # # L1 term (sparsity)
+        # l1_terms = []
+        # for j in range(T):
+        #     for k in range(M):
+        #         if (j, k) in X:
+        #             l1_terms.append(X[j, k])
+        # obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
         
-        # L2 term (smoothing)
-        l2_terms = []
-        for j in range(T):
-            for k in range(M):
-                if (j, k) in X:
-                    l2_terms.append(X[j, k] * X[j, k])
-        obj_terms.append(-lambda_reg_gex * (1 - alpha) * gp.quicksum(l2_terms))
+        # # L2 term (smoothing)
+        # l2_terms = []
+        # for j in range(T):
+        #     for k in range(M):
+        #         if (j, k) in X:
+        #             l2_terms.append(X[j, k] * X[j, k])
+        # obj_terms.append(-lambda_reg_gex * (1 - alpha) * gp.quicksum(l2_terms))
 
         # Maximize the sum of all terms
         model.setObjective(
