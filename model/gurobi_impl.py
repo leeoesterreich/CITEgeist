@@ -837,13 +837,13 @@ def deconvolute_spot_with_neighbors_with_prior(
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
 
-        # # L1 term (sparsity)
-        # l1_terms = []
-        # for j in range(T):
-        #     for k in range(M):
-        #         if (j, k) in X:
-        #             l1_terms.append(X[j, k])
-        # obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
+        # L1 term (sparsity)
+        l1_terms = []
+        for j in range(T):
+            for k in range(M):
+                if (j, k) in X:
+                    l1_terms.append(X[j, k])
+        obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
         
         # # L2 term (smoothing)
         # l2_terms = []
