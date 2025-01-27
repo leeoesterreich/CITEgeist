@@ -1,4 +1,3 @@
-Benchmarking scripts
 # Benchmarking Scripts
 
 This folder contains scripts for benchmarking spatial transcriptomics deconvolution methods.
