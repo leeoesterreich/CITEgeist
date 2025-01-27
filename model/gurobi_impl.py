@@ -164,7 +164,7 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
     adata = adata[:, existing_markers]
 
     # Step 2: Extract and prepare antibody capture data
-    antibody_capture_data = adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X
+    antibody_capture_data = adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X.X
     antibody_capture_var_names = np.array(adata.var_names)
 
     cell_type_names = list(cell_profile_dict.keys())
@@ -721,9 +721,13 @@ def deconvolute_spot_with_neighbors_with_prior(
         neighborhood_expression_data = deconvolution_expression_data[neighborhood_indices, :]
         neighborhood_cell_type_numbers = cell_type_numbers_array[neighborhood_indices, :]
 
-        # Compute expression-aware enrichment for each gene
-        gene_specific_enrichment = np.zeros((M, T))
+        # Compute normalized cell type weights to avoid abundance bias
+        total_celltype_counts = np.sum(cell_type_numbers_array, axis=0) + 1e-10
+        celltype_frequencies = total_celltype_counts / np.sum(total_celltype_counts)
+        inverse_frequency_weights = 1.0 / (celltype_frequencies + 1e-10)
+        normalized_weights = inverse_frequency_weights / np.max(inverse_frequency_weights)
 
+        # Modified enrichment calculation
         def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
             """
             Compute expression-aware enrichment scores.
@@ -743,15 +747,22 @@ def deconvolute_spot_with_neighbors_with_prior(
             if not np.any(high_expr_spots):
                 return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
 
-            high_expr_props = np.mean(cell_type_props[high_expr_spots], axis=0)
-            background_props = np.mean(cell_type_props, axis=0)
+            # Normalize cell type proportions by their global frequency
+            normalized_props = cell_type_props / (celltype_frequencies + 1e-10)
+            
+            high_expr_props = np.mean(normalized_props[high_expr_spots], axis=0)
+            background_props = np.mean(normalized_props, axis=0)
 
             epsilon = 1e-10
             enrichment = high_expr_props / (background_props + epsilon)
+            
+            # Apply smoothing to avoid extreme values
             smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
             return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
 
-        # Compute enrichment scores
+        # Compute expression-aware enrichment for each gene
+        gene_specific_enrichment = np.zeros((M, T))
+
         for k in range(M):
             local_enrich = compute_expression_aware_enrichment(
                 neighborhood_expression_data,
@@ -807,27 +818,26 @@ def deconvolute_spot_with_neighbors_with_prior(
             if global_prior.shape != (T, M):
                 raise ValueError(f"Prior matrix shape {global_prior.shape} does not match expected shape ({T}, {M})")
 
-        # Objective terms
+        # Modify objective terms to include frequency normalization
         obj_terms = []
-        # total_prop = np.sum(cell_type_numbers_array[spot_idx, :]) + 1e-10  # For normalizing
-        
-        # Add base terms
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    # Base enrichment term
+                    # Get normalized weights
                     enrichment_weight = gene_specific_enrichment[k, j]
                     cell_type_weight = neighborhood_cell_type_numbers[len(neighborhood_indices) // 2, j]
-
+                    
+                    # Apply frequency normalization
+                    normalized_weight = cell_type_weight * normalized_weights[j]
+                    
+                    # Add slight randomness to break ties
                     randomness = 0.9 + 0.2 * np.random.random()
                     
-                    base_term = enrichment_weight * cell_type_weight * randomness * X[j,k]
+                    base_term = enrichment_weight * normalized_weight * randomness * X[j,k]
                     obj_terms.append(base_term)
-                    # base_term = enrichment_weight * cell_type_weight * X[j, k]
-                    # obj_terms.append(base_term)
 
-                    # Add prior-based penalty if available
+                    # Prior terms remain unchanged
                     if global_prior is not None and lambda_prior_weight > 0:
                         try:
                             prior_value = float(global_prior[j, k])
@@ -836,22 +846,6 @@ def deconvolute_spot_with_neighbors_with_prior(
                         except Exception as e:
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
-
-        # # L1 term (sparsity)
-        # l1_terms = []
-        # for j in range(T):
-        #     for k in range(M):
-        #         if (j, k) in X:
-        #             l1_terms.append(X[j, k])
-        # obj_terms.append(-lambda_reg_gex * alpha * gp.quicksum(l1_terms))
-        
-        # # L2 term (smoothing)
-        # l2_terms = []
-        # for j in range(T):
-        #     for k in range(M):
-        #         if (j, k) in X:
-        #             l2_terms.append(X[j, k] * X[j, k])
-        # obj_terms.append(-lambda_reg_gex * (1 - alpha) * gp.quicksum(l2_terms))
 
         # Maximize the sum of all terms
         model.setObjective(
