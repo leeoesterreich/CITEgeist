@@ -1,6 +1,6 @@
 # Benchmarking Scripts
 
-This folder contains scripts for benchmarking spatial transcriptomics deconvolution methods.
+This folder contains scripts for benchmarking CITEgeist against state-of-the-art spatial transcriptomics deconvolution methods.
 
 ## Core Benchmarking Scripts
 
