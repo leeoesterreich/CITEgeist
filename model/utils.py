@@ -94,7 +94,6 @@ def get_neighbors_with_fixed_radius(spot_index, adata, radius=50, include_center
     
     logging.debug(f"Total neighbors for spot {spot_index} within radius {radius}: {neighbors}")
     return neighbors
-
 def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
     """
     Plot neighbors for multiple random central spots using `sc.pl.spatial`.
@@ -112,6 +111,14 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
     # Select random spots
     random_spots = random.sample(range(adata.shape[0]), min(num_spots, adata.shape[0]))
     
+    # Define colorblind-friendly colors that contrast well with orange background
+    # Using dark blue, white, and black for maximum contrast
+    color_dict = {
+        'Other spots': '#00FF00',  # Green
+        'Neighbor': '#40E0D0',     # Turquoise
+        'Central spot': '#0000FF'  # Dark blue
+    }
+    
     for spot_index in random_spots:
         # Find neighbors within the given radius
         central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(spot_index, adata, radius)
@@ -121,13 +128,14 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
         adata.obs.loc[neighbor_spots_names, 'highlight'] = 'Neighbor'
         adata.obs.loc[central_spot_names, 'highlight'] = 'Central spot'
         
-        # Plot using `sc.pl.spatial`
+        # Plot using `sc.pl.spatial` with custom colors
         sc.pl.spatial(
             adata,
             color='highlight',
             title=f"Neighbors within {radius} units for Spot {central_spot_names}",
-            spot_size=50,
-            frameon=False
+            spot_size = 75,
+            frameon=False,
+            palette=color_dict
         )
         
         # Clean up temporary column after each plot
@@ -366,3 +374,11 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         logging.info(f"Metrics for {cell_type}: RMSE={rmse:.4f}, NRMSE={nrmse:.4f}, MAE={mae:.4f}")
         
     return metrics_per_cell_type
+
+
+def expand_prop_gex_adata(prop_gex_adata, celltype_cutoff=0.2):
+    """
+    Expands celltype level spots to have multiple spots for each celltype, but retain spatial information
+    for COMMMOT analysis.
+    """
+    pass
