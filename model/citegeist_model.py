@@ -259,12 +259,15 @@ class CitegeistModel:
 
         self.gene_expression_adata = self.gene_expression_adata[:, col_filter].copy()
 
+        initial_spot_count = self.gene_expression_adata.shape[0]
+
         sc.pp.filter_cells(self.gene_expression_adata, min_counts=min_counts)
         
 
         print(f"Filtered gene expression data: {initial_gene_count} → {filtered_gene_count} genes "
               f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
-              f"in nonzero spots). Remaining spots: {self.gene_expression_adata.shape[0]}")
+              f"in nonzero spots). Remaining spots: {self.gene_expression_adata.shape[0]} "
+              f"Filtered spots: {initial_spot_count} to {self.gene_expression_adata.shape[0]}")
 
     def copy_gex_to_protein_adata(self):
         """
