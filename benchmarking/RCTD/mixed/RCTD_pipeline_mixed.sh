@@ -2,11 +2,16 @@
 #SBATCH --job-name=RCTD_mx
 #SBATCH --output=./logs/RCTD_mixed_%a.out
 #SBATCH --error=./logs/RCTD_mixed_%a.err
-#SBATCH --time=12:00:00
+#SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=64G
 #SBATCH --array=0-4
+
+# Record the start time
+START_TIMESTAMP=$(date +%s)
+START_TIME=$(date +'%Y-%m-%d %H:%M:%S')
+echo "[$START_TIME] Job started for replicate $SLURM_ARRAY_TASK_ID" | tee -a ./logs/RCTD_mixed_runtime.log
 
 cd /bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/RCTD/mixed
 
@@ -22,3 +27,13 @@ OUTPUT_DIR="/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulat
 # Run the R script for the specific replicate
 Rscript --vanilla RCTD_pipeline_mixed.R --replicates $REPLICATE_INDEX --output_dir $OUTPUT_DIR
 
+# Record the end time
+END_TIMESTAMP=$(date +%s)
+END_TIME=$(date +'%Y-%m-%d %H:%M:%S')
+
+# Calculate total runtime
+RUNTIME=$((END_TIMESTAMP - START_TIMESTAMP))
+RUNTIME_MINUTES=$(echo "scale=2; $RUNTIME / 60" | bc)
+
+echo "[$END_TIME] Job completed for replicate $SLURM_ARRAY_TASK_ID" | tee -a ./logs/RCTD_mixed_runtime.log
+echo "RCTD_TOTAL_RUNTIME: Replicate $SLURM_ARRAY_TASK_ID took $RUNTIME seconds ($RUNTIME_MINUTES minutes)" | tee -a ./logs/RCTD_mixed_runtime.log
