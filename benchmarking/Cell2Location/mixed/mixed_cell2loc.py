@@ -54,8 +54,8 @@ def process_replicate(replicate_name):
     adata_vis_0            = adata_vis_0[:, ~adata_vis_0.var['MT_gene'].values]
 
     # Prepare `adata_vis_0` for cell2location
-    adata_vis_0.X_norm = adata_vis_0.X
-    adata_vis_0.X      = np.expm1(adata_vis_0.X_norm).round()
+    # adata_vis_0.X_norm = adata_vis_0.X
+    # adata_vis_0.X      = np.expm1(adata_vis_0.X_norm).round()
 
     # Find shared genes and subset
     intersect       = np.intersect1d(adata_vis_0.var_names, inf_aver.index)
