@@ -21,7 +21,7 @@ This folder contains scripts for benchmarking CITEgeist against state-of-the-art
 - `RCTD_bench_wrapper.py`          - Wrapper for benchmarking RCTD results
 - `seurat_bench_wrapper.py`        - Wrapper for benchmarking Seurat results
 - `citegeist_bench_wrapper.py`     - Wrapper for benchmarking CITEgeist results
-- 
+
 ## Usage
 
 The core benchmarking modules can be used directly or through the method-specific wrappers.
