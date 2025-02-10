@@ -25,26 +25,19 @@ Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intri
 
 ## Installation Guide
 
-### Step 1: Set up Python Environment
+### Step 1: Set up Environment from YAML
 ```bash
-# Create and activate a new conda environment
-conda create -n citegeist python=3.9
+# Clone the repository
+git clone https://github.com/yourusername/CITEgeist.git
+cd CITEgeist
+
+# Create and activate conda environment from YAML
+conda env create -f docs/CITEgeist/CITEgeist_dependencies.yml
 conda activate citegeist
 ```
 
-### Step 2: Install Dependencies
+### Step 2: Install CITEgeist
 ```bash
-# Install main dependencies
-pip install numpy==1.21.0 pandas==1.3.0 scanpy==1.8.0 pyarrow==6.0.0 scipy==1.7.0
-
-# Install Gurobi
-conda install -c gurobi gurobi
-```
-
-### Step 3: Install CITEgeist
-```bash
-git clone https://github.com/yourusername/CITEgeist.git
-cd CITEgeist
 pip install -e .
 ```
 
@@ -53,9 +46,16 @@ Typical installation time: 10-15 minutes on a standard desktop computer
 ## Demo
 
 ### Running the Demo
-1. Download the demo dataset:
+1. Download the demo dataset from GEO (accession GEOXXXX):
 ```bash
-python scripts/download_demo_data.py
+# Create a demo directory
+mkdir -p demo/data
+cd demo/data
+
+# Download and extract the demo data
+wget https://www.ncbi.nlm.nih.gov/geo/download/?acc=GEOXXXX&format=file -O demo_data.tar.gz
+tar -xzf demo_data.tar.gz
+cd ../..
 ```
 
 2. Run the demo analysis:
