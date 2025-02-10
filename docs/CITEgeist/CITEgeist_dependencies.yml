@@ -1,4 +1,3 @@
-name: /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/COMMOT
 channels:
   - bioconda
   - conda-forge
@@ -339,4 +338,3 @@ dependencies:
       - zarr==2.18.2
       - zict==3.0.0
       - zipp==3.19.2
-prefix: /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/COMMOT
