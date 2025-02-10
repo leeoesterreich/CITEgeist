@@ -1,83 +1,59 @@
 import os
 import pandas as pd
 import numpy as np
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 import argparse
 
 def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
-    # Dictionary to store RMSE, NRMSE and MAE per cell type
     metrics_per_cell_type = {}
 
-    # Iterate through each ground-truth file
     for gt_filename in os.listdir(ground_truth_dir):
         if gt_filename.endswith("_GT.csv"):
-            # Determine the cell type name by removing the "_GT.csv" suffix
             cell_type = gt_filename.replace("_GT.csv", "")
-            
-            # Construct the file paths for ground truth and prediction
-            gt_filepath   = os.path.join(ground_truth_dir, gt_filename)
+            gt_filepath = os.path.join(ground_truth_dir, gt_filename)
             pred_filepath = os.path.join(predictions_dir, f"{cell_type}_layer.csv")
             
-            # Check if the prediction file exists
             if not os.path.exists(pred_filepath):
-                print(f"Prediction file for {cell_type} not found. Skipping.")
-                continue
-            
-            # Load the ground-truth and prediction data
-            gt_df   = pd.read_csv(gt_filepath, index_col=0)
+                cell_type_underscore = cell_type.replace(" ", "_")
+                alt_pred_filepath = os.path.join(predictions_dir, f"{cell_type_underscore}_layer.csv")
+                if not os.path.exists(alt_pred_filepath):
+                    print(f"Prediction file for {cell_type} not found. Skipping.")
+                    continue
+                pred_filepath = alt_pred_filepath
+
+            gt_df = pd.read_csv(gt_filepath, index_col=0)
             pred_df = pd.read_csv(pred_filepath, index_col=0)
             
-            # Find common genes (index) between GT and predictions
             common_genes = gt_df.index.intersection(pred_df.index)
-
-            # Subset both DataFrames to include only common genes
-            gt_df   = gt_df.loc[common_genes]
-            pred_df = pred_df.loc[common_genes]
-
-            # Ensure the columns (spots) are in the same order
+            gt_df, pred_df = gt_df.loc[common_genes], pred_df.loc[common_genes]
+            
             common_spots = gt_df.columns.intersection(pred_df.columns)
-            gt_df   = gt_df[common_spots]
-            pred_df = pred_df[common_spots]
-
-            # Check for any empty DataFrames after filtering
+            gt_df, pred_df = gt_df[common_spots], pred_df[common_spots]
+            
             if gt_df.empty or pred_df.empty:
                 print(f"No common genes or spots for {cell_type}. Skipping.")
                 continue
             
-            # Log1p normalization
-            assert (gt_df.values >= 0).all(), "Ground truth contains negative values, cannot apply log1p."
-            if (gt_df.values - 1).max() > 0:
-                print(f"Ground truth for {cell_type} not log1p-transformed. Applying transformation.")
-                gt_df = np.log1p(gt_df)
-            else:
-                print(f"Ground truth for {cell_type} already log1p-transformed. Skipping transformation.")
+            gt_df, pred_df = np.log1p(gt_df), np.log1p(pred_df)
             
-            assert (pred_df.values >= 0).all(), "Predictions contain negative values, cannot apply log1p."
-            if (pred_df.values - 1).max() > 0:
-                print(f"Predictions for {cell_type} not log1p-transformed. Applying transformation.")
-                pred_df = np.log1p(pred_df)
-            else:
-                print(f"Predictions for {cell_type} already log1p-transformed. Skipping transformation.")
-                
-            # Calculate RMSE for this cell type
-            mse  = mean_squared_error(gt_df.values, pred_df.values)
+            mse = mean_squared_error(gt_df.values, pred_df.values)
             rmse = np.sqrt(mse)
-            mae  = mean_absolute_error(gt_df.values, pred_df.values)
-        
-            # Calculate NRMSE
+            mae = mean_absolute_error(gt_df.values, pred_df.values)
+            
             if normalize == 'range':
                 range_gt = gt_df.values.max() - gt_df.values.min()
-                nrmse    = rmse / range_gt if range_gt != 0 else np.nan
+                nrmse = rmse / range_gt if range_gt != 0 else np.nan
             elif normalize == 'mean':
                 mean_gt = gt_df.values.mean()
-                nrmse   = rmse / mean_gt if mean_gt != 0 else np.nan
+                nrmse = rmse / mean_gt if mean_gt != 0 else np.nan
             else:
                 raise ValueError("Normalization type not recognized. Use 'range' or 'mean'.")
-
+            
             metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
     
-    # Calculate overall RMSE and NRMSE statistics
+    metrics_df = pd.DataFrame.from_dict(metrics_per_cell_type, orient='index')
+    metrics_df.to_csv(os.path.join(predictions_dir, "per_celltype_metrics.csv"))
+    
     all_rmse_values  = [metrics['RMSE'] for metrics in metrics_per_cell_type.values()]
     all_nrmse_values = [metrics['NRMSE'] for metrics in metrics_per_cell_type.values()]
     all_mae_values   = [metrics['MAE'] for metrics in metrics_per_cell_type.values()]
@@ -86,15 +62,14 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
 
     average_nrmse = np.nanmean(all_nrmse_values)
     median_nrmse  = np.nanmedian(all_nrmse_values)
-    
+
     average_mae = np.nanmean(all_mae_values)
     median_mae  = np.nanmedian(all_mae_values)
 
-    # Print RMSE and NRMSE per cell type and overall statistics
     print("RMSE, NRMSE, and MAE per cell type:")
     for cell_type, metrics in metrics_per_cell_type.items():
-        print(f"\t{cell_type}: RMSE: {metrics['RMSE']:.4f}, NRMSE: {metrics['NRMSE']:.4f}, MAE; {metrics['MAE']:.4f}")
-    
+        print(f"\t{cell_type}: RMSE: {metrics['RMSE']:.4f}, NRMSE: {metrics['NRMSE']:.4f}, MAE: {metrics['MAE']:.4f}")
+
     print("\nOverall RMSE statistics:")
     print(f"\tAverage RMSE: {average_rmse:.4f}")
     print(f"\tMedian RMSE:  {median_rmse:.4f}")
@@ -106,16 +81,15 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize='range'):
     print("\nOverall MAE statistics:")
     print(f"\tAverage MAE: {average_mae:.4f}")
     print(f"\tMedian MAE:  {median_mae:.4f}")
-
+    
+    print("Per-cell type metrics saved to per_celltype_metrics.csv")
     return { "metrics_per_cell_type" : metrics_per_cell_type, "average_rmse" : average_rmse, "median_rmse" : median_rmse, "average_nrmse" : average_nrmse, "median_nrmse" : median_nrmse, "average_mae" : average_mae, "median_mae" : median_mae }
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Calculate RMSE and NRMSE for gene count predictions.')
     parser.add_argument('ground_truth_dir', type=str, help='Directory containing ground truth CSV files.')
-    parser.add_argument('predictions_dir',  type=str, help='Directory containing predicted CSV files.')
-    parser.add_argument('--normalize', type=str, choices=['range', 'mean'], default='range', 
-                        help='Normalization method for NRMSE calculation. Choose "range" or "mean".')
-
-    args = parser.parse_args()
+    parser.add_argument('predictions_dir', type=str, help='Directory containing predicted CSV files.')
+    parser.add_argument('--normalize', type=str, choices=['range', 'mean'], default='range', help='Normalization method for NRMSE calculation.')
     
+    args = parser.parse_args()
     calculate_rmse(args.ground_truth_dir, args.predictions_dir, args.normalize)
