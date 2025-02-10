@@ -1,0 +1,292 @@
+---
+title: "GEX_adversarial_plots"
+author: "bts76"
+date: "2025-02-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/Figures")
+
+# Load required libraries
+library(jsonlite)
+library(ggplot2)
+library(tidyverse)
+library(emmeans)
+library(ggpubr)
+
+# Adjust text size for publication-quality figures
+theme_set(theme_classic(base_size = 16)) # Set base text size to 16
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(readr)
+
+# Define the directories for each reference level and pattern
+high_seg_dir_full_ref <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/full_ref/high_seg/gex/ct_specific"
+mixed_dir_full_ref <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/full_ref/mixed/gex/ct_specific"
+
+high_seg_dir_downsampled_ref <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/downsampled_ref/high_seg/gex/ct_specific"
+mixed_dir_downsampled_ref <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/downsampled_ref/mixed/gex/ct_specific"
+
+# Define the function to read and add necessary columns
+read_and_add_columns <- function(file, method, pattern, reference) {
+  df <- read_csv(file)
+  df$Method <- method
+  df$Pattern <- pattern
+  df$Reference <- reference
+  df$Replicate <- gsub(".*_rep([0-9])_.*", "\\1", basename(file))
+  return(df)
+}
+
+# Function to process files in the directories
+process_files_in_dir <- function(directory, pattern, reference) {
+  files <- list.files(directory, pattern = "metrics.csv", full.names = TRUE)
+  data <- lapply(files, function(file) {
+    if (grepl("Cell2Location", file)) {
+      return(read_and_add_columns(file, "Cell2Location", pattern, reference))
+    } else if (grepl("Tangram", file)) {
+      return(read_and_add_columns(file, "Tangram", pattern, reference))
+    } else if (grepl("CITEgeist", file)) {
+      return(read_and_add_columns(file, "CITEgeist", pattern, reference))
+    }
+  })
+  return(data)
+}
+
+# Read and add necessary columns for all the full_ref high_seg files
+high_seg_data_full_ref <- process_files_in_dir(high_seg_dir_full_ref, "high_seg", "30k Cells")
+
+# Read and add necessary columns for all the full_ref mixed files
+mixed_data_full_ref <- process_files_in_dir(mixed_dir_full_ref, "mixed", "30k Cells")
+
+# Read and add necessary columns for all the downsampled_ref high_seg files
+high_seg_data_downsampled_ref <- process_files_in_dir(high_seg_dir_downsampled_ref, "high_seg", "8k Cells")
+
+# Read and add necessary columns for all the downsampled_ref mixed files
+mixed_data_downsampled_ref <- process_files_in_dir(mixed_dir_downsampled_ref, "mixed", "8k Cells")
+
+# Combine all data into a single data frame
+combined_data <- bind_rows(high_seg_data_full_ref, mixed_data_full_ref, high_seg_data_downsampled_ref, mixed_data_downsampled_ref)
+
+# View the combined data
+head(combined_data)
+```
+
+```{r}
+# Rename the column "..1" to "Cell Type"
+combined_data <- combined_data %>%
+  rename("Cell Type" = "...1")
+
+# View the updated data frame
+head(combined_data)
+```
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpattern)
+
+# Convert data from wide to long format
+plot_data <- combined_data %>%
+  pivot_longer(cols = c(RMSE, NRMSE, MAE), 
+               names_to = "Metric", values_to = "Score") %>%
+  group_by(Method, Reference, Pattern, Metric, `Cell Type`) %>%  
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),  
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),  
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Pattern = gsub("_", " ", Pattern),
+    Metric = gsub("_", " ", Metric)
+  )
+
+# View processed data
+head(plot_data)
+
+```
+```{r}
+plot_data$Method <- factor(plot_data$Method, levels = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram"))
+
+# Create the plot
+p <- ggplot(plot_data, aes(x = Method, y = Mean_Score, fill = Method)) +
+  geom_bar_pattern(
+    aes(pattern = Reference),
+    stat = "identity", 
+    position = position_dodge(width = 0.9),
+    pattern_density = 0.1,
+    pattern_spacing = 0.1,
+    pattern_angle = 45,
+    color = "black"
+  ) +
+  geom_errorbar(
+    aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE, group = Reference),
+    position = position_dodge(width = 0.9),  
+    width = 0.3,  
+    color = "black",
+    linewidth = 0.6  
+  ) +
+  facet_grid(`Cell Type` ~ Metric + Pattern, scales = "free_y") +  # Facet by Cell Type, Metric, and Pattern
+  scale_pattern_manual(values = c('30k Cells' = "none", '8k Cells' = "crosshatch")) +
+  scale_fill_manual(values = c(
+    "CITEgeist" = "green",
+    "Cell2Location" = "blue",
+    "Seurat" = "red", 
+    "RCTD" = "orange",
+    "Tangram" = "purple"
+  ), breaks = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")) +
+  theme_classic() +
+  scale_color_manual(values = "black") +
+  theme(
+    text = element_text(family = "Arial", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 9),
+    strip.text = element_text(size = 11),
+    legend.position = "right"
+  ) +
+  labs(
+    x = "Method", 
+    y = "Mean Score", 
+    title = "Metric Comparison Across Methods, References, and Cell Types"
+  )
+
+# Save the plot
+ggsave("celltype_metric_plot.png", p, dpi = 300, width = 12, height = 10, units = "in")
+ggsave("celltype_metric_plot.svg", p, width = 10, height = 12, units = "in")
+```
+
+```{r}
+full_ref <- combined_data[combined_data$Reference == "30k Cells",]
+down_ref <- combined_data[combined_data$Reference != "30k Cells",]
+```
+
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(multcomp)
+library(car)
+
+# Read the data (assuming it's in a CSV file)
+data <- full_ref
+
+# Convert necessary columns to factors
+data <- data %>%
+  mutate(Method = as.factor(Method), 
+         Pattern = as.factor(Pattern))
+
+# Function to perform ANOVA and Tukey HSD
+run_anova_tukey <- function(df, metric) {
+  # Run ANOVA
+  anova_model <- aov(as.formula(paste(metric, "~ Method")), data = df)
+  anova_summary <- summary(anova_model)
+  
+  # Extract F-statistic and p-value
+  f_stat <- anova_summary[[1]]$`F value`[1]
+  p_val <- anova_summary[[1]]$`Pr(>F)`[1]
+  
+  # Run Tukey's HSD
+  tukey_result <- glht(anova_model, linfct = mcp(Method = "Tukey"))
+  tukey_summary <- summary(tukey_result)
+  
+  # Extract CITEgeist comparisons
+  citegeist_comparisons <- tukey_summary$test$pvalues[grepl("CITEgeist", names(tukey_summary$test$pvalues))]
+
+  return(list(
+    "F_statistic" = f_stat,
+    "ANOVA_p_value" = p_val,
+    "Tukey_CITEgeist_p_values" = citegeist_comparisons
+  ))
+}
+
+# Run analysis separately for high_seg and mixed
+patterns <- c("high_seg", "mixed")
+metrics <- c("RMSE", "NRMSE", "MAE")
+
+results_list <- list()
+
+for (pattern in patterns) {
+  df_pattern <- data %>% filter(Pattern == pattern)
+  
+  # Convert Method to factor inside the loop to ensure proper handling
+  df_pattern$Method <- as.factor(df_pattern$Method)
+  
+  for (metric in metrics) {
+    result <- run_anova_tukey(df_pattern, metric)
+    results_list[[paste(pattern, metric, sep = "_")]] <- result
+  }
+}
+
+# Print results
+results_list$high_seg_RMSE$Tukey_CITEgeist_p_values
+```
+```{r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+library(multcomp)
+library(car)
+
+# Convert categorical variables to factors
+data <- full_ref %>%
+  mutate(Method = as.factor(Method), 
+         Pattern = as.factor(Pattern),
+         Replicate = as.factor(Replicate))
+
+# Function to perform ANOVA and Tukey HSD
+run_anova_tukey <- function(df, metric) {
+  # Ensure there are enough methods for comparison
+  if (length(unique(df$Method)) < 3) {
+    warning(paste("Skipping Tukey HSD for", metric, "as there are fewer than 3 methods"))
+    return(list(F_statistic = NA, ANOVA_p_value = NA, Tukey_CITEgeist_p_values = NA))
+  }
+  
+  # Run Two-Way ANOVA (Method + Replicate as blocking factor)
+  anova_model <- aov(as.formula(paste(metric, "~ Method + Replicate")), data = df)
+  anova_summary <- summary(anova_model)
+  
+  # Extract F-statistic and p-value for Method effect
+  f_stat <- anova_summary[[1]]$`F value`[1]
+  p_val <- anova_summary[[1]]$`Pr(>F)`[1]
+
+  # Run Tukey’s HSD for Method comparisons
+  tukey_result <- TukeyHSD(anova_model, "Method")
+  
+  # Extract only CITEgeist comparisons
+  citegeist_comparisons <- tukey_result$Method[grepl("CITEgeist", rownames(tukey_result$Method)), "p adj"]
+
+  return(list(
+    "F_statistic" = f_stat,
+    "ANOVA_p_value" = p_val,
+    "Tukey_CITEgeist_p_values" = citegeist_comparisons
+  ))
+}
+
+# Run analysis separately for high_seg and mixed
+patterns <- c("high_seg", "mixed")
+metrics <- c("RMSE", "NRMSE", "MAE")
+
+results_list <- list()
+
+for (pattern in patterns) {
+  df_pattern <- data %>% filter(Pattern == pattern)
+  
+  for (metric in metrics) {
+    result <- run_anova_tukey(df_pattern, metric)
+    results_list[[paste(pattern, metric, sep = "_")]] <- result
+  }
+}
+
+# Print results
+results_list
+
+```
+
