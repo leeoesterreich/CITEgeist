@@ -376,9 +376,3 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
     return metrics_per_cell_type
 
 
-def expand_prop_gex_adata(prop_gex_adata, celltype_cutoff=0.2):
-    """
-    Expands celltype level spots to have multiple spots for each celltype, but retain spatial information
-    for COMMMOT analysis.
-    """
-    pass

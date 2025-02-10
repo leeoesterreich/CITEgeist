@@ -1,6 +1,23 @@
 
+import os
+import sys
+import argparse
+import logging
+import gc
+import json
+from datetime import datetime
+from typing import Dict, Any, List, Optional
 
+import numpy as np
+import scanpy as sc
+import pandas as pd
+import scipy.sparse
 
+# Add the parent directory to the system path
+sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+
+# Now import using the full package path
+from model.citegeist_model import CitegeistModel
 
 def main():
 
@@ -30,12 +47,6 @@ def main():
         }
     }
 
-    import scanpy as sc
-    import importlib
-    import model
-    importlib.reload(model)
-    from model import CitegeistModel  # Now directly import from the module
-    import argparse
     # Reload the model module if you're actively developing
 
     parser = argparse.ArgumentParser(description='Run CITEgeist on a single sample.')
@@ -62,7 +73,7 @@ def main():
     # Split into gene expression and antibody capture datasets
     model.split_adata()
 
-    model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=100)
+    model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=args.min_counts)
 
     model.copy_gex_to_protein_adata()
 

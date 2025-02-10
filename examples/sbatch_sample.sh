@@ -9,6 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
+#SBATCH --array=1-12
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/
@@ -22,7 +23,8 @@ echo "Loaded gurobi module"
 cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
+# Get the path for this array job
+path_to_visium_folder=$(sed -n "${SLURM_ARRAY_TASK_ID}p" examples/sample_paths.txt)
+echo "Processing sample: $path_to_visium_folder"
 
-path_to_visium_folder ="/bgfs/alee/LO_LAB/General/Lab_Data/20240510_Neil_SpatialSequencing_AgePatients/SpaceRanger_OUT/MWS23-10650/outs"
-
-/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/bin/python examples/compute_sample.py --path $path_to_visium_folder --output_folder output
+/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/singlecell/bin/python examples/compute_sample.py --path "$path_to_visium_folder" --output_folder output --radius 400 --min_counts 100

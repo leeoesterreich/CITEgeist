@@ -8,6 +8,7 @@ import gc
 import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
+import time
 
 import numpy as np
 import scanpy as sc
@@ -186,6 +187,7 @@ def main():
         sys.exit(1)
 
     for number in sample_numbers:
+        start_time = time.time()  # Start timing for this sample
         sample_name = f"{args.sample_prefix}_{number}"
         logging.info(f"Processing sample: {sample_name}")
 
@@ -333,8 +335,6 @@ def main():
         # Run first pass with weight parameters
         pass1_results = model.run_cell_expression_pass1(
             radius=radius,
-            alpha=0.5,  # Keep original alpha
-            lambda_reg_gex=0.001,  # Use new lambda_reg parameter
             max_workers=None, 
             checkpoint_interval=100, 
             output_dir="checkpoints", 
@@ -371,5 +371,11 @@ def main():
             )
 
             
+        end_time = time.time()
+        runtime = end_time - start_time
+        runtime_message = f"Runtime for sample {sample_name}: {runtime:.2f} seconds ({runtime/60:.2f} minutes)"
+        print(runtime_message)
+        logging.info(runtime_message)
+
 if __name__ == "__main__":
     main()
