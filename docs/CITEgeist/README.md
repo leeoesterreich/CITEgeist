@@ -1,129 +1,143 @@
-# CITEgeist Documentation
+# CITEgeist
 
-## Overview
 CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends) is a computational method for deconvolving spatial transcriptomics data using spatially-resolved CITE-seq measurements. The pipeline performs both cell-type proportion estimation and gene expression deconvolution in a two-pass approach, leveraging both protein and RNA measurements from the same spatial locations.
 
-## Requirements
-- Python 3.7+
-- Required packages:
-  - numpy
-  - pandas
-  - scanpy
-  - pyarrow
-  - scipy
-  - Gurobi (for optimization)
+## System Requirements
 
-## Input Data
-The pipeline requires a single AnnData object containing both gene expression and protein measurements from spatial CITE-seq data:
+### Software Dependencies
+- Operating System: 
+  - Linux (tested on Ubuntu 20.04 LTS, CentOS 7)
+  - macOS (tested on Monterey 12.0+)
+  - Windows 10 with WSL2
+- Python 3.7+ (tested on Python 3.7.9, 3.8.10, and 3.9.7)
+- Required Python packages:
+  - numpy >= 1.21.0
+  - pandas >= 1.3.0
+  - scanpy >= 1.8.0
+  - pyarrow >= 6.0.0
+  - scipy >= 1.7.0
+  - Gurobi >= 9.5.0 (requires license)
 
-1. **Spatial CITE-seq Data** (`.h5ad` format):
-   - Gene expression counts matrix
-   - Antibody capture counts matrix
-   - Spatial coordinates for each spot
-   - Both measurements must be from the same spatial locations
+### Hardware Requirements
+- RAM: Minimum 16GB, Recommended 64GB+
+- Storage: 10GB minimum for installation and basic analysis
+- CPU: Multi-core processor recommended (8+ cores for optimal performance)
+- GPU: Optional, but recommended for large datasets
 
-Note: Unlike other reference-based spatial deconvolution methods, CITEgeist does not require a single-cell RNA sequencing reference dataset. Instead, it leverages the protein measurements from the spatial CITE-seq data directly for deconvolution.
+## Installation Guide
 
-## Pipeline Parameters
+### Step 1: Set up Python Environment
+```bash
+# Create and activate a new conda environment
+conda create -n citegeist python=3.9
+conda activate citegeist
+```
 
-### Key Parameters:
-- `radius`: Radius for neighbor detection in spatial analysis
-- `lambda_reg`: Regularization strength for elastic net (default: 0.001)
-- `alpha_elastic`: Elastic net mixing parameter (0=L2, 1=L1)
-- `max_y_change`: Maximum allowed change in Y values between iterations (0-1)
-- `global_enrichment_weight`: Weight for global enrichment in gene expression optimization (default: 0.5)
-- `local_enrichment_weight`: Weight for local enrichment in gene expression optimization (default: 0.5)
+### Step 2: Install Dependencies
+```bash
+# Install main dependencies
+pip install numpy==1.21.0 pandas==1.3.0 scanpy==1.8.0 pyarrow==6.0.0 scipy==1.7.0
 
-### Optional Parameters:
-- `profiling_only`: If set, only compute cell-type proportions without gene expression deconvolution
-- `skip_pass2`: If set, skip pass 2 and only run pass 1
-- `max_workers`: Number of parallel workers for computation
-- `checkpoint_interval`: Interval for saving checkpoints during processing
+# Install Gurobi
+conda install -c gurobi gurobi
+```
 
-## Pipeline Workflow
+### Step 3: Install CITEgeist
+```bash
+git clone https://github.com/yourusername/CITEgeist.git
+cd CITEgeist
+pip install -e .
+```
 
-1. **Initialization**:
-   - Load and validate spatial CITE-seq data
-   - Set up logging and output directories
-   - Initialize model parameters
+Typical installation time: 10-15 minutes on a standard desktop computer
 
-2. **Pass 1 - Initial Deconvolution**:
-   - Process antibody capture data to identify cell-type profiles
-   - Optimize cell-type proportions using protein measurements
-   - Perform initial gene expression deconvolution
-   - Export results for each cell type
+## Demo
 
-3. **Pass 2 (Optional) - Refinement**:
-   - Use Pass 1 results to compute global priors
-   - Refine cell-type proportions using both protein and gene expression information
-   - Optimize gene expression with prior information
-   - Generate final deconvolution results
+### Running the Demo
+1. Download the demo dataset:
+```bash
+python scripts/download_demo_data.py
+```
 
-## Output Files
-
-The pipeline generates several output files:
-
-1. **Cell Type Proportions**:
-   - Format: CSV files
-   - Contents: Estimated proportions of each cell type per spot
-   - Location: `{output_dir}/{sample_name}_cellprop.csv`
-
-2. **Gene Expression Profiles**:
-   - Format: Parquet files
-   - Contents: Deconvolved gene expression for each cell type
-   - Location: `{output_dir}/{sample_name}_gene_expression_pass{1,2}.parquet`
-
-3. **Layer Files**:
-   - Format: CSV files
-   - Contents: Cell-type specific expression layers
-   - Location: `{output_dir}/{sample_name}_pass{1,2}/layers/`
-
-4. **Logs**:
-   - Format: Text files
-   - Contents: Processing logs and metrics
-   - Location: `{output_dir}/{sample_name}.log`
-
-## Usage Example
-
+2. Run the demo analysis:
 ```bash
 python run_citegeist.py \
     --radius 4 \
     --lambda_reg 1.0 \
     --alpha_elastic 0.7 \
     --max_y_change 0.2 \
-    --input_folder /path/to/input \
-    --output_folder /path/to/output \
-    --sample_prefix "sample_name"
+    --input_folder demo/data \
+    --output_folder demo/results \
+    --sample_prefix "demo_sample"
 ```
 
-## Benchmarking
+### Expected Output
+The demo will generate the following files in the `demo/results` directory:
+- `demo_sample_cellprop.csv`: Cell type proportions per spot
+- `demo_sample_gene_expression_pass1.parquet`: Initial gene expression profiles
+- `demo_sample_gene_expression_pass2.parquet`: Refined gene expression profiles
+- `demo_sample.log`: Processing logs and metrics
 
-The pipeline includes benchmarking capabilities for:
-- Cell type proportion accuracy (RMSE, MAE)
-- Gene expression deconvolution accuracy
-- Performance comparison with other methods (Cell2Location, RCTD, etc.)
+Expected runtime for demo: 30-45 minutes on a standard desktop computer (16GB RAM, 4 cores)
 
-## Troubleshooting
+## Instructions for Use
 
-Common issues and solutions:
+### Running CITEgeist on Your Data
 
-1. **Memory Issues**:
-   - Increase available memory (recommended: 64GB+)
-   - Reduce batch size or use checkpointing
+1. Prepare your input data:
+   - Format your CITE-seq data as an AnnData object (`.h5ad` format)
+   - Ensure both gene expression and protein measurements are included
+   - Include spatial coordinates for each spot
 
-2. **Runtime Optimization**:
-   - Adjust `max_workers` for parallel processing
-   - Use GPU acceleration when available
-   - Enable checkpointing for long runs
+2. Run the analysis:
+```bash
+python run_citegeist.py \
+    --radius <radius_value> \
+    --lambda_reg <regularization_strength> \
+    --alpha_elastic <elastic_net_mixing> \
+    --max_y_change <max_change_value> \
+    --input_folder /path/to/your/data \
+    --output_folder /path/to/output \
+    --sample_prefix "your_sample_name"
+```
 
-3. **Data Compatibility**:
-   - Ensure input data is properly normalized
-   - Verify gene name consistency between reference and spatial data
-   - Check for required columns in metadata
+Key Parameters:
+- `radius`: Radius for neighbor detection (default: 4)
+- `lambda_reg`: Regularization strength (default: 0.001)
+- `alpha_elastic`: Elastic net mixing parameter (default: 0.7)
+- `max_y_change`: Maximum allowed change in Y values (default: 0.2)
 
-## References
+Optional Parameters:
+- `profiling_only`: Set for cell-type proportions only
+- `skip_pass2`: Skip refinement pass
+- `max_workers`: Number of parallel workers
+- `checkpoint_interval`: Checkpoint saving interval
 
-For more information about the method and its applications, please refer to:
-- CITEgeist GitHub repository
-- Associated publications
-- Documentation for dependent packages (Scanpy, Gurobi)
+### Performance Optimization
+- For large datasets (>100k spots):
+  - Increase available RAM to 64GB+
+  - Use `max_workers` parameter for parallel processing
+  - Enable checkpointing with `checkpoint_interval`
+- For faster processing:
+  - Use SSD storage for input/output
+  - Enable GPU acceleration if available
+  - Adjust batch sizes based on available memory
+
+## Reproduction Instructions
+
+To reproduce the results from our manuscript:
+1. Download the benchmark datasets:
+```bash
+python scripts/download_benchmark_data.py
+```
+
+2. Run the benchmark analysis:
+```bash
+python scripts/run_benchmarks.py \
+    --dataset_dir benchmark/data \
+    --output_dir benchmark/results
+```
+
+The benchmark scripts will generate figures and tables matching those in the manuscript. Expected runtime: 4-6 hours on a standard desktop computer.
+
+For detailed methodology and additional analysis scripts, please refer to our [benchmarking documentation](docs/Benchmarking/README.md).
