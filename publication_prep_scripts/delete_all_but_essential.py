@@ -150,10 +150,14 @@ def remove_prefix_from_essential_files(folder_path: Path) -> None:
             
             for file in files:
                 file_path = root_path / file
-                # Check if this is a renamed essential file
-                original_name = file.split('_', 1)[-1] if '_' in file else file
-                if original_name in acceptable_files and '_' in file:
+                # Check if file ends with any of the acceptable files
+                matching_suffixes = [acceptable_file for acceptable_file in acceptable_files 
+                                   if file.endswith(acceptable_file)]
+                
+                if matching_suffixes and '_' in file:
                     try:
+                        # Use the first matching suffix as the original name
+                        original_name = matching_suffixes[0]
                         new_path = file_path.parent / original_name
                         file_path.rename(new_path)
                         logging.info(f"Removed prefix from {file_path.name} -> {original_name}")

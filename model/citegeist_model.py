@@ -2,7 +2,6 @@
 import os
 import logging
 from typing import Dict, Any, Optional, Tuple, List, Union
-import json
 
 
 # Third-party imports
@@ -19,18 +18,15 @@ from .gurobi_impl import (
     optimize_gene_expression, 
     compute_global_prior,
     normalize_counts,
-    validate_prior_effect,
     finetune_cell_proportions
 )
 from .utils import (
-    validate_cell_profile_dict, 
-    save_results_to_output, 
+    validate_cell_profile_dict,  
     cleanup_memory, 
     setup_logging, 
     get_neighbors_with_fixed_radius, 
     assert_neighborhood_size,
     export_anndata_layers,
-    calculate_expression_metrics
 )
 
 
@@ -66,6 +62,7 @@ class CitegeistModel:
         if output_folder is None:
             raise ValueError("output_folder must be provided")
         self.output_folder = str(output_folder)  # Ensure string type
+
         
         os.makedirs(self.output_folder, exist_ok=True)
         setup_logging(self.output_folder, self.sample_name)
@@ -460,8 +457,6 @@ class CitegeistModel:
             cell_type_numbers_array=self.results['cell_prop'].values,
             filtered_adata=self.gene_expression_adata,
             radius=radius,
-            alpha=alpha,
-            lambda_reg_gex=lambda_reg_gex,
             global_enrichment_weight=global_enrichment_weight,
             local_enrichment_weight=local_enrichment_weight,
             global_prior=None,  # No prior in pass 1
