@@ -2,16 +2,12 @@
 import os
 import sys
 import argparse
-import logging
-import gc
-import json
 from datetime import datetime
 from typing import Dict, Any, List, Optional
 
 import numpy as np
 import scanpy as sc
 import pandas as pd
-import scipy.sparse
 
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
@@ -60,8 +56,11 @@ def main():
 
 
     adata = sc.read_visium(args.path, count_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
-    sample_name = args.path.split('/')[-2]
-    print(sample_name)
+    sample_name = args.path.split('/')[-3]
+
+    
+
+    print("Sample name: ", sample_name)
 
         # Initialize the model
     model = CitegeistModel(sample_name=sample_name, adata=adata, output_folder='output')
