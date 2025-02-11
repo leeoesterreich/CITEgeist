@@ -1,3 +1,5 @@
+print("Loading packages...")
+
 import os
 import sys
 import gc
@@ -12,6 +14,7 @@ ref_run_name   = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/S
 results_folder = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/cell2location/mixed'
 input_folder   = '/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/replicates/mixed/h5ad_objects'
 
+print("Loading reference signatures...")
 # Load reference signatures
 adata_file = f"{ref_run_name}/reference_major.h5ad"
 adata_ref  = sc.read_h5ad(adata_file)
@@ -51,8 +54,8 @@ def process_replicate(replicate_name):
     adata_vis_0            = adata_vis_0[:, ~adata_vis_0.var['MT_gene'].values]
 
     # Prepare `adata_vis_0` for cell2location
-    adata_vis_0.X_norm = adata_vis_0.X
-    adata_vis_0.X      = np.expm1(adata_vis_0.X_norm).round()
+    # adata_vis_0.X_norm = adata_vis_0.X
+    # adata_vis_0.X      = np.expm1(adata_vis_0.X_norm).round()
 
     # Find shared genes and subset
     intersect       = np.intersect1d(adata_vis_0.var_names, inf_aver.index)
@@ -122,4 +125,5 @@ def process_replicate(replicate_name):
 
 if __name__ == "__main__":
     replicate_name = sys.argv[1]  # Get replicate name from command-line arguments
+    print(f"Starting processing for {replicate_name}")
     process_replicate(replicate_name)

@@ -1,7 +1,7 @@
 ---
-title: "CITEgeist GEX figures"
+title: "GEX_figures"
 author: "bts76"
-date: "2024-11-19"
+date: "2024-12-18"
 output: html_document
 ---
 
@@ -14,18 +14,147 @@ knitr::opts_chunk$set(echo = TRUE)
 library(jsonlite)
 library(ggplot2)
 library(tidyverse)
+library(ggpubr)
+library(svglite)
+```
+
+```{r}
+library(dplyr)
+library(readr)
+library(stringr)
+library(purrr)
+
+# Define the correct directory
+dir_path <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/high_seg/gex/ct_specific"
+
+# Get list of all CSV files with full paths
+files <- list.files(dir_path, pattern = "Cell2Location_high_seg_rep[0-4]_metrics.csv", full.names = TRUE)
+
+# Function to read a file and add Method, Replicate, and Pattern columns
+read_and_label <- function(file) {
+  df <- read_csv(file, show_col_types = FALSE) %>%
+    mutate(
+      Method = "Cell2Location",
+      Replicate = str_extract(basename(file), "(?<=rep)\\d+"),
+      Pattern = "high_seg"
+    )
+}
+
+# Read and merge all files
+merged_df <- map_dfr(files, read_and_label)
+
+# Print the first few rows
+print(merged_df)
+
+
+```
+
+# Plotting Function
+```{r}
+plot_with_pvalues <- function(all_metrics, metric, output_path, title_string) {
+  if (length(unique(all_metrics$Method)) <= 1) {
+    stop("There must be more than one group in 'Method' for this metric")
+  }
+  
+  if(title_string == "high_seg"){
+    title_string <- "Highly Segmented"
+  }
+  else if(title_string == "mixed"){
+    title_string <- "Mixed"
+  }
+  
+  # Perform ANOVA test
+  anova_test <- aov(all_metrics[[metric]] ~ all_metrics$Method)
+
+  # If ANOVA is significant, perform Tukey's HSD
+  if (summary(anova_test)[[1]]$`Pr(>F)`[1] < 0.05) {
+    tukey_test <- TukeyHSD(anova_test, "all_metrics$Method")
+    tukey_results <- as.data.frame(tukey_test$`all_metrics$Method`)
+    tukey_results <- tukey_results %>%
+      rownames_to_column("contrast") %>%
+      mutate(
+        group1 = sub("^(.*?)-.*", "\\1", contrast),  # Extract everything before the first hyphen
+        group2 = sub(".*-(.*)$", "\\1", contrast),  # Extract everything after the last hyphen
+        p.signif = cut(
+          `p adj`, 
+          breaks = c(0, 0.001, 0.01, 0.05, 1),
+          labels = c("***", "**", "*", "ns")
+        )
+      ) %>% 
+      filter(group1 == "CITEgeist" | group2 == "CITEgeist") %>%  # Keep only comparisons with CITEgeist
+      select(group1, group2, p.signif)
+    max_value <- max(all_metrics[[metric]], na.rm = TRUE)
+    tukey_results$y.position <- max_value + seq(0.1, by = 0.05, length.out = nrow(tukey_results))
+  } else {
+    tukey_results <- data.frame(group1 = NA, group2 = NA, p.signif = NA, y.position = NA)
+  }
+
+  # Create the plot
+  p <- ggplot(all_metrics, aes(x = Method, y = all_metrics[[metric]], color = Method)) +
+    geom_boxplot() +
+    stat_summary(fun = mean, geom = "point", size = 3, shape = 18) +
+    labs(
+      title = paste("Comparison of", metric),
+      subtitle = title_string,
+      x = NULL,
+      y = metric
+    ) + 
+    scale_color_manual(values = c(
+      "CITEgeist" = "green",
+      "Cell2Location" = "blue",
+      "Seurat" = "red",
+      "RCTD" = "orange",
+      "Tangram" = "purple"
+    )) +
+    theme_classic() +
+    stat_pvalue_manual(tukey_results, label = "p.signif", y.position = "y.position", hide.ns = TRUE)
+
+    # Save the plot as TIFF
+    ggsave(
+      filename = file.path(output_path, paste(metric, title_string, "_boxplot_with_pvalues.tiff", sep = "_")),
+      plot = p,
+      device = "tiff",
+      dpi = 300,
+      width = 5,
+      height = 5.5,
+      units = "in",
+      bg = "white"
+    )
+    
+    # # Save the plot as SVG
+    # ggsave(
+    #   filename = file.path(output_path, paste(metric, title_string ,"boxplot_with_pvalues.svg",sep = "_")),
+    #   plot = p,
+    #   device = "svg",
+    #   width = 5,
+    #   height = 5.5,
+    #   units = "in",
+    #   bg = "white"
+    # )
+    
+    # Save the plot as SVG using svglite
+    svg_file <- file.path(output_path, paste(metric, title_string, "boxplot_with_pvalues.svg", sep = "_"))
+    svglite(svg_file, width = 5, height = 5.5)
+    print(p)
+    dev.off()
+
+  return(p)
+}
 ```
 
 # Highly Segmented Replicates
 ```{r}
 # Define paths to directories
-citegeist_dir <- "/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/replicates/high_seg/HighSegCITEgeistOutput"
-cell2location_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/cell2location/high_seg"
-
+citegeist_dir_hs <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/CITEgeist/high_seg"
+cell2location_dir_hs <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/high_seg/gex"
+tangram_dir_hs <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/high_seg/gex"
 
 # Read all CITEgeist results
-citegeist_files <- list.files(citegeist_dir, pattern = "Wu_rep_\\d+_gex_metrics_summary_HighSeg.csv", full.names = TRUE)
-citegeist_data <- lapply(citegeist_files, function(file) {
+citegeist_files_hs <- list.files(citegeist_dir_hs,
+            pattern = "^Wu_rep_\\d+_gex_metrics_pass1.csv$",
+           full.names = TRUE)
+                                 
+citegeist_data_hs <- lapply(citegeist_files_hs, function(file) {
   read_csv(file) %>%
     # Extract replicate number using the correct pattern
     mutate(Replicate = str_extract(basename(file), "(?<=Wu_rep_)\\d+"))
@@ -34,139 +163,83 @@ citegeist_data <- lapply(citegeist_files, function(file) {
   pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
 
 # Read all Cell2Location results
-cell2location_files <- list.files(cell2location_dir, pattern = "GEX_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
-cell2location_data <- lapply(cell2location_files, function(file) {
+cell2location_files_hs <- list.files(cell2location_dir_hs, pattern = "GEX_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
+cell2location_data_hs <- lapply(cell2location_files_hs, function(file) {
   read_csv(file) %>%
      mutate(Replicate = str_extract(file, "(?<=cell2location_map_)\\d+")) # Extract the number after 'cell2location_map_'
     }) %>%
   bind_rows() %>%
   pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
 
+# Read all Tangram results
+tangram_files_hs <- list.files(tangram_dir_hs, pattern = "GEX_metrics_tangram_map_\\d+.csv", full.names = TRUE)
+tangram_data_hs <- lapply(tangram_files_hs, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(file, "(?<=tangram_map_)\\d+")) # Extract the number after 'tangram_map_'
+    }) %>%
+  bind_rows() %>%
+  pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
+
 # Combine all results into a single dataframe
-all_metrics <- bind_rows(
-  citegeist_data %>% mutate(Method = "CITEgeist"),
-  cell2location_data %>% mutate(Method = "Cell2Location")
+all_metrics_hs <- bind_rows(
+  citegeist_data_hs %>% mutate("Method" = "CITEgeist"),
+  cell2location_data_hs %>% mutate("Method" = "Cell2Location"),
+  tangram_data_hs %>% mutate("Method" = "Tangram")
 )
 
 # View combined dataframe
-print(all_metrics)
+print(all_metrics_hs)
 
 # Save coalesced output to CSV:
-write.csv(all_metrics, "all_GEX_metrics_high_seg.csv")
+write.csv(all_metrics_hs, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/Figures/all_GEX_metrics_high_seg.csv")
 ```
-```{r}
-# Function to create boxplot with a single p-value annotation for a given metric
-plot_with_pvalues <- function(metric) {
-  # Ensure there are two groups
-  if (length(unique(all_metrics$Method)) != 2) {
-    stop("There must be exactly two groups in 'Method' for this metric.")
-  }
-  
-  # Prepare all_metrics for paired test
-  all_metrics_paired <- all_metrics %>%
-    select(Replicate, Method, all_of(metric)) %>%
-    spread(key = Method, value = all_of(metric))
-  
-  # Perform Paired t-test
-  test <- t.test(all_metrics_paired[[2]], all_metrics_paired[[3]], paired = TRUE)
-  p_value <- test$p.value
-  
-  # Add significance label
-  p_label <- ifelse(p_value < 0.001, "***",
-                    ifelse(p_value < 0.01, "**",
-                           ifelse(p_value < 0.05, "*", "ns")))
-  
-  # Create boxplot with significance annotation
-  p <- ggplot(all_metrics, aes(x = Method, y = .data[[metric]], color = Method)) +
-    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-    stat_summary(fun = mean, geom = "point", size = 3, shape = 18) +  # Add mean points
-    geom_jitter(width = 0.2, size = 2, alpha = 0.8) +
-    labs(
-      title = paste("Comparison of", metric),
-      subtitle = "Highly Segmented Simulation",
-      x = NULL,
-      y = metric
-    ) +
-    scale_color_manual(values = c("CITEgeist"="green", "Cell2Location"="blue")) + 
-    theme_classic() +
-    theme(
-      plot.title = element_text(size = 18, face = "bold"),           # Increase plot title size
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # Increase x-axis text size
-      axis.text.y = element_text(size = 16),                         # Increase y-axis text size
-      axis.title.y = element_text(size = 18),                        # Increase y-axis title size
-      axis.title.x = element_text(size = 18),                        # Increase x-axis title size
-      legend.title = element_text(size = 18),
-      legend.text = element_text(size = 16)                          # Increase legend text size
-    ) +
-    geom_segment(
-      aes(
-        x = 1, y = max(all_metrics[[metric]], na.rm = TRUE) + 0.05, 
-        xend = 2, yend = max(all_metrics[[metric]], na.rm = TRUE) + 0.05
-      ),
-      size = 0.8, color = "black"
-    ) +
-    geom_text(
-      aes(
-        x = 1.5, 
-        y = max(all_metrics[[metric]], na.rm = TRUE) + 0.07,
-        label = p_label
-      ),
-      size = 6, color = "black"
-    )
-  
-  # Save plot as PNG
-  ggsave(
-    filename = paste0("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/high_seg/", metric, "_GEX_boxplot_with_pvalues.png"),
-    plot = p,
-    device = "png",
-    dpi = 300,
-    width = 5, height = 5.5, units = "in", bg = "white"
-  )
-  
-  return(p)
-}
 
+```{r}
 # List of metrics to analyze (only "Average" stats)
 metrics_to_plot <- grep("^Average", c("Average RMSE", "Median RMSE", "Average NRMSE", "Median NRMSE", "Average MAE", "Median MAE"), value = TRUE)
 
 # Adjust factor levels for 'Method'
-all_metrics$Method <- factor(all_metrics$Method, levels = c("Seurat", "Cell2Location", "CITEgeist"))
-
+all_metrics_hs$Method <- factor(all_metrics_hs$Method, levels = c("Seurat", "Cell2Location", "Tangram", "CITEgeist"))
 ```
 
 ```{r}
-# Generate the plots
-plots <- lapply(metrics_to_plot, plot_with_pvalues)
+library(patchwork)
 
-plots
+# Generate the plots
+plots_hs <- lapply(metrics_to_plot, function(x){
+  plot_with_pvalues(all_metrics_hs, x, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/Figures/GEX", "high_seg")
+})
+plots_hs
 
 # Arrange the plots in a single row
-combined_plot <- wrap_plots(plots, nrow = 1) +
+combined_plot_hs <- wrap_plots(plots_hs, nrow = 1) +
   plot_annotation(tag_levels = "A") &  # Add letter annotations
   theme(
     plot.tag = element_text(size = 20, face = "bold")  # Increase tag size and make bold
   )
+combined_plot_hs
 
 # Save the combined plot as PNG
 ggsave(
-  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/high_seg/GEX_Metrics_high_seg.png",
-  plot = combined_plot,
+  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/Figures/GEX_Metrics_high_seg.png",
+  plot = combined_plot_hs,
   device = "png",
   dpi = 300,
-  width = 16.5, height = 6, units = "in", bg = "white"
+  width = 14, height = 5, units = "in", bg = "white"
 )
 ```
+
 
 # Mixed Replicates
 ```{r}
 # Define paths to directories
-citegeist_dir <- "/bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/spatial_gurobi/replicates/mixed/MixedCITEgeistOutput"
-cell2location_dir <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/cell2location/mixed"
-
+citegeist_dir_mx <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/CITEgeist/mixed"
+cell2location_dir_mx <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/mixed/gex"
+tangram_dir_mx <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/mixed/gex"
 
 # Read all CITEgeist results
-citegeist_files <- list.files(citegeist_dir, pattern = "Wu_rep_\\d+_gex_metrics_summary_Mixed.csv", full.names = TRUE)
-citegeist_data <- lapply(citegeist_files, function(file) {
+citegeist_files_mx <- list.files(citegeist_dir_mx, pattern = "^Wu_rep_\\d+_gex_metrics_pass1.csv$", full.names = TRUE)
+citegeist_data_mx <- lapply(citegeist_files_mx, function(file) {
   read_csv(file) %>%
     # Extract replicate number using the correct pattern
     mutate(Replicate = str_extract(basename(file), "(?<=Wu_rep_)\\d+"))
@@ -175,114 +248,54 @@ citegeist_data <- lapply(citegeist_files, function(file) {
   pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
 
 # Read all Cell2Location results
-cell2location_files <- list.files(cell2location_dir, pattern = "GEX_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
-cell2location_data <- lapply(cell2location_files, function(file) {
+cell2location_files_mx <- list.files(cell2location_dir_mx, pattern = "GEX_metrics_cell2location_map_\\d+.csv", full.names = TRUE)
+cell2location_data_mx  <- lapply(cell2location_files_mx, function(file) {
   read_csv(file) %>%
      mutate(Replicate = str_extract(file, "(?<=cell2location_map_)\\d+")) # Extract the number after 'cell2location_map_'
     }) %>%
   bind_rows() %>%
   pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
 
+# Read all Tangram results
+tangram_files_mx <- list.files(tangram_dir_mx, pattern = "GEX_metrics_tangram_map_\\d+.csv", full.names = TRUE)
+tangram_data_mx <- lapply(tangram_files_mx, function(file) {
+  read_csv(file) %>%
+     mutate(Replicate = str_extract(file, "(?<=tangram_map_)\\d+")) # Extract the number after 'tangram_map_'
+    }) %>%
+  bind_rows() %>%
+  pivot_wider(names_from = "Metric", values_from = "Value", id_cols = c("Replicate"))
+
 # Combine all results into a single dataframe
-all_metrics <- bind_rows(
-  citegeist_data %>% mutate(Method = "CITEgeist"),
-  cell2location_data %>% mutate(Method = "Cell2Location")
+all_metrics_mx <- bind_rows(
+  citegeist_data_mx     %>% mutate(Method = "CITEgeist"),
+  cell2location_data_mx %>% mutate(Method = "Cell2Location"),
+  tangram_data_mx       %>% mutate(Method = "Tangram")
 )
 
 # View combined dataframe
-print(all_metrics)
+print(all_metrics_mx)
 
 # Save coalesced output to CSV:
-write.csv(all_metrics, "all_GEX_metrics_mixed.csv")
+write.csv(all_metrics_mx, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/Figures/all_GEX_metrics_mixed.csv")
 ```
-```{r}
-# Function to create boxplot with a single p-value annotation for a given metric
-plot_with_pvalues <- function(metric) {
-  # Ensure there are two groups
-  if (length(unique(all_metrics$Method)) != 2) {
-    stop("There must be exactly two groups in 'Method' for this metric.")
-  }
-  
-  # Prepare all_metrics for paired test
-  all_metrics_paired <- all_metrics %>%
-    select(Replicate, Method, all_of(metric)) %>%
-    spread(key = Method, value = all_of(metric))
-  
-  # Perform Paired t-test
-  test <- t.test(all_metrics_paired[[2]], all_metrics_paired[[3]], paired = TRUE)
-  p_value <- test$p.value
-  
-  # Add significance label
-  p_label <- ifelse(p_value < 0.001, "***",
-                    ifelse(p_value < 0.01, "**",
-                           ifelse(p_value < 0.05, "*", "ns")))
-  
-  # Create boxplot with significance annotation
-  p <- ggplot(all_metrics, aes(x = Method, y = .data[[metric]], color = Method)) +
-    geom_boxplot(outlier.shape = NA, alpha = 0.6) +
-    stat_summary(fun = mean, geom = "point", size = 3, shape = 18) +  # Add mean points
-    geom_jitter(width = 0.2, size = 2, alpha = 0.8) +
-    labs(
-      title = paste("Comparison of", metric),
-      subtitle = "Highly Segmented Simulation",
-      x = NULL,
-      y = metric
-    ) +
-    scale_color_manual(values = c("CITEgeist"="green", "Cell2Location"="blue")) + 
-    theme_classic() +
-    theme(
-      plot.title = element_text(size = 18, face = "bold"),           # Increase plot title size
-      axis.text.x = element_text(angle = 45, hjust = 1, size = 14),  # Increase x-axis text size
-      axis.text.y = element_text(size = 16),                         # Increase y-axis text size
-      axis.title.y = element_text(size = 18),                        # Increase y-axis title size
-      axis.title.x = element_text(size = 18),                        # Increase x-axis title size
-      legend.title = element_text(size = 18),
-      legend.text = element_text(size = 16)                          # Increase legend text size
-    ) +
-    geom_segment(
-      aes(
-        x = 1, y = max(all_metrics[[metric]], na.rm = TRUE) + 0.05, 
-        xend = 2, yend = max(all_metrics[[metric]], na.rm = TRUE) + 0.05
-      ),
-      size = 0.8, color = "black"
-    ) +
-    geom_text(
-      aes(
-        x = 1.5, 
-        y = max(all_metrics[[metric]], na.rm = TRUE) + 0.07,
-        label = p_label
-      ),
-      size = 6, color = "black"
-    )
-  
-  # Save plot as PNG
-  ggsave(
-    filename = paste0("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/mixed/", metric, "_GEX_boxplot_with_pvalues_mixed.png"),
-    plot = p,
-    device = "png",
-    dpi = 300,
-    width = 5, height = 5.5, units = "in", bg = "white"
-  )
-  
-  return(p)
-}
 
+```{r}
 # List of metrics to analyze (only "Average" stats)
 metrics_to_plot <- grep("^Average", c("Average RMSE", "Median RMSE", "Average NRMSE", "Median NRMSE", "Average MAE", "Median MAE"), value = TRUE)
 
 # Adjust factor levels for 'Method'
-all_metrics$Method <- factor(all_metrics$Method, levels = c("Seurat", "Cell2Location", "CITEgeist"))
-
+all_metrics_mx$Method <- factor(all_metrics_mx$Method, levels = c("Seurat", "Cell2Location", "Tangram", "CITEgeist"))
 ```
 
 ```{r}
 # Generate the plots
-plots <- lapply(metrics_to_plot, plot_with_pvalues)
-
-plots
+plots_mx <- lapply(metrics_to_plot, function(x){
+  plot_with_pvalues(all_metrics_mx, x, "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/Figures/GEX", "mixed")
+})
+plots_mx
 
 # Arrange the plots in a single row
-combined_plot <- wrap_plots(plots, nrow = 1) +
+combined_plot_mx <- wrap_plots(plots_mx, nrow = 1) +
   plot_annotation(tag_levels = "A") &  # Add letter annotations
   theme(
     plot.tag = element_text(size = 20, face = "bold")  # Increase tag size and make bold
@@ -290,12 +303,15 @@ combined_plot <- wrap_plots(plots, nrow = 1) +
 
 # Save the combined plot as PNG
 ggsave(
-  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/larger_ref/Benchmarking/Figures/mixed/GEX_Metrics_mixed.png",
-  plot = combined_plot,
+  filename = "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/Figures/GEX/GEX_Metrics_mixed.png",
+  plot = combined_plot_mx,
   device = "png",
   dpi = 300,
-  width = 16.5, height = 6, units = "in", bg = "white"
+  width = 14, height = 5, units = "in", bg = "white"
 )
+```
+```{r}
+combined_plot_hs
 ```
 
 ```{r}
@@ -304,4 +320,3 @@ save.image(
   "GEX_figures.RData"
 )
 ```
-
