@@ -1,4 +1,5 @@
 import os
+import argparse
 from pathlib import Path
 from typing import Set, List
 import logging
@@ -10,8 +11,8 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Main folder path
-main_folder: Path = Path("/bgfs/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/")
+# Default main folder path
+DEFAULT_FOLDER: Path = Path("/bgfs/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/")
 
 # List of acceptable files to keep
 acceptable_files: Set[str] = {
@@ -169,6 +170,13 @@ def remove_prefix_from_essential_files(folder_path: Path) -> None:
         raise
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Process and clean up files in a directory.')
+    parser.add_argument('--folder', type=Path, default=DEFAULT_FOLDER,
+                      help='Path to the main folder to process (default: %(default)s)')
+    
+    args = parser.parse_args()
+    main_folder = args.folder
+    
     print(f"Choose operation:")
     print("1. Delete non-essential files and add prefixes")
     print("2. Remove prefixes from essential files")
