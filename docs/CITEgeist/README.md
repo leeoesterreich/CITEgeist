@@ -29,7 +29,7 @@ CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Explorati
 ### Step 1: Set up Python Environment
 ```bash
 # Create and activate a new conda environment
-conda create -n citegeist python=3.9
+conda create -n citegeist python=3.10
 conda activate citegeist
 ```
 
@@ -75,7 +75,6 @@ python run_citegeist.py \
 The demo will generate the following files in the `demo/results` directory:
 - `demo_sample_cellprop.csv`: Cell type proportions per spot
 - `demo_sample_gene_expression_pass1.parquet`: Initial gene expression profiles
-- `demo_sample_gene_expression_pass2.parquet`: Refined gene expression profiles
 - `demo_sample.log`: Processing logs and metrics
 
 Expected runtime for demo: 30-45 minutes on a standard desktop computer (16GB RAM, 4 cores)
