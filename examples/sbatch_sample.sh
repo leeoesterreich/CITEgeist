@@ -9,7 +9,7 @@
 #SBATCH --cluster=htc
 #SBATCH --cpus-per-task=16
 #SBATCH --partition=HTC
-#SBATCH --array=1-12
+#SBATCH --array=1-14
 
 # Activate conda environment
 source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/

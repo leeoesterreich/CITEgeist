@@ -829,9 +829,9 @@ def deconvolute_spot_with_neighbors_with_prior(
                     # Apply frequency normalization
                     normalized_weight = cell_type_weight * normalized_weights[j]
                     
-                    # Add slight randomness to break ties
-                    randomness = 0.9 + 0.2 * np.random.random()
-                    
+                    # Add slight randomness to break ties using seeded RNG for reproducibility
+                    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
+                    randomness = 0.9 + 0.2 * rng.random()
                     base_term = enrichment_weight * normalized_weight * randomness * X[j,k]
                     obj_terms.append(base_term)
 

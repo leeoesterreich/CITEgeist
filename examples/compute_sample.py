@@ -8,6 +8,7 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import scanpy as sc
 import pandas as pd
+import squidpy as sq
 
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
@@ -55,7 +56,7 @@ def main():
     args = parser.parse_args()
 
 
-    adata = sc.read_visium(args.path, count_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
+    adata = sq.read.visium(args.path, counts_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
     sample_name = args.path.split('/')[-3]
 
     
