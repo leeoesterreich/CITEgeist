@@ -41,7 +41,10 @@ You can either:
 
 A. Run the notebooks directly:
 - Update data paths in the notebooks to match your local directory structure
-- Expected runtime: ~2 hours on a standard computer (16 threads, 32GB RAM)
+- Expected runtime: 
+-- ~2 hours for vignette 1 on a standard computer (16 threads, 32GB RAM)
+-- ~2 hours for vignette 2 on a standard computer (16 threads, 32GB RAM)
+-- ~10 hours for vignette 3 on a standard computer (16 threads, 32GB RAM)
 
 B. Use SLURM distribution:
 - Use the provided `examples/sbatch_sample.sh` script for distributed computing

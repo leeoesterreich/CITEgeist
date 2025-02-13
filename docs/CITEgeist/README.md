@@ -7,16 +7,27 @@ CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Explorati
 ### Software Dependencies
 - Operating System: 
   - Linux (tested on Ubuntu 20.04 LTS, CentOS 7)
-  - macOS (tested on Monterey 12.0+)
-  - Windows 10 with WSL2
-- Python 3.7+ (tested on Python 3.7.9, 3.8.10, and 3.9.7)
+- Python 3.10
 - Required Python packages:
-  - numpy >= 1.21.0
-  - pandas >= 1.3.0
-  - scanpy >= 1.8.0
-  - pyarrow >= 6.0.0
-  - scipy >= 1.7.0
+  - numpy==1.23.0
+  - pandas==2.2.2
+  - scanpy==1.10.1
+  - pyarrow==17.0.0
+  - scipy==1.10.1
+  - anndata==0.10.7
+  - scikit-learn==1.5.0
+  - matplotlib==3.9.4
+  - seaborn==0.13.2
+  - tqdm==4.66.4
+  - h5py==3.11.0
+  - networkx==3.2.1
   - Gurobi >= 9.5.0 (requires license)
+  - squidpy==1.6.1 (for spatial analysis)
+  - spatialdata==0.2.1 (for spatial data handling)
+  - dask==2024.7.1 (for parallel computing)
+  - zarr==2.18.2 (for data storage)
+  - python-igraph==0.11.5 (for graph analysis)
+  - leidenalg==0.10.2 (for clustering)
 
 ### Hardware Requirements
 - RAM: Minimum 16GB, Recommended 64GB+
