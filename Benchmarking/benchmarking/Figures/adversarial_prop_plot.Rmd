@@ -1,0 +1,546 @@
+---
+title: "adversarial_plots"
+author: "bts76"
+date: "2025-02-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/Figures")
+
+# Load required libraries
+library(jsonlite)
+library(ggplot2)
+library(tidyverse)
+library(emmeans)
+library(ggpubr)
+
+# Adjust text size for publication-quality figures
+theme_set(theme_classic(base_size = 16)) # Set base text size to 16
+```
+
+```{r}
+prop_full_high_seg <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/Figures/Prop/Prop_all_metrics_highseg_combined.csv")
+prop_full_mixed    <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Benchmarking/Figures/Prop/prop_all_metrics_mixed_combined.csv")
+
+prop_8k_high_seg  <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/high_seg/prop/Prop_all_metrics_highseg_combined.csv")
+prop_8k_mixed  <- read.csv("/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/adversarial/benchmarking/metrics/mixed/prop/prop_all_metrics_mixed_combined.csv")
+```
+
+```{r}
+prop_full_high_seg$Reference <- "Full"
+prop_full_high_seg$Pattern <- "High Seg"
+prop_full_mixed$Reference <- "Full"
+prop_full_mixed$Pattern <- "Mixed"
+
+prop_8k_high_seg$Reference <- "Downsampled"
+prop_8k_high_seg$Pattern <- "High Seg"
+prop_8k_mixed$Reference <- "Downsampled"
+prop_8k_mixed$Pattern <- "Mixed"
+```
+
+```{r}
+all_metrics <- rbind(prop_full_high_seg,
+                     prop_full_mixed, 
+                     prop_8k_high_seg,
+                     prop_8k_mixed)
+```
+
+```{r}
+# Collapse data: Average metrics across replicates for each method
+collapsed_metrics <- all_metrics %>%
+  group_by(Method, Replicate,Reference, Pattern) %>%
+  summarize(
+    JSD = mean(JSD, na.rm = TRUE),
+    RMSE = mean(as.numeric(RMSE_Value), na.rm = TRUE),
+    MAE = mean(as.numeric(MAE_Value), na.rm = TRUE),
+    Sum_RMSE = mean(Sum_RMSE, na.rm = TRUE),
+    Sum_MAE = mean(Sum_MAE, na.rm = TRUE),
+    Corr = mean(corr, na.rm = TRUE)
+  ) %>%
+  ungroup()
+collapsed_metrics
+```
+
+```{r}
+# Load required libraries
+library(ComplexHeatmap)
+library(tidyverse)
+library(circlize)
+
+# Select relevant columns for visualization
+metrics <- c("JSD", "RMSE", "MAE", "Sum_RMSE", "Sum_MAE", "Corr")
+
+# Convert data to long format and remove unwanted columns
+heatmap_data <- collapsed_metrics %>%
+  select(Method, Reference, all_of(metrics)) %>%
+  pivot_longer(cols = metrics, names_to = "Metric", values_to = "Score") %>%
+  group_by(Reference, Metric, Method) %>%
+  summarise(Score = mean(Score, na.rm = TRUE), .groups = "drop")
+
+# Define red-to-blue diverging color palette for all metrics
+metric_colors <- list(
+  "Red to Blue" = c("#D73027", "white", "#4575B4")  # Red to Blue diverging for all metrics
+)
+
+# Function to create a heatmap per metric with a consistent red-to-blue color scale
+create_heatmap <- function(metric_name) {
+  metric_data <- heatmap_data %>%
+    filter(Metric == metric_name) %>%
+    select(-Metric) %>%  # Remove the "Metric" column before pivoting
+    pivot_wider(names_from = Reference, values_from = Score) %>%
+    column_to_rownames("Method")  # Set methods as rows
+
+  # Convert to numeric matrix
+  metric_matrix <- as.matrix(metric_data)
+  mode(metric_matrix) <- "numeric"
+
+  # Define color scale based on metric
+  if (metric_name == "Corr") {
+    col_fun <- colorRamp2(
+      c(min(metric_matrix, na.rm = TRUE), median(metric_matrix, na.rm = TRUE), max(metric_matrix, na.rm = TRUE)),
+      rev(metric_colors[["Red to Blue"]])  # Reverse the color scale for "Corr"
+    )
+  } else {
+    col_fun <- colorRamp2(
+      c(min(metric_matrix, na.rm = TRUE), median(metric_matrix, na.rm = TRUE), max(metric_matrix, na.rm = TRUE)),
+      metric_colors[["Red to Blue"]]
+    )
+  }
+
+  # Generate heatmap
+  Heatmap(
+    metric_matrix,
+    name = metric_name, 
+    col = col_fun, 
+    row_names_gp = gpar(fontsize = 10, rot = 45), 
+    column_names_gp = gpar(fontsize = 10, rot = 45),  
+    cluster_rows = FALSE,
+    cluster_columns = FALSE,  
+    column_title = metric_name,  
+    column_title_gp = gpar(fontsize = 10, fontface = "bold")  
+  )
+}
+# Create heatmaps for each metric separately
+metrics <- unique(heatmap_data$Metric)
+heatmap_list <- lapply(metrics, create_heatmap)
+
+# Combine heatmaps while keeping independent color scales
+ht_list <- Reduce(`+`, heatmap_list)
+
+# Draw the heatmaps
+draw(ht_list)
+
+
+```
+
+```{r}
+boxplot_data <- collapsed_metrics %>%
+  select(Method, Reference, Pattern, Replicate, all_of(metrics)) %>%
+  pivot_longer(cols = metrics, names_to = "Metric", values_to = "Score") %>%
+  group_by(Reference, Metric, Method, Pattern, Replicate) %>%
+  summarise(Score = mean(Score, na.rm = TRUE), .groups = "drop")
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Define colors for metrics
+metric_colors <- c(
+  "JSD" = "#E69F00",      # Orange
+  "RMSE" = "#56B4E9",     # Blue
+  "MAE" = "#009E73",      # Green
+  "Sum_RMSE" = "#D55E00", # Red
+  "Sum_MAE" = "#CC79A7",  # Pink
+  "Corr" = "#0072B2"      # Dark Blue
+)
+
+# Define Reference order (ensure "Full" is first)
+reference_order <- c("Full", "Downsampled") 
+
+# Define Method order (CITEgeist, Cell2Location, Seurat, RCTD, Tangram)
+method_order <- c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")
+
+# Compute mean and standard error for each Reference, Pattern, Method, and Metric
+barplot_data <- boxplot_data %>%
+  group_by(Method, Reference, Pattern, Metric) %>%
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),  # Standard error
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Reference = factor(Reference, levels = reference_order),  # Set custom order for Reference
+    Method = factor(Method, levels = method_order),  # Set custom order for Method
+    # Normalize Mean_Score to have mean 0 and sd 1 for each Metric
+    Normalized_Score = scale(Mean_Score)  # Standardization of Mean_Score
+  )
+
+# Create bar plot with error bars
+p <- ggplot(barplot_data, aes(x = interaction(Ref, Method), y = Normalized_Score, fill = Method, color = Reference)) +
+  geom_bar_pattern(stat = "identity", position = position_dodge(width = 0.8), width = 0.7, pattern = Ref) +  # Bar plot with fill by Method
+  geom_errorbar(aes(ymin = Normalized_Score - SE, ymax = Normalized_Score + SE), 
+                position = position_dodge(width = 0.8), width = 0.3) +  # Error bars
+  facet_grid(Pattern ~ Metric, scales = "free_y") +  # Split by Pattern and Metric
+  scale_fill_manual(values = c(
+    "CITEgeist" = "green",
+    "Cell2Location" = "blue",
+    "Seurat" = "red",
+    "RCTD" = "orange",
+    "Tangram" = "purple"
+  )) +  # Color by Method
+  scale_color_manual(values = c("transparent", "black")) +  # Set border color for Single Sample vs Atlas
+  theme_minimal(base_size = 14) +
+  theme(
+    axis.text.x = element_blank(),  # Remove x-axis labels completely
+    axis.ticks.x = element_blank(),  # Remove x-axis ticks
+    axis.title.x = element_blank(),  # Remove x-axis title
+    legend.position = "top"
+  ) +   
+  labs(
+    y = "Normalized Score",
+    title = "Metric Comparison Across Methods and Patterns"
+  )
+
+# Print plot
+print(p)
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+
+# Define colors for metrics
+metric_colors <- c(
+  "JSD" = "#E69F00",      # Orange
+  "RMSE" = "#56B4E9",     # Blue
+  "MAE" = "#009E73",      # Green
+  "Sum_RMSE" = "#D55E00", # Red
+  "Sum_MAE" = "#CC79A7",  # Pink
+  "Corr" = "#0072B2"      # Dark Blue
+)
+
+# Define Reference order (ensure "Full" is first)
+reference_order <- c("Full", "Downsampled", "Other1", "Other2")
+
+# Compute mean and standard error for each Reference, Pattern, Method, and Metric
+barplot_data <- boxplot_data %>%
+  group_by(Method, Reference, Pattern, Metric) %>%
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),  # Standard error
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Mean_Score = ifelse(Metric == "Corr", -Mean_Score, Mean_Score),  # Flip Corr values so higher is better
+    Reference = factor(Reference, levels = reference_order),  # Set custom order
+    Metric = factor(Metric, levels = names(metric_colors))  # Ensure consistent order of metrics
+  )
+
+# Create bar plot with error bars
+p <- ggplot(barplot_data, aes(x = Metric, y = Mean_Score, fill = Metric)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.7) +
+  geom_errorbar(aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE), 
+                position = position_dodge(width = 0.9), width = 0.3) +
+  facet_grid(Pattern ~ Method + Reference, scales = "free_y") +
+  scale_fill_manual(values = metric_colors) +
+  labs(
+    x = "Metric",
+    y = "Mean Score",
+    title = "Metric Comparison Across Methods and Patterns",
+    caption = "Higher Corr values are better (inverted for visualization)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top",
+    strip.text = element_text(size = 8)
+  )
+
+# Print plot
+print(p)
+
+
+```
+```{r}
+library(ggplot2)
+library(ggpattern)
+library(dplyr)
+
+# Prepare the data
+plot_data <- boxplot_data %>%
+  group_by(Method, Reference, Pattern, Metric) %>%
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Reference = factor(Reference, levels = c("Full", "Downsampled"))
+  )
+plot_data$Method <- factor(plot_data$Method, levels = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram"))
+# Create plot
+p <- ggplot(plot_data, aes(x = Method, y = Mean_Score, fill = Method, color = "black")) +
+  geom_bar_pattern(
+    aes(pattern = Reference),
+    stat = "identity", 
+    position = position_dodge(width = 0.9),
+    pattern_density = 0.1,  # Reduced from 0.1
+    pattern_spacing = 0.1,  # Adjusted spacing
+    pattern_angle = 45,
+    color = "black"
+  ) +
+  geom_errorbar(
+    aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE),
+    position = position_dodge(width = 0.9),
+    width = 0.3
+  ) +
+  facet_grid(Metric ~ Pattern, scales = "free_y") +
+  scale_pattern_manual(values = c(Full = "none", Downsampled = "crosshatch")) +
+  scale_fill_manual(values = c(
+    "CITEgeist" = "green",
+    "Cell2Location" = "blue",
+    "Seurat" = "red", 
+    "RCTD" = "orange",
+    "Tangram" = "purple"
+  ), breaks = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")) +
+  theme_classic() +
+ scale_color_manual(values = "black")
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  ) +
+  labs(
+    x = "Method", 
+    y = "Mean Score", 
+    title = "Metric Comparison Across Methods and References"
+  )
+```
+```{r}
+library(ggplot2)
+library(ggpattern)
+library(dplyr)
+library(extrafont)  # For Arial font
+
+# Prepare the data
+plot_data <- boxplot_data %>%
+  group_by(Method, Reference, Pattern, Metric) %>%
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    Reference = factor(Reference, levels = c("Full", "Downsampled")),
+    Pattern = gsub("_", " ", Pattern),  # Remove underscores
+    Metric = gsub("_", " ", Metric)
+  )
+plot_data$Method <- factor(plot_data$Method, levels = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram"))
+
+# Create plot
+p <- ggplot(plot_data, aes(x = Method, y = Mean_Score, fill = Method, color = "black")) +
+  geom_bar_pattern(
+    aes(pattern = Reference),
+    stat = "identity", 
+    position = position_dodge(width = 0.9),
+    pattern_density = 0.1,
+    pattern_spacing = 0.1,
+    pattern_angle = 45,
+    color = "black"
+  ) +
+  geom_errorbar(
+    aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE),
+    position = position_dodge(width = 0.9),
+    width = 0.3
+  ) +
+  facet_grid(Metric ~ Pattern, scales = "free_y") +
+  scale_pattern_manual(values = c(Full = "none", Downsampled = "crosshatch")) +
+  scale_fill_manual(values = c(
+    "CITEgeist" = "green",
+    "Cell2Location" = "blue",
+    "Seurat" = "red", 
+    "RCTD" = "orange",
+    "Tangram" = "purple"
+  ), breaks = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")) +
+  theme_classic() +
+  scale_color_manual(values = "black") +
+  theme(
+    text = element_text(family = "Arial", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 10),
+    strip.text = element_text(size = 10),
+    legend.position = "top"
+  ) +
+  labs(
+    x = "Method", 
+    y = "Mean Score", 
+    title = "Metric Comparison Across Methods and References"
+  )
+
+# Save plot
+ggsave("prop_plot.png", p, dpi = 300, width = 6, height = 8, units = "in")
+ggsave("prop_plot.svg", p, width = 6, height = 8, units = "in")
+```
+```{r}
+library(ggplot2)
+library(ggpattern)
+library(dplyr)
+library(extrafont)
+
+# Prepare the data
+plot_data <- boxplot_data %>%
+ group_by(Method, Reference, Pattern, Metric, Replicate) %>%
+ summarise(
+   Mean_Score = mean(Score, na.rm = TRUE),
+   SE = sd(Score, na.rm = TRUE) / sqrt(n()),
+   .groups = "drop"
+ ) %>%
+ mutate(
+   Reference = factor(Reference, 
+                      levels = c("Full", "Downsampled"),
+                      labels = c("30k cells", "8k cells")),
+   Pattern = gsub("_", " ", Pattern),
+   Metric = gsub("_", " ", Metric)
+ )
+plot_data$Method <- factor(plot_data$Method, levels = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram"))
+
+# Create plot
+p <- ggplot(plot_data, aes(x = Method, y = Mean_Score, fill = Method, color = "black"))+
+ geom_bar_pattern(
+   aes(pattern = Reference),
+   stat = "identity", 
+   position = position_dodge(width = 0.9),
+   pattern_density = 0.1,
+   pattern_spacing = 0.1,
+   pattern_angle = 45,
+   color = "black"
+ ) +
+ geom_errorbar(
+   aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE, group = Reference),
+   color = "black"
+ ) +
+ geom_hline(yintercept = 0, color = "black", linetype = "solid", size = 0.5) +
+ facet_grid(Metric ~ Pattern, scales = "free_y") +
+ scale_pattern_manual(values = c('30k cells' = "none", '8k cells' = "crosshatch")) +
+ scale_fill_manual(values = c(
+   "CITEgeist" = "green",
+   "Cell2Location" = "blue",
+   "Seurat" = "red", 
+   "RCTD" = "orange",
+   "Tangram" = "purple"
+ ), breaks = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")) +
+ theme_classic() +
+ scale_color_manual(values = "black") +
+ theme(
+   text = element_text(family = "Arial", size = 12),
+   axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+   axis.text.y = element_text(size = 9),
+   strip.text = element_text(size = 11),
+   legend.position = "right"
+ ) +
+ labs(
+   x = "Method", 
+   y = "Mean Score", 
+   title = "Metric Comparison Across Methods and References"
+ )
+
+# Save plot
+ggsave("prop_plot.png", p, dpi = 300, width = 7, height = 8, units = "in")
+ggsave("prop_plot.svg", p, width = 7, height = 8, units = "in")
+```
+
+
+```{r}
+# Prepare the data
+plot_data <- boxplot_data %>%
+  # Group by Method, Reference, Pattern, Metric (without Replicate)
+  group_by(Method, Reference, Pattern, Metric) %>%
+  summarise(
+    Mean_Score = mean(Score, na.rm = TRUE),  # Compute the mean score across replicates
+    SE = sd(Score, na.rm = TRUE) / sqrt(n()),  # Compute the SE across replicates
+    .groups = "drop"
+  ) %>%
+  # Now mutate the additional information (e.g., Reference levels)
+  mutate(
+    Reference = factor(Reference, 
+                       levels = c("Full", "Downsampled"),
+                       labels = c("30k cells", "8k cells")),
+    Pattern = gsub("_", " ", Pattern),
+    Metric = gsub("_", " ", Metric)
+  )
+View(plot_data)
+```
+
+
+
+```{r}
+library(ggplot2)
+library(ggpattern)
+library(dplyr)
+library(extrafont)
+plot_data$Method <- factor(plot_data$Method, levels = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram"))
+
+# Create plot
+p <- ggplot(plot_data, aes(x = Method, y = Mean_Score, fill = Method, color = "black")) +
+  geom_bar_pattern(
+    aes(pattern = Reference),
+    stat = "identity", 
+    position = position_dodge(width = 0.9),
+    pattern_density = 0.1,
+    pattern_spacing = 0.1,
+    pattern_angle = 45,
+    color = "black"
+  ) +
+  geom_errorbar(
+    aes(ymin = Mean_Score - SE, ymax = Mean_Score + SE, group = Reference),
+    position = position_dodge(width = 0.9),  # Aligns with bars
+    width = 0.3,  # Adds small whiskers
+    color = "black",
+    linewidth = 0.6  # Thicker for better visibility
+  ) #+ 
+  facet_grid(Metric ~ Pattern, scales = "free_y") +
+  scale_pattern_manual(values = c('30k cells' = "none", '8k cells' = "crosshatch")) +
+  scale_fill_manual(values = c(
+    "CITEgeist" = "green",
+    "Cell2Location" = "blue",
+    "Seurat" = "red", 
+    "RCTD" = "orange",
+    "Tangram" = "purple"
+  ), breaks = c("CITEgeist", "Cell2Location", "Seurat", "RCTD", "Tangram")) +
+  theme_classic() +
+  scale_color_manual(values = "black") +
+  theme(
+    text = element_text(family = "Arial", size = 12),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.text.y = element_text(size = 9),
+    strip.text = element_text(size = 11),
+    legend.position = "right"
+  ) +
+  labs(
+    x = "Method", 
+    y = "Mean Score", 
+    title = "Metric Comparison Across Methods and References"
+  )
+
+# Save plot
+ggsave("prop_plot.png", p, dpi = 300, width = 7, height = 8, units = "in")
+ggsave("prop_plot.svg", p, width = 7, height = 8, units = "in")
+
+```
+```{r}
+p
+```
+```{r}
+write.csv(plot_data, "adversarial_prop_plot_data.csv")
+write.csv(collapsed_metrics, "adversarial_aggregated_metrics.csv")
+write.csv(all_metrics, "adversarial_global_metrics.csv")
+```
+
+```{r}
+save.image("adversarial_prop_plot.RData")
+```
+
