@@ -52,29 +52,7 @@ It is recommended to install the dependencies in the `CITEgeist_env.yml` file fo
 ## Getting Started
 
 ### 1. Download the Code and Data (Instructions for Peer Reviewers)
-
-1. Download the code from Figshare: [https://figshare.com/s/34e456fd7786e5211acc](https://figshare.com/s/34e456fd7786e5211acc)
-2. Unzip the downloaded file to your preferred location.
-3. Download the data from GEO (Reviewers: see Data Availability section in the manuscript for the GEO link and Private Access Token).
-4. Run the following code to strip unique identifiers required by GEO:
-
-```bash
-# go to the 'data' directory
-cd data
-
-# untar the raw files
-mkdir -pv ./GEO_data
-tar -xvf GEO_data_RAW.tar -C ./GEO_data
-
-# run the py preprocessing script
-## round 1) aggregate the files by sample
-python3 ./delete_all_but_essential.py --folder GEO_data # select option: 1
-
-## round 2) remove the prefix from necessary files
-python3 ./delete_all_but_essential.py --folder GEO_data # select option: 2
-```
-
-Note: When prompted, select Option 1 or 2 and type 'Yes' to confirm.
+- Please see the [Data Directory](data/README.md) for installation/download instructions.
 
 ### 2. Set Up the Environment
 
