@@ -8,6 +8,13 @@ The benchmarking system evaluates two main aspects:
 1. Cell Type Deconvolution Performance
 2. Gene Expression Prediction Accuracy
 
+> **⚠️ IMPORTANT NOTE**
+> 
+> This repository does **NOT** contain method-specific results or raw data from individual methods.
+> Instead, it provides:
+> - Scripts used to run each benchmarked method (in the `benchmarking/` folder)
+> - Aggregated results and visualizations (in the `benchmarking/Figures/` subfolder)
+
 ## Metrics
 
 ### Cell Type Deconvolution Metrics
@@ -112,3 +119,4 @@ benchmarking/
     ├── high_seg/                 # Runtime analysis for highly segmented patterns
     └── mixed/                    # Runtime analysis for mixed patterns
 ```
+
