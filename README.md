@@ -20,12 +20,9 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 
 ## 📚 Documentation
 
-- [Quick Start Guide](docs/QuickStart.md)
-- [Installation Instructions](docs/Installation.md)
-- [Method Details](docs/Methods/README.md)
-- [Benchmarking Results](docs/Benchmarking/README.md)
-- [API Reference](docs/API/README.md)
-- [Example Notebooks](docs/Examples/README.md)
+- [Quick Start Guide](CITEgeist/README.md)
+- [Benchmarking Results](Benchmarking/README.md)
+- [Example Notebooks](CITEgeist/examples)
 
 ## 💻 System Requirements
 
@@ -55,12 +52,12 @@ This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICE
 
 - **Lab Website**: [Lee/Oesterreich Laboratory](https://leeoesterreich.org/)
 - **Issues**: [GitHub Issues](https://github.com/leeoesterreich/CITEgeist/issues)
-- **Email**: [lab@contact.com](mailto:lab@contact.com)
+- **Email**: [Contact Us](mailto:alc376@pitt.edu)
 
 ## 📝 Citation
 
 If you use CITEgeist in your research, please cite our paper:
-
+(to be updated)
 ```bibtex
 @article{citegeist2025,
     title={CITEgeist: Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends},
@@ -74,3 +71,4 @@ If you use CITEgeist in your research, please cite our paper:
 
 ---
 Copyright (c) 2024 Lee/Oesterreich Lab
+
