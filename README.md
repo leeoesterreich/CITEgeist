@@ -70,5 +70,5 @@ If you use CITEgeist in your research, please cite our paper:
 ```
 
 ---
-Copyright (c) 2024 Lee/Oesterreich Lab
+Copyright (c) 2025 Lee/Oesterreich Lab
 
