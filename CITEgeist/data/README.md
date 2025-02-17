@@ -4,7 +4,7 @@
 
 ### 1. Download the Code
 
-- Download the code from Figshare: [https://figshare.com/s/34e456fd7786e5211acc](https://figshare.com/s/34e456fd7786e5211acc)
+- Download the code from Figshare (see the Manuscript Submission for private access)
 - Unzip the downloaded file to your preferred location
 
 ### 2. Download and Prepare the Data
@@ -21,7 +21,7 @@ tar -xvf GEO_data_RAW.tar -C ./GEO_data
 python3 ./organize_spatial_data.py --folder GEO_data
 ```
 
-Note: When prompted, type 'yes' to confirm.
+*Note*: When prompted, type 'yes' to confirm.
 
 ### 3. Set Up the Environment
 
@@ -39,11 +39,11 @@ conda activate CITEgeist_env
 
 CITEgeist requires a Gurobi license (free for academic use):
 
-1. Sign up for an academic license at: [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/)
+1. Sign up for a Gurobi [academic license](https://www.gurobi.com/downloads/end-user-license-agreement-academic/)
 2. Follow the instructions to download and install your license
 3. Update the license file path in the notebooks to match your local license location
 
-### 5. Run the Analysis
+### 5. Run the Analysis ([See the "Examples" folder for details](../examples/README.md))
 
 You can either:
 
@@ -53,10 +53,6 @@ A. Run the notebooks directly:
 
 B. Use SLURM distribution:
 - Use the provided `examples/sbatch_sample.sh` script for distributed computing
-
-### 6. Benchmarking
-
-For specific reproduction of benchmarking tests, please refer to the benchmarking section in the documentation.
 
 ## System Requirements
 
