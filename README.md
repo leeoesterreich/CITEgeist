@@ -37,14 +37,18 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 
 ## 🔧 Quick Installation
 
-```bash
-# Clone the repository
-git clone https://github.com/leeoesterreich/CITEgeist.git
-cd CITEgeist
+You can install CITEgeist using pip:
 
-# Create and activate conda environment
-conda env create -f CITEgeist_env.yml
-conda activate CITEgeist_env
+```bash
+pip install citegeist
+```
+
+For development installation:
+
+```bash
+git clone https://github.com/alee-x/CITEgeist.git
+cd CITEgeist
+pip install -e .[dev]
 ```
 
 ## 📜 License
@@ -71,6 +75,20 @@ If you use CITEgeist in your research, please cite our paper:
     pages={}
 }
 ```
+
+## 📝 Citation
+
+If you use CITEgeist in your research, please cite:
+
+[Citation information to be added]
+
+## 📝 Contributing
+
+We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+
+## 📝 Support
+
+For support, please open an issue on our [GitHub issue tracker](https://github.com/alee-x/CITEgeist/issues).
 
 ---
 Copyright (c) 2024 Lee/Oesterreich Lab
