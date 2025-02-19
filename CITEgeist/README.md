@@ -1,14 +1,21 @@
-
 # CITEgeist: Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
 
 CITEgeist is a computational method for deconvolving spatial transcriptomics data using spatially-resolved CITE-seq measurements. The pipeline performs both cell-type proportion estimation and gene expression deconvolution in a two-pass approach, leveraging both protein and RNA measurements from the same spatial locations.
+
+## Quick Installation
+
+You can now also install CITEgeist using pip:
+
+```bash
+pip install citegeist
+```
 
 ## Table of Contents
 1. [System Requirements](#system-requirements)
     - [Software Dependencies](#software-dependencies)
     - [Hardware Requirements](#hardware-requirements)
 2. [Getting Started](#getting-started)
-    - [1. Download the Code and Data](#1-download-the-code-and-data)
+    - [1. Installation](#1-installation)
     - [2. Set Up the Environment](#2-set-up-the-environment)
     - [3. Obtain Gurobi License](#3-obtain-gurobi-license)
     - [4. Running CITEgeist](#4-running-citegeist)
@@ -51,43 +58,29 @@ It is recommended to install the dependencies in the `CITEgeist_env.yml` file fo
 
 ## Getting Started
 
-### 1. Download the Code and Data (Instructions for Peer Reviewers)
+### 1. Installation
 
-1. Download the code from Figshare: [https://figshare.com/s/34e456fd7786e5211acc](https://figshare.com/s/34e456fd7786e5211acc)
-2. Unzip the downloaded file to your preferred location.
-3. Download the data from GEO (Reviewers: see Data Availability section in the manuscript for the GEO link and Private Access Token).
-4. Run the following code to strip unique identifiers required by GEO:
+Install CITEgeist using pip:
 
 ```bash
-# go to the 'data' directory
-cd data
-
-# untar the raw files
-mkdir -pv ./GEO_data
-tar -xvf GEO_data_RAW.tar -C ./GEO_data
-
-# run the py preprocessing script
-## round 1) aggregate the files by sample
-python3 ./delete_all_but_essential.py --folder GEO_data # select option: 1
-
-## round 2) remove the prefix from necessary files
-python3 ./delete_all_but_essential.py --folder GEO_data # select option: 2
+pip install citegeist
 ```
 
-Note: When prompted, select Option 1 or 2 and type 'Yes' to confirm.
+For development installation:
+
+```bash
+git clone https://github.com/acc383/CITEgeist.git
+cd CITEgeist
+pip install -e .[dev]
+```
 
 ### 2. Set Up the Environment
 
-- Install dependencies using the provided environment file:
+- Create and activate a new conda environment:
 
 ```bash
-conda env create -f CITEgeist_env.yml
-```
-
-- Activate the environment and set up a Jupyter kernel:
-
-```bash
-conda activate CITEgeist_env
+conda create -n citegeist python=3.10
+conda activate citegeist
 ```
 
 ### 3. Obtain Gurobi License
@@ -96,18 +89,17 @@ CITEgeist requires a Gurobi license (free for academic use):
 
 1. Sign up for an academic license at: [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/)
 2. Follow the instructions to download and install your license.
-3. Update the license file path in the notebooks to match your local license location.
+3. Update the license file path in your code to match your local license location.
 
 ### 4. Running CITEgeist
 
 You can run CITEgeist in two ways:
 
-#### A. Using Jupyter Notebooks
-- Update data paths in the top of the notebooks to match your local directory structure.
+#### A. Using Python Scripts
 - Expected runtime on a standard computer (16 threads, 32GB RAM):
-  - Vignette 1: ~2 hours
-  - Vignette 2: ~2 hours
-  - Vignette 3: ~10 hours
+  - Small dataset: ~2 hours
+  - Medium dataset: ~4 hours
+  - Large dataset: ~10 hours
 
 #### Key Parameters:
 - `radius`: Radius for neighbor detection (default: 4)
@@ -121,7 +113,7 @@ You can run CITEgeist in two ways:
 - `checkpoint_interval`: Checkpoint saving interval.
 
 #### B. Using SLURM Distribution
-For large-scale analyses, you can use the provided `CITEgeist/examples/sbatch_sample.sh` script for distributed computing.
+For large-scale analyses, you can use the provided `examples/sbatch_sample.sh` script for distributed computing.
 
 ---
 
@@ -135,8 +127,7 @@ For specific reproduction of benchmarking tests and detailed methodology, please
 
 You can either:
 
-#### A. Run the notebooks directly:
-- Update data paths in the notebooks to match your local directory structure.
+#### A. Run the code directly:
 - Expected runtime: ~2 hours on a standard computer (16 threads, 32GB RAM).
 
 #### B. Use SLURM distribution:
@@ -147,5 +138,5 @@ You can either:
 ## Additional System Requirements
 - **RAM**: 32GB (minimum)
 - **CPU**: 16 threads (recommended)
-- **Storage**: Sufficient space for the GEO dataset
+- **Storage**: Sufficient space for your dataset
 - **Operating System**: Linux/Unix recommended (Windows users may need additional configuration)
