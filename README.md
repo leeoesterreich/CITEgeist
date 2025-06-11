@@ -1,144 +1,99 @@
 # CITEgeist
-Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
 
-## System Requirements
+[![GitHub stars](https://img.shields.io/github/stars/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/stargazers)
+[![License](https://img.shields.io/github/license/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/issues)
+[![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
 
-### Software Dependencies
-- Operating System: 
-  - Linux (tested on Ubuntu 20.04 LTS, CentOS 7)
-  - macOS (tested on Monterey 12.0+)
-  - Windows 10 with WSL2
-- Python 3.7+ (tested on Python 3.7.9, 3.8.10, and 3.9.7)
-- Required Python packages:
-  - numpy >= 1.21.0
-  - pandas >= 1.3.0
-  - scanpy >= 1.8.0
-  - pyarrow >= 6.0.0
-  - scipy >= 1.7.0
-  - Gurobi >= 9.5.0 (requires license)
+> Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
 
-### Hardware Requirements
-- RAM: Minimum 16GB, Recommended 64GB+
-- Storage: 10GB minimum for installation and basic analysis
-- CPU: Multi-core processor recommended (8+ cores for optimal performance)
-- GPU: Optional, but recommended for large datasets
+CITEgeist is a comprehensive computational framework for analyzing spatial multi-omic data, with a focus on integrating CITE-seq and spatial transcriptomics. Our toolkit enables researchers to uncover spatial patterns in cellular organization and gene expression, providing deeper insights into tissue architecture and function.
 
-## Installation Guide
+## 🚀 Key Features
 
-### Step 1: Set up Environment from YAML
+- Integration of CITE-seq and spatial transcriptomics data
+- Robust cell-type deconvolution
+- Spatial pattern analysis
+- Flexible regularization options
+- Scalable to large datasets
+- Comprehensive visualization tools
+
+## 📚 Documentation
+
+- [Quick Start Guide](CITEgeist/README.md)
+- [Benchmarking Results](Benchmarking/README.md)
+- [Example Notebooks](CITEgeist/examples)
+
+## 💻 System Requirements
+
+### Minimum Requirements
+- Python 3.10
+- 16GB RAM
+- Multi-core processor
+- Linux, macOS, or Windows 10 with WSL2
+
+## 🔧 Quick Installation
+
+You can install CITEgeist using pip:
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/CITEgeist.git
+pip install citegeist
+```
+
+For development installation:
+
+```bash
+git clone https://github.com/alee-x/CITEgeist.git
 cd CITEgeist
-
-# Create and activate conda environment from YAML
-conda env create -f docs/CITEgeist/CITEgeist_dependencies.yml
-conda activate citegeist
+pip install -e .[dev]
 ```
 
-### Step 2: Install CITEgeist
-```bash
-pip install -e .
+## 📜 License
+
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details. This license ensures that all modifications and derivative works must also be open source.
+
+## 📫 Contact
+
+- **Lab Website**: [Lee/Oesterreich Laboratory](https://leeoesterreich.org/)
+- **Issues**: [GitHub Issues](https://github.com/leeoesterreich/CITEgeist/issues)
+- **Email**: [Contact Us](mailto:alc376@pitt.edu)
+
+## 📝 Citation
+
+If you use CITEgeist in your research, please cite our paper:
+(to be updated)
+```bibtex
+@article{ChangSchlegelCITEgeistCellularIndexing2025,
+  title = {{{CITEgeist}}: {{Cellular Indexing}} of {{Transcriptomes}} and {{Epitopes}} for {{Guided Exploration}} of {{Intrinsic Spatial Trends}}},
+  shorttitle = {{{CITEgeist}}},
+  author = {Chang, Alexander Chih-Chieh and Schlegel, Brent T. and Carleton, Neil and McAulife, Priscilla F. and Oesterreich, Steffi and Schwartz, Russell and Lee, Adrian V.},
+  date = {2025-02-17},
+  eprinttype = {bioRxiv},
+  eprintclass = {New Results},
+  pages = {2025.02.15.638331},
+  doi = {10.1101/2025.02.15.638331},
+  url = {https://www.biorxiv.org/content/10.1101/2025.02.15.638331v1},
+  urldate = {2025-02-17},
+  abstract = {Spatial transcriptomics provides insights into tissue architecture by linking gene expression with spatial localization. Current deconvolution methods rely heavily on single-cell RNA sequencing (scRNA-seq) references, which are costly and often unavailable, mainly if the tissue under evaluation is limited, such as in a core biopsy specimen. We present a novel tool, CITEgeist, that deconvolutes spatial transcriptomics data using antibody capture from the same slide as the reference, directly leveraging cell surface protein measurements from the same tissue section. This approach circumvents the limitations of scRNA-seq as a reference, offering a cost-effective and biologically grounded alternative. Our method employs mathematical optimization to estimate cell type proportions and gene expression profiles, incorporating sparsity constraints for robustness and interpretability. Benchmarks against state-of-the-art deconvolution methods show improved accuracy in cell type resolution, particularly in dense tumor microenvironments, while maintaining computational efficiency. This antibody-based tool advances spatial transcriptomics by providing a scalable, accurate, and reference-independent solution for deconvolution in complex tissues. We validate this tool by using a combined approach of simulated data and clinical samples by applying CITEgeist to translational pre-treatment and post-treatment ER+ breast tumors from an ongoing clinical trial, emphasizing the applicability and robustness of CITEgeist.},
+}
+
+
 ```
 
-Typical installation time: 10-15 minutes on a standard desktop computer
+## 📝 Citation
 
-## Demo
+If you use CITEgeist in your research, please cite:
 
-### Running the Demo
-1. Download the demo dataset from GEO (accession GEOXXXX):
-```bash
-# Create a demo directory
-mkdir -p demo/data
-cd demo/data
+[Citation information to be added]
 
-# Download and extract the demo data
-wget https://www.ncbi.nlm.nih.gov/geo/download/?acc=GEOXXXX&format=file -O demo_data.tar.gz
-tar -xzf demo_data.tar.gz
-cd ../..
-```
+## 📝 Contributing
 
-2. Run the demo analysis:
-```bash
-python run_citegeist.py \
-    --radius 4 \
-    --lambda_reg 1.0 \
-    --alpha_elastic 0.7 \
-    --max_y_change 0.2 \
-    --input_folder demo/data \
-    --output_folder demo/results \
-    --sample_prefix "demo_sample"
-```
+We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
 
-### Expected Output
-The demo will generate the following files in the `demo/results` directory:
-- `demo_sample_cellprop.csv`: Cell type proportions per spot
-- `demo_sample_gene_expression_pass1.parquet`: Initial gene expression profiles
-- `demo_sample_gene_expression_pass2.parquet`: Refined gene expression profiles
-- `demo_sample.log`: Processing logs and metrics
+## 📝 Support
 
-Expected runtime for demo: 30-45 minutes on a standard desktop computer (16GB RAM, 4 cores)
+For support, please open an issue on our [GitHub issue tracker](https://github.com/alee-x/CITEgeist/issues).
 
-## Instructions for Use
+---
+Copyright (c) 2025 Lee/Oesterreich Lab
 
-### Running CITEgeist on Your Data
-
-1. Prepare your input data:
-   - Format your CITE-seq data as an AnnData object (`.h5ad` format)
-   - Ensure both gene expression and protein measurements are included
-   - Include spatial coordinates for each spot
-
-2. Run the analysis:
-```bash
-python run_citegeist.py \
-    --radius <radius_value> \
-    --lambda_reg <regularization_strength> \
-    --alpha_elastic <elastic_net_mixing> \
-    --max_y_change <max_change_value> \
-    --input_folder /path/to/your/data \
-    --output_folder /path/to/output \
-    --sample_prefix "your_sample_name"
-```
-
-Key Parameters:
-- `radius`: Radius for neighbor detection (default: 4)
-- `lambda_reg`: Regularization strength (default: 0.001)
-- `alpha_elastic`: Elastic net mixing parameter (default: 0.7)
-- `max_y_change`: Maximum allowed change in Y values (default: 0.2)
-
-Optional Parameters:
-- `profiling_only`: Set for cell-type proportions only
-- `skip_pass2`: Skip refinement pass
-- `max_workers`: Number of parallel workers
-- `checkpoint_interval`: Checkpoint saving interval
-
-### Performance Optimization
-- For large datasets (>100k spots):
-  - Increase available RAM to 64GB+
-  - Use `max_workers` parameter for parallel processing
-  - Enable checkpointing with `checkpoint_interval`
-- For faster processing:
-  - Use SSD storage for input/output
-  - Enable GPU acceleration if available
-  - Adjust batch sizes based on available memory
-
-## Reproduction Instructions
-
-To reproduce the results from our manuscript:
-1. Download the benchmark datasets:
-```bash
-python scripts/download_benchmark_data.py
-```
-
-2. Run the benchmark analysis:
-```bash
-python scripts/run_benchmarks.py \
-    --dataset_dir benchmark/data \
-    --output_dir benchmark/results
-```
-
-The benchmark scripts will generate figures and tables matching those in the manuscript. Expected runtime: 4-6 hours on a standard desktop computer.
-
-For detailed methodology and additional analysis scripts, please refer to our [benchmarking documentation](docs/Benchmarking/README.md).
-
-Copyright (c) 2024 Lee Oesterreich Lab
