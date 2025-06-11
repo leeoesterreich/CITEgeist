@@ -152,8 +152,8 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         list: List of cell type names (to ensure column order).
     """
     # Step 1: Subset data to relevant markers
-    all_markers = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
-    existing_markers = [marker for marker in all_markers if marker in adata.var_names]
+    all_markers: list[str] = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
+    existing_markers: list[str] = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
         logging.info("Adata variables: %s", adata.var_names)
