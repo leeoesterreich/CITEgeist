@@ -142,6 +142,7 @@ class CitegeistModel:
         if self.adata is None:
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
 
+        
         self.adata.var_names_make_unique()
         
         if self.gene_expression_adata or self.antibody_capture_adata :
@@ -420,12 +421,12 @@ class CitegeistModel:
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 
     def run_cell_expression_pass1(self, radius, alpha=0.5, lambda_reg_gex=0.001,
-                            global_enrichment_weight=0.5, local_enrichment_weight=0.5,
-                            max_workers=None, checkpoint_interval=100, 
-                            output_dir="checkpoints", rerun=True):
+                                global_enrichment_weight=0.5, local_enrichment_weight=0.5,
+                                max_workers=None, checkpoint_interval=100,
+                                output_dir="checkpoints", rerun=True):
         """
         Run first pass of gene expression deconvolution.
-        
+
         Args:
             radius (float): Radius for neighbor detection
             alpha (float): Weight for spatial regularization
@@ -436,7 +437,7 @@ class CitegeistModel:
             checkpoint_interval (int): Number of spots between checkpoints
             output_dir (str): Directory for checkpoints
             rerun (bool): Whether to rerun if results exist
-            
+
         Returns:
             Dict[str, Any]: {
                 'spotwise_profiles': Dict[int, np.ndarray],
@@ -447,14 +448,30 @@ class CitegeistModel:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
         logging.info("Starting Pass 1: Error minimization with enrichment weights...")
-        
+
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
-        
+
+        if 'cell_prop' not in self.results or self.results['cell_prop'] is None:
+            raise ValueError("Cell proportions not computed. Run cell proportion model first.")
+
+        cell_props_values = self.results['cell_prop'].values
+
+        # Diagnostic check for low or zero cell proportions
+        total_props_per_spot = cell_props_values.sum(axis=1)
+        zero_prop_spots = np.where(total_props_per_spot < 1e-9)[0]
+
+        if len(zero_prop_spots) > 0:
+            logging.warning(
+                f"Found {len(zero_prop_spots)} spots with zero or negligible total cell proportions. "
+                f"Deconvolution for these spots may fail and their profiles will be imputed as zeros. "
+                f"Example spot indices: {zero_prop_spots[:5]}"
+            )
+
         spotwise_profiles = optimize_gene_expression(
             sample_name=self.sample_name,
             deconvolution_expression_data=self.gene_expression_adata.X,
-            cell_type_numbers_array=self.results['cell_prop'].values,
+            cell_type_numbers_array=cell_props_values,
             filtered_adata=self.gene_expression_adata,
             radius=radius,
             global_enrichment_weight=global_enrichment_weight,
@@ -467,60 +484,71 @@ class CitegeistModel:
             rerun=rerun
         )
 
-       
-       
-        # Get dimensions for NaN imputation
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression data not available")
-        if 'cell_prop' not in self.results or self.results['cell_prop'] is None:
-            raise ValueError("Cell proportions not computed. Run cell proportion model first.")
-            
+        # Get dimensions for NaN imputation and consistency checks
         N = self.gene_expression_adata.shape[0]  # number of spots
-        T = self.results['cell_prop'].values.shape[1]  # number of cell types
+        T = cell_props_values.shape[1]  # number of cell types
         M = self.gene_expression_adata.shape[1]  # number of genes
-        
-        # Impute NaN spots for first pass
+        dimensions = (N, T, M)
+
+        # Impute spots that failed to converge (NaN spots)
         nan_spots = [i for i in range(N) if i not in spotwise_profiles]
-        for nan_spot in nan_spots:
-            neighbor_indices = get_neighbors_with_fixed_radius(
-                nan_spot, 
-                self.gene_expression_adata, 
-                radius=radius, 
-                include_center=False
-            )
+        if nan_spots:
+            logging.info(f"Found {len(nan_spots)} spots that failed to converge. Starting imputation...")
 
-            if spotwise_profiles is None:
-                raise ValueError("Spotwise profiles not computed. Run cell expression pass 1 first.")
+            imputed_count = 0
+            zero_profile = np.zeros((T, M), dtype=int)
 
-            neighbor_profiles = [
-                spotwise_profiles[str(i)]
-                for i in neighbor_indices
-                if i in spotwise_profiles
-            ]
+            for spot_idx in nan_spots:
+                # Prioritize imputing with zeros if cell proportions are negligible
+                if total_props_per_spot[spot_idx] < 1e-9:
+                    spotwise_profiles[spot_idx] = zero_profile
+                    logging.info(f"Imputed spot {spot_idx} with a zero profile due to negligible cell proportions.")
+                    imputed_count += 1
+                    continue
 
-            if neighbor_profiles:
-                # Round to nearest integer for count data
-                imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
-                spotwise_profiles[str(nan_spot)] = imputed_profile
-                logging.info(f"Imputed spot {nan_spot} using neighbors at radius {radius} (Pass 1).")
-            else:
-                logging.warning(f"No valid neighbors found to impute spot {nan_spot} (Pass 1). Leaving as NaN.")
+                # Otherwise, use neighbor-based imputation
+                neighbor_indices = get_neighbors_with_fixed_radius(
+                    spot_idx,
+                    self.gene_expression_adata,
+                    radius=radius,
+                    include_center=False
+                )
+
+                # Corrected key usage: use integer keys consistently
+                neighbor_profiles = [
+                    spotwise_profiles[i]
+                    for i in neighbor_indices
+                    if i in spotwise_profiles
+                ]
+
+                if neighbor_profiles:
+                    imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
+                    spotwise_profiles[spot_idx] = imputed_profile
+                    logging.info(f"Imputed spot {spot_idx} using {len(neighbor_profiles)} neighbors.")
+                    imputed_count += 1
+                else:
+                    logging.warning(f"No valid neighbors found to impute spot {spot_idx}. It will be filled with zeros as a fallback.")
+                    spotwise_profiles[spot_idx] = zero_profile  # Fallback to prevent downstream errors
+                    imputed_count += 1
+
+            logging.info(f"Finished imputation. {imputed_count}/{len(nan_spots)} failed spots were imputed.")
+
+        # Final check for any remaining NaNs, though the logic above should prevent this
+        final_nan_spots = [i for i in range(N) if i not in spotwise_profiles]
+        if final_nan_spots:
+            logging.error(f"FATAL: {len(final_nan_spots)} spots could not be imputed: {final_nan_spots[:10]}. Check imputation logic.")
+            # This case should ideally not be reached. Raising an error might be appropriate.
+            raise RuntimeError("Failed to impute all necessary spot profiles.")
 
         # Store first pass results
         self.results['gene_expression_pass1'] = spotwise_profiles
-        
-        # Get dimensions for consistency checks
-        N = self.gene_expression_adata.shape[0]  # spots
-        T = self.results['cell_prop'].values.shape[1]  # cell types
-        M = self.gene_expression_adata.shape[1]  # genes
-        dimensions = (N, T, M)
 
         # Save and evaluate results
         parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression_pass1.parquet")
         self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
-        
+
         self.append_gex_to_adata(pass_number=1)
-        
+
         layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass1/layers")
         export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=1)
 
