@@ -11,23 +11,41 @@ import scanpy as sc
 import pyarrow.parquet as pq
 from scipy.ndimage import gaussian_filter
 
-# Local imports
-from .gurobi_impl import (
-    map_antibodies_to_profiles, 
-    optimize_cell_proportions, 
-    optimize_gene_expression, 
-    compute_global_prior,
-    normalize_counts,
-    finetune_cell_proportions
-)
-from .utils import (
-    validate_cell_profile_dict,  
-    cleanup_memory, 
-    setup_logging, 
-    get_neighbors_with_fixed_radius, 
-    assert_neighborhood_size,
-    export_anndata_layers,
-)
+# Local imports with fallback for direct script execution
+try:
+    from .gurobi_impl import (
+        map_antibodies_to_profiles,
+        optimize_cell_proportions,
+        optimize_gene_expression,
+        compute_global_prior,
+        normalize_counts,
+        finetune_cell_proportions,
+    )
+    from .utils import (
+        validate_cell_profile_dict,
+        cleanup_memory,
+        setup_logging,
+        get_neighbors_with_fixed_radius,
+        assert_neighborhood_size,
+        export_anndata_layers,
+    )
+except Exception:  # pragma: no cover - allow running as a script without package context
+    from gurobi_impl import (  # type: ignore
+        map_antibodies_to_profiles,
+        optimize_cell_proportions,
+        optimize_gene_expression,
+        compute_global_prior,
+        normalize_counts,
+        finetune_cell_proportions,
+    )
+    from utils import (  # type: ignore
+        validate_cell_profile_dict,
+        cleanup_memory,
+        setup_logging,
+        get_neighbors_with_fixed_radius,
+        assert_neighborhood_size,
+        export_anndata_layers,
+    )
 
 
 class CitegeistModel:
