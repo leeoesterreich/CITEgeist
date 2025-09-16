@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, Tuple, List, Union
 # Third-party imports
 import numpy as np
 import pandas as pd
-import scanpy as sc docume
+import scanpy as sc
 import pyarrow.parquet as pq
 from scipy.ndimage import gaussian_filter
 
