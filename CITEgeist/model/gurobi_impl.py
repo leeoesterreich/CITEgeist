@@ -13,8 +13,12 @@ import time
 # Third-party imports
 import numpy as np
 import pandas as pd
-import gurobipy as gp
-from gurobipy import Model, GRB, quicksum
+try:
+    import gurobipy as gp
+    from gurobipy import Model, GRB, quicksum
+except Exception:  # pragma: no cover - allow module import without gurobi present
+    gp = None  # type: ignore
+    GRB = None  # type: ignore
 import scanpy as sc
 import scipy
 from scipy.stats import spearmanr
@@ -27,8 +31,13 @@ from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
 # Local imports
-from .utils import get_neighbors_with_fixed_radius
-from .checkpoints import CheckpointManager
+# Provide a fallback so this module can be executed directly as a script
+try:
+    from .utils import get_neighbors_with_fixed_radius
+    from .checkpoints import CheckpointManager
+except Exception:  # pragma: no cover - fallback for __main__ execution
+    from utils import get_neighbors_with_fixed_radius  # type: ignore
+    from checkpoints import CheckpointManager  # type: ignore
 
 
 def compute_global_prior(
@@ -152,8 +161,8 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         list: List of cell type names (to ensure column order).
     """
     # Step 1: Subset data to relevant markers
-    all_markers = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
-    existing_markers = [marker for marker in all_markers if marker in adata.var_names]
+    all_markers: list[str] = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
+    existing_markers: list[str] = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
         logging.info("Adata variables: %s", adata.var_names)
@@ -265,7 +274,7 @@ def optimize_cell_proportions(
         for i in range(N):
             model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.9)
             model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.2)
-
+        model.write('cell_proportion_model.mps')
         try:
             model.optimize()
         except Exception as e:
@@ -614,6 +623,8 @@ def deconvolute_local_cell_proportions(
             reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
             model.setObjective(total_error + reg_term, GRB.MINIMIZE)
 
+            model.write('local_cell_proportions_model.mps')
+
             model.optimize()
 
             if model.status != GRB.OPTIMAL:
@@ -692,6 +703,9 @@ def deconvolute_spot_with_neighbors_with_prior(
     Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
     """
     model = None
+    # Local import to avoid hard dependency at module import time
+    import gurobipy as gp  # type: ignore
+    from gurobipy import GRB  # type: ignore
     try:
         neighborhood_indices = get_neighbors_with_fixed_radius(
             spot_idx, adata, radius=int(radius), include_center=True
@@ -850,6 +864,8 @@ def deconvolute_spot_with_neighbors_with_prior(
             gp.quicksum(obj_terms),
             GRB.MAXIMIZE
         )
+
+        model.write('gene_expression_model.mps')
 
         model.optimize()
 
@@ -1217,3 +1233,188 @@ def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, glob
     
     return validation_metrics
 
+
+
+def _create_dummy_anndata(num_spots: int, num_genes: int) -> sc.AnnData:
+    """Create a minimal AnnData with integer counts and spatial coordinates.
+
+    The data is intentionally tiny so that model construction is fast, while
+    still ensuring at least one positive count to create variables.
+
+    Args:
+        num_spots: Number of spatial spots to include.
+        num_genes: Number of genes to include.
+
+    Returns:
+        A newly created AnnData object with `.obsm['spatial']` populated.
+    """
+    X = np.zeros((num_spots, num_genes), dtype=int)
+    # Ensure at least one count is positive so variables are created
+    X[0, 0] = 3
+    if num_genes > 1:
+        X[0, 1] = 1
+
+    adata = sc.AnnData(X=X)
+    adata.obsm['spatial'] = np.zeros((num_spots, 2), dtype=float)
+    return adata
+
+
+def _run_dummy_models() -> Dict[str, bool]:
+    """Build tiny models and trigger writing of their MPS files.
+
+    This function is intended for quick verification that model definitions
+    are valid and can be exported to .mps files. Solver failures are tolerated
+    because the primary goal here is to exercise the `model.write` calls.
+
+    Returns:
+        Dict[str, bool]: Mapping of model key to existence of the written file.
+            Keys: 'cell', 'local', 'gene'.
+    """
+    results: Dict[str, bool] = {'cell': False, 'local': False, 'gene': False}
+
+    try:
+        # Tiny problem sizes
+        num_spots = 1
+        num_cell_types = 2
+        num_genes = 3
+
+        # Create minimal inputs
+        adata = _create_dummy_anndata(num_spots, num_genes)
+        profile_based_antibody_data = np.full((num_spots, num_cell_types), 0.5, dtype=float)
+        cell_type_names = [f"Type_{i}" for i in range(num_cell_types)]
+
+        # 1) Global EM-based cell proportions → writes cell_proportion_model.mps
+        try:
+            optimize_cell_proportions(
+                profile_based_antibody_data=profile_based_antibody_data,
+                cell_type_names=cell_type_names,
+                max_iterations=1,
+            )
+        except Exception as exc:
+            logging.warning("Cell proportions run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['cell'] = os.path.exists('cell_proportion_model.mps')
+
+        # 2) Local refinement of cell proportions → writes local_cell_proportions_model.mps
+        try:
+            deconvolute_local_cell_proportions(
+                spot_idx=0,
+                adata=adata,
+                profile_based_antibody_data=profile_based_antibody_data,
+                radius=2.0,
+                max_iterations=1,
+                beta_values=np.ones(num_cell_types, dtype=float),
+                beta_vary=False,
+                max_y_change=0.4,
+            )
+        except Exception as exc:
+            logging.warning("Local proportions run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['local'] = os.path.exists('local_cell_proportions_model.mps')
+
+        # 3) Gene deconvolution → writes gene_expression_model.mps
+        try:
+            cell_type_numbers_array = np.full((num_spots, num_cell_types), 0.5, dtype=float)
+            deconvolute_spot_with_neighbors_with_prior(
+                spot_idx=0,
+                adata=adata,
+                cell_type_numbers_array=cell_type_numbers_array,
+                radius=2.0,
+                global_prior=None,
+                lambda_prior_weight=0.0,
+                local_enrichment_weight=0.5,
+                global_enrichment_weight=0.5,
+            )
+        except Exception as exc:
+            logging.warning("Gene deconvolution run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['gene'] = os.path.exists('gene_expression_model.mps')
+
+    except Exception as outer_exc:
+        logging.error("Dummy model setup failed: %s", str(outer_exc))
+
+    return results
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.info("Running gurobi_impl to write .mps files using CitegeistModel where available")
+
+    # Import CitegeistModel lazily to avoid circular imports at module import time
+    try:
+        from .citegeist_model import CitegeistModel  # type: ignore
+    except Exception:  # pragma: no cover
+        from citegeist_model import CitegeistModel  # type: ignore
+
+    DATA_FOLDER = "/bgfs/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
+    path_to_biopsy = os.path.join(DATA_FOLDER, "HCC22-088-P4-S1/outs")
+    path_to_surgical = os.path.join(DATA_FOLDER, "HCC22-088-P4-S2_1i_rep/outs")
+    path_list = [path_to_surgical]
+
+    cell_profiles = {
+        "Cancer Cells": {"Major": ["EPCAM-1"], "Minor": ["SDC1-1", "KRT5-1"]},
+        "Macrophages": {"Major": ["CD68-1"], "Minor": ["CD14-1"]},
+        "CD4 T Cells": {"Major": ["CD3E-1", "CD4-1"]},
+        "CD8 T Cells": {"Major": ["CD3E-1", "CD8A-1"]},
+        "B Cells": {"Major": ["MS4A1-1", "CD19-1"]},
+        "Endothelial Cells": {"Major": ["PECAM1-1"]},
+        "Fibroblasts": {"Major": ["ACTA2-1"]},
+    }
+
+    any_success = False
+    try:
+        import squidpy as sq  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        logging.error("squidpy not available to read Visium data: %s", str(exc))
+        sq = None  # type: ignore
+
+    for sample_path in path_list:
+        try:
+            if sq is None:
+                raise RuntimeError("squidpy unavailable")
+            sample_name = os.path.basename(os.path.dirname(sample_path))
+            adata = sq.read.visium(sample_path, counts_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
+
+            model = CitegeistModel(sample_name=sample_name, adata=adata, output_folder=f'output_mps_{sample_name}')
+            model.load_cell_profile_dict(cell_profiles)
+            model.split_adata()
+            model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=25)
+            model.copy_gex_to_protein_adata()
+            model.preprocess_gex()
+            model.preprocess_antibody()
+
+            # Optional: register Gurobi if a license path is provided via env
+            license_file = os.environ.get("GRB_LICENSE_FILE")
+            if license_file and os.path.isfile(license_file):
+                try:
+                    model.register_gurobi(license_file)
+                except Exception as exc:
+                    logging.warning("Gurobi registration skipped: %s", str(exc))
+
+            # Running these will invoke the underlying gurobi_impl functions that write .mps files
+            model.run_cell_proportion_model(radius=400)
+            # Trigger at least one gene model build; pass1 will spawn tasks that write MPS
+            try:
+                model.run_cell_expression_pass1(
+                    radius=400,
+                    max_workers=1,
+                    checkpoint_interval=100,
+                    output_dir=os.path.join(model.output_folder, "checkpoints"),
+                    rerun=True,
+                )
+            except Exception as exc:
+                logging.warning("Pass1 gene expression run ended: %s", str(exc))
+
+            # Check for MPS files
+            cell_mps = os.path.exists('cell_proportion_model.mps')
+            local_mps = os.path.exists('local_cell_proportions_model.mps')
+            gene_mps = os.path.exists('gene_expression_model.mps')
+            logging.info("Sample '%s' MPS write outcomes: cell=%s local=%s gene=%s", sample_name, cell_mps, local_mps, gene_mps)
+            any_success = any_success or cell_mps or local_mps or gene_mps
+        except Exception as exc:
+            logging.error("Failed processing sample at '%s': %s", sample_path, str(exc))
+
+    if not any_success:
+        logging.info("Falling back to dummy models as no MPS files were produced from real data.")
+        outcome = _run_dummy_models()
+        logging.info("Dummy MPS write outcomes: %s", outcome)
