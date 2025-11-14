@@ -1,5 +1,6 @@
-
-import scanpy as sc
+"""
+Analysis functions for filtering and processing CITEgeist results.
+"""
 import anndata as ad
 
 
@@ -15,13 +16,13 @@ def expand_prop_gex_adata(prop_gex_adata, celltype_cutoff=0.2, celltype_profile_
     Expands celltype level spots to have multiple spots for each celltype, but retain spatial information
     for COMMMOT analysis.
     """
-    
+
     if celltype_profile_dict is None:
         raise ValueError("celltype_profile_dict is required for this function.")
     celltypes = celltype_profile_dict.keys()
 
     all_adatas = []
-    
+
     for celltype in celltypes:
         filtered_adata = filter_spots_by_celltype_proportion(prop_gex_adata, celltype, celltype_cutoff)
         celltype_label = celltype.replace(" ", "_")
@@ -38,5 +39,3 @@ def get_celltype_expression_data(adata, celltype):
     Get expression data for a specific celltype.
     """
     return adata[adata.obs['celltype'] == celltype].copy()
-
-

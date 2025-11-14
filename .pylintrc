@@ -1,0 +1,88 @@
+[MAIN]
+# Python version to target
+py-version=3.10
+
+# Use multiple processes to speed up Pylint
+jobs=1
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+# Allow loading of arbitrary C extensions
+unsafe-load-any-extension=no
+
+[MESSAGES CONTROL]
+# Disable import-error since dependencies won't be installed in CI
+# Disable some overly strict checks for research code
+disable=
+    import-error,
+    too-many-lines,
+    too-many-locals,
+    too-many-arguments,
+    too-many-positional-arguments,
+    too-many-branches,
+    too-many-statements,
+    too-many-nested-blocks,
+    too-many-boolean-expressions,
+    too-few-public-methods,
+    duplicate-code,
+    fixme
+
+[REPORTS]
+# Simplified output
+output-format=text
+reports=no
+score=yes
+
+[BASIC]
+# Naming conventions - allow single uppercase letters for mathematical variables
+# (N for number of spots, T for number of cell types, etc.)
+variable-rgx=[a-z_][a-z0-9_]{0,30}$|^[A-Z](_[A-Z]+)*$|^[NTYXM](_[a-z0-9_]+)?$
+argument-rgx=[a-z_][a-z0-9_]{0,30}$|^[A-Z](_[A-Z]+)*$|^[NTYXM](_[a-z0-9_]+)?$
+attr-rgx=[a-z_][a-z0-9_]{1,30}$|^[A-Z](_[A-Z]+)*$|^[NTYXM](_[a-z0-9_]+)?$
+const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$|^[a-z_][a-z0-9_]{0,30}$
+
+# Good variable names
+good-names=i,j,k,n,m,t,x,y,z,N,T,M,X,Y,S,df,df2,ax,fig,gc,os,np,pd,sc,gp
+
+# Allow module names with underscores
+module-rgx=(([a-z_][a-z0-9_]*)|([A-Z][a-zA-Z0-9]+))$
+
+[FORMAT]
+# Maximum line length
+max-line-length=100
+
+# Maximum module lines
+max-module-lines=1500
+
+# String quote consistency
+string-quote=single-avoid-escape
+
+[LOGGING]
+# Allow f-string formatting in logging (common in modern Python)
+# Commented out to enforce lazy formatting
+# logging-format-style=new
+
+[DESIGN]
+# Adjusted thresholds for research code
+max-args=10
+max-locals=25
+max-returns=6
+max-branches=15
+max-statements=70
+max-parents=7
+max-attributes=10
+max-public-methods=25
+
+[IMPORTS]
+# Allow import outside toplevel for optional imports
+allow-any-import-level=no
+
+[CLASSES]
+# Valid special methods
+valid-classmethod-first-arg=cls
+valid-metaclass-classmethod-first-arg=cls
+
+[EXCEPTIONS]
+# Allow catching Exception in some cases (common in parallel processing)
+overgeneral-exceptions=builtins.BaseException
