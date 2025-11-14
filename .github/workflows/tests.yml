@@ -1,13 +1,20 @@
-name: Pylint
+name: Tests
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
 
 jobs:
-  pylint:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest]
         python-version: ["3.10"]
+
     steps:
     - uses: actions/checkout@v4
 
@@ -34,10 +41,23 @@ jobs:
       shell: bash -l {0}
       run: |
         conda env update --file CITEgeist_env.yml --name base
-        pip install pylint
+        pip install pytest pytest-cov
 
-    - name: Analysing the CITEgeist folder with pylint
+    - name: Run tests
       shell: bash -l {0}
       run: |
-        pylint CITEgeist --exit-zero --max-line-length=120 --disable=C0103,C0114,C0115,C0116
-      continue-on-error: true
+        # Run tests if test files exist
+        if [ -d "CITEgeist/tests" ] && [ "$(ls -A CITEgeist/tests/test_*.py 2>/dev/null)" ]; then
+          pytest CITEgeist/tests/ -v --cov=CITEgeist --cov-report=xml --cov-report=term-missing
+        else
+          echo "No test files found, skipping tests"
+        fi
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      if: matrix.python-version == '3.10'
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
