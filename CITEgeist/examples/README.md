@@ -61,4 +61,4 @@ These notebooks provide step-by-step walkthroughs with detailed explanations and
 - Gurobi optimizer with valid license
 - CITEgeist package installed in your environment
 
-For detailed information about CITEgeist and its methodology, please refer to the main README in the root directory. 
+For detailed information about CITEgeist and its methodology, please refer to the main README in the root directory.

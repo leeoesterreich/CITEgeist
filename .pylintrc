@@ -1,0 +1,127 @@
+[MASTER]
+# Use multiple processes to speed up Pylint
+jobs=0
+
+# Pickle collected data for later comparisons
+persistent=yes
+
+# List of plugins (as comma separated values of python module names) to load
+load-plugins=
+
+# Allow loading of arbitrary C extensions
+unsafe-load-any-extension=no
+
+[MESSAGES CONTROL]
+# Disable specific warnings that are too strict for scientific code
+disable=
+    C0103,  # Invalid name (allow single-letter variable names common in math/ML)
+    C0114,  # Missing module docstring
+    C0115,  # Missing class docstring
+    C0116,  # Missing function docstring
+    R0913,  # Too many arguments
+    R0914,  # Too many local variables
+    R0915,  # Too many statements
+    W0212,  # Access to protected member (common in scientific libraries)
+    W0221,  # Arguments differ from overridden method
+    W0511,  # TODO/FIXME comments
+    R0801,  # Similar lines in multiple files
+    C0302,  # Too many lines in module
+    R0902,  # Too many instance attributes
+    R0903,  # Too few public methods
+    E1136,  # Unsubscriptable object (false positives with numpy/pandas)
+    E1137,  # Unsupported assignment operation (false positives)
+
+[REPORTS]
+# Set the output format
+output-format=colorized
+
+# Include message's id in output
+include-ids=yes
+
+# Tells whether to display a full report or only the messages
+reports=no
+
+# Evaluate Python code to activate a custom score
+score=yes
+
+[BASIC]
+# Good variable names which should always be accepted
+good-names=i,j,k,x,y,z,df,ax,fig,lr,id,_
+
+# Bad variable names which should always be refused
+bad-names=foo,bar,baz,toto,tutu,tata
+
+# Regular expression matching correct argument names
+argument-rgx=[a-z_][a-z0-9_]{0,30}$
+
+# Regular expression matching correct variable names
+variable-rgx=[a-z_][a-z0-9_]{0,30}$
+
+# Regular expression matching correct constant names
+const-rgx=(([A-Z_][A-Z0-9_]*)|(__.*__))$
+
+[FORMAT]
+# Maximum number of characters on a single line
+max-line-length=120
+
+# Maximum number of lines in a module
+max-module-lines=2000
+
+# String used as indentation unit
+indent-string='    '
+
+# Number of spaces of indent required inside a hanging or continued line
+indent-after-paren=4
+
+[DESIGN]
+# Maximum number of arguments for function / method
+max-args=10
+
+# Maximum number of locals for function / method body
+max-locals=25
+
+# Maximum number of return / yield for function / method body
+max-returns=6
+
+# Maximum number of branch for function / method body
+max-branches=20
+
+# Maximum number of statements in function / method body
+max-statements=100
+
+# Maximum number of attributes for a class
+max-attributes=15
+
+[IMPORTS]
+# Deprecated modules which should not be used
+deprecated-modules=optparse,tkinter.tix
+
+# Allow wildcard imports from specific modules common in scientific computing
+allow-wildcard-with-all=yes
+
+[SIMILARITIES]
+# Minimum lines number of a similarity
+min-similarity-lines=10
+
+# Ignore comments when computing similarities
+ignore-comments=yes
+
+# Ignore docstrings when computing similarities
+ignore-docstrings=yes
+
+# Ignore imports when computing similarities
+ignore-imports=yes
+
+[TYPECHECK]
+# List of class names for which member attributes should not be checked
+ignored-classes=SQLObject,optparse.Values,thread._local,_thread._local,numpy,pandas,torch
+
+# List of module names for which member attributes should not be checked
+ignored-modules=numpy,pandas,torch,scipy,matplotlib,sklearn,scanpy,anndata
+
+# List of members which are set dynamically and missed by pylint inference
+generated-members=numpy.*,torch.*,cv2.*
+
+[EXCEPTIONS]
+# Exceptions that will emit a warning when being caught
+overgeneral-exceptions=builtins.Exception

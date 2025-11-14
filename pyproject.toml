@@ -1,0 +1,154 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "citegeist"
+version = "0.1.1"
+description = "Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "BSD-3-Clause"}
+authors = [
+    {name = "Alexander Chih-Chieh Chang", email = "alc376@pitt.edu"},
+    {name = "Lee/Oesterreich Laboratory"},
+]
+keywords = [
+    "spatial-transcriptomics",
+    "CITE-seq",
+    "deconvolution",
+    "computational-biology",
+    "single-cell",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.urls]
+Homepage = "https://github.com/leeoesterreich/CITEgeist"
+Documentation = "https://github.com/leeoesterreich/CITEgeist"
+Repository = "https://github.com/leeoesterreich/CITEgeist"
+"Bug Tracker" = "https://github.com/leeoesterreich/CITEgeist/issues"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "pylint>=3.0",
+    "pre-commit>=3.0",
+]
+
+[tool.black]
+line-length = 120
+target-version = ['py310']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+  | Benchmarking
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 120
+skip_gitignore = true
+known_first_party = ["CITEgeist"]
+known_third_party = ["numpy", "pandas", "scanpy", "anndata", "scipy", "matplotlib"]
+sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.pytest.ini_options]
+testpaths = ["CITEgeist/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=CITEgeist",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+ignore_missing_imports = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+
+[[tool.mypy.overrides]]
+module = [
+    "numpy.*",
+    "pandas.*",
+    "scipy.*",
+    "matplotlib.*",
+    "scanpy.*",
+    "anndata.*",
+    "gurobipy.*",
+]
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["CITEgeist"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__init__.py",
+    "*/Benchmarking/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+
+[tool.bandit]
+exclude_dirs = [
+    "tests",
+    "Benchmarking",
+]
+skips = [
+    "B101",  # assert_used - common in scientific code
+    "B601",  # paramiko_calls
+]

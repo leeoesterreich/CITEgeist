@@ -4,6 +4,9 @@
 [![License](https://img.shields.io/github/license/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE)
 [![Issues](https://img.shields.io/github/issues/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/issues)
 [![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
+[![Code Quality](https://github.com/leeoesterreich/CITEgeist/actions/workflows/code-quality.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/code-quality.yml)
+[![Tests](https://github.com/leeoesterreich/CITEgeist/actions/workflows/tests.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/tests.yml)
+[![Pylint](https://github.com/leeoesterreich/CITEgeist/actions/workflows/pylint.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/pylint.yml)
 
 > Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
 
@@ -48,6 +51,60 @@ cd CITEgeist
 pip install -e .[dev]
 ```
 
+## 🛠️ Development Setup
+
+### For Contributors
+
+If you want to contribute to CITEgeist, follow these steps:
+
+```bash
+# Clone the repository
+git clone https://github.com/leeoesterreich/CITEgeist.git
+cd CITEgeist
+
+# Create conda environment
+conda env create -f CITEgeist_env.yml
+conda activate CITEgeist_env
+
+# Install in development mode with dev dependencies
+pip install -e ".[dev]"
+
+# Install pre-commit hooks for automatic code quality checks
+pre-commit install
+```
+
+### Code Quality Tools
+
+We use several tools to maintain code quality:
+
+- **black**: Code formatting (120 char line length)
+- **isort**: Import sorting
+- **flake8**: Linting
+- **mypy**: Type checking
+- **pylint**: Static code analysis
+- **pytest**: Testing framework
+
+Run quality checks before committing:
+```bash
+# Format code
+black CITEgeist/
+isort CITEgeist/
+
+# Run linting
+flake8 CITEgeist/
+pylint CITEgeist/
+
+# Run tests
+pytest
+```
+
+Or run pre-commit hooks on all files:
+```bash
+pre-commit run --all-files
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+
 ## 📜 License
 
 This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details. This license ensures that all modifications and derivative works must also be open source.
@@ -80,20 +137,20 @@ If you use CITEgeist in your research, please cite our paper:
 
 ```
 
-## 📝 Citation
-
-If you use CITEgeist in your research, please cite:
-
-[Citation information to be added]
-
 ## 📝 Contributing
 
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
+We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+- Setting up your development environment
+- Code quality standards
+- Testing requirements
+- Pull request process
 
 ## 📝 Support
 
-For support, please open an issue on our [GitHub issue tracker](https://github.com/alee-x/CITEgeist/issues).
+For support, please:
+- Open an issue on our [GitHub issue tracker](https://github.com/leeoesterreich/CITEgeist/issues)
+- Check existing issues and discussions
+- Read our documentation and examples
 
 ---
 Copyright (c) 2025 Lee/Oesterreich Lab
-
