@@ -30,10 +30,10 @@ Run Interactive Notebook
 .. raw:: html
 
     <div style="margin: 20px 0;">
-        <a href="https://mybinder.org/v2/gh/leeoesterreich/CITEgeist/dev?labpath=docs%2Fcore_scripts%2FJupyter%2Fvignette_2_surgical_d538g.ipynb" target="_blank">
+        <a href="https://mybinder.org/v2/gh/leeoesterreich/dal413/HEAD?labpath=CITEgeist%2FCITEgeist%2FJupyter%2Fvignette_2_surgical_d538g.ipynb" target="_blank">
             <img src="https://mybinder.org/badge_logo.svg" alt="Launch Binder" style="margin-right: 10px;">
         </a>
-        <a href="https://colab.research.google.com/github/leeoesterreich/CITEgeist/blob/dev/docs/core_scripts/Jupyter/vignette_2_surgical_d538g.ipynb" target="_blank">
+        <a href="https://colab.research.google.com/github/leeoesterreich/dal413/blob/main/CITEgeist/CITEgeist/Jupyter/vignette_2_surgical_d538g.ipynb" target="_blank">
             <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
         </a>
     </div>
@@ -61,67 +61,53 @@ Run Interactive Notebook
 Code Example
 ------------
 
-Here's a preview of the key analysis steps:
+Here's a preview of the key steps from the notebook:
 
 .. code-block:: python
 
-   # Load surgical sample data with mutation annotations
-   adata = sc.read_visium(path_to_surgical_sample)
+   # Load surgical sample data
+   surgical_data_path = os.path.join(DATA_FOLDER, "surgical_sample/outs")
    
-   # Initialize CITEgeist model
+   # Initialize model for surgical analysis
    model = CitegeistModel(
        sample_name="surgical_d538g",
-       adata=adata,
+       adata=surgical_adata,
        output_folder="./surgical_results"
    )
    
-   # Preprocess and analyze
-   model.split_adata()
-   model.filter_gex()
+   # Process with lower min_count for surgical samples
+   model.filter_gex(min_counts=5)  # Lower threshold for surgical samples
    model.preprocess_gex()
    model.preprocess_antibody()
    
-   # Run deconvolution with mutation context
-   global_props, finetuned_props = model.run_cell_proportion_model(radius=75)
-   
-   # Integrate with mutation data for pathway analysis
-   mutation_enriched_spots = identify_mutation_regions(adata, mutation_data)
+   # Run deconvolution
+   props, finetuned_props = model.run_cell_proportion_model(radius=75)
 
 Expected Outputs
 ----------------
 
 This notebook will generate:
 
-* Cell type proportions stratified by mutation status
-* Spatial maps highlighting mutation-positive regions
+* Cell type proportions in mutation-positive and negative regions
 * Pathway enrichment analysis results
-* Differential expression between mutation contexts
+* Spatial maps of mutation-associated gene expression
 * Validation plots for mutation signatures
-
-Advanced Analysis
------------------
-
-This vignette includes:
-
-* **Mutation Integration**: Methods for incorporating genetic variant data
-* **Pathway Analysis**: Gene set enrichment in spatial context
-* **Comparative Analysis**: Mutation-positive vs negative region comparison
-* **Signature Validation**: Confirming mutation-associated expression patterns
+* Comparative analysis between regions
 
 Next Steps
 ----------
 
 After completing this vignette:
 
-1. Apply the workflow to your own surgical specimens
+1. Apply the analysis to your own surgical samples
 2. Explore different mutation types and their spatial patterns
 3. Integrate with clinical outcome data
-4. Consider multi-sample comparative analyses
+4. Try the macrophage analysis in :doc:`vignette_3_responder_macrophages`
 
 Related Documentation
 ---------------------
 
-* :doc:`vignette_1_biopsy_heterogeneity` - Basic CITEgeist workflow
-* :doc:`vignette_3_responder_macrophages` - Treatment response analysis
-* :doc:`../tutorial` - Comprehensive methodology guide
+* :doc:`../tutorial` - Comprehensive workflow guide
+* :doc:`vignette_1_biopsy_heterogeneity` - Basic analysis workflow
 * :doc:`../api` - Complete API reference
+

@@ -10,4 +10,4 @@ jupyter nbextension enable --py widgetsnbextension --sys-prefix
 # jupyter labextension install @jupyter-widgets/jupyterlab-manager
 
 echo "CITEgeist Binder environment setup complete!"
-echo "Navigate to core_scripts/Jupyter/ to access the vignettes."
+echo "Navigate to CITEgeist/CITEgeist/Jupyter/ to access the vignettes."
