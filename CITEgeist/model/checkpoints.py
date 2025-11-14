@@ -2,8 +2,11 @@
 Checkpoint management for saving and resuming optimization state.
 """
 import logging
-import numpy as np
+import os
 from pathlib import Path
+
+import numpy as np
+
 
 class CheckpointManager:
     """Manages loading and saving of optimization checkpoints."""
@@ -37,8 +40,8 @@ class CheckpointManager:
         if complete_file.exists():
             try:
                 complete_data = np.load(complete_file)
-                if 'profiles' in complete_data and 'completed_spots' in complete_data:
-                    profiles = complete_data['profiles']
+                if "profiles" in complete_data and "completed_spots" in complete_data:
+                    profiles = complete_data["profiles"]
                     if profiles.shape == (N, T, M):
                         return {i: profiles[i] for i in range(N)}
             except Exception as e:
@@ -58,32 +61,23 @@ class CheckpointManager:
         Returns:
             tuple: (completed_spots set, spotwise_profiles dict)
         """
-        checkpoints = list(self.output_dir.glob(
-            f"{self.sample_name}_gene_expression_checkpoint_*.npz"
-        ))
+        checkpoints = list(self.output_dir.glob(f"{self.sample_name}_gene_expression_checkpoint_*.npz"))
 
         if not checkpoints:
             return set(), {}
 
-        checkpoint_numbers = [
-            int(f.stem.split('_')[-1])
-            for f in checkpoints
-        ]
+        checkpoint_numbers = [int(f.stem.split("_")[-1]) for f in checkpoints]
         latest_number = max(checkpoint_numbers)
         latest_checkpoint = self.output_dir / f"{self.sample_name}_gene_expression_checkpoint_{latest_number}.npz"
 
         try:
             checkpoint_data = np.load(latest_checkpoint)
-            if 'profiles' in checkpoint_data and 'completed_spots' in checkpoint_data:
-                profiles = checkpoint_data['profiles']
-                completed_spots = set(checkpoint_data['completed_spots'].tolist())
+            if "profiles" in checkpoint_data and "completed_spots" in checkpoint_data:
+                profiles = checkpoint_data["profiles"]
+                completed_spots = set(checkpoint_data["completed_spots"].tolist())
 
                 if profiles.shape == (N, T, M):
-                    spotwise_profiles = {
-                        i: profiles[i]
-                        for i in completed_spots
-                        if not np.any(np.isnan(profiles[i]))
-                    }
+                    spotwise_profiles = {i: profiles[i] for i in completed_spots if not np.any(np.isnan(profiles[i]))}
                     completed_spots = set(spotwise_profiles.keys())
                     logging.info(f"Loaded {len(completed_spots)} valid profiles from checkpoint")
                     return completed_spots, spotwise_profiles
@@ -121,7 +115,7 @@ class CheckpointManager:
                 checkpoint_path,
                 profiles=profiles_array,
                 completed_spots=np.array(list(completed_spots)),
-                n_completed=n_completed
+                n_completed=n_completed,
             )
 
             # Cleanup old checkpoints
@@ -150,11 +144,7 @@ class CheckpointManager:
         for spot_idx, profile in spotwise_profiles.items():
             final_profiles[spot_idx] = profile
 
-        np.savez_compressed(
-            final_path,
-            profiles=final_profiles,
-            completed_spots=np.array(list(completed_spots))
-        )
+        np.savez_compressed(final_path, profiles=final_profiles, completed_spots=np.array(list(completed_spots)))
         logging.info(f"Saved final results with {len(completed_spots)} completed spots")
 
     def _cleanup_corrupted_files(self):

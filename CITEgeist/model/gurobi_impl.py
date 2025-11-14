@@ -5,32 +5,51 @@ This module contains the optimization functions for cell proportion estimation
 and gene expression deconvolution using quadratic programming.
 """
 # Standard library imports
-import os
-import logging
-import traceback
-import gc
 import concurrent
+import gc
+import json
+import logging
+import os
+import time
+import traceback
 from concurrent.futures import ProcessPoolExecutor, as_completed
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
+
+import gurobipy as gp
 
 # Third-party imports
 import numpy as np
-import gurobipy as gp
-from gurobipy import GRB
+import pandas as pd
+import psutil
 import scanpy as sc
 import scipy
+import scipy.sparse as sp
+from gurobipy import GRB, Model, quicksum
+from scipy.cluster.hierarchy import fcluster, linkage
+from scipy.optimize import minimize
+from scipy.spatial.distance import squareform
+from scipy.special import digamma, loggamma
+from scipy.stats import spearmanr
+from statsmodels.stats.multitest import multipletests
 from tqdm import tqdm
 
-# Local imports
-from .utils import get_neighbors_with_fixed_radius
 from .checkpoints import CheckpointManager
+
+# Local imports
+# Provide a fallback so this module can be executed directly as a script
+try:
+    from .utils import get_neighbors_with_fixed_radius
+    from .checkpoints import CheckpointManager
+except Exception:  # pragma: no cover - fallback for __main__ execution
+    from utils import get_neighbors_with_fixed_radius  # type: ignore
+    from checkpoints import CheckpointManager  # type: ignore
 
 
 def compute_global_prior(
     spotwise_gene_expression_profiles: Dict[int, np.ndarray],
     cell_type_numbers_array: np.ndarray,
     lambda_prior: float = 1.0,
-    min_expression_threshold: float = 0.1
+    min_expression_threshold: float = 0.1,
 ) -> Dict[str, Any]:
     """
     Compute global prior from pass 1 results using normalized expression patterns.
@@ -84,11 +103,7 @@ def compute_global_prior(
             weights_for_average = weights[present_mask]  # 1D array of length n_present
             expression_for_average = weighted_expression[present_mask, :]  # (n_present, M)
 
-            mean_expression[t] = np.average(
-                expression_for_average,
-                weights=weights_for_average,
-                axis=0
-            )
+            mean_expression[t] = np.average(expression_for_average, weights=weights_for_average, axis=0)
 
             # Expression consistency (coefficient of variation, inverse)
             # Calculate weighted std dev properly
@@ -125,14 +140,15 @@ def compute_global_prior(
     logging.info(f" - % Strong signals (>0.5): {100 * np.mean(global_prior > 0.5):.2f}%")
 
     return {
-        'global_prior': global_prior,
-        'confidence_scores': confidence_scores,
-        'expression_patterns': {
-            'mean_expression': mean_expression,
-            'expression_frequency': expression_frequency,
-            'expression_consistency': expression_consistency
-        }
+        "global_prior": global_prior,
+        "confidence_scores": confidence_scores,
+        "expression_patterns": {
+            "mean_expression": mean_expression,
+            "expression_frequency": expression_frequency,
+            "expression_consistency": expression_consistency,
+        },
     }
+
 
 def map_antibodies_to_profiles(adata, cell_profile_dict):
     """
@@ -147,8 +163,8 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         list: List of cell type names (to ensure column order).
     """
     # Step 1: Subset data to relevant markers
-    all_markers = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
-    existing_markers = [marker for marker in all_markers if marker in adata.var_names]
+    all_markers: list[str] = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
+    existing_markers: list[str] = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
         logging.info("Adata variables: %s", adata.var_names)
@@ -159,7 +175,7 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
     adata = adata[:, existing_markers]
 
     # Step 2: Extract and prepare antibody capture data
-    antibody_capture_data = adata.X.toarray() if hasattr(adata.X, 'toarray') else adata.X.X
+    antibody_capture_data = adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X.X
     antibody_capture_var_names = np.array(adata.var_names)
 
     cell_type_names = list(cell_profile_dict.keys())
@@ -174,10 +190,13 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         try:
             relevant_marker_indices = [
                 np.where(antibody_capture_var_names == marker)[0][0]
-                for marker in major_markers if marker in antibody_capture_var_names
+                for marker in major_markers
+                if marker in antibody_capture_var_names
             ]
             if relevant_marker_indices:
-                profile_based_antibody_data[:, profile_idx] = antibody_capture_data[:, relevant_marker_indices].mean(axis=1)
+                profile_based_antibody_data[:, profile_idx] = antibody_capture_data[:, relevant_marker_indices].mean(
+                    axis=1
+                )
             else:
                 logging.warning(f"No valid markers found for profile '{profile_name}'")
         except IndexError as e:
@@ -197,6 +216,7 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
 
     return profile_based_antibody_data, cell_type_names
 
+
 def optimize_cell_proportions(
     profile_based_antibody_data: np.ndarray,
     cell_type_names: List[str],
@@ -204,7 +224,7 @@ def optimize_cell_proportions(
     max_iterations: int = 50,
     lambda_reg: float = 1.0,
     alpha: float = 0.5,
-    normalize_beta: bool = True
+    normalize_beta: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions using Gurobi.
@@ -235,7 +255,7 @@ def optimize_cell_proportions(
     while iteration < max_iterations:
         logging.info(f"\nIteration {iteration + 1}")
         model = gp.Model("EM_Cell_Proportions")
-        model.setParam('OutputFlag', 0)
+        model.setParam("OutputFlag", 0)
 
         # Define variables Y[i, j]
         Y = model.addVars(N, T, lb=0, ub=1, vtype=GRB.CONTINUOUS, name="Y")
@@ -260,7 +280,7 @@ def optimize_cell_proportions(
         for i in range(N):
             model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) >= 0.9)
             model.addConstr(gp.quicksum(Y[i, j] for j in range(T)) <= 1.2)
-
+        model.write('cell_proportion_model.mps')
         try:
             model.optimize()
         except Exception as e:
@@ -312,7 +332,6 @@ def optimize_cell_proportions(
     return Y_values, beta_new
 
 
-
 def finetune_cell_proportions(
     profile_based_antibody_data: np.ndarray,
     cell_type_names: List[str],
@@ -329,8 +348,7 @@ def finetune_cell_proportions(
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
-
-    rerun: bool = False
+    rerun: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Refine cell proportions using local neighborhood optimization with parallelization.
@@ -378,10 +396,11 @@ def finetune_cell_proportions(
               of local refinements.
             - The original beta_values array, returned for interface consistency.
     """
-    import os
     import gc
+    import os
     from concurrent.futures import ProcessPoolExecutor, as_completed
     from concurrent.futures.process import BrokenProcessPool
+
     from tqdm import tqdm
 
     if initial_Y_values.ndim != 2:
@@ -431,7 +450,7 @@ def finetune_cell_proportions(
                         beta_values=initial_beta_values,
                         beta_vary=beta_vary,
                         max_iterations=max_iterations,
-                        max_y_change=max_y_change
+                        max_y_change=max_y_change,
                     )
                     futures[future] = spot_idx
 
@@ -448,7 +467,9 @@ def finetune_cell_proportions(
 
                                 if spots_processed % checkpoint_interval == 0:
                                     # Save checkpoint
-                                    checkpoint_path = os.path.join(output_dir, f"cell_prop_refinement_checkpoint_{spots_processed}.npy")
+                                    checkpoint_path = os.path.join(
+                                        output_dir, f"cell_prop_refinement_checkpoint_{spots_processed}.npy"
+                                    )
                                     np.save(checkpoint_path, Y_refined)
                                     logging.info(f"Saved checkpoint after {spots_processed} spots")
 
@@ -467,6 +488,7 @@ def finetune_cell_proportions(
             if retry_count == max_retries:
                 logging.error("Max retries reached, saving current progress")
             import time
+
             time.sleep(5)
 
     # Cleanup
@@ -482,7 +504,6 @@ def finetune_cell_proportions(
     return Y_refined, initial_beta_values
 
 
-
 def deconvolute_local_cell_proportions(
     spot_idx: int,
     adata: sc.AnnData,
@@ -495,7 +516,7 @@ def deconvolute_local_cell_proportions(
     beta_vary: bool = True,
     normalize_beta: bool = True,
     max_iterations: int = 20,
-    max_y_change: float = 0.4
+    max_y_change: float = 0.4,
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization.
@@ -572,9 +593,9 @@ def deconvolute_local_cell_proportions(
     while iteration < max_iterations:
         try:
             model = gp.Model(f"Local_Cell_Props_spot_{spot_idx}")
-            model.setParam('OutputFlag', 0)
-            model.setParam('TimeLimit', 60)
-            model.setParam('MIPGap', 0.01)
+            model.setParam("OutputFlag", 0)
+            model.setParam("TimeLimit", 60)
+            model.setParam("MIPGap", 0.01)
 
             # Build Y variables in [0, 1]
             Y_vars = model.addVars(local_N, T, lb=0.0, ub=1.0, vtype=GRB.CONTINUOUS, name="Y")
@@ -609,10 +630,14 @@ def deconvolute_local_cell_proportions(
             reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
             model.setObjective(total_error + reg_term, GRB.MINIMIZE)
 
+            model.write('local_cell_proportions_model.mps')
+
             model.optimize()
 
             if model.status != GRB.OPTIMAL:
-                logging.warning(f"[Local Cell Props] Spot {spot_idx} local optimization not optimal (status: {model.status}).")
+                logging.warning(
+                    f"[Local Cell Props] Spot {spot_idx} local optimization not optimal (status: {model.status})."
+                )
                 return None
 
             # Extract current Y solution
@@ -642,8 +667,9 @@ def deconvolute_local_cell_proportions(
             beta_diff = np.linalg.norm(new_beta - beta_prev) if beta_vary else 0.0
             Y_diff = np.linalg.norm(Y_values - Y_prev)
 
-            logging.debug(f"Spot {spot_idx} - Iteration {iteration + 1}: "
-                        f"beta_diff={beta_diff:.6f}, Y_diff={Y_diff:.6f}")
+            logging.debug(
+                f"Spot {spot_idx} - Iteration {iteration + 1}: " f"beta_diff={beta_diff:.6f}, Y_diff={Y_diff:.6f}"
+            )
 
             if beta_diff < tolerance and Y_diff < tolerance:
                 logging.debug(f"Spot {spot_idx} converged after {iteration + 1} iterations")
@@ -662,7 +688,7 @@ def deconvolute_local_cell_proportions(
             return None
 
         finally:
-            if 'model' in locals():
+            if "model" in locals():
                 del model
             gc.collect()
 
@@ -687,18 +713,18 @@ def deconvolute_spot_with_neighbors_with_prior(
     Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
     """
     model = None
+    # Local import to avoid hard dependency at module import time
+    import gurobipy as gp  # type: ignore
+    from gurobipy import GRB  # type: ignore
     try:
-        neighborhood_indices = get_neighbors_with_fixed_radius(
-            spot_idx, adata, radius=int(radius), include_center=True
-        )
+        neighborhood_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
         if not neighborhood_indices:
             logging.error(f"No valid neighbors found for spot {spot_idx}.")
             return None
 
-        neighborhood_indices = np.array([
-            int(idx) for idx in neighborhood_indices
-            if isinstance(idx, (int, np.integer))
-        ], dtype=int)
+        neighborhood_indices = np.array(
+            [int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))], dtype=int
+        )
 
         # Extract expression data
         deconvolution_expression_data = adata.X
@@ -758,28 +784,23 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         for k in range(M):
             local_enrich = compute_expression_aware_enrichment(
-                neighborhood_expression_data,
-                neighborhood_cell_type_numbers,
-                k
+                neighborhood_expression_data, neighborhood_cell_type_numbers, k
             )
             global_enrich = compute_expression_aware_enrichment(
-                deconvolution_expression_data,
-                cell_type_numbers_array,
-                k
+                deconvolution_expression_data, cell_type_numbers_array, k
             )
             gene_specific_enrichment[k] = (
-                local_enrichment_weight * local_enrich +
-                global_enrichment_weight * global_enrich
+                local_enrichment_weight * local_enrich + global_enrichment_weight * global_enrich
             )
 
         # Build Gurobi model
         model = gp.Model(f"discrete_gene_expression_spot_{spot_idx}")
-        model.setParam('OutputFlag', 0)
-        model.setParam('Threads', 1)
-        model.setParam('NodefileStart', 0.5)
-        model.setParam('MIPGap', 0.01)
-        model.setParam('TimeLimit', 600)
-        model.setParam('NodeLimit', 1000000)
+        model.setParam("OutputFlag", 0)
+        model.setParam("Threads", 1)
+        model.setParam("NodefileStart", 0.5)
+        model.setParam("MIPGap", 0.01)
+        model.setParam("TimeLimit", 600)
+        model.setParam("NodeLimit", 1000000)
 
         # Variables for count assignment
         X = {}
@@ -789,17 +810,9 @@ def deconvolute_spot_with_neighbors_with_prior(
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    X[j, k] = model.addVar(
-                        vtype=GRB.INTEGER,
-                        lb=0,
-                        ub=total_counts,
-                        name=f"X_{j}_{k}"
-                    )
+                    X[j, k] = model.addVar(vtype=GRB.INTEGER, lb=0, ub=total_counts, name=f"X_{j}_{k}")
                 # Count conservation constraint
-                model.addConstr(
-                    gp.quicksum(X[j, k] for j in range(T)) == total_counts,
-                    name=f"count_conservation_{k}"
-                )
+                model.addConstr(gp.quicksum(X[j, k] for j in range(T)) == total_counts, name=f"count_conservation_{k}")
 
         # Validate prior if asked
         if global_prior is not None:
@@ -827,7 +840,7 @@ def deconvolute_spot_with_neighbors_with_prior(
                     # Add slight randomness to break ties using seeded RNG for reproducibility
                     rng = np.random.default_rng(42)  # Fixed seed for reproducibility
                     randomness = 0.9 + 0.2 * rng.random()
-                    base_term = enrichment_weight * normalized_weight * randomness * X[j,k]
+                    base_term = enrichment_weight * normalized_weight * randomness * X[j, k]
                     obj_terms.append(base_term)
 
                     # Prior terms remain unchanged
@@ -841,10 +854,9 @@ def deconvolute_spot_with_neighbors_with_prior(
                             continue
 
         # Maximize the sum of all terms
-        model.setObjective(
-            gp.quicksum(obj_terms),
-            GRB.MAXIMIZE
-        )
+        model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
+
+        model.write('gene_expression_model.mps')
 
         model.optimize()
 
@@ -871,6 +883,7 @@ def deconvolute_spot_with_neighbors_with_prior(
             del model
         gc.collect()
 
+
 def log_marker_gene_patterns(zero_patterns, marker_genes):
     """
     Log detailed patterns for marker genes.
@@ -882,12 +895,13 @@ def log_marker_gene_patterns(zero_patterns, marker_genes):
                 stats = genes_data[gene]
                 logging.info(f"  {ct}:")
                 logging.info(f"    Zero proportion: {stats['zero_proportion']:.3f}")
-                if stats['n_nonzero'] > 0:
+                if stats["n_nonzero"] > 0:
                     logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
                 else:
                     logging.info(f"    Mean nonzero expression: 0.0 (no nonzero values)")
                 logging.info(f"    Number of spots: {stats['n_spots']}")
                 logging.info(f"    Number of nonzero spots: {stats['n_nonzero']}")
+
 
 def scale_genes(expression_matrix):
     """Scale each gene independently to [0,1] range.
@@ -907,6 +921,7 @@ def scale_genes(expression_matrix):
 
     return scaled_matrix, gene_mins, gene_maxs
 
+
 def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
     """Reverse the gene-wise scaling transformation.
 
@@ -921,6 +936,7 @@ def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
     gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
     return (scaled_matrix * gene_ranges) + gene_mins
 
+
 def optimize_gene_expression(
     sample_name: str,
     deconvolution_expression_data: np.ndarray,
@@ -934,7 +950,7 @@ def optimize_gene_expression(
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
-    rerun: bool = False
+    rerun: bool = False,
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -1041,9 +1057,7 @@ def optimize_gene_expression(
 
                                     if spots_since_last_save >= checkpoint_interval:
                                         checkpoint_mgr.save_checkpoint(
-                                            completed_spots,
-                                            spotwise_gene_expression_profiles,
-                                            N, T, M
+                                            completed_spots, spotwise_gene_expression_profiles, N, T, M
                                         )
                                         spots_since_last_save = 0
                             except TimeoutError:
@@ -1062,6 +1076,7 @@ def optimize_gene_expression(
                 if retry_count == max_retries:
                     logging.error("Max retries reached, saving current progress")
                 import time
+
                 time.sleep(5)
 
     finally:
@@ -1070,11 +1085,7 @@ def optimize_gene_expression(
         gc.collect()
 
         if spotwise_gene_expression_profiles:
-            checkpoint_mgr.save_final_results(
-                spotwise_gene_expression_profiles,
-                completed_spots,
-                N, T, M
-            )
+            checkpoint_mgr.save_final_results(spotwise_gene_expression_profiles, completed_spots, N, T, M)
 
     return spotwise_gene_expression_profiles
 
@@ -1106,7 +1117,7 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
 
     # Calculate bounded scaling factors
     scaling_factors = np.clip(size_factors / median_size, 0.1, 10.0)
-    scaled_factors = (target_sum / size_factors)
+    scaled_factors = target_sum / size_factors
 
     # Scale and round to integers
     X_scaled = np.round(X * scaled_factors[:, None]).astype(int)
@@ -1120,9 +1131,9 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
     adata_norm.X = X_scaled
 
     # Store normalization info
-    adata_norm.obs['size_factors'] = scaling_factors
-    adata_norm.obs['original_total'] = size_factors
-    adata_norm.obs['scaled_total'] = X_scaled.sum(axis=1)
+    adata_norm.obs["size_factors"] = scaling_factors
+    adata_norm.obs["original_total"] = size_factors
+    adata_norm.obs["scaled_total"] = X_scaled.sum(axis=1)
 
     # Log statistics
     logging.info(f"Normalization stats:")
@@ -1131,6 +1142,7 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
     logging.info(f"Max scaled value: {X_scaled.max():.2f}")
 
     return adata_norm
+
 
 def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, global_prior):
     """
@@ -1180,27 +1192,27 @@ def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, glob
 
         # Store per-spot metrics
         spot_metrics[spot] = {
-            'total_change': total_diff,
-            'prior_alignment': prior_alignment,
-            'mean_change': np.mean(profile_diff),
-            'max_change': np.max(profile_diff)
+            "total_change": total_diff,
+            "prior_alignment": prior_alignment,
+            "mean_change": np.mean(profile_diff),
+            "max_change": np.max(profile_diff),
         }
 
     # Calculate correlation between changes and prior influence
     changes = np.array([x[0] for x in prior_guided_changes])
     influences = np.array([x[1] for x in prior_guided_changes])
 
-    correlation = np.corrcoef(changes, influences)[0,1]
+    correlation = np.corrcoef(changes, influences)[0, 1]
 
     # Calculate summary statistics
     validation_metrics = {
-        'prior_correlation': correlation,
-        'mean_total_change': np.mean(changes),
-        'mean_prior_influence': np.mean(influences),
-        'std_total_change': np.std(changes),
-        'std_prior_influence': np.std(influences),
-        'n_spots_analyzed': len(common_spots),
-        'spot_metrics': spot_metrics
+        "prior_correlation": correlation,
+        "mean_total_change": np.mean(changes),
+        "mean_prior_influence": np.mean(influences),
+        "std_total_change": np.std(changes),
+        "std_prior_influence": np.std(influences),
+        "n_spots_analyzed": len(common_spots),
+        "spot_metrics": spot_metrics,
     }
 
     # Log summary statistics
@@ -1210,4 +1222,188 @@ def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, glob
     logging.info(f"Mean Prior Influence: {validation_metrics['mean_prior_influence']:.4f}")
     logging.info(f"Number of Spots Analyzed: {validation_metrics['n_spots_analyzed']}")
 
-    return validation_metrics
+
+
+def _create_dummy_anndata(num_spots: int, num_genes: int) -> sc.AnnData:
+    """Create a minimal AnnData with integer counts and spatial coordinates.
+
+    The data is intentionally tiny so that model construction is fast, while
+    still ensuring at least one positive count to create variables.
+
+    Args:
+        num_spots: Number of spatial spots to include.
+        num_genes: Number of genes to include.
+
+    Returns:
+        A newly created AnnData object with `.obsm['spatial']` populated.
+    """
+    X = np.zeros((num_spots, num_genes), dtype=int)
+    # Ensure at least one count is positive so variables are created
+    X[0, 0] = 3
+    if num_genes > 1:
+        X[0, 1] = 1
+
+    adata = sc.AnnData(X=X)
+    adata.obsm['spatial'] = np.zeros((num_spots, 2), dtype=float)
+    return adata
+
+
+def _run_dummy_models() -> Dict[str, bool]:
+    """Build tiny models and trigger writing of their MPS files.
+
+    This function is intended for quick verification that model definitions
+    are valid and can be exported to .mps files. Solver failures are tolerated
+    because the primary goal here is to exercise the `model.write` calls.
+
+    Returns:
+        Dict[str, bool]: Mapping of model key to existence of the written file.
+            Keys: 'cell', 'local', 'gene'.
+    """
+    results: Dict[str, bool] = {'cell': False, 'local': False, 'gene': False}
+
+    try:
+        # Tiny problem sizes
+        num_spots = 1
+        num_cell_types = 2
+        num_genes = 3
+
+        # Create minimal inputs
+        adata = _create_dummy_anndata(num_spots, num_genes)
+        profile_based_antibody_data = np.full((num_spots, num_cell_types), 0.5, dtype=float)
+        cell_type_names = [f"Type_{i}" for i in range(num_cell_types)]
+
+        # 1) Global EM-based cell proportions → writes cell_proportion_model.mps
+        try:
+            optimize_cell_proportions(
+                profile_based_antibody_data=profile_based_antibody_data,
+                cell_type_names=cell_type_names,
+                max_iterations=1,
+            )
+        except Exception as exc:
+            logging.warning("Cell proportions run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['cell'] = os.path.exists('cell_proportion_model.mps')
+
+        # 2) Local refinement of cell proportions → writes local_cell_proportions_model.mps
+        try:
+            deconvolute_local_cell_proportions(
+                spot_idx=0,
+                adata=adata,
+                profile_based_antibody_data=profile_based_antibody_data,
+                radius=2.0,
+                max_iterations=1,
+                beta_values=np.ones(num_cell_types, dtype=float),
+                beta_vary=False,
+                max_y_change=0.4,
+            )
+        except Exception as exc:
+            logging.warning("Local proportions run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['local'] = os.path.exists('local_cell_proportions_model.mps')
+
+        # 3) Gene deconvolution → writes gene_expression_model.mps
+        try:
+            cell_type_numbers_array = np.full((num_spots, num_cell_types), 0.5, dtype=float)
+            deconvolute_spot_with_neighbors_with_prior(
+                spot_idx=0,
+                adata=adata,
+                cell_type_numbers_array=cell_type_numbers_array,
+                radius=2.0,
+                global_prior=None,
+                lambda_prior_weight=0.0,
+                local_enrichment_weight=0.5,
+                global_enrichment_weight=0.5,
+            )
+        except Exception as exc:
+            logging.warning("Gene deconvolution run ended (expected OK if solver missing): %s", str(exc))
+        finally:
+            results['gene'] = os.path.exists('gene_expression_model.mps')
+
+    except Exception as outer_exc:
+        logging.error("Dummy model setup failed: %s", str(outer_exc))
+
+    return results
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    logging.info("Running gurobi_impl to write .mps files using CitegeistModel where available")
+
+    # Import CitegeistModel lazily to avoid circular imports at module import time
+    try:
+        from .citegeist_model import CitegeistModel  # type: ignore
+    except Exception:  # pragma: no cover
+        from citegeist_model import CitegeistModel  # type: ignore
+
+    DATA_FOLDER = "/bgfs/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
+    path_to_biopsy = os.path.join(DATA_FOLDER, "HCC22-088-P4-S1/outs")
+    path_to_surgical = os.path.join(DATA_FOLDER, "HCC22-088-P4-S2_1i_rep/outs")
+    path_list = [path_to_surgical]
+
+    cell_profiles = {
+        "Cancer Cells": {"Major": ["EPCAM-1"], "Minor": ["SDC1-1", "KRT5-1"]},
+        "Macrophages": {"Major": ["CD68-1"], "Minor": ["CD14-1"]},
+        "CD4 T Cells": {"Major": ["CD3E-1", "CD4-1"]},
+        "CD8 T Cells": {"Major": ["CD3E-1", "CD8A-1"]},
+        "B Cells": {"Major": ["MS4A1-1", "CD19-1"]},
+        "Endothelial Cells": {"Major": ["PECAM1-1"]},
+        "Fibroblasts": {"Major": ["ACTA2-1"]},
+    }
+
+    any_success = False
+    try:
+        import squidpy as sq  # type: ignore
+    except Exception as exc:  # pragma: no cover
+        logging.error("squidpy not available to read Visium data: %s", str(exc))
+        sq = None  # type: ignore
+
+    for sample_path in path_list:
+        try:
+            if sq is None:
+                raise RuntimeError("squidpy unavailable")
+            sample_name = os.path.basename(os.path.dirname(sample_path))
+            adata = sq.read.visium(sample_path, counts_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
+
+            model = CitegeistModel(sample_name=sample_name, adata=adata, output_folder=f'output_mps_{sample_name}')
+            model.load_cell_profile_dict(cell_profiles)
+            model.split_adata()
+            model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=25)
+            model.copy_gex_to_protein_adata()
+            model.preprocess_gex()
+            model.preprocess_antibody()
+
+            # Optional: register Gurobi if a license path is provided via env
+            license_file = os.environ.get("GRB_LICENSE_FILE")
+            if license_file and os.path.isfile(license_file):
+                try:
+                    model.register_gurobi(license_file)
+                except Exception as exc:
+                    logging.warning("Gurobi registration skipped: %s", str(exc))
+
+            # Running these will invoke the underlying gurobi_impl functions that write .mps files
+            model.run_cell_proportion_model(radius=400)
+            # Trigger at least one gene model build; pass1 will spawn tasks that write MPS
+            try:
+                model.run_cell_expression_pass1(
+                    radius=400,
+                    max_workers=1,
+                    checkpoint_interval=100,
+                    output_dir=os.path.join(model.output_folder, "checkpoints"),
+                    rerun=True,
+                )
+            except Exception as exc:
+                logging.warning("Pass1 gene expression run ended: %s", str(exc))
+
+            # Check for MPS files
+            cell_mps = os.path.exists('cell_proportion_model.mps')
+            local_mps = os.path.exists('local_cell_proportions_model.mps')
+            gene_mps = os.path.exists('gene_expression_model.mps')
+            logging.info("Sample '%s' MPS write outcomes: cell=%s local=%s gene=%s", sample_name, cell_mps, local_mps, gene_mps)
+            any_success = any_success or cell_mps or local_mps or gene_mps
+        except Exception as exc:
+            logging.error("Failed processing sample at '%s': %s", sample_path, str(exc))
+
+    if not any_success:
+        logging.info("Falling back to dummy models as no MPS files were produced from real data.")
+        outcome = _run_dummy_models()
+        logging.info("Dummy MPS write outcomes: %s", outcome)

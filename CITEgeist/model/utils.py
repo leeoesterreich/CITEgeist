@@ -1,15 +1,17 @@
 """
 Utility functions for CITEgeist including neighbor detection and validation.
 """
-import os
 import gc
 import logging
-import pandas as pd
+import os
+
 import numpy as np
+import pandas as pd
 import scanpy as sc
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import pearsonr
-from sklearn.metrics import mean_squared_error, mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
+
 
 def validate_cell_profile_dict(cell_profile_dict):
     """
@@ -19,6 +21,7 @@ def validate_cell_profile_dict(cell_profile_dict):
         return False
     return all(isinstance(k, str) and isinstance(v, dict) for k, v in cell_profile_dict.items())
 
+
 def save_results_to_output(results, filepath):
     """
     Save results as a CSV file.
@@ -26,11 +29,13 @@ def save_results_to_output(results, filepath):
     df = pd.DataFrame(results)
     df.to_csv(filepath)
 
+
 def cleanup_memory():
     """
     Force garbage collection to free memory.
     """
     gc.collect()
+
 
 def setup_logging(output_folder, sample_name):
     """
@@ -38,15 +43,12 @@ def setup_logging(output_folder, sample_name):
     """
     log_file = os.path.join(output_folder, f"{sample_name}_CITEgeist.log")
     logging.basicConfig(
-        filename=log_file,
-        filemode='w',
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        level=logging.INFO
+        filename=log_file, filemode="w", format="%(asctime)s - %(levelname)s - %(message)s", level=logging.INFO
     )
-    logging.info('Logging initialized.')
+    logging.info("Logging initialized.")
+
 
 ### 📏 **Spatial Neighbor Functions**
-
 
 
 def find_fixed_radius_neighbors(spot_index, adata, radius=50):
@@ -61,12 +63,15 @@ def find_fixed_radius_neighbors(spot_index, adata, radius=50):
     Returns:
         tuple: (central_spot_name, list of neighbor spot names)
     """
-    coordinates = adata.obsm['spatial']
+    coordinates = adata.obsm["spatial"]
     central_coord = coordinates[spot_index]
 
     # Identify all spots within the given radius, excluding the central spot
-    neighbors = [idx for idx, coord in enumerate(coordinates)
-                 if idx != spot_index and np.linalg.norm(coord - central_coord) <= radius]
+    neighbors = [
+        idx
+        for idx, coord in enumerate(coordinates)
+        if idx != spot_index and np.linalg.norm(coord - central_coord) <= radius
+    ]
 
     # Convert indices to spot names
     neighbor_names = adata.obs_names[neighbors].tolist()
@@ -75,7 +80,9 @@ def find_fixed_radius_neighbors(spot_index, adata, radius=50):
     return central_spot_name, neighbor_names, spot_index, neighbors
 
 
-def get_neighbors_with_fixed_radius(spot_index, adata, radius=50, include_center=True): # In Visium, 2 rings gives you the adjacent 6 units
+def get_neighbors_with_fixed_radius(
+    spot_index, adata, radius=50, include_center=True
+):  # In Visium, 2 rings gives you the adjacent 6 units
     """
     Get indices of neighboring spots based on a fixed radius around the central spot.
 
@@ -89,7 +96,9 @@ def get_neighbors_with_fixed_radius(spot_index, adata, radius=50, include_center
     - List of indices representing the central spot and its neighbors.
     """
     # Find neighbors within the given radius
-    _, _, spot_index, neighbors = find_fixed_radius_neighbors(spot_index, adata, radius)
+    central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
+        spot_index, adata, radius
+    )
 
     # Optionally include the central spot itself
     if include_center:
@@ -97,6 +106,8 @@ def get_neighbors_with_fixed_radius(spot_index, adata, radius=50, include_center
 
     logging.debug(f"Total neighbors for spot {spot_index} within radius {radius}: {neighbors}")
     return neighbors
+
+
 def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
     """
     Plot neighbors for multiple random central spots using `sc.pl.spatial`.
@@ -117,37 +128,38 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
     # Define colorblind-friendly colors that contrast well with orange background
     # Using dark blue, white, and black for maximum contrast
     color_dict = {
-        'Other spots': '#00FF00',  # Green
-        'Neighbor': '#40E0D0',     # Turquoise
-        'Central spot': '#0000FF'  # Dark blue
+        "Other spots": "#00FF00",  # Green
+        "Neighbor": "#40E0D0",  # Turquoise
+        "Central spot": "#0000FF",  # Dark blue
     }
 
     for spot_index in random_spots:
         # Find neighbors within the given radius
-        central_spot_names, neighbor_spots_names, spot_index, _ = find_fixed_radius_neighbors(spot_index, adata, radius)
+        central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
+            spot_index, adata, radius
+        )
 
         # Create a temporary column to highlight spots
-        adata.obs['highlight'] = 'Other spots'
-        adata.obs.loc[neighbor_spots_names, 'highlight'] = 'Neighbor'
-        adata.obs.loc[central_spot_names, 'highlight'] = 'Central spot'
+        adata.obs["highlight"] = "Other spots"
+        adata.obs.loc[neighbor_spots_names, "highlight"] = "Neighbor"
+        adata.obs.loc[central_spot_names, "highlight"] = "Central spot"
 
         # Plot using `sc.pl.spatial` with custom colors
         sc.pl.spatial(
             adata,
-            color='highlight',
+            color="highlight",
             title=f"Neighbors within {radius} units for Spot {central_spot_names}",
-            spot_size = 75,
+            spot_size=75,
             frameon=False,
-            palette=color_dict
+            palette=color_dict,
         )
 
         # Clean up temporary column after each plot
-        adata.obs.drop(columns=['highlight'], inplace=True)
+        adata.obs.drop(columns=["highlight"], inplace=True)
+
 
 def assert_neighborhood_size(adata, cell_profile_dict, radius=50, num_spots=5):
-    """
-
-    """
+    """ """
     import random
 
     # Select random spots
@@ -157,13 +169,21 @@ def assert_neighborhood_size(adata, cell_profile_dict, radius=50, num_spots=5):
 
     for spot_index in random_spots:
         # Find neighbors within the given radius
-        central_spot_names, neighbor_spots_names, spot_index, _ = find_fixed_radius_neighbors(spot_index, adata, radius)
+        central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
+            spot_index, adata, radius
+        )
 
     central_spot_names = list(central_spot_names) if not isinstance(central_spot_names, list) else central_spot_names
-    neighbor_spots_names = list(neighbor_spots_names) if not isinstance(neighbor_spots_names, list) else neighbor_spots_names
+    neighbor_spots_names = (
+        list(neighbor_spots_names) if not isinstance(neighbor_spots_names, list) else neighbor_spots_names
+    )
 
+    neighborhood_size = len(central_spot_names + neighbor_spots_names)
 
-    assert all(x <= len(cell_profile_dict) for x in neighborhood_sizes), f"Some neighborhood values in the list are less than {len(cell_profile_dict)} celltypes being deconvoluted"
+    assert all(
+        x <= len(cell_profile_dict) for x in neighborhood_sizes
+    ), f"Some neighborhood values in the list are less than {len(cell_profile_dict)} celltypes being deconvoluted"
+
 
 def benchmark_cell_proportions(true_proportions, predicted_proportions, cell_type_names):
     """
@@ -214,14 +234,8 @@ def benchmark_cell_proportions(true_proportions, predicted_proportions, cell_typ
     quants_jsd = np.quantile(np.min(true_jsd_mtrx, axis=1), [0.25, 0.5, 0.75])
     corr, _ = pearsonr(true_proportions.flatten(), predicted_proportions.flatten())
 
-    return {
-        'JSD': quants_jsd[1],
-        'RMSE': RMSE,
-        'Sum_RMSE': all_rmse,
-        'MAE': MAE,
-        'Sum_MAE': all_mae,
-        'corr': corr
-    }
+    return {"JSD": quants_jsd[1], "RMSE": RMSE, "Sum_RMSE": all_rmse, "MAE": MAE, "Sum_MAE": all_mae, "corr": corr}
+
 
 def export_anndata_layers(adata, output_dir, pass_number=None):
     """
@@ -253,13 +267,13 @@ def export_anndata_layers(adata, output_dir, pass_number=None):
 
         # Extract data and ensure it's dense
         layer_data = adata.layers[layer_name]
-        dense_data = layer_data.toarray() if hasattr(layer_data, 'toarray') else layer_data
+        dense_data = layer_data.toarray() if hasattr(layer_data, "toarray") else layer_data
 
         # Create DataFrame
         df = pd.DataFrame(dense_data, index=adata.obs.index, columns=adata.var.index)
 
         # Extract cell type name from layer name consistently
-        cell_type = layer_name.split('_genes_pass')[0]
+        cell_type = layer_name.split("_genes_pass")[0]
 
         # Save with standardized naming including pass number
         if pass_number is not None:
@@ -270,7 +284,8 @@ def export_anndata_layers(adata, output_dir, pass_number=None):
         df.to_csv(output_file)
         logging.info(f"Exported layer '{layer_name}' to '{output_file}'")
 
-def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='range', pass_number=None):
+
+def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="range", pass_number=None):
     """
     Calculate performance metrics for gene expression predictions.
 
@@ -295,11 +310,11 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
     logging.info(f"Layer files: {sorted(os.listdir(predictions_dir))}")
 
     # Get sorted lists of files with pass number handling
-    gt_files = sorted([f for f in os.listdir(ground_truth_dir) if f.endswith('_GT.csv')])
+    gt_files = sorted([f for f in os.listdir(ground_truth_dir) if f.endswith("_GT.csv")])
     if pass_number is not None:
-        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith(f'_layer_pass{pass_number}.csv')])
+        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith(f"_layer_pass{pass_number}.csv")])
     else:
-        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith('_layer.csv')])
+        pred_files = sorted([f for f in os.listdir(predictions_dir) if f.endswith("_layer.csv")])
 
     print("GT files: ", gt_files)
     print("Pred files: ", pred_files)
@@ -307,15 +322,15 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
     assert len(gt_files) == len(pred_files), "Number of ground truth files and prediction files do not match"
 
     # Create a dictionary to map cell types to their ground truth files
-    gt_file_map = {f.replace('_GT.csv', ''): f for f in gt_files}
+    gt_file_map = {f.replace("_GT.csv", ""): f for f in gt_files}
 
     # Create a list to store matched prediction and ground truth file pairs
     matched_files = []
 
     for pred_file in pred_files:
         # Remove pass number suffix if present
-        base_pred_file = pred_file.replace(f'_pass{pass_number}', '') if pass_number is not None else pred_file
-        cell_type = base_pred_file.replace('_layer.csv', '').split('_')[0]
+        base_pred_file = pred_file.replace(f"_pass{pass_number}", "") if pass_number is not None else pred_file
+        cell_type = base_pred_file.replace("_layer.csv", "").split("_")[0]
         if cell_type in gt_file_map:
             matched_files.append((pred_file, gt_file_map[cell_type]))
 
@@ -357,10 +372,10 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         mae = mean_absolute_error(gt_df.values, pred_df.values)
 
         # Calculate NRMSE
-        if normalize == 'range':
+        if normalize == "range":
             range_gt = gt_df.values.max() - gt_df.values.min()
             nrmse = rmse / range_gt if range_gt != 0 else np.nan
-        elif normalize == 'mean':
+        elif normalize == "mean":
             mean_gt = gt_df.values.mean()
             nrmse = rmse / mean_gt if mean_gt != 0 else np.nan
         else:
@@ -371,7 +386,7 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='r
         assert rmse is not None and rmse != np.nan, f"RMSE is None for {cell_type}"
         assert mae is not None and mae != np.nan, f"MAE is None for {cell_type}"
 
-        metrics_per_cell_type[cell_type] = {'RMSE': rmse, 'NRMSE': nrmse, 'MAE': mae}
+        metrics_per_cell_type[cell_type] = {"RMSE": rmse, "NRMSE": nrmse, "MAE": mae}
         logging.info(f"Metrics for {cell_type}: RMSE={rmse:.4f}, NRMSE={nrmse:.4f}, MAE={mae:.4f}")
 
     return metrics_per_cell_type

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+# Binder post-build script for CITEgeist
+# This script runs after the environment is built but before the user session starts
+
+# Enable Jupyter extensions
+jupyter nbextension enable --py widgetsnbextension --sys-prefix
+
+# Install any additional Jupyter lab extensions if needed
+# jupyter labextension install @jupyter-widgets/jupyterlab-manager
+
+echo "CITEgeist Binder environment setup complete!"
+echo "Navigate to CITEgeist/CITEgeist/Jupyter/ to access the vignettes."

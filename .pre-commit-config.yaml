@@ -1,0 +1,87 @@
+# Pre-commit hooks for code quality checks
+# Install: pip install pre-commit
+# Setup: pre-commit install
+# Run manually: pre-commit run --all-files
+
+default_language_version:
+  python: python3.10
+
+repos:
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^(Benchmarking/)
+      - id: end-of-file-fixer
+        exclude: ^(Benchmarking/)
+      - id: check-yaml
+      - id: check-added-large-files
+        args: ['--maxkb=10000']
+      - id: check-merge-conflict
+      - id: check-json
+      - id: check-toml
+      - id: debug-statements
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Python code formatting with black
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        args: ['--line-length=120']
+        exclude: ^(Benchmarking/)
+
+  # Import sorting with isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile', 'black', '--line-length', '120']
+        exclude: ^(Benchmarking/)
+
+  # Fast linting with flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: [
+          '--max-line-length=120',
+          '--extend-ignore=E203,E501,W503,E402',
+          '--exclude=Benchmarking/*',
+        ]
+        additional_dependencies: [
+          'flake8-docstrings',
+          'flake8-bugbear',
+        ]
+
+  # Type checking with mypy (optional - can be disabled if too strict)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: ['--ignore-missing-imports', '--no-strict-optional']
+        exclude: ^(Benchmarking/|CITEgeist/tests/)
+        additional_dependencies: [
+          'types-requests',
+          'types-PyYAML',
+        ]
+
+  # Jupyter notebook checks (optional)
+  - repo: https://github.com/nbQA-dev/nbQA
+    rev: 1.7.1
+    hooks:
+      - id: nbqa-black
+        args: ['--line-length=120']
+      - id: nbqa-isort
+        args: ['--profile=black']
+
+  # Security checks
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-c', 'pyproject.toml']
+        additional_dependencies: ['bandit[toml]']
+        exclude: ^(Benchmarking/|CITEgeist/tests/)
