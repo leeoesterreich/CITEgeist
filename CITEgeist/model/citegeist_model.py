@@ -1,7 +1,13 @@
+"""
+Main CitegeistModel class for spatial transcriptomics deconvolution.
+
+This module implements the two-pass CITEgeist algorithm for deconvolving
+spatial transcriptomics data using CITE-seq profiles.
+"""
 # Standard library imports
 import os
 import logging
-from typing import Dict, Any, Optional, Tuple, List, Union
+from typing import Dict, Any
 
 
 # Third-party imports
@@ -9,22 +15,21 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import pyarrow.parquet as pq
-from scipy.ndimage import gaussian_filter
 
 # Local imports
 from .gurobi_impl import (
-    map_antibodies_to_profiles, 
-    optimize_cell_proportions, 
-    optimize_gene_expression, 
+    map_antibodies_to_profiles,
+    optimize_cell_proportions,
+    optimize_gene_expression,
     compute_global_prior,
     normalize_counts,
     finetune_cell_proportions
 )
 from .utils import (
-    validate_cell_profile_dict,  
-    cleanup_memory, 
-    setup_logging, 
-    get_neighbors_with_fixed_radius, 
+    validate_cell_profile_dict,
+    cleanup_memory,
+    setup_logging,
+    get_neighbors_with_fixed_radius,
     assert_neighborhood_size,
     export_anndata_layers,
 )
@@ -58,22 +63,22 @@ class CitegeistModel:
             self.antibody_capture_adata = None
 
         self.sample_name = sample_name
-            
+
         if output_folder is None:
             raise ValueError("output_folder must be provided")
         self.output_folder = str(output_folder)  # Ensure string type
 
-        
+
         os.makedirs(self.output_folder, exist_ok=True)
         setup_logging(self.output_folder, self.sample_name)
-        
+
         self.results = {}
         self.cell_profile_dict = None
         self.preprocessed_gex = False
         self.preprocessed_antibody = False
-        
+
         print("CitegeistModel initialized successfully.")
-    
+
     def __repr__(self):
         """
         Developer-friendly representation of the CitegeistModel.
@@ -103,8 +108,8 @@ class CitegeistModel:
             f"- Antibody Capture Preprocessed: {'Yes' if self.preprocessed_antibody else 'No'}",
         ]
         return "\n".join(details)
-    
-    
+
+
     def register_gurobi(self, license_file_path):
         """
         Configure Gurobi by setting only the license file path.
@@ -117,14 +122,14 @@ class CitegeistModel:
 
         # Set only the license file environment variable
         os.environ["GRB_LICENSE_FILE"] = license_file_path
-        
+
         print("✅ Gurobi license file has been successfully configured.")
         print(f" - GRB_LICENSE_FILE: {os.environ['GRB_LICENSE_FILE']}")
-        
+
     # -----------------------------------------
     # Data Splitting
     # -----------------------------------------
-        
+
     def split_adata(self):
         """
         Split the AnnData object into separate gene expression and antibody capture sub-objects
@@ -135,16 +140,16 @@ class CitegeistModel:
         """
         if self.adata is None:
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
-        
+
         if 'feature_types' not in self.adata.var.columns:
             raise ValueError("The 'feature_types' column is missing in `adata.var`. Cannot split data.")
-        
+
         if self.adata is None:
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
 
-        
+
         self.adata.var_names_make_unique()
-        
+
         if self.gene_expression_adata or self.antibody_capture_adata :
                 raise ValueError(
                     "Data seems to already be split"
@@ -201,7 +206,7 @@ class CitegeistModel:
     def load_cell_profile_dict(self, cell_profile_dict):
         """
         Load and validate the cell profile dictionary.
-        
+
         Args:
             cell_profile_dict (dict): Dictionary of cell type profiles.
         """
@@ -213,7 +218,7 @@ class CitegeistModel:
     # -----------------------------------------
     # Preprocessing Functions
     # -----------------------------------------
-    
+
     def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=10):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
@@ -260,7 +265,7 @@ class CitegeistModel:
         initial_spot_count = self.gene_expression_adata.shape[0]
 
         sc.pp.filter_cells(self.gene_expression_adata, min_counts=min_counts)
-        
+
 
         print(f"Filtered gene expression data: {initial_gene_count} → {filtered_gene_count} genes "
               f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
@@ -288,7 +293,7 @@ class CitegeistModel:
         self.antibody_capture_adata = self.antibody_capture_adata[filtered_spots, :].copy()
 
         logging.info(f"Filtered antibody capture data to {len(filtered_spots)} spots present in gene expression data.")
-    
+
     def preprocess_gex(self, target_sum=10000):
         """
         Preprocess gene expression data with count-preserving normalization.
@@ -298,15 +303,15 @@ class CitegeistModel:
 
         # Normalize while preserving counts
         self.gene_expression_adata = normalize_counts(self.gene_expression_adata, target_sum=target_sum)
-        
+
         # Validate integer format
         matrix = self.gene_expression_adata.X
         if hasattr(matrix, 'toarray'):
             matrix = matrix.toarray()
-        
+
         if not np.all(np.equal(np.mod(matrix, 1), 0)):
             raise ValueError("Gene expression data contains non-integer values after normalization.")
-        
+
         self.preprocessed_gex = True
         logging.info(f"Gene expression data normalized to {target_sum} counts per spot and validated for discrete count analysis.")
 
@@ -377,23 +382,23 @@ class CitegeistModel:
             raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
 
         profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(self.antibody_capture_adata, self.cell_profile_dict)
-        
+
         Y_values, beta_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
-        
+
         # Create finetuning output directory
         finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
-        
+
         os.makedirs(finetune_output_dir, exist_ok=True)
-        
+
         if self.antibody_capture_adata is None:
             raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
-        
-        Y_prev, beta_prev = finetune_cell_proportions(
-            profile_based_antibody_data, 
-            cell_type_names, 
-            Y_values, 
-            beta_values, 
-            self.antibody_capture_adata, 
+
+        Y_prev, _ = finetune_cell_proportions(
+            profile_based_antibody_data,
+            cell_type_names,
+            Y_values,
+            beta_values,
+            self.antibody_capture_adata,
             radius=radius,
             max_workers=max_workers,
             checkpoint_interval=checkpoint_interval,
@@ -408,13 +413,13 @@ class CitegeistModel:
         )
 
         spot_names = self.antibody_capture_adata.obs_names
-        
+
         global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
         finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
 
         global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
         finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
-        
+
         global_cell_type_proportions_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_global_results.csv"))
         finetuned_cell_type_proportions_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_finetuned_results.csv"))
 
@@ -558,7 +563,7 @@ class CitegeistModel:
         }
 
     def compute_expression_prior(
-        self, 
+        self,
         spotwise_profiles_pass1: Dict[int, np.ndarray],
         cell_type_numbers_array: np.ndarray,
         lambda_prior: float = 1.0,
@@ -566,13 +571,13 @@ class CitegeistModel:
     ) -> Dict[str, Any]:
         """
         Compute global prior from pass 1 results.
-        
+
         Args:
             spotwise_profiles_pass1: Dictionary mapping spot indices to profile matrices
             cell_type_numbers_array: Array of cell type proportions (N_spots × T_celltypes)
             lambda_prior: Strength of prior influence (default: 1.0)
             min_expression_threshold: Minimum expression to consider "active" (default: 0.1)
-            
+
         Returns:
             Dict[str, Any]: {
                 'global_prior': np.ndarray,  # shape (T_celltypes, M_genes)
@@ -584,16 +589,15 @@ class CitegeistModel:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
         logging.info("Computing prior from pass 1 results...")
-        
-        # Get gene and cell type names for validation
+
+        # Get cell type names for validation
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
-        gene_names = self.gene_expression_adata.var_names
 
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
         cell_type_names = list(self.cell_profile_dict.keys())
-        
+
         # Compute global prior with new approach
         prior_info = compute_global_prior(
             spotwise_profiles_pass1,
@@ -601,19 +605,19 @@ class CitegeistModel:
             lambda_prior=lambda_prior,
             min_expression_threshold=min_expression_threshold
         )
-        
+
         # Validate prior shape
         T = cell_type_numbers_array.shape[1]  # num cell types
         M = self.gene_expression_adata.shape[1]  # num genes
-        
+
         if prior_info['global_prior'].shape != (T, M):
             raise ValueError(f"Prior shape {prior_info['global_prior'].shape} does not match expected ({T}, {M})")
-        
+
         # Log detailed statistics about the prior
         logging.info("\nPrior computation details:")
         logging.info(f"Number of cell types: {T}")
         logging.info(f"Number of genes: {M}")
-        
+
         # Per cell-type statistics
         for t, cell_type in enumerate(cell_type_names):
             mean_conf = np.mean(prior_info['confidence_scores'][t])
@@ -621,7 +625,7 @@ class CitegeistModel:
             logging.info(f"\n{cell_type}:")
             logging.info(f" - Mean confidence score: {mean_conf:.4f}")
             logging.info(f" - % Strong signals: {100 * strong_signals:.2f}%")
-            
+
             # Expression pattern summary
             mean_exp = np.mean(prior_info['expression_patterns']['mean_expression'][t])
             freq = np.mean(prior_info['expression_patterns']['expression_frequency'][t])
@@ -629,7 +633,7 @@ class CitegeistModel:
             logging.info(f" - Mean expression: {mean_exp:.4f}")
             logging.info(f" - Mean expression frequency: {freq:.4f}")
             logging.info(f" - Mean expression consistency: {cons:.4f}")
-        
+
         return prior_info
 
 
@@ -638,17 +642,17 @@ class CitegeistModel:
         if not profiles:
             logging.warning("No profiles to save.")
             return
-        
+
         N = max(profiles.keys()) + 1
         T = profiles[0].shape[0]
         M = profiles[0].shape[1]
-        
+
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
 
         # Get cell type names from the dictionary
         cell_type_names = list(self.cell_profile_dict.keys())
-        
+
         # Create combined matrix with proper cell type names and spot formatting
         spot_celltype_indices = []
 
@@ -660,21 +664,21 @@ class CitegeistModel:
             spot_name = self.gene_expression_adata.obs_names[i]  # Use actual spot names from AnnData
             for cell_type in cell_type_names:
                 spot_celltype_indices.append(f"{spot_name}_{cell_type}")
-        
+
         gene_names = self.gene_expression_adata.var_names
         nan_matrix = np.full((T, M), np.nan)
         data_combined = np.vstack([
-            profiles.get(i, nan_matrix) 
+            profiles.get(i, nan_matrix)
             for i in range(N)
         ])
-        
+
         # Create DataFrame
         df = pd.DataFrame(
-            data_combined, 
-            index=spot_celltype_indices, 
+            data_combined,
+            index=spot_celltype_indices,
             columns=gene_names
         )
-        
+
         df.to_parquet(path, compression="gzip")
         logging.info(f"Saved profiles to {path} with cell types: {cell_type_names}")
 
@@ -689,52 +693,52 @@ class CitegeistModel:
 
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
-        
+
         # Debug prints before sorting
         print("\nBefore sorting:")
         print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
         print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
-        
+
         if 'spot_' in str(spot_by_celltype_df.index[0]):
             # Sort both numerically by the spot number
             def get_spot_number(x):
                 return int(x.split('spot_')[1])
-            
+
             # Sort using reindex instead of sort_index
             sorted_csv_idx = sorted(spot_by_celltype_df.index, key=get_spot_number)
             sorted_adata_idx = sorted(self.gene_expression_adata.obs_names, key=get_spot_number)
-            
+
             spot_by_celltype_df = spot_by_celltype_df.reindex(sorted_csv_idx)
             self.gene_expression_adata = self.gene_expression_adata[sorted_adata_idx].copy()
-            
+
             # Debug prints after sorting
             print("\nAfter sorting:")
             print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
             print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
-        
+
         # Check if indices match after sorting
         if not all(spot_by_celltype_df.index == self.gene_expression_adata.obs_names):
             raise ValueError("Spot indices still don't match after sorting. Please verify your data.")
-        
+
         # Add cell type proportions to adata.obs
         for cell_type in spot_by_celltype_df.columns:
             self.gene_expression_adata.obs[cell_type] = spot_by_celltype_df[cell_type]
 
         self.results['cell_prop'] = spot_by_celltype_df
-        
+
         print("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
-        
-        
+
+
     def append_gex_to_adata(self, parquet_path=None, pass_number=1):
         """
         Append gene expression layers from a Parquet file back into the gene_expression_adata object.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
-        
+
         if parquet_path is None:
             parquet_path = os.path.join(
-                self.output_folder, 
+                self.output_folder,
                 f"{self.sample_name}_gene_expression_pass{pass_number}.parquet"
             )
 
@@ -757,10 +761,10 @@ class CitegeistModel:
         # Get cell type names from the dictionary for validation
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
-        
+
         expected_cell_types = set(self.cell_profile_dict.keys())
         found_cell_types = set(df['CellType'].unique())
-        
+
         if not found_cell_types.issubset(expected_cell_types):
             logging.warning(f"Found unexpected cell types: {found_cell_types - expected_cell_types}")
             logging.warning(f"Expected cell types: {expected_cell_types}")
@@ -771,28 +775,28 @@ class CitegeistModel:
             # Filter data for this cell type
             celltype_data = df[df['CellType'] == cell_type].copy()
             celltype_data = celltype_data.drop(columns=['CellType'])
-            
+
             # Ensure spot names match AnnData format
             if 'spot_' in str(self.gene_expression_adata.obs_names[0]) and not celltype_data['Spot'].str.contains('spot_').all():
                 celltype_data['Spot'] = 'spot_' + celltype_data['Spot'].astype(str)
             elif celltype_data['Spot'].str.contains('spot_').all() and not 'spot_' in str(self.gene_expression_adata.obs_names[0]):
                 celltype_data['Spot'] = celltype_data['Spot'].str.replace('spot_', '')
-            
+
             # Set Spot as index
             celltype_data = celltype_data.set_index('Spot')
-            
+
             # Verify all spots exist in AnnData
             missing_spots = set(celltype_data.index) - set(self.gene_expression_adata.obs_names)
             if missing_spots:
                 raise ValueError(f"Found spots in parquet that don't exist in AnnData: {missing_spots}")
-            
+
             # Create matrix with proper spot ordering
             celltype_matrix = np.zeros((len(self.gene_expression_adata.obs_names), len(self.gene_expression_adata.var_names)))
             for spot in self.gene_expression_adata.obs_names:
                 if spot in celltype_data.index:
                     idx = self.gene_expression_adata.obs_names.get_loc(spot)
                     celltype_matrix[idx] = celltype_data.loc[spot].values
-            
+
             # Add as layer with consistent naming
             layer_name = f"{cell_type.replace(' ', '_')}_genes_pass{pass_number}"
             self.gene_expression_adata.layers[layer_name] = celltype_matrix
@@ -804,7 +808,7 @@ class CitegeistModel:
             else:
                 logging.info(f"Successfully added layer: {layer_name}")
 
-    
+
 
     def get_adata(self):
         """
@@ -818,7 +822,7 @@ class CitegeistModel:
 
         print("✅ Returning the internal AnnData object.")
         return self.gene_expression_adata
-            
+
 
 
     def cleanup(self):
@@ -832,4 +836,3 @@ class CitegeistModel:
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dict has not been loaded. Run 'load_cell_profile_dict' first.")
         assert_neighborhood_size(self.gene_expression_adata, self.cell_profile_dict, radius=radius, num_spots=5)
-        
