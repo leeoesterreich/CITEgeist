@@ -30,10 +30,10 @@ Run Interactive Notebook
 .. raw:: html
 
     <div style="margin: 20px 0;">
-        <a href="https://mybinder.org/v2/gh/leeoesterreich/CITEgeist/dev?labpath=docs%2Fcore_scripts%2FJupyter%2Fvignette_1_biopsy_heterogeneity.ipynb" target="_blank">
+        <a href="https://mybinder.org/v2/gh/leeoesterreich/dal413/HEAD?labpath=CITEgeist%2FCITEgeist%2FJupyter%2Fvignette_1_biopsy_heterogeneity.ipynb" target="_blank">
             <img src="https://mybinder.org/badge_logo.svg" alt="Launch Binder" style="margin-right: 10px;">
         </a>
-        <a href="https://colab.research.google.com/github/leeoesterreich/CITEgeist/blob/dev/docs/core_scripts/Jupyter/vignette_1_biopsy_heterogeneity.ipynb" target="_blank">
+        <a href="https://colab.research.google.com/github/leeoesterreich/dal413/blob/main/CITEgeist/CITEgeist/Jupyter/vignette_1_biopsy_heterogeneity.ipynb" target="_blank">
             <img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab">
         </a>
     </div>
@@ -108,3 +108,4 @@ Related Documentation
 * :doc:`../tutorial` - Comprehensive workflow guide
 * :doc:`../examples` - Additional code examples
 * :doc:`../api` - Complete API reference
+

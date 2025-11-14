@@ -9,7 +9,7 @@ This section contains interactive Jupyter notebooks that demonstrate various asp
     <p class="admonition-title">🚀 Try CITEgeist Interactively!</p>
     <p>Click the <strong>Binder</strong> or <strong>Colab</strong> buttons on any vignette page to run the notebooks instantly in your browser - no installation required!</p>
     <div style="margin: 15px 0;">
-        <a href="https://mybinder.org/v2/gh/leeoesterreich/CITEgeist/dev?labpath=docs%2Fcore_scripts%2FJupyter" target="_blank">
+        <a href="https://mybinder.org/v2/gh/leeoesterreich/dal413/HEAD?labpath=CITEgeist%2FCITEgeist%2FJupyter" target="_blank">
             <img src="https://mybinder.org/badge_logo.svg" alt="Launch Binder" style="margin-right: 10px;">
         </a>
         <span style="color: #666;">← Launch all notebooks in Binder</span>
@@ -60,3 +60,4 @@ These notebooks use example datasets that should be available in your CITEgeist 
 * Ensure all required Python packages are installed
 
 For more information about data preparation, see the :doc:`tutorial` section.
+
