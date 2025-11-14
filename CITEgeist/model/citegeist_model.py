@@ -1,3 +1,9 @@
+"""
+Main CitegeistModel class for spatial transcriptomics deconvolution.
+
+This module implements the two-pass CITEgeist algorithm for deconvolving
+spatial transcriptomics data using CITE-seq profiles.
+"""
 # Standard library imports
 import logging
 import os

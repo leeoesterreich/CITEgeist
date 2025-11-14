@@ -13,7 +13,9 @@ unsafe-load-any-extension=no
 
 [MESSAGES CONTROL]
 # Disable specific warnings that are too strict for scientific code
+# CRITICAL: import-error disabled since dependencies won't be installed in CI
 disable=
+    import-error,  # Dependencies not installed in CI environment
     C0103,  # Invalid name (allow single-letter variable names common in math/ML)
     C0114,  # Missing module docstring
     C0115,  # Missing class docstring
@@ -46,7 +48,8 @@ score=yes
 
 [BASIC]
 # Good variable names which should always be accepted
-good-names=i,j,k,x,y,z,df,ax,fig,lr,id,_
+# Include mathematical notation common in research code
+good-names=i,j,k,n,m,t,x,y,z,N,T,M,X,Y,S,df,df2,ax,fig,lr,id,_,gc,os,np,pd,sc,gp
 
 # Bad variable names which should always be refused
 bad-names=foo,bar,baz,toto,tutu,tata

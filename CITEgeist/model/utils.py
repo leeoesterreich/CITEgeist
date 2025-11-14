@@ -1,3 +1,6 @@
+"""
+Utility functions for CITEgeist including neighbor detection and validation.
+"""
 import gc
 import logging
 import os

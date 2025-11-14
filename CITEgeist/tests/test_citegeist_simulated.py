@@ -1,3 +1,6 @@
+"""
+Test script for CITEgeist on simulated data with benchmarking.
+"""
 # tests/test_citegeist_simulated.py
 
 import argparse

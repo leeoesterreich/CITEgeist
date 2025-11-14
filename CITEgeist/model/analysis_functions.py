@@ -1,3 +1,6 @@
+"""
+Analysis functions for filtering and processing CITEgeist results.
+"""
 import anndata as ad
 import scanpy as sc
 

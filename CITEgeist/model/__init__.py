@@ -1,3 +1,6 @@
+"""
+CITEgeist model package - spatial transcriptomics deconvolution using CITE-seq.
+"""
 # Expose key classes and functions for easy access
 
 from .citegeist_model import CitegeistModel

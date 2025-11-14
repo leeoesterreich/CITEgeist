@@ -1,3 +1,6 @@
+"""
+Visualization script for parameter grid search results on cell proportions.
+"""
 import ast
 import os
 from typing import Dict, List, Optional, Tuple

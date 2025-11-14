@@ -1,3 +1,6 @@
+"""
+Checkpoint management for saving and resuming optimization state.
+"""
 import logging
 import os
 from pathlib import Path

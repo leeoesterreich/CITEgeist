@@ -1,3 +1,6 @@
+"""
+Visualization script for simulated benchmark results comparing CITEgeist to other methods.
+"""
 import os
 
 import matplotlib.pyplot as plt

@@ -1,3 +1,9 @@
+"""
+Core optimization implementations using Gurobi for CITEgeist deconvolution.
+
+This module contains the optimization functions for cell proportion estimation
+and gene expression deconvolution using quadratic programming.
+"""
 # Standard library imports
 import concurrent
 import gc
