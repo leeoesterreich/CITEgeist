@@ -26,10 +26,10 @@ pip install citegeist
 
 ### Software Dependencies
 
-- **Operating System**:  
-  - Linux  
-  - macOS  
-  - Windows 10 with WSL2  
+- **Operating System**:
+  - Linux
+  - macOS
+  - Windows 10 with WSL2
 
 - **Python**: 3.10
 - **Gurobi** [version > 3.9](https://www.gurobi.com/downloads/gurobi-software/)
