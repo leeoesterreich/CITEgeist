@@ -2,6 +2,7 @@
 Analysis functions for filtering and processing CITEgeist results.
 """
 import anndata as ad
+import scanpy as sc
 
 
 def filter_spots_by_celltype_proportion(adata, celltype, proportion_threshold):
@@ -28,14 +29,17 @@ def expand_prop_gex_adata(prop_gex_adata, celltype_cutoff=0.2, celltype_profile_
         celltype_label = celltype.replace(" ", "_")
         layer_name = f"{celltype_label}_genes_pass1"
         filtered_adata.X = filtered_adata.layers[layer_name]
-        filtered_adata.obs['celltype'] = celltype
+        filtered_adata.obs["celltype"] = celltype
         all_adatas.append(filtered_adata)
     # Extract the corresponding layer for the filtered_adata, including the spatial information
-    combined_adata = ad.concat(all_adatas, join="outer", keys=celltypes, index_unique = "_", merge="same", uns_merge = "first")
+    combined_adata = ad.concat(
+        all_adatas, join="outer", keys=celltypes, index_unique="_", merge="same", uns_merge="first"
+    )
     return combined_adata
+
 
 def get_celltype_expression_data(adata, celltype):
     """
     Get expression data for a specific celltype.
     """
-    return adata[adata.obs['celltype'] == celltype].copy()
+    return adata[adata.obs["celltype"] == celltype].copy()
