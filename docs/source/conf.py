@@ -7,10 +7,10 @@ import os
 import sys
 
 # Add the project root to sys.path
-project_root = os.path.abspath('../')  # docs/source -> docs/
+project_root = os.path.abspath('../../')
 sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, 'core_scripts'))
-sys.path.insert(0, os.path.join(project_root, 'core_scripts', 'model'))
+sys.path.insert(0, os.path.join(project_root, 'CITEgeist'))
+sys.path.insert(0, os.path.join(project_root, 'CITEgeist', 'model'))
 print("!!! DEBUG: The project root path added is:", project_root)
 print("!!! DEBUG: The full sys.path is:", sys.path)
 
@@ -46,7 +46,7 @@ html_theme = 'pydata_sphinx_theme'
 html_static_path = ['_static']
 
 html_theme_options = {
-    "github_url": "https://github.com/leeoesterreich/CITEgeist",
+    "github_url": "ll ghttps://github.com/leeoesterreich/CITEgeist",
     "show_nav_level": 2,
     "navigation_depth": 4,
     "show_toc_level": 2,
@@ -61,7 +61,7 @@ html_theme_options = {
 html_context = {
     "github_user": "leeoesterreich",
     "github_repo": "CITEgeist",
-    "github_version": "dev",
+    "github_version": "main",
     "doc_path": "docs/source",
 }
 
@@ -84,3 +84,4 @@ napoleon_use_rtype = True
 napoleon_preprocess_types = False
 napoleon_type_aliases = None
 napoleon_attr_annotations = True
+
