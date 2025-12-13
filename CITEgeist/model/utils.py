@@ -4,10 +4,12 @@ Utility functions for CITEgeist including neighbor detection and validation.
 import gc
 import logging
 import os
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 import scanpy as sc
+import matplotlib.pyplot as plt
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import pearsonr
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -289,6 +291,12 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
     """
     Calculate performance metrics for gene expression predictions.
 
+    Handles mismatched profiles between ground truth and predictions:
+    - Profiles in predictions but not ground truth (e.g., Nonspecific, Unknown) are
+      compared against zero (any allocation is wrong)
+    - Profiles in ground truth but not predictions are compared against zero predictions
+      (missed cell types)
+
     Args:
         ground_truth_dir (str): Directory containing ground truth CSV files
         predictions_dir (str): Directory containing prediction CSV files
@@ -296,7 +304,8 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         pass_number (int, optional): If specified, look for predictions in pass-specific subdirectory
 
     Returns:
-        dict: Dictionary containing performance metrics per cell type and overall statistics
+        dict: Dictionary containing performance metrics per cell type and overall statistics.
+              Includes special keys '_spurious_profiles' and '_missed_profiles' for tracking.
     """
     metrics_per_cell_type = {}
 
@@ -319,74 +328,334 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
     print("GT files: ", gt_files)
     print("Pred files: ", pred_files)
 
-    assert len(gt_files) == len(pred_files), "Number of ground truth files and prediction files do not match"
+    # Extract cell type names from filenames
+    # GT: "B-cells_GT.csv" -> "B-cells"
+    # Pred: "B-cells_Protein_1_B-cells_Protein_2_layer_pass1.csv" -> need to match to "B-cells"
+    gt_cell_types = {f.replace("_GT.csv", ""): f for f in gt_files}
 
-    # Create a dictionary to map cell types to their ground truth files
-    gt_file_map = {f.replace("_GT.csv", ""): f for f in gt_files}
-
-    # Create a list to store matched prediction and ground truth file pairs
-    matched_files = []
-
+    # For predictions, we need to extract the base cell type
+    # Handle formats like: "B-cells_Protein_1_B-cells_Protein_2_layer_pass1.csv"
+    # or "Cancer_Epithelial_Protein_1_Cancer_Epithelial_Protein_2_layer_pass1.csv"
+    pred_cell_types = {}
     for pred_file in pred_files:
-        # Remove pass number suffix if present
-        base_pred_file = pred_file.replace(f"_pass{pass_number}", "") if pass_number is not None else pred_file
-        cell_type = base_pred_file.replace("_layer.csv", "").split("_")[0]
-        if cell_type in gt_file_map:
-            matched_files.append((pred_file, gt_file_map[cell_type]))
+        # Remove the layer suffix
+        if pass_number is not None:
+            base = pred_file.replace(f"_layer_pass{pass_number}.csv", "")
+        else:
+            base = pred_file.replace("_layer.csv", "")
+        pred_cell_types[base] = pred_file
 
-    # Sort matched files by the cell type name
-    matched_files.sort(key=lambda x: x[0])
+    # Create a mapping from prediction names to ground truth names
+    # Try to match by finding GT name at the start of the prediction name
+    pred_to_gt_map = {}
+    for pred_name in pred_cell_types:
+        matched_gt = None
+        # Try exact match first (for simple names like "Unknown")
+        if pred_name in gt_cell_types:
+            matched_gt = pred_name
+        else:
+            # Try to find GT cell type that matches the start of pred name
+            # Sort by length descending to match longest first (e.g., "Cancer Epithelial" before "Cancer")
+            for gt_name in sorted(gt_cell_types.keys(), key=len, reverse=True):
+                # Normalize names for comparison (replace spaces with underscores)
+                gt_normalized = gt_name.replace(" ", "_")
+                pred_normalized = pred_name.replace(" ", "_")
+                if pred_normalized.startswith(gt_normalized + "_") or pred_normalized == gt_normalized:
+                    matched_gt = gt_name
+                    break
+        pred_to_gt_map[pred_name] = matched_gt
 
-    # Calculate metrics
-    for pred_filename, gt_filename in matched_files:
-        cell_type = gt_filename.replace("_GT.csv", "")
-        gt_filepath = os.path.join(ground_truth_dir, gt_filename)
-        pred_filepath = os.path.join(predictions_dir, pred_filename)
+    # Track matched, spurious (in pred but not gt), and missed (in gt but not pred) profiles
+    matched_pred_names = set()
+    spurious_profiles = []
 
-        if not os.path.exists(pred_filepath):
-            logging.warning(f"Prediction file for {cell_type} not found. Skipping.")
-            continue
+    for pred_name, gt_name in pred_to_gt_map.items():
+        if gt_name is None:
+            spurious_profiles.append(pred_name)
+        else:
+            matched_pred_names.add(pred_name)
 
-        # Load and preprocess data
-        gt_df = pd.read_csv(gt_filepath, index_col=0)
-        pred_df = pd.read_csv(pred_filepath, index_col=0)
+    # Find GT profiles that weren't matched by any prediction
+    matched_gt_names = set(gt for gt in pred_to_gt_map.values() if gt is not None)
+    missed_profiles = [gt for gt in gt_cell_types if gt not in matched_gt_names]
 
+    logging.info(f"Matched profiles: {len(matched_pred_names)}")
+    logging.info(f"Spurious profiles (pred only): {spurious_profiles}")
+    logging.info(f"Missed profiles (gt only): {missed_profiles}")
+
+    # Helper function to calculate metrics for a pair of dataframes
+    def _calculate_pair_metrics(gt_df, pred_df, cell_type, normalize):
         # Find common genes and spots
         common_genes = gt_df.index.intersection(pred_df.index)
         common_spots = gt_df.columns.intersection(pred_df.columns)
 
         if len(common_genes) == 0 or len(common_spots) == 0:
             logging.warning(f"No common genes or spots for {cell_type}. Skipping.")
-            continue
+            return None
 
         # Subset and normalize data
         gt_subset = gt_df.reindex(index=common_genes, columns=common_spots)
         pred_subset = pred_df.reindex(index=common_genes, columns=common_spots)
 
-        gt_df = pd.DataFrame(np.log1p(gt_subset.values), index=common_genes, columns=common_spots)
-        pred_df = pd.DataFrame(np.log1p(pred_subset.values), index=common_genes, columns=common_spots)
+        gt_log = pd.DataFrame(np.log1p(gt_subset.values), index=common_genes, columns=common_spots)
+        pred_log = pd.DataFrame(np.log1p(pred_subset.values), index=common_genes, columns=common_spots)
 
         # Calculate metrics
-        mse = mean_squared_error(gt_df.values, pred_df.values)
+        mse = mean_squared_error(gt_log.values, pred_log.values)
         rmse = np.sqrt(mse)
-        mae = mean_absolute_error(gt_df.values, pred_df.values)
+        mae = mean_absolute_error(gt_log.values, pred_log.values)
 
         # Calculate NRMSE
         if normalize == "range":
-            range_gt = gt_df.values.max() - gt_df.values.min()
+            range_gt = gt_log.values.max() - gt_log.values.min()
             nrmse = rmse / range_gt if range_gt != 0 else np.nan
         elif normalize == "mean":
-            mean_gt = gt_df.values.mean()
+            mean_gt = gt_log.values.mean()
             nrmse = rmse / mean_gt if mean_gt != 0 else np.nan
         else:
             raise ValueError("Normalization type must be 'range' or 'mean'")
 
-        # Assertions that also print the celltype
-        assert nrmse is not None and nrmse != np.nan, f"NRMSE is None for {cell_type}"
-        assert rmse is not None and rmse != np.nan, f"RMSE is None for {cell_type}"
-        assert mae is not None and mae != np.nan, f"MAE is None for {cell_type}"
+        return {"RMSE": rmse, "NRMSE": nrmse, "MAE": mae}
 
-        metrics_per_cell_type[cell_type] = {"RMSE": rmse, "NRMSE": nrmse, "MAE": mae}
-        logging.info(f"Metrics for {cell_type}: RMSE={rmse:.4f}, NRMSE={nrmse:.4f}, MAE={mae:.4f}")
+    # Process matched profiles
+    for pred_name, gt_name in pred_to_gt_map.items():
+        if gt_name is None:
+            continue  # Handle spurious profiles separately
+
+        gt_filepath = os.path.join(ground_truth_dir, gt_cell_types[gt_name])
+        pred_filepath = os.path.join(predictions_dir, pred_cell_types[pred_name])
+
+        if not os.path.exists(pred_filepath):
+            logging.warning(f"Prediction file for {gt_name} not found. Skipping.")
+            continue
+
+        # Load data
+        gt_df = pd.read_csv(gt_filepath, index_col=0)
+        pred_df = pd.read_csv(pred_filepath, index_col=0)
+
+        metrics = _calculate_pair_metrics(gt_df, pred_df, gt_name, normalize)
+        if metrics is not None:
+            metrics_per_cell_type[gt_name] = metrics
+            logging.info(f"Metrics for {gt_name}: RMSE={metrics['RMSE']:.4f}, "
+                        f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f}")
+
+    # Process spurious profiles (predictions without ground truth)
+    # These should be compared against zero - any allocation is wrong
+    for pred_name in spurious_profiles:
+        pred_filepath = os.path.join(predictions_dir, pred_cell_types[pred_name])
+
+        if not os.path.exists(pred_filepath):
+            continue
+
+        pred_df = pd.read_csv(pred_filepath, index_col=0)
+
+        # Create zero ground truth with same shape
+        gt_df = pd.DataFrame(0.0, index=pred_df.index, columns=pred_df.columns)
+
+        metrics = _calculate_pair_metrics(gt_df, pred_df, pred_name, normalize)
+        if metrics is not None:
+            # Mark as spurious in the key
+            metrics_per_cell_type[f"[SPURIOUS] {pred_name}"] = metrics
+            logging.warning(f"Spurious profile {pred_name}: RMSE={metrics['RMSE']:.4f}, "
+                           f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f} "
+                           "(compared against zero)")
+
+    # Process missed profiles (ground truth without predictions)
+    # These are compared against zero predictions - missed cell types
+    for gt_name in missed_profiles:
+        gt_filepath = os.path.join(ground_truth_dir, gt_cell_types[gt_name])
+
+        if not os.path.exists(gt_filepath):
+            continue
+
+        gt_df = pd.read_csv(gt_filepath, index_col=0)
+
+        # Create zero predictions with same shape
+        pred_df = pd.DataFrame(0.0, index=gt_df.index, columns=gt_df.columns)
+
+        metrics = _calculate_pair_metrics(gt_df, pred_df, gt_name, normalize)
+        if metrics is not None:
+            # Mark as missed in the key
+            metrics_per_cell_type[f"[MISSED] {gt_name}"] = metrics
+            logging.warning(f"Missed profile {gt_name}: RMSE={metrics['RMSE']:.4f}, "
+                           f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f} "
+                           "(predicted as zero)")
+
+    # Store tracking info as special keys
+    metrics_per_cell_type['_spurious_profiles'] = spurious_profiles
+    metrics_per_cell_type['_missed_profiles'] = missed_profiles
 
     return metrics_per_cell_type
+
+
+### 📊 **Spatial Diagnostic Plotting Functions**
+
+
+def plot_marker_processing_stages(
+    marker_name: str,
+    coords: np.ndarray,
+    raw_values: np.ndarray,
+    signal_prob: np.ndarray,
+    corrected_values: np.ndarray,
+    smoothed_values: np.ndarray,
+    zscore_values: np.ndarray,
+    morans_i: float,
+    p_value: float,
+    passed: bool,
+    output_path: str,
+    spot_size: float = 30.0,
+    dpi: int = 150,
+    snr: Optional[float] = None,
+    signal_fraction: Optional[float] = None,
+):
+    """Generate 5-panel diagnostic plot showing processing stages for a marker.
+
+    Creates a horizontal figure showing the transformation of marker expression
+    through the SMM background correction pipeline:
+
+    1. Raw expression with signal probability overlay
+    2. Background-corrected values (X * P(signal))
+    3. Spatially smoothed values
+    4. Z-scored values
+    5. Final verdict with Moran's I and pass/fail status
+
+    Args:
+        marker_name: Name of the marker being visualized.
+        coords: Spatial coordinates of shape (n_spots, 2).
+        raw_values: Original expression values (n_spots,).
+        signal_prob: P(signal | x) from GMM (n_spots,).
+        corrected_values: Background-corrected values (n_spots,).
+        smoothed_values: Spatially smoothed values (n_spots,).
+        zscore_values: Z-scored values (n_spots,).
+        morans_i: Moran's I statistic computed on Z-scored data.
+        p_value: P-value from permutation test.
+        passed: Whether marker passed the Moran's I threshold.
+        output_path: Path to save the output figure.
+        spot_size: Size of scatter plot points (default 30).
+        dpi: Resolution for saved figure (default 150).
+        snr: Optional SNR value for display (for diagnostics).
+        signal_fraction: Optional signal fraction for display.
+
+    Example:
+        >>> plot_marker_processing_stages(
+        ...     marker_name="CD3D",
+        ...     coords=coords,
+        ...     raw_values=X_raw[:, m],
+        ...     signal_prob=signal_posteriors[:, m],
+        ...     corrected_values=X_corrected[:, m],
+        ...     smoothed_values=X_smoothed[:, m],
+        ...     zscore_values=Z[:, m],
+        ...     morans_i=0.35,
+        ...     p_value=0.001,
+        ...     passed=True,
+        ...     output_path="output/CD3D_stages.png"
+        ... )
+    """
+    fig, axes = plt.subplots(1, 5, figsize=(25, 5))
+
+    # Common colorbar settings
+    cbar_kwargs = {'shrink': 0.8, 'pad': 0.02}
+
+    # Panel 1: Raw expression with signal probability as edge color
+    ax = axes[0]
+    # Main scatter: raw values
+    scatter1 = ax.scatter(
+        coords[:, 0], coords[:, 1],
+        c=raw_values, cmap='viridis',
+        s=spot_size, edgecolors='none'
+    )
+    ax.set_title(f"1. Raw Expression", fontsize=11, weight='bold')
+    ax.set_xlabel('X coordinate')
+    ax.set_ylabel('Y coordinate')
+    ax.set_aspect('equal')
+    plt.colorbar(scatter1, ax=ax, label='Expression', **cbar_kwargs)
+
+    # Panel 2: Signal probability (P(signal | x))
+    ax = axes[1]
+    scatter2 = ax.scatter(
+        coords[:, 0], coords[:, 1],
+        c=signal_prob, cmap='RdYlBu_r',
+        s=spot_size, edgecolors='none',
+        vmin=0, vmax=1
+    )
+    ax.set_title(f"2. P(signal | x)\n(GMM Classification)", fontsize=11, weight='bold')
+    ax.set_xlabel('X coordinate')
+    ax.set_ylabel('Y coordinate')
+    ax.set_aspect('equal')
+    plt.colorbar(scatter2, ax=ax, label='Signal Probability', **cbar_kwargs)
+
+    # Panel 3: Background-corrected (X * P(signal))
+    ax = axes[2]
+    scatter3 = ax.scatter(
+        coords[:, 0], coords[:, 1],
+        c=corrected_values, cmap='viridis',
+        s=spot_size, edgecolors='none'
+    )
+    ax.set_title(f"3. Background Corrected\n(X × P(signal))", fontsize=11, weight='bold')
+    ax.set_xlabel('X coordinate')
+    ax.set_ylabel('Y coordinate')
+    ax.set_aspect('equal')
+    plt.colorbar(scatter3, ax=ax, label='Corrected', **cbar_kwargs)
+
+    # Panel 4: Smoothed + Z-scored
+    ax = axes[3]
+    # Use diverging colormap for Z-scores centered at 0
+    vmax_z = max(abs(np.nanmin(zscore_values)), abs(np.nanmax(zscore_values)))
+    scatter4 = ax.scatter(
+        coords[:, 0], coords[:, 1],
+        c=zscore_values, cmap='RdBu_r',
+        s=spot_size, edgecolors='none',
+        vmin=-vmax_z, vmax=vmax_z
+    )
+    ax.set_title(f"4. Smoothed + Z-scored\n(for Moran's I)", fontsize=11, weight='bold')
+    ax.set_xlabel('X coordinate')
+    ax.set_ylabel('Y coordinate')
+    ax.set_aspect('equal')
+    plt.colorbar(scatter4, ax=ax, label='Z-score', **cbar_kwargs)
+
+    # Panel 5: Verdict
+    ax = axes[4]
+    ax.axis('off')
+
+    # Verdict text with color
+    verdict_color = '#228B22' if passed else '#DC143C'  # Forest green or crimson
+    verdict_text = 'PASSED' if passed else 'FILTERED'
+
+    # Build info text
+    info_lines = [
+        f"Moran's I = {morans_i:.4f}",
+        f"p-value = {p_value:.4f}",
+    ]
+    if snr is not None:
+        info_lines.append(f"SNR = {snr:.3f}")
+    if signal_fraction is not None:
+        info_lines.append(f"Signal fraction = {signal_fraction:.3f}")
+
+    # Display verdict box
+    ax.text(0.5, 0.75, verdict_text, ha='center', va='center',
+            fontsize=24, color=verdict_color, weight='bold',
+            transform=ax.transAxes)
+
+    # Display stats
+    info_text = '\n'.join(info_lines)
+    ax.text(0.5, 0.35, info_text, ha='center', va='center',
+            fontsize=12, family='monospace',
+            transform=ax.transAxes,
+            bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', alpha=0.3))
+
+    ax.set_title("5. Verdict", fontsize=11, weight='bold')
+
+    # Main title
+    fig.suptitle(f"Marker: {marker_name}", fontsize=14, weight='bold', y=1.02)
+
+    plt.tight_layout()
+
+    # Create output directory if needed
+    output_dir = os.path.dirname(output_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
+    plt.close(fig)
+
+    logging.info(f"Saved processing stages plot for {marker_name}: {output_path}")

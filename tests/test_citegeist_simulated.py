@@ -14,13 +14,212 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import scipy.sparse
+import matplotlib.pyplot as plt
+from matplotlib.colors import Normalize
 
-# Add the parent directory to the system path
-sys.path.append(os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
+# Spatial statistics imports
+try:
+    from esda.moran import Moran
+    from libpysal.weights import KNN as LibPySAL_KNN
+    HAS_ESDA = True
+except ImportError:
+    HAS_ESDA = False
+    Moran = None
+    LibPySAL_KNN = None
+
+# Add the CITEgeist package directory to the system path
+# The model directory is in CITEgeist/model/, not at the repo root
+repo_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(os.path.join(repo_root, 'CITEgeist'))
 
 # Now import using the full package path
 from model.citegeist_model import CitegeistModel
 from model.utils import benchmark_cell_proportions, calculate_expression_metrics, export_anndata_layers
+from model.auto_profile_discovery import integrate_with_model
+from model.profile_matching import (
+    match_profiles_to_ground_truth,
+    create_remapped_proportions,
+    benchmark_profile_discovery,
+)
+from model.background_correction import spatial_smooth_markers, fit_spatial_mixture_model
+
+
+##############################################################################
+# Spatial Visualization Functions for SMM Debugging
+##############################################################################
+
+def compute_morans_i(
+    values: np.ndarray,
+    coords: np.ndarray,
+    k: int = 8,
+) -> float:
+    """
+    Compute global Moran's I for a single variable.
+
+    Args:
+        values: 1D array of values (n_spots,)
+        coords: Spatial coordinates (n_spots, 2)
+        k: Number of nearest neighbors for spatial weights
+
+    Returns:
+        Moran's I statistic (float). Returns NaN if computation fails.
+    """
+    if not HAS_ESDA:
+        logging.warning("esda/libpysal not available for Moran's I computation")
+        return np.nan
+
+    # Handle edge cases
+    if len(values) < k + 1:
+        return np.nan
+    if np.var(values) < 1e-10:
+        return np.nan  # No variance = undefined Moran's I
+
+    try:
+        # Create spatial weights
+        w = LibPySAL_KNN.from_array(coords, k=k)
+        w.transform = 'r'  # Row-standardize
+
+        # Compute Moran's I
+        mi = Moran(values, w)
+        return mi.I
+    except Exception as e:
+        logging.warning(f"Moran's I computation failed: {e}")
+        return np.nan
+
+
+def visualize_marker_spatial_patterns(
+    marker_names: List[str],
+    coords: np.ndarray,
+    output_dir: str,
+    discovery_result,
+    prefix: str = "marker_spatial",
+    morans_k: int = 8,
+    morans_i_threshold: float = 0.0,
+    alpha: float = 0.1,
+    spot_size: float = 30.0,
+):
+    """
+    Generate 5-panel spatial diagnostic plots for markers showing all SMM pipeline stages.
+
+    Pipeline: GMM(raw) -> Soft-scale(X * P(signal)) -> Smooth -> Z-score -> Moran's I
+
+    Creates a 5-panel figure per marker showing:
+    1. Raw expression
+    2. Signal probability P(signal | x) from GMM
+    3. Background-corrected (X * P(signal))
+    4. Smoothed + Z-scored values
+    5. Verdict with Moran's I and pass/fail status
+
+    Args:
+        marker_names: List of marker names to visualize
+        coords: Spatial coordinates (n_spots, 2)
+        output_dir: Directory to save output plots
+        discovery_result: ProfileDiscoveryResult with SMM data
+        prefix: Filename prefix for output plots
+        morans_k: Number of neighbors for Moran's I computation
+        morans_i_threshold: Threshold for passing Moran's I filter
+        alpha: Significance level for Moran's I p-value
+        spot_size: Size of spots in scatter plot
+    """
+    from model.utils import plot_marker_processing_stages
+
+    # Create output directory for spatial diagnostics
+    diag_dir = os.path.join(output_dir, "spatial_diagnostics")
+    os.makedirs(diag_dir, exist_ok=True)
+
+    # Check if SMM data is available
+    if not discovery_result.smm_applied or discovery_result.smm_raw_matrix is None:
+        logging.warning("SMM data not available in discovery_result, skipping visualization")
+        print("  Warning: SMM data not available, skipping spatial diagnostic plots")
+        return
+
+    # Get all marker names from the original data
+    all_markers = list(discovery_result.smm_snr_values.keys()) if discovery_result.smm_snr_values else []
+
+    for marker in marker_names:
+        if marker not in all_markers:
+            logging.warning(f"Marker {marker} not in SMM results, skipping visualization")
+            continue
+
+        # Get marker index
+        try:
+            m_idx = all_markers.index(marker)
+        except ValueError:
+            logging.warning(f"Marker {marker} index not found, skipping")
+            continue
+
+        # Extract data for this marker
+        raw_values = discovery_result.smm_raw_matrix[:, m_idx]
+        signal_prob = discovery_result.smm_signal_posteriors[:, m_idx]
+        corrected_values = discovery_result.smm_corrected_matrix[:, m_idx]
+        smoothed_values = discovery_result.smm_smoothed_matrix[:, m_idx]
+
+        # Z-score the smoothed values for Moran's I
+        zscore_values = (smoothed_values - smoothed_values.mean()) / (smoothed_values.std() + 1e-10)
+
+        # Compute Moran's I on Z-scored data
+        morans_i = compute_morans_i(zscore_values, coords, k=morans_k)
+
+        # Simple permutation test for p-value (quick approximation)
+        n_perm = 99
+        rng = np.random.default_rng(42)
+        null_i = np.zeros(n_perm)
+        for b in range(n_perm):
+            perm_z = rng.permutation(zscore_values)
+            null_i[b] = compute_morans_i(perm_z, coords, k=morans_k)
+        p_value = (1 + np.sum(null_i >= morans_i)) / (1 + n_perm)
+
+        # Determine if marker passed
+        passed = morans_i >= morans_i_threshold and p_value < alpha
+
+        # Get SNR and signal fraction for display
+        snr = discovery_result.smm_snr_values.get(marker)
+        signal_fraction = discovery_result.smm_signal_fractions.get(marker) if discovery_result.smm_signal_fractions else None
+
+        # Generate plot
+        safe_marker_name = marker.replace(' ', '_').replace('/', '_')
+        output_path = os.path.join(diag_dir, f"{prefix}_{safe_marker_name}_stages.png")
+
+        plot_marker_processing_stages(
+            marker_name=marker,
+            coords=coords,
+            raw_values=raw_values,
+            signal_prob=signal_prob,
+            corrected_values=corrected_values,
+            smoothed_values=smoothed_values,
+            zscore_values=zscore_values,
+            morans_i=morans_i,
+            p_value=p_value,
+            passed=passed,
+            output_path=output_path,
+            spot_size=spot_size,
+            snr=snr,
+            signal_fraction=signal_fraction,
+        )
+
+        status = "PASSED" if passed else "FILTERED"
+        print(f"  Saved: {output_path} (Moran's I={morans_i:.3f}, p={p_value:.3f}, {status})")
+
+
+# Representative GT markers for visualization (one per cell type)
+GT_MARKERS_FOR_VISUALIZATION = {
+    "Cancer Epithelial": "Cancer Epithelial_Protein_1",
+    "Normal Epithelial": "Normal Epithelial_Protein_1",
+    "CAFs": "CAFs_Protein_1",  # Fibroblasts
+    "T-cells": "T-cells_Protein_1",
+    "B-cells": "B-cells_Protein_1",
+}
+
+# Nonspecific markers for diagnostic visualization (to compare filtering behavior)
+# These should have low Moran's I and help calibrate filtering thresholds
+NONSPECIFIC_MARKERS_FOR_VISUALIZATION = [
+    "Nonspecific_Protein_1",
+    "Nonspecific_Protein_10",
+    "Nonspecific_Protein_25",
+    "Nonspecific_Protein_50",
+    "Nonspecific_Protein_75",
+]
+
 
 def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
     """
@@ -35,14 +234,28 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
         pd.DataFrame: DataFrame containing metrics
     """
     metrics = calculate_expression_metrics(ground_truth_dir, layer_dir, normalize="range", pass_number=pass_number)
-    
+
+    # Filter out special tracking keys (not metric dictionaries)
+    metric_keys = [k for k in metrics.keys() if not k.startswith('_')]
+
+    # Report spurious and missed profiles if any
+    spurious = metrics.get('_spurious_profiles', [])
+    missed = metrics.get('_missed_profiles', [])
+    if spurious:
+        print(f"  Spurious profiles (not in ground truth): {spurious}")
+    if missed:
+        print(f"  Missed profiles (not predicted): {missed}")
+
     # Check if all metrics are not None or Nan, if they are, print the celltype
-    for celltype, metric in metrics.items():
+    for celltype in metric_keys:
+        metric = metrics[celltype]
         if metric['RMSE'] is None or metric['NRMSE'] is None or metric['MAE'] is None or np.isnan(metric['RMSE']) or np.isnan(metric['NRMSE']) or np.isnan(metric['MAE']):
             print(f"Cell type {celltype} has None or NaN metrics")
 
     # Create DataFrame with metrics while excluding None or NaN values
-    
+    # Only use actual metric entries (not special keys)
+    metric_values_list = [metrics[k] for k in metric_keys]
+
     metrics_values = {
         'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
         'Metric': [
@@ -50,12 +263,12 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
             'Median NRMSE', 'Average MAE', 'Median MAE'
         ],
         'Value': [
-            np.nanmean([m['RMSE'] for m in metrics.values() if m['RMSE'] is not None]),
-            np.nanmedian([m['RMSE'] for m in metrics.values() if m['RMSE'] is not None]),
-            np.nanmean([m['NRMSE'] for m in metrics.values() if m['NRMSE'] is not None]),
-            np.nanmedian([m['NRMSE'] for m in metrics.values() if m['NRMSE'] is not None]),
-            np.nanmean([m['MAE'] for m in metrics.values() if m['MAE'] is not None]),
-            np.nanmedian([m['MAE'] for m in metrics.values() if m['MAE'] is not None])
+            np.nanmean([m['RMSE'] for m in metric_values_list if m['RMSE'] is not None]),
+            np.nanmedian([m['RMSE'] for m in metric_values_list if m['RMSE'] is not None]),
+            np.nanmean([m['NRMSE'] for m in metric_values_list if m['NRMSE'] is not None]),
+            np.nanmedian([m['NRMSE'] for m in metric_values_list if m['NRMSE'] is not None]),
+            np.nanmean([m['MAE'] for m in metric_values_list if m['MAE'] is not None]),
+            np.nanmedian([m['MAE'] for m in metric_values_list if m['MAE'] is not None])
         ]
     }
     return pd.DataFrame(metrics_values)
@@ -141,8 +354,96 @@ def main():
     parser.add_argument('--sample_prefix', type=str, default='Wu_rep', help='Prefix to filter sample files')
     parser.add_argument('--profiling_only', action='store_true', default=False, 
                         help='If set, only compute cell-type proportions (no gene expression deconvolution).')
-    parser.add_argument('--skip_pass2', action='store_true', default=False, 
+    parser.add_argument('--skip_pass2', action='store_true', default=False,
                         help='If set, skip pass 2 and only run pass 1.')
+    parser.add_argument('--auto-profiles', action='store_true', default=False,
+                        help='Use auto-discovered profiles instead of manual profiles')
+    parser.add_argument('--max-profile-size', type=int, default=2,
+                        help='Maximum markers per profile for auto-discovery (default: 2)')
+    parser.add_argument('--discovery-seed', type=int, default=1234,
+                        help='Random seed for profile discovery reproducibility')
+    # New robust auto-discovery parameters
+    parser.add_argument('--morans-k', type=str, default='3,5,8,12',
+                        help='Moran I k-neighbors, comma-separated for multi-scale (default: 3,5,8,12)')
+    parser.add_argument('--morans-i-threshold', type=float, default=0.1,
+                        help='Moran I threshold, stricter to filter noise (default: 0.1)')
+    parser.add_argument('--hierarchical', action='store_true', default=False,
+                        help='Enable hierarchical profile discovery for shared markers')
+    parser.add_argument('--model-selection', type=str, default='cv',
+                        choices=['cv', 'bic', 'greedy'],
+                        help='Model selection strategy (default: cv)')
+    parser.add_argument('--cv-folds', type=int, default=5,
+                        help='Number of CV folds for model selection (default: 5)')
+    parser.add_argument('--min-profiles', type=int, default=2,
+                        help='Minimum profiles before model selection stopping (default: 2)')
+    # NEW: Reconstruction-based discovery parameters
+    parser.add_argument('--selection-method', type=str, default='reconstruction',
+                        choices=['reconstruction', 'permutation', 'miqp', 'miqp_hierarchical'],
+                        help='Profile selection method (default: reconstruction)')
+    parser.add_argument('--min-reconstruction-improvement', type=float, default=0.05,
+                        help='Minimum reconstruction improvement to include profile (default: 0.05)')
+    parser.add_argument('--abundance-adaptive', action='store_true', default=True,
+                        help='Use abundance-adaptive marker classification (default: True)')
+    parser.add_argument('--no-abundance-adaptive', action='store_false', dest='abundance_adaptive',
+                        help='Disable abundance-adaptive marker classification')
+    parser.add_argument('--ubiquitous-cv-threshold', type=float, default=0.5,
+                        help='CV threshold for ubiquitous classification (default: 0.5)')
+    parser.add_argument('--rare-presence-threshold', type=float, default=0.10,
+                        help='Presence threshold for rare classification (default: 0.10)')
+    parser.add_argument('--redundancy-threshold', type=float, default=0.9,
+                        help='Correlation threshold for redundancy check (default: 0.9)')
+    parser.add_argument('--allow-overlap', type=str, default='auto',
+                        choices=['auto', 'true', 'false'],
+                        help='Allow overlapping markers: auto (detect), true (hierarchical), false (flat)')
+    # MIQP-specific parameters (only used when selection-method=miqp or miqp_hierarchical)
+    parser.add_argument('--miqp-lambda-spatial', type=float, default=0.1,
+                        help='Spatial penalty weight for MIQP (default: 0.1)')
+    parser.add_argument('--miqp-lambda-complexity', type=float, default=0.01,
+                        help='Profile count penalty for MIQP (default: 0.01)')
+    parser.add_argument('--miqp-time-limit', type=float, default=300.0,
+                        help='Time limit in seconds for MIQP solver (default: 300)')
+    parser.add_argument('--miqp-gap', type=float, default=0.01,
+                        help='Acceptable MIP optimality gap (default: 0.01)')
+    # Hierarchical MIQP parameters (only used when selection-method=miqp_hierarchical)
+    parser.add_argument('--miqp-lambda-overlap', type=float, default=0.5,
+                        help='Same-level overlap penalty for hierarchical MIQP (default: 0.5)')
+    parser.add_argument('--miqp-lambda-orphan', type=float, default=0.2,
+                        help='Orphan penalty for hierarchical MIQP (default: 0.2)')
+    parser.add_argument('--miqp-lambda-sparsity', type=float, default=0.3,
+                        help='Spot-level sparsity penalty for hierarchical MIQP (default: 0.3)')
+    parser.add_argument('--miqp-enforce-hierarchy', action='store_true', default=False,
+                        help='Use hard hierarchy constraints (default: soft penalty)')
+    parser.add_argument('--miqp-sparsity-aggregation', type=str, default='mean',
+                        choices=['mean', 'min', 'geometric'],
+                        help='Spot-profile fit aggregation method (default: mean)')
+    # NEW: Spatial Mixture Model (SMM) background correction parameters
+    parser.add_argument('--use-smm', action='store_true', default=False,
+                        help='Enable SMM background correction (default: False)')
+    parser.add_argument('--smm-k-neighbors', type=int, default=6,
+                        help='Number of neighbors for SMM spatial graph (default: 6)')
+    parser.add_argument('--smm-snr-threshold', type=float, default=1.5,
+                        help='Minimum SNR for marker to pass SMM filter (default: 1.5)')
+    parser.add_argument('--smm-min-signal-fraction', type=float, default=0.05,
+                        help='Minimum fraction of spots with signal (default: 0.05)')
+    parser.add_argument('--smm-max-signal-fraction', type=float, default=0.95,
+                        help='Maximum fraction of spots with signal (default: 0.95)')
+    parser.add_argument('--smm-beta-init', type=float, default=1.0,
+                        help='Initial spatial regularization for SMM (default: 1.0)')
+    parser.add_argument('--smm-max-iter', type=int, default=50,
+                        help='Maximum iterations for SMM EM algorithm (default: 50)')
+    # NEW: Spatial smoothing parameters (applied before SMM)
+    parser.add_argument('--smm-smoothing-sigma', type=float, default=1.5,
+                        help='Gaussian smoothing bandwidth for SMM preprocessing (default: 1.5)')
+    parser.add_argument('--smm-smoothing-k', type=int, default=6,
+                        help='Number of neighbors for spatial smoothing (default: 6)')
+    # NEW: Visualization parameters
+    parser.add_argument('--visualize-markers', action='store_true', default=False,
+                        help='Generate spatial diagnostic plots for GT markers (default: False)')
+    # NEW: Laplacian smoothing parameters for proportion optimization
+    parser.add_argument('--lambda-laplacian', type=float, default=0.1,
+                        help='Laplacian smoothing weight for spatial coherence (default: 0.1, 0 to disable)')
+    parser.add_argument('--laplacian-k', type=int, default=8,
+                        help='Number of neighbors for Laplacian graph (default: 8)')
     args = parser.parse_args()
 
     radius = args.radius
@@ -219,12 +520,9 @@ def main():
         # Initialize the model
         ##############################################################################
         
-        model = CitegeistModel(sample_name=sample_name, output_folder=output_folder, 
-                               simulation=True, 
+        model = CitegeistModel(sample_name=sample_name, output_folder=output_folder,
+                               simulation=True,
                                gene_expression_adata=adata_gex, antibody_capture_adata=adata_cite)
-        
-        # Load cell profile dictionary
-        model.load_cell_profile_dict(cell_type_profiles)
 
         model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1)
 
@@ -232,8 +530,202 @@ def main():
         model.preprocess_gex(target_sum=10000)
         model.preprocess_antibody()
 
-        # Register Gurobi license
-        model.register_gurobi("/ihome/crc/install/gurobi/gurobi1102/linux64/lic/gurobi.lic")
+        # Load or discover cell profiles
+        if args.auto_profiles:
+            # Get spatial coordinates for Moran's I filtering
+            coords = model.antibody_capture_adata.obsm.get('spatial', None)
+            if coords is None:
+                coords = model.gene_expression_adata.obsm.get('spatial', None)
+            if coords is None:
+                raise ValueError(
+                    "Spatial coordinates required for auto-profile discovery. "
+                    "Ensure obsm['spatial'] is populated in the AnnData object."
+                )
+
+            logging.info("Running auto profile discovery...")
+            # Parse morans_k from comma-separated string to list of ints
+            morans_k = [int(k.strip()) for k in args.morans_k.split(',')]
+            if len(morans_k) == 1:
+                morans_k = morans_k[0]  # Single int for backward compatibility
+
+            # Convert allow_overlap string to proper type
+            allow_overlap_arg = args.allow_overlap
+            if allow_overlap_arg == 'auto':
+                allow_overlap_value = 'auto'
+            elif allow_overlap_arg == 'true':
+                allow_overlap_value = True
+            else:
+                allow_overlap_value = False
+
+            discovery_result = integrate_with_model(
+                model,
+                max_k=args.max_profile_size,
+                seed=args.discovery_seed,
+                coords=coords,
+                # Robust auto-discovery parameters
+                morans_k=morans_k,
+                morans_i_threshold=args.morans_i_threshold,
+                hierarchical=args.hierarchical,
+                model_selection=args.model_selection,
+                cv_folds=args.cv_folds,
+                min_profiles=args.min_profiles,
+                # Reconstruction-based discovery parameters
+                selection_method=args.selection_method,
+                min_reconstruction_improvement=args.min_reconstruction_improvement,
+                use_abundance_adaptive=args.abundance_adaptive,
+                ubiquitous_cv_threshold=args.ubiquitous_cv_threshold,
+                rare_presence_threshold=args.rare_presence_threshold,
+                redundancy_threshold=args.redundancy_threshold,
+                allow_overlap=allow_overlap_value,
+                # MIQP-specific parameters
+                miqp_lambda_spatial=args.miqp_lambda_spatial,
+                miqp_lambda_complexity=args.miqp_lambda_complexity,
+                miqp_time_limit=args.miqp_time_limit,
+                miqp_gap=args.miqp_gap,
+                # Hierarchical MIQP parameters
+                miqp_lambda_overlap=args.miqp_lambda_overlap,
+                miqp_lambda_orphan=args.miqp_lambda_orphan,
+                miqp_lambda_sparsity=args.miqp_lambda_sparsity,
+                miqp_enforce_hierarchy=args.miqp_enforce_hierarchy,
+                miqp_sparsity_aggregation=args.miqp_sparsity_aggregation,
+                # SMM background correction parameters
+                use_smm=args.use_smm,
+                smm_k_neighbors=args.smm_k_neighbors,
+                smm_snr_threshold=args.smm_snr_threshold,
+                smm_min_signal_fraction=args.smm_min_signal_fraction,
+                smm_max_signal_fraction=args.smm_max_signal_fraction,
+                smm_beta_init=args.smm_beta_init,
+                smm_max_iter=args.smm_max_iter,
+                # Spatial smoothing parameters (applied before SMM)
+                smm_apply_smoothing=True,  # Always apply smoothing when SMM is enabled
+                smm_smoothing_sigma=args.smm_smoothing_sigma,
+                smm_smoothing_k=args.smm_smoothing_k,
+            )
+            logging.info(f"Discovered {len(discovery_result.profiles)} profiles: {list(discovery_result.profiles.keys())}")
+
+            # Report SMM marker filtering metrics (compare against ground truth markers)
+            if discovery_result.smm_applied:
+                # Extract all ground truth markers from cell_type_profiles
+                gt_markers = set()
+                for cell_type, marker_dict in cell_type_profiles.items():
+                    for marker_list in marker_dict.values():
+                        gt_markers.update(marker_list)
+
+                # Calculate how many GT markers were filtered vs retained
+                filtered_markers = set(discovery_result.smm_filtered_markers)
+                gt_markers_filtered = gt_markers & filtered_markers
+                gt_markers_retained = gt_markers - filtered_markers
+
+                # Count nonspecific markers (markers containing "Nonspecific")
+                nonspecific_filtered = sum(1 for m in filtered_markers if "Nonspecific" in m)
+                nonspecific_retained = sum(1 for m in (set(model.antibody_capture_adata.var_names) - filtered_markers) if "Nonspecific" in m)
+
+                print(f"\nSMM Marker Filtering Metrics:")
+                print(f"  SMM applied: True (β={discovery_result.smm_beta_learned:.3f})")
+                print(f"  Total markers filtered: {len(filtered_markers)}")
+                print(f"  Ground truth markers retained: {len(gt_markers_retained)}/{len(gt_markers)} ({100*len(gt_markers_retained)/len(gt_markers):.1f}%)")
+                print(f"  Ground truth markers LOST: {len(gt_markers_filtered)}/{len(gt_markers)} ({100*len(gt_markers_filtered)/len(gt_markers):.1f}%)")
+                if gt_markers_filtered:
+                    print(f"    Lost GT markers: {sorted(gt_markers_filtered)}")
+                print(f"  Nonspecific markers filtered: {nonspecific_filtered}")
+                print(f"  Nonspecific markers retained (PROBLEM): {nonspecific_retained}")
+
+                # Report SNR and signal fraction values for GT markers
+                if discovery_result.smm_snr_values:
+                    print(f"\n  SNR/Signal fraction for ground truth markers:")
+                    signal_fracs = discovery_result.smm_signal_fractions or {}
+                    for marker in sorted(gt_markers):
+                        snr = discovery_result.smm_snr_values.get(marker, None)
+                        sig_frac = signal_fracs.get(marker, None)
+                        status = "FILTERED" if marker in gt_markers_filtered else "retained"
+                        if snr is not None and sig_frac is not None:
+                            # Determine filter reason
+                            reasons = []
+                            if snr < args.smm_snr_threshold:
+                                reasons.append(f"SNR<{args.smm_snr_threshold}")
+                            if sig_frac < args.smm_min_signal_fraction:
+                                reasons.append(f"sig<{args.smm_min_signal_fraction}")
+                            if sig_frac > args.smm_max_signal_fraction:
+                                reasons.append(f"sig>{args.smm_max_signal_fraction}")
+                            reason_str = f" [{','.join(reasons)}]" if reasons and status == "FILTERED" else ""
+                            print(f"    {marker}: SNR={snr:.3f}, sig_frac={sig_frac:.3f} ({status}){reason_str}")
+                        elif snr is not None:
+                            print(f"    {marker}: SNR={snr:.3f} ({status})")
+                        else:
+                            print(f"    {marker}: not found in data")
+
+                # Report SNR, signal fraction, and Moran's I for sample nonspecific markers
+                print(f"\n  SNR/Signal fraction/Moran's I for sample NONSPECIFIC markers:")
+                all_markers = list(model.antibody_capture_adata.var_names)
+                nonspecific_sample = [m for m in NONSPECIFIC_MARKERS_FOR_VISUALIZATION if m in all_markers]
+
+                for marker in nonspecific_sample:
+                    snr = discovery_result.smm_snr_values.get(marker, None)
+                    sig_frac = signal_fracs.get(marker, None)
+                    status = "FILTERED" if marker in filtered_markers else "retained"
+
+                    # Compute Moran's I for this marker
+                    morans_i_val = np.nan
+                    if discovery_result.smm_smoothed_matrix is not None:
+                        try:
+                            m_idx = all_markers.index(marker)
+                            smoothed_vals = discovery_result.smm_smoothed_matrix[:, m_idx]
+                            zscore_vals = (smoothed_vals - smoothed_vals.mean()) / (smoothed_vals.std() + 1e-10)
+                            morans_i_val = compute_morans_i(zscore_vals, coords, k=8)
+                        except (ValueError, IndexError):
+                            pass
+
+                    if snr is not None and sig_frac is not None:
+                        print(f"    {marker}: SNR={snr:.3f}, sig_frac={sig_frac:.3f}, I={morans_i_val:.3f} ({status})")
+                    elif snr is not None:
+                        print(f"    {marker}: SNR={snr:.3f}, I={morans_i_val:.3f} ({status})")
+                    else:
+                        print(f"    {marker}: not found in SMM data")
+
+            # Visualize spatial patterns for GT markers (if enabled)
+            # New 5-panel plots showing: Raw -> P(signal) -> Corrected -> Z-score -> Verdict
+            if args.visualize_markers:
+                print("\nGenerating 5-panel spatial diagnostic plots for GT markers...")
+                gt_markers_to_viz = list(GT_MARKERS_FOR_VISUALIZATION.values())
+
+                visualize_marker_spatial_patterns(
+                    marker_names=gt_markers_to_viz,
+                    coords=coords,
+                    output_dir=output_folder,
+                    discovery_result=discovery_result,
+                    prefix=sample_name,
+                    morans_k=8,
+                    morans_i_threshold=args.morans_i_threshold,
+                    alpha=0.1,
+                    spot_size=30.0,
+                )
+
+                # Also visualize nonspecific markers for comparison
+                print("\nGenerating 5-panel spatial diagnostic plots for NONSPECIFIC markers...")
+                nonspecific_markers_to_viz = [
+                    m for m in NONSPECIFIC_MARKERS_FOR_VISUALIZATION
+                    if m in model.antibody_capture_adata.var_names
+                ]
+                if nonspecific_markers_to_viz:
+                    visualize_marker_spatial_patterns(
+                        marker_names=nonspecific_markers_to_viz,
+                        coords=coords,
+                        output_dir=output_folder,
+                        discovery_result=discovery_result,
+                        prefix=f"{sample_name}_nonspecific",
+                        morans_k=8,
+                        morans_i_threshold=args.morans_i_threshold,
+                        alpha=0.1,
+                        spot_size=30.0,
+                    )
+                print(f"Spatial diagnostic plots saved to: {os.path.join(output_folder, 'spatial_diagnostics')}")
+
+        else:
+            # Use manual cell_type_profiles (existing behavior)
+            model.load_cell_profile_dict(cell_type_profiles)
+
+        # Skip explicit Gurobi registration - module load sets GRB_LICENSE_FILE env var
+        # model.register_gurobi("/ihome/crc/install/gurobi/gurobi1102/linux64/lic/gurobi.lic")
 
         ##############################################################################
         # 1) Cell Proportion Inference
@@ -248,21 +740,18 @@ def main():
             alpha=alpha_elastic,
             max_workers=None,
             checkpoint_interval=100,
-            max_y_change=max_y_change
+            max_y_change=max_y_change,
+            validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
+            skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
+            # Laplacian smoothing parameters
+            lambda_laplacian=args.lambda_laplacian,
+            laplacian_k=args.laplacian_k,
         )
 
-        
         logging.info(f"Completed cell proportion inference for {sample_name}.")
 
-        # # Plot cell proportions (Append cell proportions) 
-        # model.append_proportions_to_adata()
-
-        # # Benchmarking Cell Proportions
+        # Benchmarking Cell Proportions
         st_folder = os.path.join(input_folder, "ST_sim")
-
-        # proportions_path = os.path.join(output_folder, f"{sample_name}_cell_prop_results.csv")
-        # test_spots_df = pd.read_csv(proportions_path, index_col=0).sort_index().sort_index(axis=1)
-
 
         spot_composition_df = pd.read_csv(os.path.join(st_folder, f"Wu_ST_{number}_prop.csv"), index_col=0).sort_index().sort_index(axis=1)
         spot_composition_df = spot_composition_df.iloc[:, :-2]
@@ -274,36 +763,112 @@ def main():
             return df.reindex(sorted(df.index, key=lambda x: int(x.split('_')[1]) if '_' in x else float('inf')))
 
         spot_composition_df = sort_spot_indices(spot_composition_df)
-        
+        gt_cell_types = list(cell_type_profiles.keys())
+
+        # If using auto-profiles, calculate discovery metrics and remap proportions
+        if args.auto_profiles:
+            # Calculate profile discovery accuracy metrics
+            discovery_metrics = benchmark_profile_discovery(
+                model.cell_profile_dict,  # Discovered profiles
+                cell_type_profiles,       # Ground truth profiles
+            )
+            logging.info(f"Profile Discovery Metrics: {discovery_metrics}")
+            print(f"\nProfile Discovery Metrics:")
+            print(f"  Profile Recovery Rate: {discovery_metrics['profile_recovery_rate']:.2%}")
+            print(f"  Marker Precision: {discovery_metrics['marker_precision']:.2%}")
+            print(f"  Marker Recall: {discovery_metrics['marker_recall']:.2%}")
+            print(f"  False Discovery Rate: {discovery_metrics['false_discovery_rate']:.2%}")
+            print(f"  Matched: {discovery_metrics['n_matched']}/{discovery_metrics['n_ground_truth']} cell types")
+            if discovery_metrics['matched_pairs']:
+                print(f"  Matched pairs: {discovery_metrics['matched_pairs']}")
+            if discovery_metrics['missing_ground_truth']:
+                print(f"  Missing GT types: {discovery_metrics['missing_ground_truth']}")
+
+            # Save profile discovery metrics
+            discovery_metrics_df = pd.DataFrame([{
+                k: str(v) if isinstance(v, list) else v
+                for k, v in discovery_metrics.items()
+            }])
+            discovery_metrics_path = os.path.join(
+                output_folder,
+                f'{sample_name}_profile_discovery_metrics_{suffix}.csv'
+            )
+            discovery_metrics_df.to_csv(discovery_metrics_path, index=False)
+            logging.info(f"Saved profile discovery metrics to {discovery_metrics_path}")
+
+            # Remap discovered profile names to ground truth cell type names
+            match_result = match_profiles_to_ground_truth(
+                model.cell_profile_dict,
+                cell_type_profiles,
+            )
+
+            # Remap proportion DataFrames
+            global_cell_type_proportions_df = create_remapped_proportions(
+                global_cell_type_proportions_df,
+                match_result,
+                gt_cell_types,
+            )
+            finetuned_cell_type_proportions_df = create_remapped_proportions(
+                finetuned_cell_type_proportions_df,
+                match_result,
+                gt_cell_types,
+            )
+            logging.info(f"Remapped proportions to GT cell types. Columns: {list(global_cell_type_proportions_df.columns)}")
+
         results_dict = {
             'global': global_cell_type_proportions_df,
             'finetune': finetuned_cell_type_proportions_df
         }
 
         for key, test_spots_df in results_dict.items():
-            # Sort test spots numerically
-            test_spots_df = sort_spot_indices(test_spots_df)
+            # Sort both DataFrames: rows numerically by spot number, columns alphabetically
+            test_spots_df = sort_spot_indices(test_spots_df).sort_index(axis=1)
+            spot_composition_df = sort_spot_indices(spot_composition_df).sort_index(axis=1)
 
-            # Sort both DataFrames by index and ensure indices match
-            test_spots_df = test_spots_df.sort_index()
-            spot_composition_df = spot_composition_df.sort_index()
+            # Normalize column names (strip whitespace, convert to string)
+            test_spots_df.columns = pd.Index([str(c).strip() for c in test_spots_df.columns])
+            spot_composition_df.columns = pd.Index([str(c).strip() for c in spot_composition_df.columns])
 
             print(test_spots_df.index)
             print(spot_composition_df.index)
 
             # Verify that indices match
-            if not np.array_equal(test_spots_df.index, spot_composition_df.index):
+            if not np.array_equal(test_spots_df.index.astype(str), spot_composition_df.index.astype(str)):
                 logging.warning(f"test_spots_df indices: {test_spots_df.index}, spot_composition_df indices: {spot_composition_df.index}")
                 raise ValueError("ERROR: The row indices in the input CSV files do not match or are not in the same order!")
 
-            # Check if columns match
-            if not np.array_equal(test_spots_df.columns, spot_composition_df.columns):
-                logging.warning(f"test_spots_df columns: {test_spots_df.columns}, spot_composition_df columns: {spot_composition_df.columns}")
-                raise ValueError("ERROR: The column names in the input CSV files do not match or are not in the same order!")
+            # For auto-profiles mode, we've already remapped columns, so align with GT columns
+            if args.auto_profiles:
+                # Get common columns (GT cell types that were matched)
+                common_cols = [c for c in spot_composition_df.columns if c in test_spots_df.columns]
+                if not common_cols:
+                    logging.error("No common columns between predicted and ground truth after remapping!")
+                    continue
+                # Subset both DataFrames to common columns
+                test_spots_df = test_spots_df[common_cols]
+                spot_composition_df_subset = spot_composition_df[common_cols]
+            else:
+                # For manual profiles, model adds "Unknown" cell type - exclude it for benchmark comparison
+                test_cols = set(test_spots_df.columns) - {"Unknown"}
+                gt_cols = set(spot_composition_df.columns)
+                common_cols = sorted(test_cols & gt_cols)
+
+                # Check if GT columns are covered (ignore "Unknown" from predictions)
+                missing_in_test = gt_cols - test_cols
+                if missing_in_test:
+                    print(f"Column mismatch - Missing in predictions: {missing_in_test}")
+                    print(f"test_spots_df columns ({len(test_spots_df.columns)}): {list(test_spots_df.columns)}")
+                    print(f"spot_composition_df columns ({len(spot_composition_df.columns)}): {list(spot_composition_df.columns)}")
+                    logging.warning(f"Column mismatch - Missing in predictions: {missing_in_test}")
+                    raise ValueError("ERROR: The column names in the input CSV files do not match!")
+
+                # Reorder both to common sorted order (excludes "Unknown" from predictions)
+                test_spots_df = test_spots_df[common_cols]
+                spot_composition_df_subset = spot_composition_df[common_cols]
 
             # Convert DataFrames to numpy arrays
             test_spots_metadata_mtrx = test_spots_df.values
-            spot_composition_mtrx = spot_composition_df.values
+            spot_composition_mtrx = spot_composition_df_subset.values
 
 
             column_names = test_spots_df.columns.tolist()

@@ -208,11 +208,22 @@ class CitegeistModel:
     def load_cell_profile_dict(self, cell_profile_dict):
         """
         Load and validate the cell profile dictionary.
+        
+        Automatically adds an "Unknown" cell type if not present to capture
+        uncharacterized cell populations.
 
         Args:
             cell_profile_dict (dict): Dictionary of cell type profiles.
         """
         if validate_cell_profile_dict(cell_profile_dict):
+            # Automatically add Unknown cell type if not present
+            if "Unknown" not in cell_profile_dict:
+                # Add Unknown as the last entry with empty markers
+                cell_profile_dict["Unknown"] = {"Major": []}
+                logging.info("✓ Automatically added 'Unknown' cell type to capture uncharacterized populations")
+            else:
+                logging.info("'Unknown' cell type already present in cell profile dictionary")
+            
             self.cell_profile_dict = cell_profile_dict
         else:
             raise ValueError("Invalid cell_profile_dict format.")
@@ -381,6 +392,14 @@ class CitegeistModel:
         max_y_change=0.4,
         max_workers=None,
         checkpoint_interval=100,
+        unknown_threshold=0.05,
+        min_celltype_threshold=0.01,
+        redundancy_threshold=0.1,
+        validation_warn_only=False,
+        skip_finetuning=False,
+        # Laplacian smoothing parameters
+        lambda_laplacian=0.1,
+        laplacian_k=8,
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -393,6 +412,12 @@ class CitegeistModel:
             alpha (float): L1-L2 tradeoff factor (0 = L2, 1 = L1)
             max_workers (int, optional): Maximum number of parallel workers for finetuning
             checkpoint_interval (int): Number of spots between checkpoints during finetuning
+            unknown_threshold (float): Maximum allowed mean proportion for Unknown cell type (default: 0.05 = 5%)
+            min_celltype_threshold (float): Minimum required mean proportion for defined cell types (default: 0.01 = 1%)
+            redundancy_threshold (float): Maximum allowed fraction of redundant cell types (default: 0.1 = 10%)
+            skip_finetuning (bool): If True, skip the finetuning step and return global proportions only
+            lambda_laplacian (float): Weight for Laplacian spatial smoothing (default: 0.1, 0 to disable)
+            laplacian_k (int): Number of neighbors for Laplacian graph (default: 8)
         """
 
         if radius is None:
@@ -408,39 +433,78 @@ class CitegeistModel:
             self.antibody_capture_adata, self.cell_profile_dict
         )
 
-        Y_values, beta_values = optimize_cell_proportions(profile_based_antibody_data, cell_type_names)
+        # Extract spatial coordinates for Laplacian smoothing
+        coords = None
+        if lambda_laplacian > 0:
+            coords = self.antibody_capture_adata.obsm.get('spatial', None)
+            if coords is None and self.gene_expression_adata is not None:
+                coords = self.gene_expression_adata.obsm.get('spatial', None)
+            if coords is not None:
+                logging.info(f"Using Laplacian smoothing with lambda={lambda_laplacian}, k={laplacian_k}")
+            else:
+                logging.warning("No spatial coordinates found for Laplacian smoothing - disabling")
+                lambda_laplacian = 0
 
-        # Create finetuning output directory
-        finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+        try:
+            logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
+                        f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
 
-        os.makedirs(finetune_output_dir, exist_ok=True)
-
-        if self.antibody_capture_adata is None:
-            raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
-
-        Y_prev, beta_prev = finetune_cell_proportions(
-            profile_based_antibody_data,
-            cell_type_names,
-            Y_values,
-            beta_values,
-            self.antibody_capture_adata,
-            radius=radius,
-            max_workers=max_workers,
-            checkpoint_interval=checkpoint_interval,
-            output_dir=finetune_output_dir,
-            rerun=True,
-            beta_vary=True,
-            tolerance=tolerance,
-            max_iterations=max_iterations,
-            lambda_reg=lambda_reg,
-            alpha=alpha,
-            max_y_change=max_y_change,
-        )
+            Y_values, beta_values = optimize_cell_proportions(
+                profile_based_antibody_data,
+                cell_type_names,
+                unknown_threshold=unknown_threshold,
+                min_celltype_threshold=min_celltype_threshold,
+                redundancy_threshold=redundancy_threshold,
+                warn_only=validation_warn_only,
+                # Laplacian smoothing parameters
+                lambda_laplacian=lambda_laplacian,
+                coords=coords,
+                laplacian_k=laplacian_k,
+            )
+        except ValueError as e:
+            # Re-raise validation errors with sample context
+            error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg) from e
 
         spot_names = self.antibody_capture_adata.obs_names
 
-        global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-        finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+        # Optionally skip finetuning (useful for auto-profile discovery benchmarks)
+        if skip_finetuning:
+            logging.info("Skipping finetuning step (skip_finetuning=True)")
+            global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+            # Return global proportions for both when skipping finetuning
+            finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
+        else:
+            # Create finetuning output directory
+            finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+
+            os.makedirs(finetune_output_dir, exist_ok=True)
+
+            if self.antibody_capture_adata is None:
+                raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+
+            Y_prev, beta_prev = finetune_cell_proportions(
+                profile_based_antibody_data,
+                cell_type_names,
+                Y_values,
+                beta_values,
+                self.antibody_capture_adata,
+                radius=radius,
+                max_workers=max_workers,
+                checkpoint_interval=checkpoint_interval,
+                output_dir=finetune_output_dir,
+                rerun=True,
+                beta_vary=True,
+                tolerance=tolerance,
+                max_iterations=max_iterations,
+                lambda_reg=lambda_reg,
+                alpha=alpha,
+                max_y_change=max_y_change,
+            )
+
+            global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+            finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
 
         global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
         finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
@@ -690,10 +754,12 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
 
+        # Use ::: as delimiter to avoid conflicts with underscores in cell type names
+        # (e.g., auto-discovered profiles like "Cancer Epithelial_Protein_1")
         for i in range(N):
             spot_name = self.gene_expression_adata.obs_names[i]  # Use actual spot names from AnnData
             for cell_type in cell_type_names:
-                spot_celltype_indices.append(f"{spot_name}_{cell_type}")
+                spot_celltype_indices.append(f"{spot_name}:::{cell_type}")
 
         gene_names = self.gene_expression_adata.var_names
         nan_matrix = np.full((T, M), np.nan)
@@ -769,9 +835,40 @@ class CitegeistModel:
 
         # Step 2: Reset the index to extract 'Spot' and 'CellType'
         df = df.reset_index()
-        df[["Spot", "CellType"]] = df["index"].str.rsplit("_", n=1, expand=True)
+
+        # Check which delimiter format is used (new ::: or legacy _)
+        sample_index = df["index"].iloc[0]
+        if ":::" in sample_index:
+            # New format: spot_1:::CellType
+            df[["Spot", "CellType"]] = df["index"].str.split(":::", n=1, expand=True)
+            print("Spot and CellType successfully split (using ::: delimiter).")
+        else:
+            # Legacy format: spot_1_CellType - need to match against known cell types
+            # Get cell type names from the dictionary for parsing
+            if self.cell_profile_dict is None:
+                raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
+            known_cell_types = list(self.cell_profile_dict.keys())
+
+            # Parse each index by finding which cell type suffix matches
+            spots = []
+            cell_types = []
+            for idx_val in df["index"]:
+                matched = False
+                for ct in known_cell_types:
+                    suffix = f"_{ct}"
+                    if idx_val.endswith(suffix):
+                        spots.append(idx_val[:-len(suffix)])
+                        cell_types.append(ct)
+                        matched = True
+                        break
+                if not matched:
+                    raise ValueError(f"Could not parse index '{idx_val}' - no matching cell type found in {known_cell_types}")
+
+            df["Spot"] = spots
+            df["CellType"] = cell_types
+            print("Spot and CellType successfully split (using legacy _ delimiter with cell type matching).")
+
         df = df.drop(columns=["index"])
-        print("Spot and CellType successfully split.")
 
         # Debug print spot names
         print("\nSpot name formats:")
