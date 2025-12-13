@@ -294,12 +294,16 @@ def discover_profiles(
     smm_filtered_markers = []
     original_marker_names = list(marker_names)  # Keep original for tracking
 
+    # Keep RAW data for Moran's I filtering (smoothing induces artificial correlation)
+    X_raw = X.copy() if hasattr(X, 'copy') else np.array(X)
+
     # ========================================================================
     # TIER -1: Spatial Mixture Model (SMM) Background Correction
     # ========================================================================
     # Pipeline: GMM on RAW data -> Per-spot soft-scale correction -> Smoothing
     # All markers proceed through the pipeline (no pre-filtering by SNR).
     # Filtering decisions are made downstream based on Moran's I.
+    # IMPORTANT: Moran's I is computed on RAW data to avoid artificial correlation
     if use_smm and coords is not None:
         from .background_correction import fit_spatial_mixture_model
 
@@ -322,8 +326,8 @@ def discover_profiles(
             verbose=verbose,
         )
 
-        # Use the SMOOTHED corrected matrix for downstream analysis
-        # All markers proceed - no SNR-based filtering
+        # Use SMOOTHED corrected matrix for profile optimization (deconvolution)
+        # But keep X_raw for Moran's I filtering (to avoid artificial correlation from smoothing)
         X = smm_result.smoothed_matrix
         snr_weights = smm_result.snr_values
 
@@ -339,7 +343,7 @@ def discover_profiles(
                 sig_frac = signal_fracs.get(m_name, 0)
                 logger.debug(f"  {m_name}: SNR={snr:.2f}, sig_frac={sig_frac:.2f}")
 
-    # Standardize markers
+    # Standardize markers for profile optimization (uses smoothed X if SMM applied)
     Z, valid_mask = _standardize_markers(X, robust=robust_zscore)
     valid_indices = np.where(valid_mask)[0]
     valid_names = [marker_names[i] for i in valid_indices]
@@ -350,12 +354,17 @@ def discover_profiles(
 
     Z_valid = Z[:, valid_mask]
 
+    # Standardize RAW markers for Moran's I filtering (avoids artificial correlation from smoothing)
+    Z_raw, _ = _standardize_markers(X_raw, robust=robust_zscore)
+    Z_raw_valid = Z_raw[:, valid_mask]
+
     # UPFRONT marker filtering: identify significant markers using abundance-adaptive detection
     # This ensures only markers with real signal can participate in profiles
     # Tier 0 (abundance-adaptive) catches ubiquitous and rare markers
     # Tiers 1-3 catch spatially-structured markers at different scales
+    # IMPORTANT: Uses RAW Z-scores for Moran's I to avoid smoothing-induced correlation
     eligible_markers = _identify_significant_single_markers(
-        Z_valid,
+        Z_raw_valid,  # Use RAW data for filtering to avoid smoothing artifacts
         np.ones(len(valid_indices)),  # uniform beta for initial screening
         rng,
         n_perm,
@@ -2209,17 +2218,24 @@ def _identify_significant_single_markers(
         )
 
     # =========================================================================
-    # TIER 1: Global Spatial (Moran's I)
+    # TIER 1: Global Spatial (Moran's I) + Kurtosis Gate
     # =========================================================================
     # Skip markers that already passed Tier 0
     markers_passed_tier0 = markers_passed_tier0_ubiq | markers_passed_tier0_rare
     markers_for_tier1 = set(range(n_markers)) - markers_passed_tier0
+
+    # Pre-compute kurtosis for all markers (used as universal gate)
+    # Real cell type markers have peaked distributions (high kurtosis)
+    # Nonspecific/noise markers have near-normal distributions (low kurtosis)
+    marker_kurtosis = np.array([scipy_kurtosis(Z[:, m], fisher=True) for m in range(n_markers)])
+    kurtosis_threshold = 2.0  # Excess kurtosis > 2 indicates peaked distribution
 
     if coords is not None and markers_for_tier1:
         multiscale_results = _compute_morans_i_multiscale(
             Z, coords, k_scales, rng, n_perm
         )
 
+        markers_failed_kurtosis = set()
         for m in markers_for_tier1:
             passed = False
             best_I = -np.inf
@@ -2240,12 +2256,27 @@ def _identify_significant_single_markers(
                     break
 
             if passed:
-                significant.append(m)
-                markers_passed_tier1.add(m)
-                logger.debug(
-                    f"Marker {m} passed Tier 1 (Global Moran's I) at k={best_k}: "
-                    f"I={best_I:.3f}, p<{alpha}"
-                )
+                # ADDITIONAL GATE: Require kurtosis > threshold
+                # This filters out spatially correlated noise (high Moran's I but flat distribution)
+                if marker_kurtosis[m] > kurtosis_threshold:
+                    significant.append(m)
+                    markers_passed_tier1.add(m)
+                    logger.debug(
+                        f"Marker {m} passed Tier 1 (Global Moran's I) at k={best_k}: "
+                        f"I={best_I:.3f}, kurtosis={marker_kurtosis[m]:.2f}, p<{alpha}"
+                    )
+                else:
+                    markers_failed_kurtosis.add(m)
+                    logger.debug(
+                        f"Marker {m} FAILED Tier 1 kurtosis gate: I={best_I:.3f} OK but "
+                        f"kurtosis={marker_kurtosis[m]:.2f} < {kurtosis_threshold}"
+                    )
+
+        if markers_failed_kurtosis:
+            logger.info(
+                f"Tier 1 kurtosis gate filtered {len(markers_failed_kurtosis)} markers with "
+                f"high Moran's I but low kurtosis (likely spatially correlated noise)"
+            )
 
         logger.info(
             f"Tier 1 (Global Moran's I): {len(markers_passed_tier1)}/{len(markers_for_tier1)} "
