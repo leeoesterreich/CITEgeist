@@ -131,7 +131,7 @@ def discover_profiles(
     use_abundance_adaptive: bool = True,
     ubiquitous_cv_threshold: float = 0.5,
     ubiquitous_presence_threshold: float = 0.7,
-    rare_presence_threshold: float = 0.10,
+    rare_presence_threshold: float = 0.15,
     rare_intensity_factor: float = 2.0,
     # NEW: Profile selection method
     selection_method: str = "reconstruction",
@@ -1463,7 +1463,7 @@ def _classify_marker_abundance(
     marker_values: NDArray[np.floating],
     ubiquitous_cv_threshold: float = 0.5,
     ubiquitous_presence_threshold: float = 0.7,
-    rare_presence_threshold: float = 0.10,
+    rare_presence_threshold: float = 0.15,
     rare_intensity_factor: float = 2.0,
 ) -> str:
     """
@@ -2086,7 +2086,7 @@ def _identify_significant_single_markers(
     use_abundance_adaptive: bool = True,
     ubiquitous_cv_threshold: float = 0.5,
     ubiquitous_presence_threshold: float = 0.7,
-    rare_presence_threshold: float = 0.10,
+    rare_presence_threshold: float = 0.15,
     rare_intensity_factor: float = 2.0,
 ) -> List[int]:
     """

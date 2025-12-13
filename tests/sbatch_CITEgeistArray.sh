@@ -48,7 +48,9 @@ SELECTION_METHOD="miqp_hierarchical"  # Options: reconstruction, permutation, mi
 MIN_RECON_IMPROVEMENT=0.05         # Minimum reconstruction improvement to include profile
 ABUNDANCE_ADAPTIVE="--abundance-adaptive"  # Enable abundance-adaptive marker classification
 UBIQUITOUS_CV_THRESHOLD=0.5        # CV threshold for ubiquitous classification
+UBIQUITOUS_PRESENCE_THRESHOLD=0.7  # Presence fraction threshold for ubiquitous classification
 RARE_PRESENCE_THRESHOLD=0.15       # Presence threshold for rare classification (high_frac < this)
+RARE_INTENSITY_FACTOR=2.0          # Intensity factor for rare classification (max > factor*mean)
 REDUNDANCY_THRESHOLD=0.7           # Correlation threshold for redundancy check (LOWERED from 0.9)
 
 # NEW: MIQP-specific parameters (only used when SELECTION_METHOD="miqp" or "miqp_hierarchical")
@@ -137,7 +139,9 @@ if [ "$PROFILE_MODE" == "auto" ]; then
     CMD="$CMD --min-reconstruction-improvement $MIN_RECON_IMPROVEMENT"
     CMD="$CMD $ABUNDANCE_ADAPTIVE"
     CMD="$CMD --ubiquitous-cv-threshold $UBIQUITOUS_CV_THRESHOLD"
+    CMD="$CMD --ubiquitous-presence-threshold $UBIQUITOUS_PRESENCE_THRESHOLD"
     CMD="$CMD --rare-presence-threshold $RARE_PRESENCE_THRESHOLD"
+    CMD="$CMD --rare-intensity-factor $RARE_INTENSITY_FACTOR"
     CMD="$CMD --redundancy-threshold $REDUNDANCY_THRESHOLD"
     # MIQP-specific parameters (only applied when selection-method=miqp or miqp_hierarchical)
     CMD="$CMD --miqp-lambda-spatial $MIQP_LAMBDA_SPATIAL"
@@ -175,6 +179,11 @@ if [ "$PROFILE_MODE" == "auto" ]; then
     echo "  - selection_method=$SELECTION_METHOD"
     echo "  - min_recon_improvement=$MIN_RECON_IMPROVEMENT"
     echo "  - abundance_adaptive=true"
+    echo "  - ubiquitous_cv_threshold=$UBIQUITOUS_CV_THRESHOLD"
+    echo "  - ubiquitous_presence_threshold=$UBIQUITOUS_PRESENCE_THRESHOLD"
+    echo "  - rare_presence_threshold=$RARE_PRESENCE_THRESHOLD"
+    echo "  - rare_intensity_factor=$RARE_INTENSITY_FACTOR"
+    echo "  - redundancy_threshold=$REDUNDANCY_THRESHOLD"
     echo "  - miqp_lambda_spatial=$MIQP_LAMBDA_SPATIAL"
     echo "  - miqp_lambda_complexity=$MIQP_LAMBDA_COMPLEXITY"
     echo "  - miqp_time_limit=$MIQP_TIME_LIMIT"

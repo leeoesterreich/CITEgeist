@@ -388,8 +388,12 @@ def main():
                         help='Disable abundance-adaptive marker classification')
     parser.add_argument('--ubiquitous-cv-threshold', type=float, default=0.5,
                         help='CV threshold for ubiquitous classification (default: 0.5)')
-    parser.add_argument('--rare-presence-threshold', type=float, default=0.10,
-                        help='Presence threshold for rare classification (default: 0.10)')
+    parser.add_argument('--ubiquitous-presence-threshold', type=float, default=0.7,
+                        help='Presence fraction threshold for ubiquitous classification (default: 0.7)')
+    parser.add_argument('--rare-presence-threshold', type=float, default=0.15,
+                        help='Presence threshold for rare classification (high_frac < this, default: 0.15)')
+    parser.add_argument('--rare-intensity-factor', type=float, default=2.0,
+                        help='Intensity factor for rare classification (max > factor*mean, default: 2.0)')
     parser.add_argument('--redundancy-threshold', type=float, default=0.9,
                         help='Correlation threshold for redundancy check (default: 0.9)')
     parser.add_argument('--allow-overlap', type=str, default='auto',
@@ -574,7 +578,9 @@ def main():
                 min_reconstruction_improvement=args.min_reconstruction_improvement,
                 use_abundance_adaptive=args.abundance_adaptive,
                 ubiquitous_cv_threshold=args.ubiquitous_cv_threshold,
+                ubiquitous_presence_threshold=args.ubiquitous_presence_threshold,
                 rare_presence_threshold=args.rare_presence_threshold,
+                rare_intensity_factor=args.rare_intensity_factor,
                 redundancy_threshold=args.redundancy_threshold,
                 allow_overlap=allow_overlap_value,
                 # MIQP-specific parameters
