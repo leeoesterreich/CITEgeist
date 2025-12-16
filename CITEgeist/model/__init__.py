@@ -17,6 +17,9 @@ from .spatial_colocalization import (
     MarkerPairColocalization,
     ColocalizationResult,
     analyze_marker_colocalization,
+    LineageDendrogram,
+    ProfileDiscoveryResult,
+    discover_profiles,
 )
 
 __all__ = [
@@ -39,4 +42,8 @@ __all__ = [
     "MarkerPairColocalization",
     "ColocalizationResult",
     "analyze_marker_colocalization",
+    # Profile discovery
+    "LineageDendrogram",
+    "ProfileDiscoveryResult",
+    "discover_profiles",
 ]
