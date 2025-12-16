@@ -254,6 +254,83 @@ Benchmarking framework in `Benchmarking/` directory:
 - **CITE-seq/antibody capture**: Spatially resolved protein measurements
 - **Data format**: AnnData objects (.h5ad files)
 
+### Real Patient Data vs Simulated Data Loading
+
+**CRITICAL DISTINCTION**: Real patient data and simulated data are loaded differently.
+
+#### Real Patient Data (from 10x SpaceRanger)
+
+Uses a **combined AnnData object** loaded from SpaceRanger outputs, then split:
+
+```python
+import squidpy as sq
+from model import CitegeistModel
+
+# Load from SpaceRanger outs/ folder (contains both GEX and antibody data)
+adata = sq.read.visium(
+    path_to_visium_folder,  # e.g., "/path/to/sample/outs/"
+    counts_file='filtered_feature_bc_matrix.h5',
+    load_images=True,
+    gex_only=False  # CRITICAL: Must be False to load antibody data too
+)
+
+# Initialize model with combined adata
+model = CitegeistModel(sample_name="HCC22-088-P1-S2", adata=adata, output_folder='output')
+
+# REQUIRED: Split into separate GEX and antibody AnnData objects
+model.split_adata()  # Splits by feature_types column
+
+# Then continue with preprocessing...
+model.preprocess_gex()
+model.preprocess_antibody()
+```
+
+**Key notes for real patient data:**
+- Antibody names have "-1" suffix (e.g., "EPCAM-1", "CD68-1", "CD3E-1")
+- Data directory: `/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/`
+- `min_counts=100` for high-quality biopsy samples, `min_counts=25` for surgical samples
+
+#### Simulated Data (pre-separated files)
+
+Uses **pre-separated** gene expression and antibody AnnData objects:
+
+```python
+import scanpy as sc
+from model import CitegeistModel
+
+# Load two separate h5ad files
+adata_gex = sc.read_h5ad("h5ad_objects/Wu_rep_1_GEX.h5ad")
+adata_cite = sc.read_h5ad("h5ad_objects/Wu_rep_1_CITE.h5ad")
+
+# Initialize with simulation=True flag
+model = CitegeistModel(
+    sample_name="Wu_rep_1",
+    output_folder='output',
+    simulation=True,  # CRITICAL: Must be True for simulated data
+    gene_expression_adata=adata_gex,
+    antibody_capture_adata=adata_cite
+)
+
+# NO split_adata() needed - data is already separate
+model.preprocess_gex()
+model.preprocess_antibody()
+```
+
+**Key notes for simulated data:**
+- Location: `replicates/high_seg/h5ad_objects/Wu_rep_X_CITE.h5ad` and `Wu_rep_X_GEX.h5ad`
+- Marker names don't have "-1" suffix (e.g., "B-cells_Protein_1", "T-cells_Protein_1")
+- Ground truth: 18 cell-type specific proteins vs 82 "Nonspecific_Protein_X" markers
+
+#### Quick Reference Table
+
+| Aspect | Real Patient Data | Simulated Data |
+|--------|------------------|----------------|
+| **Data Source** | `sq.read.visium()` from SpaceRanger | Separate `_GEX.h5ad` and `_CITE.h5ad` |
+| **gex_only** | `False` | N/A |
+| **split_adata()** | **Required** | Not needed |
+| **simulation flag** | `False` (default) | `True` |
+| **Antibody suffix** | "-1" (e.g., "CD68-1") | None (e.g., "B-cells_Protein_1") |
+
 ### AnnData Structure Expectations
 ```python
 adata.X                    # Gene expression matrix

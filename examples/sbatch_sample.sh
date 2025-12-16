@@ -12,12 +12,12 @@
 #SBATCH --array=1-14
 
 # Activate conda environment
-source /bgfs/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/
+source /ix1/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/
 echo "Activated conda environment"
 
 
 # CHANGE THIS FOR REPRODUCIBILITY ON YOUR OWN COMPUTER
-DATA_FOLDER="/bgfs/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files"
+DATA_FOLDER="/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files"
 
 
 # Load Gurobi module
@@ -25,7 +25,7 @@ module load gurobi/11.0.2
 echo "Loaded gurobi module"
 
 # Change to working directory
-cd /bgfs/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
+cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 echo "Changed to working directory"
 
 # Get the path for this array job
