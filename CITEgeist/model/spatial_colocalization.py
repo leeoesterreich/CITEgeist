@@ -579,6 +579,157 @@ class ProfileDiscoveryResult:
         )
 
 
+def _apply_fdr_correction(
+    pairs: List[MarkerPairColocalization],
+    alpha: float = 0.01,
+) -> Tuple[List[MarkerPairColocalization], NDArray[np.bool_]]:
+    """
+    Apply Benjamini-Hochberg FDR correction to p-values.
+
+    Args:
+        pairs: List of marker pair colocalization results.
+        alpha: FDR threshold (default: 0.01 for q < 1%).
+
+    Returns:
+        Tuple of (filtered pairs that pass FDR, boolean mask of significance).
+    """
+    if len(pairs) == 0:
+        return [], np.array([], dtype=bool)
+
+    pvalues = np.array([p.neighbor_enrichment_pvalue for p in pairs])
+
+    # Benjamini-Hochberg procedure
+    n = len(pvalues)
+    sorted_indices = np.argsort(pvalues)
+    sorted_pvalues = pvalues[sorted_indices]
+
+    # BH critical values: (rank / n) * alpha
+    bh_critical = (np.arange(1, n + 1) / n) * alpha
+
+    # Find largest k where p_(k) <= (k/n) * alpha
+    below_threshold = sorted_pvalues <= bh_critical
+    if not np.any(below_threshold):
+        # No discoveries
+        return [], np.zeros(n, dtype=bool)
+
+    # All indices up to and including the largest k pass
+    max_k = np.max(np.where(below_threshold)[0])
+    significant_sorted_indices = sorted_indices[:max_k + 1]
+
+    # Create boolean mask in original order
+    is_significant = np.zeros(n, dtype=bool)
+    is_significant[significant_sorted_indices] = True
+
+    filtered_pairs = [p for p, sig in zip(pairs, is_significant) if sig]
+
+    return filtered_pairs, is_significant
+
+
+def _apply_mutual_topk(
+    pairs: List[MarkerPairColocalization],
+    k: int = 3,
+    specificity: Optional[Dict[str, float]] = None,
+) -> List[MarkerPairColocalization]:
+    """
+    Apply mutual top-k sparsification to edges.
+
+    For each marker, keep only its top-k partners by colocalization score.
+    Then keep an edge only if BOTH markers rank each other in their top-k.
+
+    This prevents the "one giant component" collapse by limiting hub markers.
+
+    Args:
+        pairs: List of marker pair colocalization results.
+        k: Number of top partners to keep per marker (default: 3).
+        specificity: Optional dict mapping marker names to specificity scores [0,1].
+            If provided, effective score = score * sqrt(s_a * s_b), which
+            downweights edges involving broad/ubiquitous markers.
+
+    Returns:
+        Filtered list of pairs that pass mutual top-k criterion.
+    """
+    if len(pairs) == 0 or k <= 0:
+        return pairs
+
+    # Build marker -> [(partner, effective_score, pair)] mapping
+    marker_edges: Dict[str, List[Tuple[str, float, MarkerPairColocalization]]] = defaultdict(list)
+    for p in pairs:
+        score = p.colocalization_score
+        # Apply specificity weighting if provided
+        if specificity is not None:
+            s_a = specificity.get(p.marker_a, 0.5)
+            s_b = specificity.get(p.marker_b, 0.5)
+            score = score * np.sqrt(s_a * s_b)
+        marker_edges[p.marker_a].append((p.marker_b, score, p))
+        marker_edges[p.marker_b].append((p.marker_a, score, p))
+
+    # For each marker, keep top-k by score
+    topk_partners: Dict[str, Set[str]] = {}
+    for marker, edges in marker_edges.items():
+        # Sort by score descending, take top k
+        sorted_edges = sorted(edges, key=lambda x: x[1], reverse=True)[:k]
+        topk_partners[marker] = {e[0] for e in sorted_edges}
+
+    # Keep only mutual edges (both rank each other in top-k)
+    kept = []
+    seen: Set[Tuple[str, str]] = set()
+    for p in pairs:
+        key = tuple(sorted([p.marker_a, p.marker_b]))
+        if key in seen:
+            continue
+
+        # Check mutual: A has B in top-k AND B has A in top-k
+        a_has_b = p.marker_b in topk_partners.get(p.marker_a, set())
+        b_has_a = p.marker_a in topk_partners.get(p.marker_b, set())
+
+        if a_has_b and b_has_a:
+            kept.append(p)
+            seen.add(key)
+
+    return kept
+
+
+def _compute_marker_specificity(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+) -> Dict[str, float]:
+    """
+    Compute Gini coefficient for each marker (higher = more specific).
+
+    Specific markers (high Gini) are concentrated in few spots.
+    Broad markers (low Gini) are spread across many spots.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column
+
+    Returns:
+        Dict mapping marker name to specificity score [0, 1]
+    """
+    specificity = {}
+    for i, name in enumerate(marker_names):
+        values = X[:, i]
+        values = values[values > 0]  # Only positive values
+        if len(values) < 2:
+            specificity[name] = 0.5  # Default for rare markers
+            continue
+
+        # Gini coefficient: 0 = uniform, 1 = concentrated
+        sorted_vals = np.sort(values)
+        n = len(sorted_vals)
+        total = sorted_vals.sum()
+        if total == 0:
+            specificity[name] = 0.5
+            continue
+
+        # Gini = 1 - 2 * (area under Lorenz curve)
+        cumsum = np.cumsum(sorted_vals)
+        gini = (n + 1 - 2 * np.sum(cumsum) / total) / n
+        specificity[name] = max(0, min(1, gini))
+
+    return specificity
+
+
 def _find_connected_components(
     markers: List[str],
     edges: List[Tuple[str, str, float]],
@@ -618,6 +769,100 @@ def _find_connected_components(
         components[find(m)].add(m)
 
     return list(components.values())
+
+
+def _triangle_assembly(
+    markers: List[str],
+    edges: List[Tuple[str, str, float]],
+    verbose: bool = True,
+) -> List[List[str]]:
+    """
+    Assemble profiles using triangle-first strategy.
+
+    Algorithm:
+    1. Find all triangles (3 nodes with all 3 edges) - strongest evidence
+    2. Triangles become triplet profiles (assigned strongest-first by mean weight)
+    3. Remaining edges (not in triangles) become pair profiles
+    4. Remaining nodes (no edges) become singletons
+
+    Args:
+        markers: List of marker names
+        edges: List of (marker_a, marker_b, weight) tuples
+        verbose: Whether to log assembly details
+
+    Returns:
+        List of profiles (each is a list of marker names)
+    """
+    if len(edges) == 0:
+        # No edges - all singletons
+        return [[m] for m in markers]
+
+    # Build adjacency set for fast lookup
+    adj: Dict[str, Set[str]] = defaultdict(set)
+    edge_weights: Dict[Tuple[str, str], float] = {}
+    for a, b, w in edges:
+        adj[a].add(b)
+        adj[b].add(a)
+        edge_key = tuple(sorted([a, b]))
+        edge_weights[edge_key] = w
+
+    # Step 1: Find all triangles
+    triangles: List[Tuple[Tuple[str, str, str], float]] = []
+    seen_triangles: Set[Tuple[str, str, str]] = set()
+
+    for a in adj:
+        for b in adj[a]:
+            if b <= a:
+                continue
+            # Find common neighbors (potential triangle completions)
+            common = adj[a] & adj[b]
+            for c in common:
+                if c <= b:
+                    continue
+                tri = tuple(sorted([a, b, c]))
+                if tri not in seen_triangles:
+                    # Compute mean edge weight for this triangle
+                    w_ab = edge_weights[tuple(sorted([a, b]))]
+                    w_ac = edge_weights[tuple(sorted([a, c]))]
+                    w_bc = edge_weights[tuple(sorted([b, c]))]
+                    mean_weight = (w_ab + w_ac + w_bc) / 3
+                    triangles.append((tri, mean_weight))
+                    seen_triangles.add(tri)
+
+    # Sort triangles by mean weight (strongest first)
+    triangles.sort(key=lambda x: x[1], reverse=True)
+
+    if verbose and triangles:
+        logging.info(f"  Found {len(triangles)} triangles in graph")
+
+    # Step 2: Greedily assign triangles (no node reuse)
+    used_nodes: Set[str] = set()
+    profiles: List[List[str]] = []
+
+    for tri, weight in triangles:
+        if any(node in used_nodes for node in tri):
+            continue  # Skip if any node already used
+        profiles.append(list(tri))
+        used_nodes.update(tri)
+        if verbose:
+            logging.info(f"    Triangle profile: {list(tri)} (mean_weight={weight:.3f})")
+
+    # Step 3: Remaining edges become pairs (strongest first)
+    sorted_edges = sorted(edges, key=lambda x: x[2], reverse=True)
+    for a, b, w in sorted_edges:
+        if a in used_nodes or b in used_nodes:
+            continue
+        profiles.append([a, b])
+        used_nodes.update([a, b])
+        if verbose:
+            logging.info(f"    Pair profile: [{a}, {b}] (weight={w:.3f})")
+
+    # Step 4: Remaining nodes become singletons
+    for marker in markers:
+        if marker not in used_nodes:
+            profiles.append([marker])
+
+    return profiles
 
 
 def _build_distance_matrix(
@@ -804,9 +1049,9 @@ def _split_dendrogram_by_gaps(
         return [markers]
 
     # Log the split for debugging
-    logger.info(f"  Gap-split at merge {max_gap_idx} (gap={max_gap:.3f}, {max_gap/median_gap:.1f}x median)")
+    logging.info(f"  Gap-split at merge {max_gap_idx} (gap={max_gap:.3f}, {max_gap/median_gap:.1f}x median)")
     for i, lin in enumerate(lineages):
-        logger.info(f"    Lineage {i+1}: {lin}")
+        logging.info(f"    Lineage {i+1}: {lin}")
 
     # Recursively check each lineage for further splits (max 1 level deep)
     final_lineages = []
@@ -1056,8 +1301,10 @@ def _fit_score_gmm_with_bic(
 def discover_profiles(
     colocalization_result: ColocalizationResult,
     *,
-    alpha: float = 0.05,
+    fdr_alpha: float = 0.05,
+    top_k: int = 3,
     min_score: Optional[float] = None,
+    use_triangle_assembly: bool = False,
     seed: int = 1234,
     verbose: bool = True,
 ) -> ProfileDiscoveryResult:
@@ -1065,22 +1312,32 @@ def discover_profiles(
     Discover cell type profiles from colocalization analysis.
 
     Algorithm:
-    1. Filter edges by statistical significance (p < alpha)
-    2. Apply adaptive score threshold using GMM with BIC model selection
-       - Fits 1-5 component GMM to score distribution
-       - BIC selects optimal number of components
-       - Lowest component = noise/spatial proximity (excluded)
-       - Higher components = true colocalization (kept)
-    3. Find connected components (separate lineages get separate dendrograms)
-    4. Within each component, perform hierarchical clustering
-    5. Dynamic tree cutting to extract profiles automatically
-    6. Compute modularity to measure how well profiles explain the data
+    1. Apply BH-FDR correction to p-values (controls false discovery rate)
+    2. Apply mutual top-k sparsification (prevents hub marker collapse)
+    3. Optionally apply score threshold (GMM-adaptive or fixed)
+    4. Either:
+       a) Triangle-first assembly (if use_triangle_assembly=True):
+          - Find all triangles (3 nodes with all 3 edges) as triplet profiles
+          - Remaining edges become pair profiles
+          - Remaining nodes become singletons
+       b) Hierarchical clustering (default):
+          - Find connected components
+          - Within each component, perform hierarchical clustering
+          - Dynamic tree cutting to extract profiles
+    5. Compute modularity to measure how well profiles explain the data
 
     Args:
         colocalization_result: Result from analyze_marker_colocalization().
-        alpha: Significance threshold for p-value filtering (default: 0.05).
+        fdr_alpha: FDR threshold for Benjamini-Hochberg correction (default: 0.05).
+            Use stricter threshold (e.g., 0.01) to reduce false edges if needed.
+        top_k: Number of top partners to keep per marker in mutual top-k
+            sparsification (default: 3). Lower values = more aggressive pruning.
+            Set to 0 to disable.
         min_score: Minimum colocalization score. If None (default), uses
             adaptive GMM-based threshold with BIC model selection.
+        use_triangle_assembly: If True, use triangle-first assembly instead
+            of hierarchical clustering (default: False). Triangle assembly
+            is more robust for detecting triplets but doesn't build dendrograms.
         seed: Random seed for reproducibility (default: 1234).
         verbose: Log progress information (default: True).
 
@@ -1101,50 +1358,57 @@ def discover_profiles(
     if verbose:
         logging.info(f"Discovering profiles from {len(pairs)} marker pairs...")
 
-    # Step 1: Filter edges by p-value significance
-    pvalue_significant = [
-        p for p in pairs
-        if p.neighbor_enrichment_pvalue < alpha
-    ]
+    # Step 1: Apply BH-FDR correction to p-values
+    fdr_pairs, _ = _apply_fdr_correction(pairs, alpha=fdr_alpha)
 
     if verbose:
         logging.info(
-            f"P-value filter (p < {alpha}): {len(pvalue_significant)}/{len(pairs)} pairs"
+            f"FDR correction (q < {fdr_alpha}): {len(fdr_pairs)}/{len(pairs)} pairs"
         )
 
-    # Step 2: Apply score threshold (adaptive or fixed)
-    if min_score is None:
-        # Adaptive: Use GMM with BIC to find score threshold
-        scores = np.array([p.colocalization_score for p in pvalue_significant])
+    # Step 2: Apply mutual top-k sparsification
+    if top_k > 0:
+        topk_pairs = _apply_mutual_topk(fdr_pairs, k=top_k)
+        if verbose:
+            logging.info(
+                f"Mutual top-{top_k} sparsification: {len(topk_pairs)}/{len(fdr_pairs)} pairs"
+            )
+    else:
+        topk_pairs = fdr_pairs
 
-        if len(scores) > 0:
-            n_components, score_threshold, is_signal = _fit_score_gmm_with_bic(
-                scores, max_components=5, seed=seed
+    # Step 3: Apply optional score threshold (GMM-adaptive or fixed)
+    if min_score is None and len(topk_pairs) > 10:
+        # Only use GMM if we have enough pairs and user didn't disable
+        scores = np.array([p.colocalization_score for p in topk_pairs])
+
+        n_components, score_threshold, is_signal = _fit_score_gmm_with_bic(
+            scores, max_components=5, seed=seed
+        )
+
+        if verbose:
+            logging.info(
+                f"GMM-BIC selected {n_components} components, "
+                f"score threshold = {score_threshold:.3f}"
             )
 
-            if verbose:
-                logging.info(
-                    f"GMM-BIC selected {n_components} components, "
-                    f"score threshold = {score_threshold:.3f}"
-                )
-
-            # Keep only signal pairs
-            significant_pairs = [
-                p for p, sig in zip(pvalue_significant, is_signal) if sig
-            ]
-        else:
-            significant_pairs = []
-            score_threshold = 0.0
-    else:
+        # Keep only signal pairs
+        significant_pairs = [
+            p for p, sig in zip(topk_pairs, is_signal) if sig
+        ]
+    elif min_score is not None:
         # Fixed threshold
         score_threshold = min_score
         significant_pairs = [
-            p for p in pvalue_significant
+            p for p in topk_pairs
             if p.colocalization_score >= min_score
         ]
 
         if verbose:
             logging.info(f"Fixed score filter (>= {min_score}): {len(significant_pairs)} pairs")
+    else:
+        # No additional filtering - FDR + top-k is sufficient
+        significant_pairs = topk_pairs
+        score_threshold = 0.0
 
     significant_edges = [
         (p.marker_a, p.marker_b, p.colocalization_score)
@@ -1156,7 +1420,39 @@ def discover_profiles(
             f"Final: {len(significant_edges)} edges for graph construction"
         )
 
-    # Step 2: Find connected components
+    # Branch: Triangle assembly vs hierarchical clustering
+    if use_triangle_assembly:
+        # Triangle-first assembly approach
+        if verbose:
+            logging.info("Using triangle-first assembly...")
+
+        profiles = _triangle_assembly(all_markers, significant_edges, verbose=verbose)
+
+        # Identify singletons for result tracking
+        singletons = [p[0] for p in profiles if len(p) == 1]
+        lineage_dendrograms = {}  # No dendrograms in triangle mode
+
+        # Compute modularity
+        modularity = _compute_modularity(profiles, pairs, significant_pairs)
+
+        if verbose:
+            logging.info(f"Discovered {len(profiles)} profiles, modularity = {modularity:.3f}")
+
+        result = ProfileDiscoveryResult(
+            profiles=profiles,
+            lineage_dendrograms=lineage_dendrograms,
+            singletons=singletons,
+            modularity=modularity,
+            n_significant_edges=len(significant_edges),
+            alpha=fdr_alpha,
+        )
+
+        if verbose:
+            logging.info(result.summary())
+
+        return result
+
+    # Step 2: Find connected components (hierarchical approach)
     components = _find_connected_components(all_markers, significant_edges)
 
     # Separate singletons (components of size 1 with no significant edges)
@@ -1201,13 +1497,9 @@ def discover_profiles(
             continue
 
         if n_comp == 2:
-            # Two markers - check distance to decide if same profile
-            dist_matrix = _build_distance_matrix(comp_markers, pairs)
-            if dist_matrix[0, 1] < 0.5:  # Strong colocalization
-                profiles.append(comp_markers)
-            else:
-                profiles.append([comp_markers[0]])
-                profiles.append([comp_markers[1]])
+            # 2-node component already passed FDR + mutual top-k evidence criteria
+            # No additional filtering needed - return as pair profile
+            profiles.append(comp_markers)
             continue
 
         # Build distance matrix and dendrogram for the full component
@@ -1230,13 +1522,9 @@ def discover_profiles(
                 continue
 
             if n_lineage == 2:
-                # Check if they should be together
-                lin_dist = _build_distance_matrix(lineage_markers, pairs)
-                if lin_dist[0, 1] < 0.5:
-                    profiles.append(lineage_markers)
-                else:
-                    profiles.append([lineage_markers[0]])
-                    profiles.append([lineage_markers[1]])
+                # 2-node lineage already passed FDR + mutual top-k evidence criteria
+                # No additional filtering needed - return as pair profile
+                profiles.append(lineage_markers)
                 continue
 
             # Build lineage-specific dendrogram
@@ -1282,7 +1570,7 @@ def discover_profiles(
         singletons=singletons,
         modularity=modularity,
         n_significant_edges=len(significant_edges),
-        alpha=alpha,
+        alpha=fdr_alpha,
     )
 
     if verbose:

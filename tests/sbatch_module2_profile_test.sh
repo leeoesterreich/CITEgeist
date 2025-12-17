@@ -8,9 +8,9 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --partition=HTC
 
-# Module 2 Profile Discovery Test
-# Tests gap-based lineage splitting and dynamic tree cutting
-# on both simulated (9 GT cell types) and real patient data
+# Module 2 Profile Discovery Test - Phase 2
+# Tests triangle assembly vs hierarchical clustering
+# Also tests removed 2-node threshold (should fix CD3E-CD8A split)
 
 # Activate conda environment
 source /ix1/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/
