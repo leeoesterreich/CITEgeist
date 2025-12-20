@@ -20,7 +20,14 @@ from .spatial_colocalization import (
     LineageDendrogram,
     ProfileDiscoveryResult,
     discover_profiles,
+    ProfileSelectionResult,
+    select_profiles_by_reconstruction,
+    SpatialVarianceSelectionResult,
+    select_profiles_by_spatial_variance,
 )
+
+# Default profile selection method (spatial variance-based)
+select_profiles = select_profiles_by_spatial_variance
 
 __all__ = [
     # Core model
@@ -46,4 +53,10 @@ __all__ = [
     "LineageDendrogram",
     "ProfileDiscoveryResult",
     "discover_profiles",
+    # Profile selection (Module 2c)
+    "ProfileSelectionResult",
+    "select_profiles_by_reconstruction",
+    "SpatialVarianceSelectionResult",
+    "select_profiles_by_spatial_variance",
+    "select_profiles",  # Default alias for spatial variance method
 ]

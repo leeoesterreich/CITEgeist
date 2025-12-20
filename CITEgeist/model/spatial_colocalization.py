@@ -2676,3 +2676,505 @@ def select_profiles_by_coverage(
         residual_morans_i=morans_i_arr,
         stopping_reason=stopping_reason,
     )
+
+
+# =============================================================================
+# Module 2c v3: Spatial Variance-Based Profile Selection
+# =============================================================================
+
+
+@dataclass
+class SpatialVarianceSelectionResult:
+    """Result from spatial variance-based profile selection."""
+
+    selected_profiles: List[List[str]]
+    """Profiles selected by spatial variance objective."""
+
+    optimal_n: int
+    """Number of profiles selected."""
+
+    all_profiles_ranked: List[List[str]]
+    """All profiles in selection order."""
+
+    # Spatial metrics
+    spatial_covariance_matrix: NDArray[np.floating]
+    """Bivariate Moran's I matrix for interesting markers."""
+
+    eigenvalues: NDArray[np.floating]
+    """Eigenvalues of spatial covariance (variance in each direction)."""
+
+    explained_spatial_variance: NDArray[np.floating]
+    """Cumulative explained spatial variance for each n profiles."""
+
+    # Reconstruction metrics
+    variance_explained: NDArray[np.floating]
+    """Fraction of data variance explained for each n profiles."""
+
+    proportion_smoothness: NDArray[np.floating]
+    """Mean Moran's I of NNLS proportions for each n profiles."""
+
+    # Stopping info
+    stopping_reason: str
+    """Reason: 'spatial_threshold', 'diminishing_returns', or 'all_profiles'."""
+
+    def summary(self) -> str:
+        """Return summary string."""
+        n = self.optimal_n
+        lines = [
+            f"Selected {n}/{len(self.all_profiles_ranked)} profiles",
+            f"Explained spatial variance: {self.explained_spatial_variance[n-1]:.1%}",
+            f"Data variance explained: {self.variance_explained[n-1]:.1%}",
+            f"Proportion smoothness: {self.proportion_smoothness[n-1]:.3f}",
+            f"Stopping reason: {self.stopping_reason}",
+        ]
+        return "\n".join(lines)
+
+
+def _build_spatial_covariance_matrix(
+    X: NDArray[np.floating],
+    neighbors: List[List[int]],
+    marker_names: List[str],
+    verbose: bool = False,
+) -> NDArray[np.floating]:
+    """
+    Build spatial covariance matrix using bivariate Moran's I.
+
+    C[i,j] = bivariate_Moran's_I(marker_i, marker_j)
+
+    For diagonal elements (i==j), uses univariate Moran's I.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        neighbors: List of neighbor indices per spot.
+        marker_names: Names for each marker column.
+        verbose: Log progress.
+
+    Returns:
+        Symmetric matrix (n_markers, n_markers) of spatial cross-correlations.
+    """
+    n_markers = len(marker_names)
+    C = np.zeros((n_markers, n_markers))
+
+    total_pairs = n_markers * (n_markers + 1) // 2
+    computed = 0
+
+    for i in range(n_markers):
+        for j in range(i, n_markers):
+            if i == j:
+                # Univariate Moran's I on diagonal
+                C[i, j] = _compute_morans_i(X[:, i], neighbors)
+            else:
+                # Bivariate Moran's I for off-diagonal
+                C[i, j] = _compute_bivariate_morans_i(X[:, i], X[:, j], neighbors)
+                C[j, i] = C[i, j]  # Symmetric
+
+            computed += 1
+            if verbose and computed % 50 == 0:
+                logging.info(f"  Spatial covariance: {computed}/{total_pairs} pairs...")
+
+    return C
+
+
+def _compute_profile_activity_map(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profile: List[str],
+) -> NDArray[np.floating]:
+    """
+    Compute activity map for a profile (mean expression across profile markers).
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        marker_names: Names for each marker column.
+        profile: List of marker names in the profile.
+
+    Returns:
+        Activity map (n_spots,) representing spatial pattern of the profile.
+    """
+    marker_indices = [marker_names.index(m) for m in profile if m in marker_names]
+    if not marker_indices:
+        return np.zeros(X.shape[0])
+
+    return np.mean(X[:, marker_indices], axis=1)
+
+
+def _compute_spatial_coverage_score(
+    activity_map: NDArray[np.floating],
+    eigenvectors: NDArray[np.floating],
+    eigenvalues: NDArray[np.floating],
+    remaining_weight: NDArray[np.floating],
+) -> float:
+    """
+    Compute how much spatial variance a profile explains.
+
+    Projects the profile's activity map onto the spatial eigenvectors,
+    weighted by remaining eigenvalue importance.
+
+    Args:
+        activity_map: Profile activity (n_spots,).
+        eigenvectors: Spatial eigenvectors (n_spots, k).
+        eigenvalues: Original eigenvalues (k,).
+        remaining_weight: Remaining unexplained weight per eigenvector (k,).
+
+    Returns:
+        Spatial coverage score (higher = explains more spatial variance).
+    """
+    # Normalize activity map
+    if np.std(activity_map) < 1e-10:
+        return 0.0
+
+    activity_normalized = (activity_map - np.mean(activity_map)) / np.std(activity_map)
+
+    # Project onto eigenvectors
+    projections = eigenvectors.T @ activity_normalized  # (k,)
+
+    # Weighted score by remaining eigenvalue importance
+    score = np.sum(remaining_weight * projections**2)
+
+    return float(score)
+
+
+def _compute_proportion_smoothness_fast(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+    neighbors: List[List[int]],
+) -> float:
+    """
+    Compute spatial smoothness of NNLS-estimated proportions.
+
+    Runs NNLS per spot and computes mean Moran's I of proportion vectors.
+    Higher values = more spatially coherent proportions.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        marker_names: Names for each marker column.
+        profiles: List of profiles (each a list of marker names).
+        neighbors: Neighbor indices per spot.
+
+    Returns:
+        Mean Moran's I of proportions across profiles (higher = smoother).
+    """
+    from scipy.optimize import nnls
+
+    n_spots = X.shape[0]
+    n_profiles = len(profiles)
+
+    if n_profiles == 0:
+        return 0.0
+
+    # Build profile indicator matrix (n_markers, n_profiles)
+    # P[m, p] = 1 if marker m is in profile p
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+    P = np.zeros((len(marker_names), n_profiles))
+    for p_idx, profile in enumerate(profiles):
+        for marker in profile:
+            if marker in marker_to_idx:
+                P[marker_to_idx[marker], p_idx] = 1.0
+
+    # NNLS per spot to estimate proportions
+    # Solve: X[i] ≈ P @ w for weights w (n_profiles,)
+    proportions = np.zeros((n_spots, n_profiles))
+    for i in range(n_spots):
+        try:
+            proportions[i], _ = nnls(P, X[i])
+        except Exception:
+            proportions[i] = np.zeros(n_profiles)
+
+    # Normalize proportions per spot
+    row_sums = proportions.sum(axis=1, keepdims=True)
+    row_sums = np.where(row_sums > 0, row_sums, 1.0)
+    proportions = proportions / row_sums
+
+    # Compute Moran's I for each profile's proportions
+    smoothness_values = []
+    for p_idx in range(n_profiles):
+        prop_values = proportions[:, p_idx]
+        if np.std(prop_values) > 1e-10:
+            moran_i = _compute_morans_i(prop_values, neighbors)
+            smoothness_values.append(moran_i)
+
+    if not smoothness_values:
+        return 0.0
+
+    return float(np.mean(smoothness_values))
+
+
+def select_profiles_by_spatial_variance(
+    X: NDArray[np.floating],
+    coords: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+    *,
+    interesting_markers: Optional[List[str]] = None,
+    colocalization_result: Optional[ColocalizationResult] = None,
+    alpha: float = 1.0,
+    beta: float = 0.3,
+    gamma: float = 0.2,
+    min_spatial_explained: float = 0.90,
+    min_marginal_gain: float = 0.02,
+    neighbor_k: int = 6,
+    verbose: bool = True,
+) -> SpatialVarianceSelectionResult:
+    """
+    Select profiles that best explain spatial variation for deconvolution.
+
+    Algorithm:
+    1. Build spatial covariance matrix (bivariate Moran's I between markers)
+    2. Eigendecomposition to find spatial variance directions
+    3. Greedy selection optimizing:
+       - Spatial coverage (eigenvalue-weighted projection)
+       - Proportion smoothness (NNLS + Moran's I)
+       - Redundancy penalty
+    4. Stop when 90% spatial variance explained or diminishing returns
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        coords: Spatial coordinates (n_spots, 2).
+        marker_names: Names for each marker column.
+        profiles: List of profiles from Module 2b (each a list of markers).
+        interesting_markers: Subset of markers to consider (from Module 1).
+        colocalization_result: Optional, for profile confidence scores.
+        alpha: Weight for spatial coverage term (default: 1.0).
+        beta: Weight for proportion smoothness term (default: 0.3).
+        gamma: Weight for redundancy penalty (default: 0.2).
+        min_spatial_explained: Target spatial variance to explain (default: 0.90).
+        min_marginal_gain: Minimum gain to continue (default: 0.02).
+        neighbor_k: Number of neighbors for spatial analysis (default: 6).
+        verbose: Log progress (default: True).
+
+    Returns:
+        SpatialVarianceSelectionResult with selected profiles and metrics.
+    """
+    X = np.asarray(X, dtype=np.float64)
+    coords = np.asarray(coords, dtype=np.float64)
+    n_spots, n_markers = X.shape
+
+    if len(profiles) == 0:
+        raise ValueError("No profiles provided")
+
+    if verbose:
+        logging.info("Module 2c: Spatial variance-based profile selection")
+        logging.info(f"  Input: {len(profiles)} profiles, {n_spots} spots")
+
+    # Determine target markers
+    if interesting_markers is not None:
+        target_markers = [m for m in interesting_markers if m in marker_names]
+    else:
+        all_profile_markers = set()
+        for p in profiles:
+            all_profile_markers.update(p)
+        target_markers = [m for m in all_profile_markers if m in marker_names]
+
+    if not target_markers:
+        raise ValueError("No valid target markers found")
+
+    if verbose:
+        logging.info(f"  Target markers: {len(target_markers)}")
+
+    # Filter X to target markers
+    target_indices = [marker_names.index(m) for m in target_markers]
+    X_target = X[:, target_indices]
+
+    # Build neighbor graph
+    neighbors = _build_neighbor_graph(coords, neighbor_k)
+
+    # Phase 1: Build spatial covariance matrix
+    if verbose:
+        logging.info("  Phase 1: Building spatial covariance matrix...")
+
+    C = _build_spatial_covariance_matrix(X_target, neighbors, target_markers, verbose=verbose)
+
+    # Eigendecomposition
+    eigenvalues, eigenvectors = np.linalg.eigh(C)
+
+    # Sort by descending eigenvalue
+    idx = np.argsort(eigenvalues)[::-1]
+    eigenvalues = eigenvalues[idx]
+    eigenvectors = eigenvectors[:, idx]
+
+    # Handle negative eigenvalues (set to small positive)
+    eigenvalues = np.maximum(eigenvalues, 1e-10)
+
+    # Normalize eigenvalues to sum to 1
+    total_variance = np.sum(eigenvalues)
+    eigenvalue_weights = eigenvalues / total_variance
+
+    if verbose:
+        top_3_explained = np.sum(eigenvalue_weights[:3])
+        logging.info(f"  Top 3 eigenvectors explain {top_3_explained:.1%} of spatial variance")
+
+    # Project X onto eigenvectors for activity map projection
+    X_target_centered = X_target - np.mean(X_target, axis=0)
+    X_projected = X_target_centered @ eigenvectors  # (n_spots, n_markers)
+
+    # Build marker lookup for variance calculation
+    target_marker_to_local = {m: i for i, m in enumerate(target_markers)}
+
+    # Helper: compute variance explained for current selection
+    def compute_ve_for_profiles(profile_list):
+        if not profile_list:
+            return 0.0
+        profile_matrix = np.zeros((len(target_markers), len(profile_list)))
+        for j, profile in enumerate(profile_list):
+            for marker in profile:
+                if marker in target_marker_to_local:
+                    local_idx = target_marker_to_local[marker]
+                    profile_matrix[local_idx, j] = 1.0
+        _, ve = _compute_reconstruction_error(X_target, profile_matrix)
+        return ve
+
+    # Phase 2: Greedy profile selection
+    if verbose:
+        logging.info("  Phase 2: Greedy selection with spatial + smoothness objectives...")
+
+    remaining_weight = eigenvalue_weights.copy()
+    selected_profiles: List[List[str]] = []
+    remaining_profiles = list(profiles)
+
+    # Get profile confidences from colocalization if available
+    profile_confidence: Dict[int, float] = {}
+    for i, profile in enumerate(profiles):
+        if colocalization_result is not None and len(profile) > 1:
+            conf = _compute_profile_confidence(profile, colocalization_result.pairs)
+        else:
+            conf = 0.5  # Default for singletons
+        profile_confidence[i] = conf
+
+    # Tracking arrays
+    spatial_explained_list = []
+    var_explained_list = []
+    smoothness_list = []
+    stopping_reason = "all_profiles"
+
+    for iteration in range(len(profiles)):
+        if not remaining_profiles:
+            break
+
+        # Score each candidate profile
+        best_score = -np.inf
+        best_profile = None
+        best_profile_idx = -1
+
+        for p_idx, profile in enumerate(remaining_profiles):
+            # Compute activity map
+            activity = _compute_profile_activity_map(X, marker_names, profile)
+
+            # Project activity onto spatial eigenvectors
+            if np.std(activity) > 1e-10:
+                activity_centered = activity - np.mean(activity)
+                activity_projected = X_projected.T @ activity_centered  # (n_markers,)
+                activity_projected = activity_projected / (np.linalg.norm(activity_projected) + 1e-10)
+            else:
+                activity_projected = np.zeros(len(target_markers))
+
+            # Spatial coverage score
+            spatial_score = np.sum(remaining_weight * activity_projected**2)
+
+            # Proportion smoothness (only compute for top candidates to save time)
+            # For first few iterations, compute for all; later only for top candidates
+            if len(selected_profiles) < 3 or spatial_score > 0.01:
+                test_profiles = selected_profiles + [profile]
+                smoothness = _compute_proportion_smoothness_fast(
+                    X, marker_names, test_profiles, neighbors
+                )
+            else:
+                smoothness = 0.0
+
+            # Redundancy penalty
+            if selected_profiles:
+                max_jaccard = max(
+                    len(set(profile) & set(sp)) / len(set(profile) | set(sp))
+                    for sp in selected_profiles
+                )
+            else:
+                max_jaccard = 0.0
+
+            # Get confidence
+            orig_idx = profiles.index(profile)
+            conf = profile_confidence.get(orig_idx, 0.5)
+
+            # Combined score
+            score = (
+                alpha * spatial_score * conf
+                + beta * smoothness
+                - gamma * max_jaccard
+            )
+
+            if score > best_score:
+                best_score = score
+                best_profile = profile
+                best_profile_idx = p_idx
+
+        if best_profile is None:
+            break
+
+        # Add best profile
+        selected_profiles.append(best_profile)
+        remaining_profiles.pop(best_profile_idx)
+
+        # Update remaining weight (deflate)
+        activity = _compute_profile_activity_map(X, marker_names, best_profile)
+        if np.std(activity) > 1e-10:
+            activity_centered = activity - np.mean(activity)
+            activity_projected = X_projected.T @ activity_centered
+            activity_projected = activity_projected / (np.linalg.norm(activity_projected) + 1e-10)
+            explained = remaining_weight * activity_projected**2
+            remaining_weight = np.maximum(remaining_weight - explained, 0)
+
+        # Compute metrics
+        cumulative_explained = 1.0 - np.sum(remaining_weight)
+        spatial_explained_list.append(cumulative_explained)
+
+        # Variance explained
+        var_exp = compute_ve_for_profiles(selected_profiles)
+        var_explained_list.append(var_exp)
+
+        # Smoothness
+        smoothness = _compute_proportion_smoothness_fast(X, marker_names, selected_profiles, neighbors)
+        smoothness_list.append(smoothness)
+
+        if verbose:
+            logging.info(
+                f"    n={len(selected_profiles)}: +{best_profile} | "
+                f"spatial={cumulative_explained:.1%}, VE={var_exp:.1%}, smooth={smoothness:.3f}"
+            )
+
+        # Check stopping criteria
+        if cumulative_explained >= min_spatial_explained:
+            stopping_reason = "spatial_threshold"
+            if verbose:
+                logging.info(f"  Stopping: {min_spatial_explained:.0%} spatial variance explained")
+            break
+
+        if len(spatial_explained_list) >= 2:
+            marginal_gain = spatial_explained_list[-1] - spatial_explained_list[-2]
+            if marginal_gain < min_marginal_gain:
+                stopping_reason = "diminishing_returns"
+                if verbose:
+                    logging.info(f"  Stopping: marginal gain {marginal_gain:.1%} < {min_marginal_gain:.0%}")
+                break
+
+    # Build result arrays
+    spatial_explained_arr = np.array(spatial_explained_list) if spatial_explained_list else np.array([0.0])
+    var_explained_arr = np.array(var_explained_list) if var_explained_list else np.array([0.0])
+    smoothness_arr = np.array(smoothness_list) if smoothness_list else np.array([0.0])
+
+    if verbose:
+        logging.info(f"  Final: {len(selected_profiles)} profiles selected")
+        logging.info(f"  Spatial variance explained: {spatial_explained_arr[-1]:.1%}")
+        logging.info(f"  Data variance explained: {var_explained_arr[-1]:.1%}")
+        logging.info(f"  Proportion smoothness: {smoothness_arr[-1]:.3f}")
+        logging.info(f"  Stopping reason: {stopping_reason}")
+
+    return SpatialVarianceSelectionResult(
+        selected_profiles=selected_profiles,
+        optimal_n=len(selected_profiles),
+        all_profiles_ranked=selected_profiles,
+        spatial_covariance_matrix=C,
+        eigenvalues=eigenvalues,
+        explained_spatial_variance=spatial_explained_arr,
+        variance_explained=var_explained_arr,
+        proportion_smoothness=smoothness_arr,
+        stopping_reason=stopping_reason,
+    )

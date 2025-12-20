@@ -30,7 +30,10 @@ from CITEgeist.model import (
     discover_profiles,
     select_profiles_by_reconstruction,
 )
-from CITEgeist.model.spatial_colocalization import select_profiles_by_coverage
+from CITEgeist.model.spatial_colocalization import (
+    select_profiles_by_coverage,
+    select_profiles_by_spatial_variance,
+)
 
 # Data paths
 DATA_FOLDER = "/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
@@ -162,28 +165,50 @@ def test_simulated_data():
     exact_new = sum(1 for p in selection_new.selected_profiles if set(p) in gt_profiles.values())
     logger.info(f"\nGround truth recovery (new): {exact_new}/{len(gt_cell_types)}")
 
+    logger.info("\n" + "=" * 50)
+    logger.info("SPATIAL VARIANCE METHOD: Eigenvalue-based selection")
+    logger.info("=" * 50)
+
+    selection_spatial = select_profiles_by_spatial_variance(
+        X, coords, marker_names, profile_result.profiles,
+        colocalization_result=coloc_result,
+        interesting_markers=result1.interesting_markers,
+        alpha=1.0,                 # Spatial coverage weight
+        beta=0.3,                  # Proportion smoothness weight
+        gamma=0.2,                 # Redundancy penalty
+        min_spatial_explained=0.90,
+        min_marginal_gain=0.02,    # Lower threshold for more profiles
+        verbose=True
+    )
+
+    # Check ground truth recovery
+    exact_spatial = sum(1 for p in selection_spatial.selected_profiles if set(p) in gt_profiles.values())
+    logger.info(f"\nGround truth recovery (spatial): {exact_spatial}/{len(gt_cell_types)}")
+
     # ==========================================================================
     # COMPARISON
     # ==========================================================================
 
     logger.info("\n" + "=" * 50)
-    logger.info("COMPARISON: Old vs New")
+    logger.info("COMPARISON: Old vs Coverage vs Spatial")
     logger.info("=" * 50)
 
-    logger.info(f"\n{'Metric':<30} {'Old (Variance)':<20} {'New (Coverage)':<20}")
+    logger.info(f"\n{'Metric':<25} {'Variance':<15} {'Coverage':<15} {'Spatial':<15}")
     logger.info("-" * 70)
-    logger.info(f"{'Profiles selected':<30} {str(selection_old.optimal_n):<20} {str(selection_new.optimal_n):<20}")
+    logger.info(f"{'Profiles selected':<25} {str(selection_old.optimal_n):<15} {str(selection_new.optimal_n):<15} {str(selection_spatial.optimal_n):<15}")
     old_ve = f"{selection_old.variance_explained[-1]:.1%}"
     new_ve = f"{selection_new.variance_explained[-1]:.1%}"
-    logger.info(f"{'Variance explained':<30} {old_ve:<20} {new_ve:<20}")
+    spatial_ve = f"{selection_spatial.variance_explained[-1]:.1%}"
+    logger.info(f"{'Data variance explained':<25} {old_ve:<15} {new_ve:<15} {spatial_ve:<15}")
+    spatial_sv = f"{selection_spatial.explained_spatial_variance[-1]:.1%}"
+    logger.info(f"{'Spatial variance expl.':<25} {'N/A':<15} {'N/A':<15} {spatial_sv:<15}")
     old_gt = f"{exact_old}/{len(gt_cell_types)}"
     new_gt = f"{exact_new}/{len(gt_cell_types)}"
-    logger.info(f"{'Ground truth recovery':<30} {old_gt:<20} {new_gt:<20}")
-    if selection_new.residual_morans_i is not None:
-        morans_label = "Final residual Morans I"
-        morans_val = f"{selection_new.residual_morans_i[-1]:.3f}"
-        logger.info(f"{morans_label:<30} {'N/A':<20} {morans_val:<20}")
-    logger.info(f"{'Stopping reason':<30} {'var_threshold':<20} {selection_new.stopping_reason:<20}")
+    spatial_gt = f"{exact_spatial}/{len(gt_cell_types)}"
+    logger.info(f"{'Ground truth recovery':<25} {old_gt:<15} {new_gt:<15} {spatial_gt:<15}")
+    smooth = f"{selection_spatial.proportion_smoothness[-1]:.3f}"
+    logger.info(f"{'Proportion smoothness':<25} {'N/A':<15} {'N/A':<15} {smooth:<15}")
+    logger.info(f"{'Stopping reason':<25} {'var_threshold':<15} {selection_new.stopping_reason:<15} {selection_spatial.stopping_reason:<15}")
 
     # Show which cell types are recovered by each method
     logger.info("\nGround truth profile recovery details:")
@@ -191,9 +216,10 @@ def test_simulated_data():
         gt_markers = gt_profiles[ct]
         old_match = "✓" if any(set(p) == gt_markers for p in selection_old.selected_profiles) else "✗"
         new_match = "✓" if any(set(p) == gt_markers for p in selection_new.selected_profiles) else "✗"
-        logger.info(f"  {ct:<25} Old: {old_match}  New: {new_match}")
+        spatial_match = "✓" if any(set(p) == gt_markers for p in selection_spatial.selected_profiles) else "✗"
+        logger.info(f"  {ct:<25} Var: {old_match}  Cov: {new_match}  Spatial: {spatial_match}")
 
-    return selection_old, selection_new
+    return selection_old, selection_new, selection_spatial
 
 
 def test_real_patient_data():
@@ -270,25 +296,42 @@ def test_real_patient_data():
         verbose=True
     )
 
+    logger.info("\n" + "=" * 50)
+    logger.info("SPATIAL VARIANCE METHOD: Eigenvalue-based selection")
+    logger.info("=" * 50)
+
+    selection_spatial = select_profiles_by_spatial_variance(
+        X, coords, marker_names, profile_result.profiles,
+        colocalization_result=coloc_result,
+        interesting_markers=result1.interesting_markers,
+        alpha=1.0,
+        beta=0.3,
+        gamma=0.2,
+        min_spatial_explained=0.90,
+        min_marginal_gain=0.02,    # Lower threshold for more profiles
+        verbose=True
+    )
+
     # ==========================================================================
     # COMPARISON
     # ==========================================================================
 
     logger.info("\n" + "=" * 50)
-    logger.info("COMPARISON: Old vs New")
+    logger.info("COMPARISON: Old vs Coverage vs Spatial")
     logger.info("=" * 50)
 
-    logger.info(f"\n{'Metric':<30} {'Old (Variance)':<20} {'New (Coverage)':<20}")
+    logger.info(f"\n{'Metric':<25} {'Variance':<15} {'Coverage':<15} {'Spatial':<15}")
     logger.info("-" * 70)
-    logger.info(f"{'Profiles selected':<30} {str(selection_old.optimal_n):<20} {str(selection_new.optimal_n):<20}")
+    logger.info(f"{'Profiles selected':<25} {str(selection_old.optimal_n):<15} {str(selection_new.optimal_n):<15} {str(selection_spatial.optimal_n):<15}")
     old_ve = f"{selection_old.variance_explained[-1]:.1%}"
     new_ve = f"{selection_new.variance_explained[-1]:.1%}"
-    logger.info(f"{'Variance explained':<30} {old_ve:<20} {new_ve:<20}")
-    if selection_new.residual_morans_i is not None:
-        morans_label = "Final residual Morans I"
-        morans_val = f"{selection_new.residual_morans_i[-1]:.3f}"
-        logger.info(f"{morans_label:<30} {'N/A':<20} {morans_val:<20}")
-    logger.info(f"{'Stopping reason':<30} {'var_threshold':<20} {selection_new.stopping_reason:<20}")
+    spatial_ve = f"{selection_spatial.variance_explained[-1]:.1%}"
+    logger.info(f"{'Data variance explained':<25} {old_ve:<15} {new_ve:<15} {spatial_ve:<15}")
+    spatial_sv = f"{selection_spatial.explained_spatial_variance[-1]:.1%}"
+    logger.info(f"{'Spatial variance expl.':<25} {'N/A':<15} {'N/A':<15} {spatial_sv:<15}")
+    smooth = f"{selection_spatial.proportion_smoothness[-1]:.3f}"
+    logger.info(f"{'Proportion smoothness':<25} {'N/A':<15} {'N/A':<15} {smooth:<15}")
+    logger.info(f"{'Stopping reason':<25} {'var_threshold':<15} {selection_new.stopping_reason:<15} {selection_spatial.stopping_reason:<15}")
 
     # Check which method picks up stromal markers earlier
     logger.info("\nStromal marker coverage analysis:")
@@ -333,7 +376,7 @@ def test_real_patient_data():
             interp = '-> Stromal/CAFs'
         logger.info(f"  {i+1}. {profile} {interp}")
 
-    return selection_old, selection_new
+    return selection_old, selection_new, selection_spatial
 
 
 def main():
@@ -344,22 +387,24 @@ def main():
     logger.info("=" * 70)
 
     # Test on simulated data
-    sim_old, sim_new = test_simulated_data()
+    sim_old, sim_new, sim_spatial = test_simulated_data()
 
     # Test on real patient data
-    real_old, real_new = test_real_patient_data()
+    real_old, real_new, real_spatial = test_real_patient_data()
 
     # Final summary
     logger.info("\n" + "=" * 70)
     logger.info("FINAL SUMMARY")
     logger.info("=" * 70)
     logger.info("\nSimulated Data:")
-    logger.info(f"  Old method: {sim_old.optimal_n} profiles, {sim_old.variance_explained[-1]:.1%} variance")
-    logger.info(f"  New method: {sim_new.optimal_n} profiles, {sim_new.variance_explained[-1]:.1%} variance, stopped by {sim_new.stopping_reason}")
+    logger.info(f"  Variance method: {sim_old.optimal_n} profiles, {sim_old.variance_explained[-1]:.1%} data variance")
+    logger.info(f"  Coverage method: {sim_new.optimal_n} profiles, {sim_new.variance_explained[-1]:.1%} data variance, stopped by {sim_new.stopping_reason}")
+    logger.info(f"  Spatial method:  {sim_spatial.optimal_n} profiles, {sim_spatial.explained_spatial_variance[-1]:.1%} spatial variance, stopped by {sim_spatial.stopping_reason}")
 
     logger.info("\nReal Patient Data:")
-    logger.info(f"  Old method: {real_old.optimal_n} profiles, {real_old.variance_explained[-1]:.1%} variance")
-    logger.info(f"  New method: {real_new.optimal_n} profiles, {real_new.variance_explained[-1]:.1%} variance, stopped by {real_new.stopping_reason}")
+    logger.info(f"  Variance method: {real_old.optimal_n} profiles, {real_old.variance_explained[-1]:.1%} data variance")
+    logger.info(f"  Coverage method: {real_new.optimal_n} profiles, {real_new.variance_explained[-1]:.1%} data variance, stopped by {real_new.stopping_reason}")
+    logger.info(f"  Spatial method:  {real_spatial.optimal_n} profiles, {real_spatial.explained_spatial_variance[-1]:.1%} spatial variance, stopped by {real_spatial.stopping_reason}")
 
     return 0
 
