@@ -444,28 +444,6 @@ def main():
     parser.add_argument('--laplacian-k', type=int, default=8,
                         help='Number of neighbors for Laplacian graph (default: 8)')
 
-    # Joint optimization parameters (replaces sequential profile discovery + proportion estimation)
-    parser.add_argument('--joint', action='store_true', default=False,
-                        help='Use joint optimization for profile discovery + proportions (recommended)')
-    parser.add_argument('--joint-min-K', type=int, default=2,
-                        help='Minimum number of cell types for joint optimization (default: 2)')
-    parser.add_argument('--joint-max-K', type=int, default=12,
-                        help='Maximum number of cell types for joint optimization (default: 12)')
-    parser.add_argument('--joint-lambda-spatial', type=float, default=0.1,
-                        help='Laplacian spatial smoothing weight for joint optimization (default: 0.1)')
-    parser.add_argument('--joint-lambda-sparsity', type=float, default=0.1,
-                        help='L1 sparsity weight on profile weights W (default: 0.1)')
-    parser.add_argument('--joint-lambda-distinct', type=float, default=0.5,
-                        help='Profile distinctness penalty weight (default: 0.5)')
-    parser.add_argument('--joint-max-markers', type=int, default=3,
-                        help='Maximum markers per cell type profile (default: 3)')
-    parser.add_argument('--joint-max-iterations', type=int, default=50,
-                        help='Maximum alternating minimization iterations (default: 50)')
-    parser.add_argument('--joint-n-restarts', type=int, default=3,
-                        help='Number of random restarts per K (default: 3)')
-    parser.add_argument('--joint-profile-threshold', type=float, default=0.3,
-                        help='Minimum W weight to include marker in profile (default: 0.3)')
-
     args = parser.parse_args()
 
     radius = args.radius
@@ -558,61 +536,7 @@ def main():
         model.preprocess_antibody()  # Applies Winsorizing + CLR transformation
 
         # Load or discover cell profiles
-        if args.joint:
-            # Use joint optimization (recommended - replaces sequential approach)
-            logging.info("Running JOINT optimization for profile discovery + proportions...")
-            logging.info(f"  K range: [{args.joint_min_K}, {args.joint_max_K}]")
-            logging.info(f"  lambda_spatial={args.joint_lambda_spatial}, lambda_sparsity={args.joint_lambda_sparsity}")
-            logging.info(f"  lambda_distinct={args.joint_lambda_distinct}, max_markers={args.joint_max_markers}")
-
-            joint_result = model.run_joint_optimization(
-                min_K=args.joint_min_K,
-                max_K=args.joint_max_K,
-                max_markers_per_type=args.joint_max_markers,
-                lambda_spatial=args.joint_lambda_spatial,
-                lambda_sparsity=args.joint_lambda_sparsity,
-                lambda_distinct=args.joint_lambda_distinct,
-                laplacian_k=args.laplacian_k,
-                max_iterations=args.joint_max_iterations,
-                tolerance=1e-4,
-                n_restarts=args.joint_n_restarts,
-                seed=args.discovery_seed,
-                profile_threshold=args.joint_profile_threshold,
-                verbose=True,
-            )
-
-            logging.info(f"Joint optimization selected K={joint_result.K} (BIC={joint_result.bic:.2f})")
-            logging.info(f"Discovered {len(joint_result.profiles) - 1} profiles: {list(joint_result.profiles.keys())}")
-
-            # Store joint result proportions for benchmarking
-            # The joint optimization already computed proportions, so we don't need run_cell_proportion_model
-            spot_names = model.antibody_capture_adata.obs_names
-
-            # Use index_to_name mapping for column names (matches profile names)
-            cell_type_names = [joint_result.index_to_name.get(k, f"CellType_{k}") for k in range(joint_result.K)]
-
-            # Create proportions DataFrame with proper cell type names
-            global_cell_type_proportions_df = pd.DataFrame(
-                joint_result.Y,
-                index=spot_names,
-                columns=cell_type_names,
-            )
-            finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
-
-            # For benchmarking: store the discovery result structure
-            # Create a minimal discovery_result-like object for compatibility
-            class JointDiscoveryCompat:
-                def __init__(self, joint_result):
-                    self.profiles = joint_result.profiles
-                    self.proportions = joint_result.Y
-                    self.beta = {name: joint_result.beta[i] for i, name in enumerate(joint_result.marker_names)}
-                    self.smm_applied = False
-                    self.metadata = joint_result.metadata
-                    self.index_to_name = joint_result.index_to_name
-
-            discovery_result = JointDiscoveryCompat(joint_result)
-
-        elif args.auto_profiles:
+        if args.auto_profiles:
             # ============================================================
             # NEW: Spatial Colocalization Pipeline (Modules 1 + 2a + 2b + 2c)
             # ============================================================
@@ -759,32 +683,25 @@ def main():
         ##############################################################################
         # 1) Cell Proportion Inference
         ##############################################################################
-        if args.joint:
-            # Joint optimization already computed proportions - skip this step
-            logging.info(f"Using proportions from joint optimization for {sample_name}.")
-            # global_cell_type_proportions_df and finetuned_cell_type_proportions_df
-            # were already set in the joint optimization block above
-        else:
-            # Sequential approach: run proportion optimization after profile discovery/loading
-            logging.info(f"Running cell proportion model for {sample_name} ...")
+        logging.info(f"Running cell proportion model for {sample_name} ...")
 
-            global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
-                radius=radius,
-                tolerance=1e-4,
-                max_iterations=20,
-                lambda_reg=lambda_reg,
-                alpha=alpha_elastic,
-                max_workers=None,
-                checkpoint_interval=100,
-                max_y_change=max_y_change,
-                validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
-                skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
-                # Laplacian smoothing parameters
-                lambda_laplacian=args.lambda_laplacian,
-                laplacian_k=args.laplacian_k,
-            )
+        global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
+            radius=radius,
+            tolerance=1e-4,
+            max_iterations=20,
+            lambda_reg=lambda_reg,
+            alpha=alpha_elastic,
+            max_workers=None,
+            checkpoint_interval=100,
+            max_y_change=max_y_change,
+            validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
+            skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
+            # Laplacian smoothing parameters
+            lambda_laplacian=args.lambda_laplacian,
+            laplacian_k=args.laplacian_k,
+        )
 
-            logging.info(f"Completed cell proportion inference for {sample_name}.")
+        logging.info(f"Completed cell proportion inference for {sample_name}.")
 
         # Benchmarking Cell Proportions
         st_folder = os.path.join(input_folder, "ST_sim")
@@ -801,8 +718,8 @@ def main():
         spot_composition_df = sort_spot_indices(spot_composition_df)
         gt_cell_types = list(cell_type_profiles.keys())
 
-        # If using auto-profiles or joint optimization, calculate discovery metrics and remap proportions
-        if args.auto_profiles or args.joint:
+        # If using auto-profiles, calculate discovery metrics and remap proportions
+        if args.auto_profiles:
             # Calculate profile discovery accuracy metrics
             discovery_metrics = benchmark_profile_discovery(
                 model.cell_profile_dict,  # Discovered profiles
@@ -873,8 +790,8 @@ def main():
                 logging.warning(f"test_spots_df indices: {test_spots_df.index}, spot_composition_df indices: {spot_composition_df.index}")
                 raise ValueError("ERROR: The row indices in the input CSV files do not match or are not in the same order!")
 
-            # For auto-profiles or joint mode, we've already remapped columns, so align with GT columns
-            if args.auto_profiles or args.joint:
+            # For auto-profiles mode, we've already remapped columns, so align with GT columns
+            if args.auto_profiles:
                 # Get common columns (GT cell types that were matched)
                 common_cols = [c for c in spot_composition_df.columns if c in test_spots_df.columns]
                 if not common_cols:

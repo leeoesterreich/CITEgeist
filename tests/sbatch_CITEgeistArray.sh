@@ -10,7 +10,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=64G
 #SBATCH --partition=HTC
-#SBATCH --array=0-35 # 3 profile modes (manual, auto, joint), 2 test sets, 2 alpha, 1 lambda_reg, 3 max_y_change = 36 combinations
+#SBATCH --array=0-23 # 2 profile modes (manual, auto), 2 test sets, 2 alpha, 1 lambda_reg, 3 max_y_change = 24 combinations
 
 # Activate conda environment
 source activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/
@@ -29,7 +29,7 @@ lambda_reg=(1)
 alpha_elastic=(0.7 0.9)
 max_y_change=(0.2 0.4 0.8)
 TEST_SETS=("mixed" "high_seg")
-PROFILE_MODES=("manual" "auto" "joint")  # manual, auto-discovery, or joint optimization
+PROFILE_MODES=("manual" "auto")  # manual or auto-discovery (spatial colocalization pipeline)
 
 # Auto-discovery parameters (only used when profile_mode="auto")
 # Uses the new spatial colocalization pipeline (Modules 1 + 2a + 2b + 2c)
@@ -56,21 +56,9 @@ MAX_PROFILES=15            # Maximum number of profiles to select
 LAMBDA_LAPLACIAN=0.1       # Laplacian smoothing weight (0 to disable)
 LAPLACIAN_K=8              # Number of neighbors for Laplacian graph
 
-# NEW: Joint optimization parameters (profile_mode="joint")
-# This jointly optimizes profile discovery and proportion estimation using NMF + Gurobi
-JOINT_MIN_K=2              # Minimum number of cell types to try
-JOINT_MAX_K=12             # Maximum number of cell types to try
-JOINT_LAMBDA_SPATIAL=0.1   # Laplacian smoothing weight on Y
-JOINT_LAMBDA_SPARSITY=0.1  # L1 sparsity penalty on W
-JOINT_LAMBDA_DISTINCT=0.5  # Profile distinctness penalty
-JOINT_MAX_MARKERS=3        # Maximum markers per cell type
-JOINT_MAX_ITERATIONS=50    # Max alternating minimization iterations
-JOINT_N_RESTARTS=3         # Number of random restarts per K
-JOINT_PROFILE_THRESHOLD=0.3  # Min W weight to include marker in profile
-
 # Calculate indices based on array task ID
 # Order: profile_mode -> test_set -> alpha_elastic -> max_y_change
-# Total: 3 * 2 * 2 * 3 = 36 combinations
+# Total: 2 * 2 * 2 * 3 = 24 combinations
 n_max_y=3
 n_alpha=2
 n_test_sets=2
@@ -138,31 +126,6 @@ if [ "$PROFILE_MODE" == "auto" ]; then
     echo "  - variance_target=$VARIANCE_TARGET"
     echo "  - min_marginal_gain=$MIN_MARGINAL_GAIN"
     echo "  - lambda_laplacian=$LAMBDA_LAPLACIAN"
-    echo "  - laplacian_k=$LAPLACIAN_K"
-elif [ "$PROFILE_MODE" == "joint" ]; then
-    # JOINT OPTIMIZATION: Simultaneously learn profiles and proportions
-    CMD="$CMD --joint"
-    CMD="$CMD --joint-min-K $JOINT_MIN_K"
-    CMD="$CMD --joint-max-K $JOINT_MAX_K"
-    CMD="$CMD --joint-lambda-spatial $JOINT_LAMBDA_SPATIAL"
-    CMD="$CMD --joint-lambda-sparsity $JOINT_LAMBDA_SPARSITY"
-    CMD="$CMD --joint-lambda-distinct $JOINT_LAMBDA_DISTINCT"
-    CMD="$CMD --joint-max-markers $JOINT_MAX_MARKERS"
-    CMD="$CMD --joint-max-iterations $JOINT_MAX_ITERATIONS"
-    CMD="$CMD --joint-n-restarts $JOINT_N_RESTARTS"
-    CMD="$CMD --joint-profile-threshold $JOINT_PROFILE_THRESHOLD"
-    CMD="$CMD --discovery-seed $DISCOVERY_SEED"
-    CMD="$CMD --laplacian-k $LAPLACIAN_K"
-    echo "  - joint_min_K=$JOINT_MIN_K"
-    echo "  - joint_max_K=$JOINT_MAX_K"
-    echo "  - joint_lambda_spatial=$JOINT_LAMBDA_SPATIAL"
-    echo "  - joint_lambda_sparsity=$JOINT_LAMBDA_SPARSITY"
-    echo "  - joint_lambda_distinct=$JOINT_LAMBDA_DISTINCT"
-    echo "  - joint_max_markers=$JOINT_MAX_MARKERS"
-    echo "  - joint_max_iterations=$JOINT_MAX_ITERATIONS"
-    echo "  - joint_n_restarts=$JOINT_N_RESTARTS"
-    echo "  - joint_profile_threshold=$JOINT_PROFILE_THRESHOLD"
-    echo "  - discovery_seed=$DISCOVERY_SEED"
     echo "  - laplacian_k=$LAPLACIAN_K"
 fi
 
