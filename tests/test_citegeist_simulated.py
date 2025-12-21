@@ -253,15 +253,48 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
     if missed:
         print(f"  Missed profiles (not predicted): {missed}")
 
-    # Check if all metrics are not None or Nan, if they are, print the celltype
+    # Separate matched, spurious, and missed profiles
+    matched_keys = [k for k in metric_keys if not k.startswith('[SPURIOUS]') and not k.startswith('[MISSED]')]
+    spurious_keys = [k for k in metric_keys if k.startswith('[SPURIOUS]')]
+    missed_keys = [k for k in metric_keys if k.startswith('[MISSED]')]
+
+    # Check if any metrics are None/NaN and report
     for celltype in metric_keys:
         metric = metrics[celltype]
-        if metric['RMSE'] is None or metric['NRMSE'] is None or metric['MAE'] is None or np.isnan(metric['RMSE']) or np.isnan(metric['NRMSE']) or np.isnan(metric['MAE']):
+        if metric is None or metric['RMSE'] is None or np.isnan(metric.get('RMSE', float('nan'))):
             print(f"Cell type {celltype} has None or NaN metrics")
 
-    # Create DataFrame with metrics while excluding None or NaN values
-    # Only use actual metric entries (not special keys)
-    metric_values_list = [metrics[k] for k in metric_keys]
+    # Get valid metrics for matched profiles only (the real accuracy measure)
+    matched_metrics = [metrics[k] for k in matched_keys if metrics[k] is not None]
+    spurious_metrics = [metrics[k] for k in spurious_keys if metrics[k] is not None]
+    missed_metrics = [metrics[k] for k in missed_keys if metrics[k] is not None]
+
+    # Report counts
+    n_matched = len(matched_keys)
+    n_spurious = len(spurious_keys)
+    n_missed = len(missed_keys)
+    print(f"  Metrics breakdown: {n_matched} matched, {n_spurious} spurious, {n_missed} missed")
+
+    # Calculate metrics ONLY from matched profiles (exclude spurious/missed)
+    # Spurious and missed are reported separately but don't inflate/deflate matched performance
+    if matched_metrics:
+        avg_rmse = np.nanmean([m['RMSE'] for m in matched_metrics])
+        med_rmse = np.nanmedian([m['RMSE'] for m in matched_metrics])
+        avg_nrmse = np.nanmean([m['NRMSE'] for m in matched_metrics])
+        med_nrmse = np.nanmedian([m['NRMSE'] for m in matched_metrics])
+        avg_mae = np.nanmean([m['MAE'] for m in matched_metrics])
+        med_mae = np.nanmedian([m['MAE'] for m in matched_metrics])
+    else:
+        avg_rmse = med_rmse = avg_nrmse = med_nrmse = avg_mae = med_mae = float('nan')
+        print("  WARNING: No matched profiles - metrics are NaN!")
+
+    # Also report spurious/missed penalty metrics if any
+    if spurious_metrics:
+        spurious_rmse = np.nanmean([m['RMSE'] for m in spurious_metrics])
+        print(f"  Spurious profiles avg RMSE: {spurious_rmse:.4f} (compared against zero)")
+    if missed_metrics:
+        missed_rmse = np.nanmean([m['RMSE'] for m in missed_metrics])
+        print(f"  Missed profiles avg RMSE: {missed_rmse:.4f} (GT compared against zero)")
 
     metrics_values = {
         'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
@@ -269,14 +302,7 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
             'Average RMSE', 'Median RMSE', 'Average NRMSE',
             'Median NRMSE', 'Average MAE', 'Median MAE'
         ],
-        'Value': [
-            np.nanmean([m['RMSE'] for m in metric_values_list if m['RMSE'] is not None]),
-            np.nanmedian([m['RMSE'] for m in metric_values_list if m['RMSE'] is not None]),
-            np.nanmean([m['NRMSE'] for m in metric_values_list if m['NRMSE'] is not None]),
-            np.nanmedian([m['NRMSE'] for m in metric_values_list if m['NRMSE'] is not None]),
-            np.nanmean([m['MAE'] for m in metric_values_list if m['MAE'] is not None]),
-            np.nanmedian([m['MAE'] for m in metric_values_list if m['MAE'] is not None])
-        ]
+        'Value': [avg_rmse, med_rmse, avg_nrmse, med_nrmse, avg_mae, med_mae]
     }
     return pd.DataFrame(metrics_values)
 
