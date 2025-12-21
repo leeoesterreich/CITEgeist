@@ -273,36 +273,58 @@ def calculate_gex_metrics(ground_truth_dir, layer_dir, pass_number=None):
     n_matched = len(matched_keys)
     n_spurious = len(spurious_keys)
     n_missed = len(missed_keys)
-    print(f"  Metrics breakdown: {n_matched} matched, {n_spurious} spurious, {n_missed} missed")
+    n_total = n_matched + n_spurious + n_missed
+    print(f"  Metrics breakdown: {n_matched} matched, {n_spurious} spurious, {n_missed} missed (total: {n_total})")
 
-    # Calculate metrics ONLY from matched profiles (exclude spurious/missed)
-    # Spurious and missed are reported separately but don't inflate/deflate matched performance
-    if matched_metrics:
-        avg_rmse = np.nanmean([m['RMSE'] for m in matched_metrics])
-        med_rmse = np.nanmedian([m['RMSE'] for m in matched_metrics])
-        avg_nrmse = np.nanmean([m['NRMSE'] for m in matched_metrics])
-        med_nrmse = np.nanmedian([m['NRMSE'] for m in matched_metrics])
-        avg_mae = np.nanmean([m['MAE'] for m in matched_metrics])
-        med_mae = np.nanmedian([m['MAE'] for m in matched_metrics])
+    # ==========================================================================
+    # HOLISTIC METRICS: Include ALL cell types (matched + spurious + missed)
+    # This is the proper metric for simulated data where GT is fully known
+    # - Matched: pred vs GT (good predictions lower this)
+    # - Spurious: pred vs 0 (false positives increase this)
+    # - Missed: 0 vs GT (false negatives increase this)
+    # ==========================================================================
+    all_valid_metrics = matched_metrics + spurious_metrics + missed_metrics
+
+    if all_valid_metrics:
+        # Holistic metrics over ALL cell types
+        holistic_rmse = np.nanmean([m['RMSE'] for m in all_valid_metrics])
+        holistic_nrmse = np.nanmean([m['NRMSE'] for m in all_valid_metrics])
+        holistic_mae = np.nanmean([m['MAE'] for m in all_valid_metrics])
     else:
-        avg_rmse = med_rmse = avg_nrmse = med_nrmse = avg_mae = med_mae = float('nan')
-        print("  WARNING: No matched profiles - metrics are NaN!")
+        holistic_rmse = holistic_nrmse = holistic_mae = float('nan')
 
-    # Also report spurious/missed penalty metrics if any
+    # Also compute matched-only metrics for reference
+    if matched_metrics:
+        matched_rmse = np.nanmean([m['RMSE'] for m in matched_metrics])
+        matched_nrmse = np.nanmean([m['NRMSE'] for m in matched_metrics])
+        matched_mae = np.nanmean([m['MAE'] for m in matched_metrics])
+    else:
+        matched_rmse = matched_nrmse = matched_mae = float('nan')
+        print("  WARNING: No matched profiles!")
+
+    # Report component metrics
+    print(f"  Holistic RMSE (all {n_total} profiles): {holistic_rmse:.4f}")
+    print(f"  Matched-only RMSE ({n_matched} profiles): {matched_rmse:.4f}")
     if spurious_metrics:
         spurious_rmse = np.nanmean([m['RMSE'] for m in spurious_metrics])
-        print(f"  Spurious profiles avg RMSE: {spurious_rmse:.4f} (compared against zero)")
+        print(f"  Spurious penalty RMSE ({n_spurious} profiles): {spurious_rmse:.4f}")
     if missed_metrics:
         missed_rmse = np.nanmean([m['RMSE'] for m in missed_metrics])
-        print(f"  Missed profiles avg RMSE: {missed_rmse:.4f} (GT compared against zero)")
+        print(f"  Missed penalty RMSE ({n_missed} profiles): {missed_rmse:.4f}")
 
+    # Return holistic metrics as the primary measure (this is what matters for benchmarking)
     metrics_values = {
-        'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 6,
+        'Pass': [f"Pass {pass_number}" if pass_number else "Unknown"] * 9,
         'Metric': [
-            'Average RMSE', 'Median RMSE', 'Average NRMSE',
-            'Median NRMSE', 'Average MAE', 'Median MAE'
+            'Holistic RMSE', 'Holistic NRMSE', 'Holistic MAE',
+            'Matched RMSE', 'Matched NRMSE', 'Matched MAE',
+            'N_Matched', 'N_Spurious', 'N_Missed'
         ],
-        'Value': [avg_rmse, med_rmse, avg_nrmse, med_nrmse, avg_mae, med_mae]
+        'Value': [
+            holistic_rmse, holistic_nrmse, holistic_mae,
+            matched_rmse, matched_nrmse, matched_mae,
+            n_matched, n_spurious, n_missed
+        ]
     }
     return pd.DataFrame(metrics_values)
 
