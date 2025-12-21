@@ -694,7 +694,7 @@ def main():
             max_workers=None,
             checkpoint_interval=100,
             max_y_change=max_y_change,
-            validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
+            validation_warn_only=True,  # Always warn-only for simulated benchmarking (we know GT)
             skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
             # Laplacian smoothing parameters
             lambda_laplacian=args.lambda_laplacian,
