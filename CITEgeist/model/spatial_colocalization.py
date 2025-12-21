@@ -474,6 +474,7 @@ def analyze_marker_colocalization(
     *,
     markers_to_analyze: Optional[List[str]] = None,
     neighbor_k: int = 6,
+    smooth_k: int = 6,
     signal_threshold_percentile: float = 75.0,
     n_permutations: int = 199,
     seed: int = 1234,
@@ -497,6 +498,9 @@ def analyze_marker_colocalization(
         markers_to_analyze: Subset of markers to analyze. If None, analyze all pairwise.
             Recommended: Pass result.interesting_markers from identify_interesting_markers().
         neighbor_k: Number of nearest neighbors for spatial analysis (default: 6).
+        smooth_k: Number of neighbors for spatial smoothing before bivariate Moran's I (default: 6).
+            Smoothing reduces noise and improves detection of spatial co-expression patterns,
+            especially in mixed tissue contexts where cell types overlap spatially.
         signal_threshold_percentile: Percentile threshold for classifying positive spots (default: 75).
         n_permutations: Number of permutations for bivariate Moran's I p-value (default: 199).
             Higher values give more precise p-values but take longer.
@@ -568,6 +572,18 @@ def analyze_marker_colocalization(
         logging.info(f"Building {neighbor_k}-NN neighbor graph...")
     neighbors = _build_neighbor_graph(coords, neighbor_k)
 
+    # Spatial smoothing for bivariate Moran's I (reduces noise, improves mixed data detection)
+    if smooth_k > 0:
+        if verbose:
+            logging.info(f"Applying spatial smoothing (k={smooth_k} neighbors) for bivariate Moran's I...")
+        smooth_neighbors = _build_neighbor_graph(coords, smooth_k)
+        analyze_X_smooth = np.zeros_like(analyze_X)
+        for spot_idx in range(n_spots):
+            neighbor_vals = analyze_X[smooth_neighbors[spot_idx], :]
+            analyze_X_smooth[spot_idx] = np.mean(neighbor_vals, axis=0)
+    else:
+        analyze_X_smooth = analyze_X
+
     # Binarize markers (kept for backwards-compatible metrics)
     if verbose:
         logging.info(f"Binarizing markers at {signal_threshold_percentile}th percentile...")
@@ -586,26 +602,31 @@ def analyze_marker_colocalization(
             name_a = analyze_names[i]
             name_b = analyze_names[j]
 
+            # Raw values for correlation and score metrics
             values_a = analyze_X[:, i]
             values_b = analyze_X[:, j]
+            # Smoothed values for bivariate Moran's I (better for mixed data)
+            smooth_a = analyze_X_smooth[:, i]
+            smooth_b = analyze_X_smooth[:, j]
             binary_a = binary[:, i]
             binary_b = binary[:, j]
 
             # Same-spot metrics (binary-based, for backwards compatibility)
             jaccard, co_spots, co_frac = _compute_jaccard(binary_a, binary_b)
 
-            # Correlation metrics (continuous)
+            # Correlation metrics (continuous, on raw data)
             pearson_r, spearman_rho, corr_pvalue = _compute_correlation(values_a, values_b)
 
             # Continuous similarity metrics (binarization-free) - used for score
             cosine_sim = _compute_cosine_similarity(values_a, values_b)
-            bivariate_i = _compute_bivariate_morans_i(values_a, values_b, neighbors)
-            # Skip bivariate Moran's I permutation test - FDR uses neighbor enrichment
-            bivariate_pval = 0.5  # Placeholder
+            # Bivariate Moran's I with permutation test - default for FDR correction
+            # Uses smoothed data to reduce noise and improve detection in mixed tissue
+            bivariate_i, bivariate_pval = _compute_bivariate_morans_i_pvalue(
+                smooth_a, smooth_b, neighbors, rng, n_perm=n_permutations
+            )
 
-            # Neighborhood metrics (binary-based, used for FDR filtering)
-            # Binarization acts as stringent filter focusing on PEAK expression spots
-            # This prevents false merges that continuous metrics might allow
+            # Neighborhood metrics (binary-based, alternative for high-seg data)
+            # Binarization focuses on PEAK expression spots - stricter but works for clear boundaries
             enrich_ab, enrich_ba, enrich_pvalue = _compute_neighbor_enrichment(
                 binary_a, binary_b, neighbors, rng, n_permutations
             )
@@ -735,20 +756,22 @@ def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
     fallback_to_raw: bool = True,
+    pvalue_source: str = "bivariate_morans",
 ) -> Tuple[List[MarkerPairColocalization], NDArray[np.bool_], str]:
     """
-    Apply Benjamini-Hochberg FDR correction to neighbor enrichment p-values.
-
-    Uses neighbor enrichment p-values (from permutation test) which test whether
-    marker B is enriched in neighbors of A-positive spots. The binarization
-    (75th percentile threshold) acts as a stringent filter that prevents false
-    merges by focusing on PEAK expression spots rather than overall correlation.
+    Apply Benjamini-Hochberg FDR correction to p-values.
 
     Args:
         pairs: List of marker pair colocalization results.
         alpha: FDR threshold (default: 0.05 for q < 5%).
         fallback_to_raw: If True and FDR finds nothing but raw p-values
             suggest signal exists, fall back to raw p-value threshold.
+        pvalue_source: Which p-value to use for FDR correction:
+            - 'bivariate_morans' (default): Tests spatial cross-correlation
+              between markers. Works well for both mixed and high-seg data.
+            - 'neighbor_enrichment': Binary-based, tests if marker B is enriched
+              in neighbors of A-positive spots. Best for high-segregation data.
+            - 'correlation': Uses correlation p-value (Pearson/Spearman).
 
     Returns:
         Tuple of (filtered pairs, boolean mask, method_used).
@@ -757,8 +780,13 @@ def _apply_fdr_correction(
     if len(pairs) == 0:
         return [], np.array([], dtype=bool), "fdr"
 
-    # Use neighbor enrichment p-value (binary-based, stricter than continuous)
-    pvalues = np.array([p.neighbor_enrichment_pvalue for p in pairs])
+    # Select p-value source based on data characteristics
+    if pvalue_source == "bivariate_morans":
+        pvalues = np.array([p.bivariate_morans_pvalue for p in pairs])
+    elif pvalue_source == "correlation":
+        pvalues = np.array([p.correlation_pvalue for p in pairs])
+    else:  # neighbor_enrichment
+        pvalues = np.array([p.neighbor_enrichment_pvalue for p in pairs])
 
     # Benjamini-Hochberg procedure
     n = len(pvalues)
@@ -1531,6 +1559,7 @@ def discover_profiles(
     top_k: int = 3,
     min_score: Optional[float] = None,
     use_triangle_assembly: bool = False,
+    pvalue_source: str = "bivariate_morans",
     seed: int = 1234,
     verbose: bool = True,
 ) -> ProfileDiscoveryResult:
@@ -1564,6 +1593,12 @@ def discover_profiles(
         use_triangle_assembly: If True, use triangle-first assembly instead
             of hierarchical clustering (default: False). Triangle assembly
             is more robust for detecting triplets but doesn't build dendrograms.
+        pvalue_source: Which p-value to use for FDR correction:
+            - 'bivariate_morans' (default): Tests spatial cross-correlation
+              between markers. Works well for both mixed and high-seg data.
+            - 'neighbor_enrichment': Binary-based. Best for high-segregation
+              data with clear cell type boundaries.
+            - 'correlation': Pearson/Spearman p-value.
         seed: Random seed for reproducibility (default: 1234).
         verbose: Log progress information (default: True).
 
@@ -1584,17 +1619,20 @@ def discover_profiles(
     if verbose:
         logging.info(f"Discovering profiles from {len(pairs)} marker pairs...")
 
-    # Step 1: Apply BH-FDR correction to p-values (with fallback for permutation tests)
-    fdr_pairs, _, method_used = _apply_fdr_correction(pairs, alpha=fdr_alpha)
+    # Step 1: Apply BH-FDR correction to p-values
+    # Default: bivariate_morans (spatial cross-correlation), works for mixed and high-seg data
+    fdr_pairs, _, method_used = _apply_fdr_correction(
+        pairs, alpha=fdr_alpha, pvalue_source=pvalue_source
+    )
 
     if verbose:
         if method_used == "fdr":
             logging.info(
-                f"FDR correction (q < {fdr_alpha}): {len(fdr_pairs)}/{len(pairs)} pairs"
+                f"FDR correction [{pvalue_source}] (q < {fdr_alpha}): {len(fdr_pairs)}/{len(pairs)} pairs"
             )
         else:
             logging.info(
-                f"Raw p-value filter (fallback): {len(fdr_pairs)}/{len(pairs)} pairs"
+                f"Raw p-value filter [{pvalue_source}] (fallback): {len(fdr_pairs)}/{len(pairs)} pairs"
             )
 
     # Step 2: Apply mutual top-k sparsification

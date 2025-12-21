@@ -14,6 +14,7 @@ import numpy as np
 import scanpy as sc
 import pandas as pd
 import scipy.sparse
+from scipy.stats import kurtosis as scipy_kurtosis
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
@@ -35,13 +36,19 @@ sys.path.append(os.path.join(repo_root, 'CITEgeist'))
 # Now import using the full package path
 from model.citegeist_model import CitegeistModel
 from model.utils import benchmark_cell_proportions, calculate_expression_metrics, export_anndata_layers
-from model.auto_profile_discovery import integrate_with_model
 from model.profile_matching import (
     match_profiles_to_ground_truth,
     create_remapped_proportions,
     benchmark_profile_discovery,
 )
-from model.background_correction import spatial_smooth_markers, fit_spatial_mixture_model
+
+# New spatial colocalization pipeline (Module 1 + 2a + 2b + 2c)
+from model import (
+    identify_interesting_markers,
+    analyze_marker_colocalization,
+    discover_profiles,
+    select_profiles,  # Default: spatial variance-based selection
+)
 
 
 ##############################################################################
@@ -357,97 +364,60 @@ def main():
     parser.add_argument('--skip_pass2', action='store_true', default=False,
                         help='If set, skip pass 2 and only run pass 1.')
     parser.add_argument('--auto-profiles', action='store_true', default=False,
-                        help='Use auto-discovered profiles instead of manual profiles')
-    parser.add_argument('--max-profile-size', type=int, default=2,
-                        help='Maximum markers per profile for auto-discovery (default: 2)')
+                        help='Use auto-discovered profiles via spatial colocalization pipeline')
+    parser.add_argument('--top-k', type=int, default=3,
+                        help='Mutual top-k for profile pair sparsification (default: 3, tested value)')
     parser.add_argument('--discovery-seed', type=int, default=1234,
                         help='Random seed for profile discovery reproducibility')
-    # New robust auto-discovery parameters
-    parser.add_argument('--morans-k', type=str, default='3,5,8,12',
-                        help='Moran I k-neighbors, comma-separated for multi-scale (default: 3,5,8,12)')
-    parser.add_argument('--morans-i-threshold', type=float, default=0.1,
-                        help='Moran I threshold, stricter to filter noise (default: 0.1)')
-    parser.add_argument('--hierarchical', action='store_true', default=False,
-                        help='Enable hierarchical profile discovery for shared markers')
-    parser.add_argument('--model-selection', type=str, default='cv',
-                        choices=['cv', 'bic', 'greedy'],
-                        help='Model selection strategy (default: cv)')
-    parser.add_argument('--cv-folds', type=int, default=5,
-                        help='Number of CV folds for model selection (default: 5)')
-    parser.add_argument('--min-profiles', type=int, default=2,
-                        help='Minimum profiles before model selection stopping (default: 2)')
-    # NEW: Reconstruction-based discovery parameters
-    parser.add_argument('--selection-method', type=str, default='reconstruction',
-                        choices=['reconstruction', 'permutation', 'miqp', 'miqp_hierarchical'],
-                        help='Profile selection method (default: reconstruction)')
-    parser.add_argument('--min-reconstruction-improvement', type=float, default=0.05,
-                        help='Minimum reconstruction improvement to include profile (default: 0.05)')
-    parser.add_argument('--abundance-adaptive', action='store_true', default=True,
-                        help='Use abundance-adaptive marker classification (default: True)')
-    parser.add_argument('--no-abundance-adaptive', action='store_false', dest='abundance_adaptive',
-                        help='Disable abundance-adaptive marker classification')
-    parser.add_argument('--ubiquitous-cv-threshold', type=float, default=0.5,
-                        help='CV threshold for ubiquitous classification (default: 0.5)')
-    parser.add_argument('--ubiquitous-presence-threshold', type=float, default=0.7,
-                        help='Presence fraction threshold for ubiquitous classification (default: 0.7)')
-    parser.add_argument('--rare-presence-threshold', type=float, default=0.15,
-                        help='Presence threshold for rare classification (high_frac < this, default: 0.15)')
-    parser.add_argument('--rare-intensity-factor', type=float, default=2.0,
-                        help='Intensity factor for rare classification (max > factor*mean, default: 2.0)')
-    parser.add_argument('--redundancy-threshold', type=float, default=0.9,
-                        help='Correlation threshold for redundancy check (default: 0.9)')
-    parser.add_argument('--allow-overlap', type=str, default='auto',
-                        choices=['auto', 'true', 'false'],
-                        help='Allow overlapping markers: auto (detect), true (hierarchical), false (flat)')
-    # MIQP-specific parameters (only used when selection-method=miqp or miqp_hierarchical)
-    parser.add_argument('--miqp-lambda-spatial', type=float, default=0.1,
-                        help='Spatial penalty weight for MIQP (default: 0.1)')
-    parser.add_argument('--miqp-lambda-complexity', type=float, default=0.01,
-                        help='Profile count penalty for MIQP (default: 0.01)')
-    parser.add_argument('--miqp-time-limit', type=float, default=300.0,
-                        help='Time limit in seconds for MIQP solver (default: 300)')
-    parser.add_argument('--miqp-gap', type=float, default=0.01,
-                        help='Acceptable MIP optimality gap (default: 0.01)')
-    # Hierarchical MIQP parameters (only used when selection-method=miqp_hierarchical)
-    parser.add_argument('--miqp-lambda-overlap', type=float, default=0.5,
-                        help='Same-level overlap penalty for hierarchical MIQP (default: 0.5)')
-    parser.add_argument('--miqp-lambda-orphan', type=float, default=0.2,
-                        help='Orphan penalty for hierarchical MIQP (default: 0.2)')
-    parser.add_argument('--miqp-lambda-sparsity', type=float, default=0.3,
-                        help='Spot-level sparsity penalty for hierarchical MIQP (default: 0.3)')
-    parser.add_argument('--miqp-enforce-hierarchy', action='store_true', default=False,
-                        help='Use hard hierarchy constraints (default: soft penalty)')
-    parser.add_argument('--miqp-sparsity-aggregation', type=str, default='mean',
-                        choices=['mean', 'min', 'geometric'],
-                        help='Spot-profile fit aggregation method (default: mean)')
-    # NEW: Spatial Mixture Model (SMM) background correction parameters
-    parser.add_argument('--use-smm', action='store_true', default=False,
-                        help='Enable SMM background correction (default: False)')
-    parser.add_argument('--smm-k-neighbors', type=int, default=6,
-                        help='Number of neighbors for SMM spatial graph (default: 6)')
-    parser.add_argument('--smm-snr-threshold', type=float, default=1.5,
-                        help='Minimum SNR for marker to pass SMM filter (default: 1.5)')
-    parser.add_argument('--smm-min-signal-fraction', type=float, default=0.05,
-                        help='Minimum fraction of spots with signal (default: 0.05)')
-    parser.add_argument('--smm-max-signal-fraction', type=float, default=0.95,
-                        help='Maximum fraction of spots with signal (default: 0.95)')
-    parser.add_argument('--smm-beta-init', type=float, default=1.0,
-                        help='Initial spatial regularization for SMM (default: 1.0)')
-    parser.add_argument('--smm-max-iter', type=int, default=50,
-                        help='Maximum iterations for SMM EM algorithm (default: 50)')
-    # NEW: Spatial smoothing parameters (applied before SMM)
-    parser.add_argument('--smm-smoothing-sigma', type=float, default=1.5,
-                        help='Gaussian smoothing bandwidth for SMM preprocessing (default: 1.5)')
-    parser.add_argument('--smm-smoothing-k', type=int, default=6,
-                        help='Number of neighbors for spatial smoothing (default: 6)')
-    # NEW: Visualization parameters
-    parser.add_argument('--visualize-markers', action='store_true', default=False,
-                        help='Generate spatial diagnostic plots for GT markers (default: False)')
-    # NEW: Laplacian smoothing parameters for proportion optimization
+    # Spatial colocalization pipeline parameters (Modules 1 + 2a + 2b + 2c)
+    parser.add_argument('--morans-k', type=int, default=8,
+                        help='Number of neighbors for spatial statistics (default: 8)')
+    parser.add_argument('--smooth-k', type=int, default=6,
+                        help='Number of neighbors for spatial smoothing before Moran\'s I (default: 6)')
+    parser.add_argument('--n-permutations', type=int, default=999,
+                        help='Number of permutations for significance testing (default: 999)')
+    parser.add_argument('--fdr-threshold', type=float, default=0.05,
+                        help='FDR threshold for significant markers/pairs (default: 0.05)')
+    # Module 1 marker filtering thresholds
+    parser.add_argument('--gmm-snr-threshold', type=float, default=0.5,
+                        help='Minimum GMM SNR for marker to be interesting (default: 0.5)')
+    parser.add_argument('--kurtosis-threshold', type=float, default=None,
+                        help='Fixed kurtosis threshold (default: None = adaptive)')
+    parser.add_argument('--morans-threshold', type=float, default=None,
+                        help='Fixed Moran\'s I threshold (default: None = adaptive)')
+    # Module 2c: Spatial variance-based profile selection
+    parser.add_argument('--variance-target', type=float, default=0.90,
+                        help='Target fraction of spatial variance to explain (default: 0.90)')
+    parser.add_argument('--min-marginal-gain', type=float, default=0.005,
+                        help='Minimum marginal variance gain to add profile (default: 0.005)')
+    # Laplacian smoothing parameters for proportion optimization
     parser.add_argument('--lambda-laplacian', type=float, default=0.1,
                         help='Laplacian smoothing weight for spatial coherence (default: 0.1, 0 to disable)')
     parser.add_argument('--laplacian-k', type=int, default=8,
                         help='Number of neighbors for Laplacian graph (default: 8)')
+
+    # Joint optimization parameters (replaces sequential profile discovery + proportion estimation)
+    parser.add_argument('--joint', action='store_true', default=False,
+                        help='Use joint optimization for profile discovery + proportions (recommended)')
+    parser.add_argument('--joint-min-K', type=int, default=2,
+                        help='Minimum number of cell types for joint optimization (default: 2)')
+    parser.add_argument('--joint-max-K', type=int, default=12,
+                        help='Maximum number of cell types for joint optimization (default: 12)')
+    parser.add_argument('--joint-lambda-spatial', type=float, default=0.1,
+                        help='Laplacian spatial smoothing weight for joint optimization (default: 0.1)')
+    parser.add_argument('--joint-lambda-sparsity', type=float, default=0.1,
+                        help='L1 sparsity weight on profile weights W (default: 0.1)')
+    parser.add_argument('--joint-lambda-distinct', type=float, default=0.5,
+                        help='Profile distinctness penalty weight (default: 0.5)')
+    parser.add_argument('--joint-max-markers', type=int, default=3,
+                        help='Maximum markers per cell type profile (default: 3)')
+    parser.add_argument('--joint-max-iterations', type=int, default=50,
+                        help='Maximum alternating minimization iterations (default: 50)')
+    parser.add_argument('--joint-n-restarts', type=int, default=3,
+                        help='Number of random restarts per K (default: 3)')
+    parser.add_argument('--joint-profile-threshold', type=float, default=0.3,
+                        help='Minimum W weight to include marker in profile (default: 0.3)')
+
     args = parser.parse_args()
 
     radius = args.radius
@@ -461,7 +431,7 @@ def main():
 
     suffix = "FilteredRadiiArrayWinsorCLRDiscreteErrorMinimizing"
 
-    output_folder = os.path.join(output_folder, f'test_results/{variables}.', suffix + "CITEgeistOutput")
+    output_folder = os.path.join(output_folder, f'{variables}.', suffix + "CITEgeistOutput")
 
     # Create an output directory
     os.makedirs(output_folder, exist_ok=True)
@@ -530,13 +500,78 @@ def main():
 
         model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1)
 
+        # Save raw antibody data BEFORE preprocessing (Module 1 needs raw data)
+        X_antibody_raw = model.antibody_capture_adata.X.copy()
+        if scipy.sparse.issparse(X_antibody_raw):
+            X_antibody_raw = X_antibody_raw.toarray()
+
         # Preprocess datasets
         model.preprocess_gex(target_sum=10000)
-        model.preprocess_antibody()
+        model.preprocess_antibody()  # Applies Winsorizing + CLR transformation
 
         # Load or discover cell profiles
-        if args.auto_profiles:
-            # Get spatial coordinates for Moran's I filtering
+        if args.joint:
+            # Use joint optimization (recommended - replaces sequential approach)
+            logging.info("Running JOINT optimization for profile discovery + proportions...")
+            logging.info(f"  K range: [{args.joint_min_K}, {args.joint_max_K}]")
+            logging.info(f"  lambda_spatial={args.joint_lambda_spatial}, lambda_sparsity={args.joint_lambda_sparsity}")
+            logging.info(f"  lambda_distinct={args.joint_lambda_distinct}, max_markers={args.joint_max_markers}")
+
+            joint_result = model.run_joint_optimization(
+                min_K=args.joint_min_K,
+                max_K=args.joint_max_K,
+                max_markers_per_type=args.joint_max_markers,
+                lambda_spatial=args.joint_lambda_spatial,
+                lambda_sparsity=args.joint_lambda_sparsity,
+                lambda_distinct=args.joint_lambda_distinct,
+                laplacian_k=args.laplacian_k,
+                max_iterations=args.joint_max_iterations,
+                tolerance=1e-4,
+                n_restarts=args.joint_n_restarts,
+                seed=args.discovery_seed,
+                profile_threshold=args.joint_profile_threshold,
+                verbose=True,
+            )
+
+            logging.info(f"Joint optimization selected K={joint_result.K} (BIC={joint_result.bic:.2f})")
+            logging.info(f"Discovered {len(joint_result.profiles) - 1} profiles: {list(joint_result.profiles.keys())}")
+
+            # Store joint result proportions for benchmarking
+            # The joint optimization already computed proportions, so we don't need run_cell_proportion_model
+            spot_names = model.antibody_capture_adata.obs_names
+
+            # Use index_to_name mapping for column names (matches profile names)
+            cell_type_names = [joint_result.index_to_name.get(k, f"CellType_{k}") for k in range(joint_result.K)]
+
+            # Create proportions DataFrame with proper cell type names
+            global_cell_type_proportions_df = pd.DataFrame(
+                joint_result.Y,
+                index=spot_names,
+                columns=cell_type_names,
+            )
+            finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
+
+            # For benchmarking: store the discovery result structure
+            # Create a minimal discovery_result-like object for compatibility
+            class JointDiscoveryCompat:
+                def __init__(self, joint_result):
+                    self.profiles = joint_result.profiles
+                    self.proportions = joint_result.Y
+                    self.beta = {name: joint_result.beta[i] for i, name in enumerate(joint_result.marker_names)}
+                    self.smm_applied = False
+                    self.metadata = joint_result.metadata
+                    self.index_to_name = joint_result.index_to_name
+
+            discovery_result = JointDiscoveryCompat(joint_result)
+
+        elif args.auto_profiles:
+            # ============================================================
+            # NEW: Spatial Colocalization Pipeline (Modules 1 + 2a + 2b + 2c)
+            # ============================================================
+            # This replaces the old integrate_with_model() approach with
+            # a cleaner, modular pipeline based on spatial statistics.
+
+            # Get spatial coordinates
             coords = model.antibody_capture_adata.obsm.get('spatial', None)
             if coords is None:
                 coords = model.gene_expression_adata.obsm.get('spatial', None)
@@ -546,185 +581,125 @@ def main():
                     "Ensure obsm['spatial'] is populated in the AnnData object."
                 )
 
-            logging.info("Running auto profile discovery...")
-            # Parse morans_k from comma-separated string to list of ints
-            morans_k = [int(k.strip()) for k in args.morans_k.split(',')]
-            if len(morans_k) == 1:
-                morans_k = morans_k[0]  # Single int for backward compatibility
+            logging.info("Running spatial colocalization pipeline for auto profile discovery...")
 
-            # Convert allow_overlap string to proper type
-            allow_overlap_arg = args.allow_overlap
-            if allow_overlap_arg == 'auto':
-                allow_overlap_value = 'auto'
-            elif allow_overlap_arg == 'true':
-                allow_overlap_value = True
-            else:
-                allow_overlap_value = False
+            # Get marker names
+            marker_names = list(model.antibody_capture_adata.var_names)
 
-            discovery_result = integrate_with_model(
-                model,
-                max_k=args.max_profile_size,
-                seed=args.discovery_seed,
+            # NOTE: Use RAW antibody data (X_antibody_raw) for Module 1-2c
+            # The CLR transformation changes kurtosis/Moran's I characteristics
+            # significantly and causes adaptive thresholds to fail.
+            # The preprocessed CLR data is still used for proportion optimization.
+
+            # -----------------------------------------------------------
+            # Module 1: Identify spatially interesting markers (RAW DATA)
+            # -----------------------------------------------------------
+            logging.info("Module 1: Identifying interesting markers (using raw data)...")
+            marker_result = identify_interesting_markers(
+                X=X_antibody_raw,
                 coords=coords,
-                # Robust auto-discovery parameters
-                morans_k=morans_k,
-                morans_i_threshold=args.morans_i_threshold,
-                hierarchical=args.hierarchical,
-                model_selection=args.model_selection,
-                cv_folds=args.cv_folds,
-                min_profiles=args.min_profiles,
-                # Reconstruction-based discovery parameters
-                selection_method=args.selection_method,
-                min_reconstruction_improvement=args.min_reconstruction_improvement,
-                use_abundance_adaptive=args.abundance_adaptive,
-                ubiquitous_cv_threshold=args.ubiquitous_cv_threshold,
-                ubiquitous_presence_threshold=args.ubiquitous_presence_threshold,
-                rare_presence_threshold=args.rare_presence_threshold,
-                rare_intensity_factor=args.rare_intensity_factor,
-                redundancy_threshold=args.redundancy_threshold,
-                allow_overlap=allow_overlap_value,
-                # MIQP-specific parameters
-                miqp_lambda_spatial=args.miqp_lambda_spatial,
-                miqp_lambda_complexity=args.miqp_lambda_complexity,
-                miqp_time_limit=args.miqp_time_limit,
-                miqp_gap=args.miqp_gap,
-                # Hierarchical MIQP parameters
-                miqp_lambda_overlap=args.miqp_lambda_overlap,
-                miqp_lambda_orphan=args.miqp_lambda_orphan,
-                miqp_lambda_sparsity=args.miqp_lambda_sparsity,
-                miqp_enforce_hierarchy=args.miqp_enforce_hierarchy,
-                miqp_sparsity_aggregation=args.miqp_sparsity_aggregation,
-                # SMM background correction parameters
-                use_smm=args.use_smm,
-                smm_k_neighbors=args.smm_k_neighbors,
-                smm_snr_threshold=args.smm_snr_threshold,
-                smm_min_signal_fraction=args.smm_min_signal_fraction,
-                smm_max_signal_fraction=args.smm_max_signal_fraction,
-                smm_beta_init=args.smm_beta_init,
-                smm_max_iter=args.smm_max_iter,
-                # Spatial smoothing parameters (applied before SMM)
-                smm_apply_smoothing=True,  # Always apply smoothing when SMM is enabled
-                smm_smoothing_sigma=args.smm_smoothing_sigma,
-                smm_smoothing_k=args.smm_smoothing_k,
+                marker_names=marker_names,
+                morans_k=args.morans_k,
+                smooth_k=args.smooth_k,  # Spatial smoothing before Moran's I
+                morans_n_perm=args.n_permutations,
+                gmm_snr_threshold=args.gmm_snr_threshold,
+                kurtosis_threshold=args.kurtosis_threshold,
+                morans_threshold=args.morans_threshold,
+                seed=args.discovery_seed,
+                verbose=True,
             )
-            logging.info(f"Discovered {len(discovery_result.profiles)} profiles: {list(discovery_result.profiles.keys())}")
 
-            # Report SMM marker filtering metrics (compare against ground truth markers)
-            if discovery_result.smm_applied:
-                # Extract all ground truth markers from cell_type_profiles
-                gt_markers = set()
-                for cell_type, marker_dict in cell_type_profiles.items():
-                    for marker_list in marker_dict.values():
-                        gt_markers.update(marker_list)
+            interesting_markers = marker_result.interesting_markers
+            logging.info(f"Module 1: Found {len(interesting_markers)} interesting markers")
+            print(f"\nModule 1: {len(interesting_markers)} spatially interesting markers identified")
 
-                # Calculate how many GT markers were filtered vs retained
-                filtered_markers = set(discovery_result.smm_filtered_markers)
-                gt_markers_filtered = gt_markers & filtered_markers
-                gt_markers_retained = gt_markers - filtered_markers
+            # Print learned thresholds and detected markers for debugging
+            print(f"  Learned thresholds: kurtosis={marker_result.kurtosis_threshold:.2f}, morans_i={marker_result.morans_threshold:.3f}")
+            print(f"  Interesting markers: {interesting_markers}")
 
-                # Count nonspecific markers (markers containing "Nonspecific")
-                nonspecific_filtered = sum(1 for m in filtered_markers if "Nonspecific" in m)
-                nonspecific_retained = sum(1 for m in (set(model.antibody_capture_adata.var_names) - filtered_markers) if "Nonspecific" in m)
-
-                print(f"\nSMM Marker Filtering Metrics:")
-                print(f"  SMM applied: True (β={discovery_result.smm_beta_learned:.3f})")
-                print(f"  Total markers filtered: {len(filtered_markers)}")
-                print(f"  Ground truth markers retained: {len(gt_markers_retained)}/{len(gt_markers)} ({100*len(gt_markers_retained)/len(gt_markers):.1f}%)")
-                print(f"  Ground truth markers LOST: {len(gt_markers_filtered)}/{len(gt_markers)} ({100*len(gt_markers_filtered)/len(gt_markers):.1f}%)")
-                if gt_markers_filtered:
-                    print(f"    Lost GT markers: {sorted(gt_markers_filtered)}")
-                print(f"  Nonspecific markers filtered: {nonspecific_filtered}")
-                print(f"  Nonspecific markers retained (PROBLEM): {nonspecific_retained}")
-
-                # Report SNR and signal fraction values for GT markers
-                if discovery_result.smm_snr_values:
-                    print(f"\n  SNR/Signal fraction for ground truth markers:")
-                    signal_fracs = discovery_result.smm_signal_fractions or {}
-                    for marker in sorted(gt_markers):
-                        snr = discovery_result.smm_snr_values.get(marker, None)
-                        sig_frac = signal_fracs.get(marker, None)
-                        status = "FILTERED" if marker in gt_markers_filtered else "retained"
-                        if snr is not None and sig_frac is not None:
-                            # Determine filter reason
-                            reasons = []
-                            if snr < args.smm_snr_threshold:
-                                reasons.append(f"SNR<{args.smm_snr_threshold}")
-                            if sig_frac < args.smm_min_signal_fraction:
-                                reasons.append(f"sig<{args.smm_min_signal_fraction}")
-                            if sig_frac > args.smm_max_signal_fraction:
-                                reasons.append(f"sig>{args.smm_max_signal_fraction}")
-                            reason_str = f" [{','.join(reasons)}]" if reasons and status == "FILTERED" else ""
-                            print(f"    {marker}: SNR={snr:.3f}, sig_frac={sig_frac:.3f} ({status}){reason_str}")
-                        elif snr is not None:
-                            print(f"    {marker}: SNR={snr:.3f} ({status})")
-                        else:
-                            print(f"    {marker}: not found in data")
-
-                # Report SNR, signal fraction, and Moran's I for sample nonspecific markers
-                print(f"\n  SNR/Signal fraction/Moran's I for sample NONSPECIFIC markers:")
-                all_markers = list(model.antibody_capture_adata.var_names)
-                nonspecific_sample = [m for m in NONSPECIFIC_MARKERS_FOR_VISUALIZATION if m in all_markers]
-
-                for marker in nonspecific_sample:
-                    snr = discovery_result.smm_snr_values.get(marker, None)
-                    sig_frac = signal_fracs.get(marker, None)
-                    status = "FILTERED" if marker in filtered_markers else "retained"
-
-                    # Compute Moran's I for this marker
-                    morans_i_val = np.nan
-                    if discovery_result.smm_smoothed_matrix is not None:
-                        try:
-                            m_idx = all_markers.index(marker)
-                            smoothed_vals = discovery_result.smm_smoothed_matrix[:, m_idx]
-                            zscore_vals = (smoothed_vals - smoothed_vals.mean()) / (smoothed_vals.std() + 1e-10)
-                            morans_i_val = compute_morans_i(zscore_vals, coords, k=8)
-                        except (ValueError, IndexError):
-                            pass
-
-                    if snr is not None and sig_frac is not None:
-                        print(f"    {marker}: SNR={snr:.3f}, sig_frac={sig_frac:.3f}, I={morans_i_val:.3f} ({status})")
-                    elif snr is not None:
-                        print(f"    {marker}: SNR={snr:.3f}, I={morans_i_val:.3f} ({status})")
-                    else:
-                        print(f"    {marker}: not found in SMM data")
-
-            # Visualize spatial patterns for GT markers (if enabled)
-            # New 5-panel plots showing: Raw -> P(signal) -> Corrected -> Z-score -> Verdict
-            if args.visualize_markers:
-                print("\nGenerating 5-panel spatial diagnostic plots for GT markers...")
-                gt_markers_to_viz = list(GT_MARKERS_FOR_VISUALIZATION.values())
-
-                visualize_marker_spatial_patterns(
-                    marker_names=gt_markers_to_viz,
+            if len(interesting_markers) < 2:
+                logging.warning("Not enough interesting markers found. Falling back to manual profiles.")
+                print("  Warning: Not enough interesting markers. Using manual profiles.")
+                model.load_cell_profile_dict(cell_type_profiles)
+            else:
+                # -----------------------------------------------------------
+                # Module 2a: Analyze marker colocalization (RAW DATA)
+                # -----------------------------------------------------------
+                logging.info("Module 2a: Analyzing marker colocalization (using raw data)...")
+                coloc_result = analyze_marker_colocalization(
+                    X=X_antibody_raw,
                     coords=coords,
-                    output_dir=output_folder,
-                    discovery_result=discovery_result,
-                    prefix=sample_name,
-                    morans_k=8,
-                    morans_i_threshold=args.morans_i_threshold,
-                    alpha=0.1,
-                    spot_size=30.0,
+                    marker_names=marker_names,
+                    markers_to_analyze=interesting_markers,
+                    neighbor_k=args.morans_k,
+                    smooth_k=args.smooth_k,  # Spatial smoothing before bivariate Moran's I
+                    n_permutations=args.n_permutations,
+                    seed=args.discovery_seed,
+                    verbose=True,
                 )
 
-                # Also visualize nonspecific markers for comparison
-                print("\nGenerating 5-panel spatial diagnostic plots for NONSPECIFIC markers...")
-                nonspecific_markers_to_viz = [
-                    m for m in NONSPECIFIC_MARKERS_FOR_VISUALIZATION
-                    if m in model.antibody_capture_adata.var_names
-                ]
-                if nonspecific_markers_to_viz:
-                    visualize_marker_spatial_patterns(
-                        marker_names=nonspecific_markers_to_viz,
-                        coords=coords,
-                        output_dir=output_folder,
-                        discovery_result=discovery_result,
-                        prefix=f"{sample_name}_nonspecific",
-                        morans_k=8,
-                        morans_i_threshold=args.morans_i_threshold,
-                        alpha=0.1,
-                        spot_size=30.0,
-                    )
-                print(f"Spatial diagnostic plots saved to: {os.path.join(output_folder, 'spatial_diagnostics')}")
+                logging.info(f"Module 2a: Found {len(coloc_result.pairs)} significant marker pairs")
+                print(f"Module 2a: {len(coloc_result.pairs)} significant colocalization pairs")
+
+                # -----------------------------------------------------------
+                # Module 2b: Discover profiles via hierarchical clustering
+                # -----------------------------------------------------------
+                logging.info("Module 2b: Discovering profiles...")
+                discovery_result = discover_profiles(
+                    colocalization_result=coloc_result,
+                    fdr_alpha=args.fdr_threshold,
+                    top_k=args.top_k,
+                    seed=args.discovery_seed,
+                    verbose=True,
+                )
+
+                logging.info(f"Module 2b: Discovered {len(discovery_result.profiles)} candidate profiles")
+                print(f"Module 2b: {len(discovery_result.profiles)} candidate profiles discovered")
+                for i, profile in enumerate(discovery_result.profiles):
+                    print(f"  {i+1}. {profile}")
+
+                # -----------------------------------------------------------
+                # Module 2c: Select profiles by spatial variance (RAW DATA)
+                # -----------------------------------------------------------
+                logging.info("Module 2c: Selecting profiles by spatial variance (using raw data)...")
+                selection_result = select_profiles(
+                    X=X_antibody_raw,
+                    coords=coords,
+                    marker_names=marker_names,
+                    profiles=discovery_result.profiles,
+                    interesting_markers=interesting_markers,
+                    colocalization_result=coloc_result,
+                    min_spatial_explained=args.variance_target,
+                    min_marginal_gain=args.min_marginal_gain,
+                    verbose=True,
+                )
+
+                selected_profiles = selection_result.selected_profiles
+                n_selected = selection_result.optimal_n
+                # Get metrics at the selected n (arrays are indexed from 0, n=1 is index 0)
+                total_ve = float(selection_result.variance_explained[n_selected - 1]) if n_selected > 0 else 0.0
+                ps = float(selection_result.proportion_smoothness[n_selected - 1]) if n_selected > 0 else 0.0
+                logging.info(f"Module 2c: Selected {len(selected_profiles)} profiles "
+                           f"(explains {total_ve:.1%} spatial variance)")
+                print(f"\nModule 2c: Selected {len(selected_profiles)} profiles")
+                print(f"  Spatial variance explained: {total_ve:.1%}")
+                print(f"  Proportion smoothness: {ps:.3f}")
+                print(f"  Stopping reason: {selection_result.stopping_reason}")
+
+                for i, profile in enumerate(selected_profiles):
+                    print(f"  {i+1}. {profile}")
+
+                # -----------------------------------------------------------
+                # Convert to cell_profile_dict format for CitegeistModel
+                # -----------------------------------------------------------
+                cell_profile_dict = {}
+                for i, profile in enumerate(selected_profiles):
+                    profile_name = f"Profile_{i+1}"
+                    markers_list = list(profile) if not isinstance(profile, list) else profile
+                    cell_profile_dict[profile_name] = {"Major": markers_list}
+
+                model.load_cell_profile_dict(cell_profile_dict)
+                logging.info(f"Loaded {len(cell_profile_dict)} profiles into model")
 
         else:
             # Use manual cell_type_profiles (existing behavior)
@@ -736,25 +711,32 @@ def main():
         ##############################################################################
         # 1) Cell Proportion Inference
         ##############################################################################
-        logging.info(f"Running cell proportion model for {sample_name} ...")
+        if args.joint:
+            # Joint optimization already computed proportions - skip this step
+            logging.info(f"Using proportions from joint optimization for {sample_name}.")
+            # global_cell_type_proportions_df and finetuned_cell_type_proportions_df
+            # were already set in the joint optimization block above
+        else:
+            # Sequential approach: run proportion optimization after profile discovery/loading
+            logging.info(f"Running cell proportion model for {sample_name} ...")
 
-        global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
-            radius=radius,
-            tolerance=1e-4,
-            max_iterations=20,
-            lambda_reg=lambda_reg,
-            alpha=alpha_elastic,
-            max_workers=None,
-            checkpoint_interval=100,
-            max_y_change=max_y_change,
-            validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
-            skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
-            # Laplacian smoothing parameters
-            lambda_laplacian=args.lambda_laplacian,
-            laplacian_k=args.laplacian_k,
-        )
+            global_cell_type_proportions_df, finetuned_cell_type_proportions_df = model.run_cell_proportion_model(
+                radius=radius,
+                tolerance=1e-4,
+                max_iterations=20,
+                lambda_reg=lambda_reg,
+                alpha=alpha_elastic,
+                max_workers=None,
+                checkpoint_interval=100,
+                max_y_change=max_y_change,
+                validation_warn_only=args.auto_profiles,  # Warnings only when using auto-discovered profiles
+                skip_finetuning=True,  # Disable finetuning for benchmarking (incompatible with auto-profiles)
+                # Laplacian smoothing parameters
+                lambda_laplacian=args.lambda_laplacian,
+                laplacian_k=args.laplacian_k,
+            )
 
-        logging.info(f"Completed cell proportion inference for {sample_name}.")
+            logging.info(f"Completed cell proportion inference for {sample_name}.")
 
         # Benchmarking Cell Proportions
         st_folder = os.path.join(input_folder, "ST_sim")
@@ -771,8 +753,8 @@ def main():
         spot_composition_df = sort_spot_indices(spot_composition_df)
         gt_cell_types = list(cell_type_profiles.keys())
 
-        # If using auto-profiles, calculate discovery metrics and remap proportions
-        if args.auto_profiles:
+        # If using auto-profiles or joint optimization, calculate discovery metrics and remap proportions
+        if args.auto_profiles or args.joint:
             # Calculate profile discovery accuracy metrics
             discovery_metrics = benchmark_profile_discovery(
                 model.cell_profile_dict,  # Discovered profiles
@@ -843,8 +825,8 @@ def main():
                 logging.warning(f"test_spots_df indices: {test_spots_df.index}, spot_composition_df indices: {spot_composition_df.index}")
                 raise ValueError("ERROR: The row indices in the input CSV files do not match or are not in the same order!")
 
-            # For auto-profiles mode, we've already remapped columns, so align with GT columns
-            if args.auto_profiles:
+            # For auto-profiles or joint mode, we've already remapped columns, so align with GT columns
+            if args.auto_profiles or args.joint:
                 # Get common columns (GT cell types that were matched)
                 common_cols = [c for c in spot_composition_df.columns if c in test_spots_df.columns]
                 if not common_cols:
@@ -891,7 +873,16 @@ def main():
             print(f"{key.capitalize()} Cell proportion results summary: \n{prop_results_df}")
 
 
-        model.append_proportions_to_adata(key='finetuned')
+        # Try to append finetuned proportions if available (may be disabled)
+        try:
+            model.append_proportions_to_adata(key='finetuned')
+        except FileNotFoundError:
+            logging.info("Finetuned proportions file not found - skipping (finetuning may be disabled)")
+            # Fall back to global proportions
+            try:
+                model.append_proportions_to_adata(key='global')
+            except FileNotFoundError:
+                logging.warning("No proportions file found to append to adata")
 
 
         if args.profiling_only:
