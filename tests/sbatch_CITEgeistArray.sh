@@ -81,6 +81,20 @@ OUTPUT_FOLDER="test_results/${TEST_SET}/${PROFILE_MODE}_profiles/"
 mkdir -p "$OUTPUT_FOLDER"
 mkdir -p benchmarking_logs
 
+# Clean up stale results from previous runs for this specific parameter combination
+# This prevents old Profile_X files from mixing with new GT-named files
+PARAM_DIR="${OUTPUT_FOLDER}/radius_4.0_lambda_${lambda_reg}_alpha_${alpha_elastic}_max_y_change_${max_y_change}."
+if [ -d "$PARAM_DIR" ]; then
+    echo "Cleaning stale results in: $PARAM_DIR"
+    rm -rf "$PARAM_DIR"
+fi
+
+# Clean summary directory on first job only (to avoid race conditions)
+if [ "$SLURM_ARRAY_TASK_ID" == "0" ]; then
+    echo "Cleaning summary directory..."
+    rm -rf test_results/summary
+fi
+
 echo "Running with parameters:"
 echo "  - profile_mode=$PROFILE_MODE"
 echo "  - lambda_reg=$lambda_reg"
