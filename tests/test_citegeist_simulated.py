@@ -38,7 +38,6 @@ from model.citegeist_model import CitegeistModel
 from model.utils import benchmark_cell_proportions, calculate_expression_metrics, export_anndata_layers
 from model.profile_matching import (
     match_profiles_to_ground_truth,
-    create_remapped_proportions,
     benchmark_profile_discovery,
 )
 
@@ -670,8 +669,60 @@ def main():
                     markers_list = list(profile) if not isinstance(profile, list) else profile
                     cell_profile_dict[profile_name] = {"Major": markers_list}
 
-                model.load_cell_profile_dict(cell_profile_dict)
-                logging.info(f"Loaded {len(cell_profile_dict)} profiles into model")
+                # -----------------------------------------------------------
+                # IMMEDIATELY match profiles to GT and rename before loading
+                # This ensures all downstream (proportions, GEX) uses GT names
+                # -----------------------------------------------------------
+                match_result = match_profiles_to_ground_truth(
+                    cell_profile_dict,
+                    cell_type_profiles,
+                )
+
+                # Calculate and display discovery metrics
+                discovery_metrics = benchmark_profile_discovery(
+                    cell_profile_dict,
+                    cell_type_profiles,
+                )
+                logging.info(f"Profile Discovery Metrics: {discovery_metrics}")
+                print(f"\nProfile Discovery Metrics:")
+                print(f"  Profile Recovery Rate: {discovery_metrics['profile_recovery_rate']:.2%}")
+                print(f"  Marker Precision: {discovery_metrics['marker_precision']:.2%}")
+                print(f"  Marker Recall: {discovery_metrics['marker_recall']:.2%}")
+                print(f"  False Discovery Rate: {discovery_metrics['false_discovery_rate']:.2%}")
+                print(f"  Matched: {discovery_metrics['n_matched']}/{discovery_metrics['n_ground_truth']} cell types")
+                if discovery_metrics['matched_pairs']:
+                    print(f"  Matched pairs: {discovery_metrics['matched_pairs']}")
+                if discovery_metrics['missing_ground_truth']:
+                    print(f"  Missing GT types: {discovery_metrics['missing_ground_truth']}")
+
+                # Save profile discovery metrics to CSV
+                discovery_metrics_df = pd.DataFrame([{
+                    k: str(v) if isinstance(v, list) else v
+                    for k, v in discovery_metrics.items()
+                }])
+                discovery_metrics_path = os.path.join(
+                    output_folder,
+                    f'{sample_name}_profile_discovery_metrics_{suffix}.csv'
+                )
+                discovery_metrics_df.to_csv(discovery_metrics_path, index=False)
+                logging.info(f"Saved profile discovery metrics to {discovery_metrics_path}")
+
+                # Rename profiles to use GT cell type names
+                remapped_cell_profile_dict = {}
+                for disc_name, gt_name in match_result.matched_profiles.items():
+                    if disc_name in cell_profile_dict:
+                        remapped_cell_profile_dict[gt_name] = cell_profile_dict[disc_name]
+                # Keep unmatched profiles with [SPURIOUS] prefix
+                for disc_name in match_result.unmatched_discovered:
+                    if disc_name in cell_profile_dict:
+                        remapped_cell_profile_dict[f"[SPURIOUS] {disc_name}"] = cell_profile_dict[disc_name]
+
+                logging.info(f"Remapped profiles: {list(cell_profile_dict.keys())} -> {list(remapped_cell_profile_dict.keys())}")
+                print(f"\nRemapped profiles to GT names: {list(remapped_cell_profile_dict.keys())}")
+
+                # Load the REMAPPED dict into model (uses GT names)
+                model.load_cell_profile_dict(remapped_cell_profile_dict)
+                logging.info(f"Loaded {len(remapped_cell_profile_dict)} profiles into model (with GT names)")
 
         else:
             # Use manual cell_type_profiles (existing behavior)
@@ -718,55 +769,9 @@ def main():
         spot_composition_df = sort_spot_indices(spot_composition_df)
         gt_cell_types = list(cell_type_profiles.keys())
 
-        # If using auto-profiles, calculate discovery metrics and remap proportions
-        if args.auto_profiles:
-            # Calculate profile discovery accuracy metrics
-            discovery_metrics = benchmark_profile_discovery(
-                model.cell_profile_dict,  # Discovered profiles
-                cell_type_profiles,       # Ground truth profiles
-            )
-            logging.info(f"Profile Discovery Metrics: {discovery_metrics}")
-            print(f"\nProfile Discovery Metrics:")
-            print(f"  Profile Recovery Rate: {discovery_metrics['profile_recovery_rate']:.2%}")
-            print(f"  Marker Precision: {discovery_metrics['marker_precision']:.2%}")
-            print(f"  Marker Recall: {discovery_metrics['marker_recall']:.2%}")
-            print(f"  False Discovery Rate: {discovery_metrics['false_discovery_rate']:.2%}")
-            print(f"  Matched: {discovery_metrics['n_matched']}/{discovery_metrics['n_ground_truth']} cell types")
-            if discovery_metrics['matched_pairs']:
-                print(f"  Matched pairs: {discovery_metrics['matched_pairs']}")
-            if discovery_metrics['missing_ground_truth']:
-                print(f"  Missing GT types: {discovery_metrics['missing_ground_truth']}")
-
-            # Save profile discovery metrics
-            discovery_metrics_df = pd.DataFrame([{
-                k: str(v) if isinstance(v, list) else v
-                for k, v in discovery_metrics.items()
-            }])
-            discovery_metrics_path = os.path.join(
-                output_folder,
-                f'{sample_name}_profile_discovery_metrics_{suffix}.csv'
-            )
-            discovery_metrics_df.to_csv(discovery_metrics_path, index=False)
-            logging.info(f"Saved profile discovery metrics to {discovery_metrics_path}")
-
-            # Remap discovered profile names to ground truth cell type names
-            match_result = match_profiles_to_ground_truth(
-                model.cell_profile_dict,
-                cell_type_profiles,
-            )
-
-            # Remap proportion DataFrames
-            global_cell_type_proportions_df = create_remapped_proportions(
-                global_cell_type_proportions_df,
-                match_result,
-                gt_cell_types,
-            )
-            finetuned_cell_type_proportions_df = create_remapped_proportions(
-                finetuned_cell_type_proportions_df,
-                match_result,
-                gt_cell_types,
-            )
-            logging.info(f"Remapped proportions to GT cell types. Columns: {list(global_cell_type_proportions_df.columns)}")
+        # NOTE: Profile matching and remapping now happens IMMEDIATELY after Module 2c
+        # (before cell proportion deconvolution), so proportions already have GT names.
+        # No remapping needed here.
 
         results_dict = {
             'global': global_cell_type_proportions_df,
