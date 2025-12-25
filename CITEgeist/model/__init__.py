@@ -20,14 +20,19 @@ from .spatial_colocalization import (
     LineageDendrogram,
     ProfileDiscoveryResult,
     discover_profiles,
+    # Module 2c: Profile selection
     ProfileSelectionResult,
-    select_profiles_by_reconstruction,
-    SpatialVarianceSelectionResult,
-    select_profiles_by_spatial_variance,
+    select_profiles,
 )
 
-# Default profile selection method (spatial variance-based)
-select_profiles = select_profiles_by_spatial_variance
+# Module 4: Protein-anchored program discovery
+from .anchored_program_discovery import (
+    SpatialProgram,
+    AnchoredProgramResult,
+    AnchoredProgramDiscoveryResult,
+    discover_anchored_programs,
+    store_results_in_adata,
+)
 
 __all__ = [
     # Core model
@@ -53,10 +58,13 @@ __all__ = [
     "LineageDendrogram",
     "ProfileDiscoveryResult",
     "discover_profiles",
-    # Profile selection (Module 2c)
+    # Module 2c: Profile selection
     "ProfileSelectionResult",
-    "select_profiles_by_reconstruction",
-    "SpatialVarianceSelectionResult",
-    "select_profiles_by_spatial_variance",
-    "select_profiles",  # Default alias for spatial variance method
+    "select_profiles",
+    # Module 4: Protein-anchored program discovery
+    "SpatialProgram",
+    "AnchoredProgramResult",
+    "AnchoredProgramDiscoveryResult",
+    "discover_anchored_programs",
+    "store_results_in_adata",
 ]
