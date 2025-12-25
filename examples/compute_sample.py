@@ -88,7 +88,8 @@ def main():
 
 
     adata = sq.read.visium(args.path, counts_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
-    sample_name = args.path.split('/')[-3]
+    # Extract sample name from path (e.g., .../processed_files/HCC22-088-P1-S1/outs -> HCC22-088-P1-S1)
+    sample_name = args.path.rstrip('/').split('/')[-2]
 
     
 
