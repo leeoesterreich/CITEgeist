@@ -450,16 +450,24 @@ def discover_anchored_programs(
     lambda_spatial: float = 0.1,
     lambda_sparsity: float = 0.01,
     min_proportion_threshold: float = 0.1,
+    contrastive_strength: float = 0.7,
+    use_enriched_genes: bool = True,
+    enriched_gene_fc: float = 1.2,
+    max_enriched_genes: int = 2000,
     validate_with_proteins: bool = True,
     top_n_genes: int = 50,
     random_state: int = 42,
 ) -> AnchoredProgramDiscoveryResult:
     """
-    Discover protein-anchored spatial transcriptomic programs.
+    Discover ANCHOR-SPECIFIC protein-anchored spatial transcriptomic programs.
 
-    Main entry point for Module 4. For each cell type from Module 3 deconvolution,
-    discovers K gene expression programs weighted by cell type proportion.
-    Optionally validates against Module 2 protein profiles.
+    Main entry point for Module 4. Uses CONTRASTIVE NMF to find programs that
+    are specific to each anchor cell type, rather than shared global patterns.
+
+    Key features:
+    1. Subtracts background expression from other cell types (contrastive)
+    2. Focuses on genes enriched in anchor spots (optional)
+    3. Produces programs unique to each anchor
 
     Args:
         adata: AnnData with gene expression (X) and spatial coords (obsm['spatial']).
@@ -470,16 +478,21 @@ def discover_anchored_programs(
         lambda_spatial: Spatial smoothness regularization weight.
         lambda_sparsity: Gene loading sparsity weight.
         min_proportion_threshold: Minimum cell type proportion to include a spot.
+        contrastive_strength: How much background to subtract (0=none, 1=full).
+        use_enriched_genes: Pre-filter to genes enriched in anchor spots.
+        enriched_gene_fc: Minimum fold-change to consider a gene enriched.
+        max_enriched_genes: Maximum number of enriched genes to use per anchor.
         validate_with_proteins: Whether to validate programs against proteins.
         top_n_genes: Number of top genes to report per program.
         random_state: Random seed for reproducibility.
 
     Returns:
-        AnchoredProgramDiscoveryResult with programs for each cell type anchor.
+        AnchoredProgramDiscoveryResult with anchor-specific programs.
     """
     import scanpy as sc
 
-    logger.info("Starting protein-anchored program discovery (Module 4)")
+    logger.info("Starting CONTRASTIVE anchor-specific program discovery (Module 4)")
+    logger.info(f"  contrastive_strength={contrastive_strength}, use_enriched_genes={use_enriched_genes}")
 
     # Get gene expression data
     if scipy.sparse.issparse(adata.X):
@@ -512,11 +525,14 @@ def discover_anchored_programs(
             profile_name = f"Profile_{i}"
             profile_to_proteins[profile_name] = list(profile)
 
-    # Discover programs for each cell type
+    # Discover programs for each cell type using CONTRASTIVE approach
     results_by_anchor = {}
     total_programs = 0
 
     for cell_type in cell_type_proportions.columns:
+        if cell_type == "Unknown":
+            continue
+
         logger.info(f"Processing anchor: {cell_type}")
 
         # Get weights from Module 3 proportions
@@ -532,15 +548,33 @@ def discover_anchored_programs(
             )
             continue
 
-        # Subset to spots with sufficient proportion
-        X_subset = X[mask, :]
+        # Compute background expression from OTHER cell types (contrastive)
+        background = _compute_background_expression(X, cell_type_proportions, cell_type)
+
+        # Optionally select anchor-enriched genes
+        if use_enriched_genes:
+            enriched_idx, enriched_names = _select_anchor_enriched_genes(
+                X, weights, gene_names,
+                high_threshold=0.3 if n_included > 100 else min_proportion_threshold * 2,
+                low_threshold=min_proportion_threshold / 2,
+                min_fold_change=enriched_gene_fc,
+                max_genes=max_enriched_genes,
+            )
+            X_subset = X[mask, :][:, enriched_idx]
+            background_subset = background[mask, :][:, enriched_idx]
+            gene_names_used = enriched_names
+        else:
+            X_subset = X[mask, :]
+            background_subset = background[mask, :]
+            gene_names_used = gene_names
+            enriched_idx = list(range(n_genes))
+
         weights_subset = weights[mask]
         coords_subset = coords[mask, :]
 
         # Determine anchor proteins
         anchor_proteins = profile_to_proteins.get(cell_type, [])
         if not anchor_proteins:
-            # Try to match cell type name to profile
             for pname, prots in profile_to_proteins.items():
                 if cell_type.lower() in pname.lower() or any(
                     cell_type.lower() in p.lower() for p in prots
@@ -548,14 +582,16 @@ def discover_anchored_programs(
                     anchor_proteins = prots
                     break
 
-        # Run spatially-regularized NMF
-        W, H, recon_error = anchored_spatial_nmf(
+        # Run CONTRASTIVE spatially-regularized NMF
+        W, H, recon_error = contrastive_anchored_nmf(
             X_subset,
             weights_subset,
+            background_subset,
             coords_subset,
             K=K_programs,
             lambda_spatial=lambda_spatial,
             lambda_sparsity=lambda_sparsity,
+            contrastive_strength=contrastive_strength,
             random_state=random_state,
         )
 
@@ -576,11 +612,11 @@ def discover_anchored_programs(
         total_var = np.var(X_subset)
 
         for k in range(K_programs):
-            # Get top genes
+            # Get top genes (from enriched subset if applicable)
             loadings = W[:, k]
             top_indices = np.argsort(loadings)[::-1][:top_n_genes]
-            top_genes = [gene_names[i] for i in top_indices]
-            gene_loadings = {gene_names[i]: float(loadings[i]) for i in top_indices}
+            top_genes = [gene_names_used[i] for i in top_indices]
+            gene_loadings = {gene_names_used[i]: float(loadings[i]) for i in top_indices}
 
             # Compute variance explained (approximate)
             program_var = np.var(H[k, :]) * np.sum(loadings ** 2)
@@ -607,12 +643,20 @@ def discover_anchored_programs(
                 active_spots_fraction=active_fraction,
             ))
 
+        # Map W back to full gene space if using enriched genes
+        if use_enriched_genes:
+            W_full = np.zeros((n_genes, K_programs))
+            for i, idx in enumerate(enriched_idx):
+                W_full[idx, :] = W[i, :]
+        else:
+            W_full = W
+
         # Build AnchoredProgramResult
         results_by_anchor[cell_type] = AnchoredProgramResult(
             anchor_name=cell_type,
             anchor_proteins=anchor_proteins,
             programs=programs,
-            W=W,
+            W=W_full,
             H=H_full,
             gene_names=gene_names,
             protein_correlations=protein_correlations,
@@ -621,15 +665,16 @@ def discover_anchored_programs(
             parameters={
                 'K_programs': K_programs,
                 'lambda_spatial': lambda_spatial,
-                'lambda_sparsity': lambda_sparsity,
-                'min_proportion_threshold': min_proportion_threshold,
+                'contrastive_strength': contrastive_strength,
+                'use_enriched_genes': use_enriched_genes,
+                'n_enriched_genes': len(enriched_idx) if use_enriched_genes else n_genes,
             },
         )
 
         total_programs += K_programs
         logger.info(
-            f"  {cell_type}: {K_programs} programs from {n_included} spots, "
-            f"reconstruction error = {recon_error:.2f}"
+            f"  {cell_type}: {K_programs} programs, {n_included} spots, "
+            f"{len(enriched_idx) if use_enriched_genes else n_genes} genes"
         )
 
     # Build final result
@@ -641,14 +686,14 @@ def discover_anchored_programs(
         parameters={
             'K_programs': K_programs,
             'lambda_spatial': lambda_spatial,
-            'lambda_sparsity': lambda_sparsity,
+            'contrastive_strength': contrastive_strength,
+            'use_enriched_genes': use_enriched_genes,
             'min_proportion_threshold': min_proportion_threshold,
-            'validate_with_proteins': validate_with_proteins,
             'random_state': random_state,
         },
     )
 
-    logger.info(f"Completed: {result.n_anchors} anchors, {result.total_programs} total programs")
+    logger.info(f"Completed: {result.n_anchors} anchors, {result.total_programs} programs (contrastive)")
 
     return result
 
@@ -689,3 +734,203 @@ def store_results_in_adata(
     }
 
     logger.info(f"Stored results in adata: {result.n_anchors} anchors in obsm/varm/uns")
+
+
+# =============================================================================
+# MODULE 4 v2: CONTRASTIVE ANCHOR-SPECIFIC PROGRAM DISCOVERY
+# =============================================================================
+
+
+def _compute_background_expression(
+    X: NDArray[np.floating],
+    all_proportions: pd.DataFrame,
+    anchor_name: str,
+) -> NDArray[np.floating]:
+    """
+    Compute background expression from OTHER cell types.
+
+    Background = weighted average of expression from non-anchor cell types.
+    This represents what we expect to see even without the anchor cell type.
+
+    Args:
+        X: Gene expression matrix (n_spots, n_genes)
+        all_proportions: Cell type proportions (n_spots, n_cell_types)
+        anchor_name: Name of anchor cell type to EXCLUDE from background
+
+    Returns:
+        Background expression matrix (n_spots, n_genes)
+    """
+    n_spots, n_genes = X.shape
+    background = np.zeros((n_spots, n_genes))
+
+    # Sum of proportions from other cell types (for normalization)
+    other_prop_sum = np.zeros(n_spots)
+
+    for cell_type in all_proportions.columns:
+        if cell_type == anchor_name or cell_type == "Unknown":
+            continue
+        props = all_proportions[cell_type].values.reshape(-1, 1)
+        background += X * props
+        other_prop_sum += all_proportions[cell_type].values
+
+    # Normalize by total other-cell-type proportion
+    other_prop_sum = np.maximum(other_prop_sum, 1e-6).reshape(-1, 1)
+    background = background / other_prop_sum
+
+    return background
+
+
+def _select_anchor_enriched_genes(
+    X: NDArray[np.floating],
+    anchor_proportions: NDArray[np.floating],
+    gene_names: List[str],
+    high_threshold: float = 0.3,
+    low_threshold: float = 0.1,
+    min_fold_change: float = 1.2,
+    max_genes: int = 2000,
+) -> Tuple[List[int], List[str]]:
+    """
+    Select genes enriched in anchor-high spots vs anchor-low spots.
+
+    Uses a simple fold-change approach to identify genes more highly
+    expressed where the anchor cell type is abundant.
+
+    Args:
+        X: Gene expression matrix (n_spots, n_genes)
+        anchor_proportions: Anchor proportion per spot (n_spots,)
+        gene_names: Names of genes
+        high_threshold: Proportion threshold for "anchor-high" spots
+        low_threshold: Proportion threshold for "anchor-low" spots
+        min_fold_change: Minimum fold-change to consider enriched
+        max_genes: Maximum number of enriched genes to return
+
+    Returns:
+        Tuple of (gene indices, gene names) for enriched genes
+    """
+    high_mask = anchor_proportions >= high_threshold
+    low_mask = anchor_proportions < low_threshold
+
+    n_high = high_mask.sum()
+    n_low = low_mask.sum()
+
+    if n_high < 10 or n_low < 10:
+        logger.warning(f"Too few spots for enrichment (high={n_high}, low={n_low}), using all genes")
+        return list(range(X.shape[1])), gene_names
+
+    # Mean expression in high vs low spots
+    mean_high = np.mean(X[high_mask, :], axis=0) + 1e-6
+    mean_low = np.mean(X[low_mask, :], axis=0) + 1e-6
+
+    fold_change = mean_high / mean_low
+
+    # Select genes with sufficient fold-change
+    enriched_mask = fold_change >= min_fold_change
+    enriched_indices = np.where(enriched_mask)[0]
+
+    # Sort by fold-change and take top max_genes
+    if len(enriched_indices) > max_genes:
+        fc_order = np.argsort(fold_change[enriched_indices])[::-1]
+        enriched_indices = enriched_indices[fc_order[:max_genes]]
+
+    enriched_names = [gene_names[i] for i in enriched_indices]
+
+    logger.debug(f"Selected {len(enriched_indices)} enriched genes (FC >= {min_fold_change})")
+
+    return list(enriched_indices), enriched_names
+
+
+def contrastive_anchored_nmf(
+    X: NDArray[np.floating],
+    anchor_weights: NDArray[np.floating],
+    background: NDArray[np.floating],
+    coords: NDArray[np.floating],
+    K: int = 5,
+    lambda_spatial: float = 0.1,
+    lambda_sparsity: float = 0.01,
+    contrastive_strength: float = 0.8,
+    max_iter: int = 200,
+    random_state: int = 42,
+) -> Tuple[NDArray[np.floating], NDArray[np.floating], float]:
+    """
+    Contrastive NMF for anchor-specific program discovery.
+
+    Subtracts a fraction of the background (expression from other cell types)
+    before running NMF, allowing discovery of anchor-SPECIFIC patterns.
+
+    Solves: NMF(X_anchor - contrastive_strength * X_background)
+
+    Args:
+        X: Gene expression matrix (n_spots, n_genes)
+        anchor_weights: Cell type weights from Module 3 (n_spots,)
+        background: Background expression from other cell types (n_spots, n_genes)
+        coords: Spatial coordinates (n_spots, 2)
+        K: Number of programs to discover
+        lambda_spatial: Spatial smoothness weight
+        lambda_sparsity: Gene sparsity weight
+        contrastive_strength: How much background to subtract (0-1)
+        max_iter: Maximum NMF iterations
+        random_state: Random seed
+
+    Returns:
+        Tuple of (W gene loadings, H spot loadings, reconstruction error)
+    """
+    n_spots, n_genes = X.shape
+
+    # Compute contrastive expression: anchor contribution minus background
+    X_contrastive = X - contrastive_strength * background
+
+    # Ensure non-negative (NMF requirement) - shift to positive range
+    X_min = X_contrastive.min()
+    if X_min < 0:
+        X_contrastive = X_contrastive - X_min + 1e-6
+
+    # Weight by anchor proportion (spots with more anchor contribute more)
+    sqrt_weights = np.sqrt(anchor_weights).reshape(-1, 1)
+    X_weighted = X_contrastive * sqrt_weights
+
+    # Handle sparse matrices
+    if scipy.sparse.issparse(X_weighted):
+        X_weighted = X_weighted.toarray()
+
+    X_weighted = np.maximum(X_weighted, 0)
+
+    # Run NMF
+    nmf = NMF(
+        n_components=K,
+        init='nndsvda',
+        max_iter=max_iter,
+        random_state=random_state,
+        alpha_W=lambda_sparsity,
+        l1_ratio=0.5,
+    )
+
+    try:
+        H = nmf.fit_transform(X_weighted)  # (n_spots, K)
+        W = nmf.components_.T  # (n_genes, K)
+    except ValueError as e:
+        logger.warning(f"Contrastive NMF failed: {e}. Falling back to standard NMF.")
+        return anchored_spatial_nmf(
+            X, anchor_weights, coords, K, lambda_spatial, lambda_sparsity,
+            max_iter, random_state
+        )
+
+    # Apply spatial smoothing
+    if lambda_spatial > 0 and n_spots >= 10:
+        L = build_spatial_laplacian(coords, k=8, normed=True)
+        I = scipy.sparse.eye(n_spots)
+        smoothing_matrix = I + lambda_spatial * L
+
+        try:
+            from scipy.sparse.linalg import spsolve
+            H_smooth = np.zeros_like(H)
+            for k in range(K):
+                H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
+            H = np.maximum(H_smooth, 0)
+        except Exception as e:
+            logger.debug(f"Spatial smoothing failed: {e}")
+
+    # Reconstruction error (on original weighted data)
+    X_reconstructed = H @ W.T
+    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, 'fro')
+
+    return W, H.T, reconstruction_error
