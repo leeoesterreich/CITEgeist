@@ -548,8 +548,11 @@ def discover_anchored_programs(
             )
             continue
 
-        # Compute background expression from OTHER cell types (contrastive)
-        background = _compute_background_expression(X, cell_type_proportions, cell_type)
+        # Compute background expression from anchor-LOW spots (contrastive)
+        background = _compute_background_expression(
+            X, cell_type_proportions, cell_type,
+            low_threshold=min_proportion_threshold / 2  # Use stricter threshold for background
+        )
 
         # Optionally select anchor-enriched genes
         if use_enriched_genes:
@@ -563,11 +566,13 @@ def discover_anchored_programs(
             X_subset = X[mask, :][:, enriched_idx]
             background_subset = background[mask, :][:, enriched_idx]
             gene_names_used = enriched_names
+            print(f"    Enriched genes: {len(enriched_names)} (FC >= {enriched_gene_fc})")
         else:
             X_subset = X[mask, :]
             background_subset = background[mask, :]
             gene_names_used = gene_names
             enriched_idx = list(range(n_genes))
+            print(f"    Using all {len(gene_names)} genes")
 
         weights_subset = weights[mask]
         coords_subset = coords[mask, :]
@@ -745,37 +750,43 @@ def _compute_background_expression(
     X: NDArray[np.floating],
     all_proportions: pd.DataFrame,
     anchor_name: str,
+    low_threshold: float = 0.1,
 ) -> NDArray[np.floating]:
     """
-    Compute background expression from OTHER cell types.
+    Compute background expression from spots with LOW anchor proportion.
 
-    Background = weighted average of expression from non-anchor cell types.
-    This represents what we expect to see even without the anchor cell type.
+    Background = mean expression in spots where anchor cell type is rare.
+    This represents tissue expression in the ABSENCE of the anchor cell type,
+    giving us a proper baseline to subtract for contrastive analysis.
 
     Args:
         X: Gene expression matrix (n_spots, n_genes)
         all_proportions: Cell type proportions (n_spots, n_cell_types)
         anchor_name: Name of anchor cell type to EXCLUDE from background
+        low_threshold: Proportion threshold for "anchor-low" spots
 
     Returns:
-        Background expression matrix (n_spots, n_genes)
+        Background expression matrix (n_spots, n_genes) - same value per gene,
+        broadcast to all spots for subtraction.
     """
     n_spots, n_genes = X.shape
-    background = np.zeros((n_spots, n_genes))
 
-    # Sum of proportions from other cell types (for normalization)
-    other_prop_sum = np.zeros(n_spots)
+    # Find spots with LOW anchor proportion
+    anchor_props = all_proportions[anchor_name].values
+    low_mask = anchor_props < low_threshold
 
-    for cell_type in all_proportions.columns:
-        if cell_type == anchor_name or cell_type == "Unknown":
-            continue
-        props = all_proportions[cell_type].values.reshape(-1, 1)
-        background += X * props
-        other_prop_sum += all_proportions[cell_type].values
+    n_low = low_mask.sum()
+    if n_low < 10:
+        # Fallback: use median across all spots
+        print(f"    Background: only {n_low} low spots, using median")
+        background_vector = np.median(X, axis=0)
+    else:
+        # Mean expression in anchor-low spots = background
+        background_vector = np.mean(X[low_mask, :], axis=0)
+        print(f"    Background: {n_low} low spots (prop < {low_threshold:.2f})")
 
-    # Normalize by total other-cell-type proportion
-    other_prop_sum = np.maximum(other_prop_sum, 1e-6).reshape(-1, 1)
-    background = background / other_prop_sum
+    # Broadcast to all spots (same background for each spot)
+    background = np.tile(background_vector, (n_spots, 1))
 
     return background
 
@@ -878,6 +889,12 @@ def contrastive_anchored_nmf(
 
     # Compute contrastive expression: anchor contribution minus background
     X_contrastive = X - contrastive_strength * background
+
+    # Report contrastive effect
+    var_orig = np.var(X)
+    var_contrastive = np.var(X_contrastive)
+    pct_removed = 100 * (1 - var_contrastive / var_orig) if var_orig > 0 else 0
+    print(f"    Contrastive: removed {pct_removed:.1f}% variance (strength={contrastive_strength})")
 
     # Ensure non-negative (NMF requirement) - shift to positive range
     X_min = X_contrastive.min()
