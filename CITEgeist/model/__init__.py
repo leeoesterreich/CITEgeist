@@ -27,9 +27,11 @@ from .spatial_colocalization import (
 
 # Module 4: Protein-anchored program discovery
 from .anchored_program_discovery import (
+    SpatialSubpopulation,
     SpatialProgram,
     AnchoredProgramResult,
     AnchoredProgramDiscoveryResult,
+    detect_spatial_subpopulations,
     discover_anchored_programs,
     store_results_in_adata,
 )
@@ -62,9 +64,11 @@ __all__ = [
     "ProfileSelectionResult",
     "select_profiles",
     # Module 4: Protein-anchored program discovery
+    "SpatialSubpopulation",
     "SpatialProgram",
     "AnchoredProgramResult",
     "AnchoredProgramDiscoveryResult",
+    "detect_spatial_subpopulations",
     "discover_anchored_programs",
     "store_results_in_adata",
 ]

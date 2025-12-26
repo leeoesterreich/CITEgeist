@@ -43,6 +43,32 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class SpatialSubpopulation:
+    """A spatially distinct subpopulation within an anchor cell type."""
+
+    subpop_id: int
+    """Unique identifier for this subpopulation."""
+
+    n_spots: int
+    """Number of spots in this subpopulation."""
+
+    spot_indices: List[int]
+    """Indices of spots belonging to this subpopulation."""
+
+    spatial_centroid: Tuple[float, float]
+    """Mean (x, y) coordinates of this subpopulation."""
+
+    dominant_program: int
+    """Index of the most active program in this subpopulation."""
+
+    program_activities: Dict[int, float]
+    """Mean activity of each program in this subpopulation."""
+
+    location_label: str
+    """Descriptive label (e.g., 'tumor_core', 'stromal', 'interface')."""
+
+
+@dataclass
 class SpatialProgram:
     """A single spatial transcriptomic program discovered within a cell type context."""
 
@@ -69,6 +95,9 @@ class SpatialProgram:
 
     active_spots_fraction: float
     """Fraction of spots with above-median program activity."""
+
+    subpopulations: Optional[List[int]] = None
+    """Subpopulation IDs where this program is dominant (if detected)."""
 
 
 @dataclass
@@ -104,6 +133,9 @@ class AnchoredProgramResult:
 
     parameters: Dict[str, Any] = field(default_factory=dict)
     """Parameters used for discovery (K, lambda_spatial, etc.)."""
+
+    subpopulations: List[SpatialSubpopulation] = field(default_factory=list)
+    """Spatially distinct subpopulations detected within this anchor."""
 
     def get_program_genes(self, program_idx: int, top_n: int = 50) -> List[Tuple[str, float]]:
         """
@@ -441,6 +473,105 @@ def validate_programs_with_proteins(
     return df
 
 
+def detect_spatial_subpopulations(
+    H: NDArray[np.floating],
+    coords: NDArray[np.floating],
+    n_clusters: int = 3,
+    spatial_weight: float = 0.3,
+    min_spots_per_cluster: int = 10,
+) -> List[SpatialSubpopulation]:
+    """
+    Detect spatially distinct subpopulations within an anchor cell type.
+
+    Clusters spots based on both program activity patterns AND spatial location,
+    enabling discovery of e.g., tumor-infiltrating vs stromal immune cells.
+
+    Args:
+        H: Program loadings matrix (K_programs x n_spots)
+        coords: Spatial coordinates (n_spots x 2)
+        n_clusters: Number of subpopulations to detect
+        spatial_weight: Weight for spatial coordinates vs program loadings (0-1)
+        min_spots_per_cluster: Minimum spots required for valid subpopulation
+
+    Returns:
+        List of SpatialSubpopulation objects, one per detected cluster
+    """
+    from sklearn.cluster import KMeans
+    from sklearn.preprocessing import StandardScaler
+
+    n_spots = H.shape[1]
+    K = H.shape[0]
+
+    if n_spots < n_clusters * min_spots_per_cluster:
+        logger.warning(f"Too few spots ({n_spots}) for {n_clusters} subpopulations")
+        return []
+
+    # Normalize program loadings and coordinates separately
+    H_norm = StandardScaler().fit_transform(H.T)  # (n_spots, K)
+    coords_norm = StandardScaler().fit_transform(coords)  # (n_spots, 2)
+
+    # Combine features with spatial weighting
+    # Higher spatial_weight = more emphasis on spatial location
+    features = np.hstack([
+        (1 - spatial_weight) * H_norm,
+        spatial_weight * coords_norm
+    ])
+
+    # Cluster spots
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+    labels = kmeans.fit_predict(features)
+
+    # Build subpopulation objects
+    subpopulations = []
+    for cluster_id in range(n_clusters):
+        mask = labels == cluster_id
+        spot_indices = np.where(mask)[0].tolist()
+
+        if len(spot_indices) < min_spots_per_cluster:
+            continue
+
+        # Compute cluster statistics
+        cluster_H = H[:, mask]  # (K, n_spots_in_cluster)
+        mean_activities = {k: float(cluster_H[k, :].mean()) for k in range(K)}
+        dominant_program = int(np.argmax([mean_activities[k] for k in range(K)]))
+
+        cluster_coords = coords[mask, :]
+        centroid = (float(cluster_coords[:, 0].mean()), float(cluster_coords[:, 1].mean()))
+
+        # Generate location label based on centroid position relative to all spots
+        # (This is a heuristic - could be refined with actual tissue annotation)
+        all_centroid = coords.mean(axis=0)
+        dist_from_center = np.sqrt(
+            (centroid[0] - all_centroid[0])**2 + (centroid[1] - all_centroid[1])**2
+        )
+        max_dist = np.sqrt(
+            ((coords[:, 0] - all_centroid[0])**2 + (coords[:, 1] - all_centroid[1])**2).max()
+        )
+
+        if dist_from_center < max_dist * 0.33:
+            location_label = "core"
+        elif dist_from_center < max_dist * 0.66:
+            location_label = "intermediate"
+        else:
+            location_label = "peripheral"
+
+        subpop = SpatialSubpopulation(
+            subpop_id=cluster_id,
+            n_spots=len(spot_indices),
+            spot_indices=spot_indices,
+            spatial_centroid=centroid,
+            dominant_program=dominant_program,
+            program_activities=mean_activities,
+            location_label=location_label,
+        )
+        subpopulations.append(subpop)
+
+    # Sort by size
+    subpopulations.sort(key=lambda x: x.n_spots, reverse=True)
+
+    return subpopulations
+
+
 def discover_anchored_programs(
     adata,
     cell_type_proportions: pd.DataFrame,
@@ -456,6 +587,8 @@ def discover_anchored_programs(
     max_enriched_genes: int = 2000,
     validate_with_proteins: bool = True,
     top_n_genes: int = 50,
+    detect_subpopulations: bool = True,
+    n_subpopulations: int = 3,
     random_state: int = 42,
 ) -> AnchoredProgramDiscoveryResult:
     """
@@ -656,6 +789,21 @@ def discover_anchored_programs(
         else:
             W_full = W
 
+        # Detect spatial subpopulations within this anchor
+        subpopulations = []
+        if detect_subpopulations and n_included >= n_subpopulations * 10:
+            subpopulations = detect_spatial_subpopulations(
+                H=H,  # Program loadings for spots with anchor
+                coords=coords_subset,
+                n_clusters=n_subpopulations,
+                spatial_weight=0.3,
+                min_spots_per_cluster=10,
+            )
+            if subpopulations:
+                print(f"    Subpopulations: {len(subpopulations)} detected")
+                for sp in subpopulations:
+                    print(f"      {sp.location_label}: {sp.n_spots} spots, dominant program {sp.dominant_program}")
+
         # Build AnchoredProgramResult
         results_by_anchor[cell_type] = AnchoredProgramResult(
             anchor_name=cell_type,
@@ -674,6 +822,7 @@ def discover_anchored_programs(
                 'use_enriched_genes': use_enriched_genes,
                 'n_enriched_genes': len(enriched_idx) if use_enriched_genes else n_genes,
             },
+            subpopulations=subpopulations,
         )
 
         total_programs += K_programs
