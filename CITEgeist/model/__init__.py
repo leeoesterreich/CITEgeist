@@ -45,6 +45,21 @@ from .anchored_program_discovery import (
     analyze_program_relationships,
 )
 
+# Module 5: Cross-sample integration
+from .cross_sample_integration import (
+    AlignedProgram,
+    ConservedRelationship,
+    IntegrationResult,
+    load_multi_sample_results,
+    integrate_samples,
+    align_gene_sets,
+    integrate_programs_harmony,
+    match_programs_across_samples,
+    compare_bivariate_relationships,
+    build_similarity_network,
+    save_integration_results,
+)
+
 __all__ = [
     # Core model
     "CitegeistModel",
@@ -88,4 +103,16 @@ __all__ = [
     "ProgramPairRelationship",
     "BivariateProgramResult",
     "analyze_program_relationships",
+    # Module 5: Cross-sample integration
+    "AlignedProgram",
+    "ConservedRelationship",
+    "IntegrationResult",
+    "load_multi_sample_results",
+    "integrate_samples",
+    "align_gene_sets",
+    "integrate_programs_harmony",
+    "match_programs_across_samples",
+    "compare_bivariate_relationships",
+    "build_similarity_network",
+    "save_integration_results",
 ]
