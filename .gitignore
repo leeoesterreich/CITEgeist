@@ -181,3 +181,11 @@ cython_debug/
 
 # Ignore .RData files
 *.RData
+
+# Prevent duplicate folder issues (see CONSOLIDATION_LOG.md)
+# Use Benchmarking/simulation_benchmarking/ instead
+benchmarking/
+# Use Benchmarking/simulation_generation/ instead
+simulation/
+# Archived duplicates
+_archive_duplicates/
