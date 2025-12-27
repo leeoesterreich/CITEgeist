@@ -32,8 +32,17 @@ from .anchored_program_discovery import (
     AnchoredProgramResult,
     AnchoredProgramDiscoveryResult,
     detect_spatial_subpopulations,
-    discover_anchored_programs,
+    discover_anchored_programs,  # Legacy: uses raw expression + contrastive
+    discover_programs_from_layers,  # Recommended: uses deconvolved layers from Module 3
     store_results_in_adata,
+    # Helper functions for deconvolved layers
+    stack_deconvolved_layers,
+    unstack_program_results,
+    extract_celltype_expression,
+    # Module 4b: Bivariate program relationships
+    ProgramPairRelationship,
+    BivariateProgramResult,
+    analyze_program_relationships,
 )
 
 __all__ = [
@@ -70,5 +79,13 @@ __all__ = [
     "AnchoredProgramDiscoveryResult",
     "detect_spatial_subpopulations",
     "discover_anchored_programs",
+    "discover_programs_from_layers",
     "store_results_in_adata",
+    "stack_deconvolved_layers",
+    "unstack_program_results",
+    "extract_celltype_expression",
+    # Module 4b: Bivariate program relationships
+    "ProgramPairRelationship",
+    "BivariateProgramResult",
+    "analyze_program_relationships",
 ]
