@@ -20,9 +20,12 @@ from scipy.ndimage import gaussian_filter
 from .gurobi_impl import (
     compute_global_prior,
     finetune_cell_proportions,
+    finetune_cell_proportions_per_marker,
     map_antibodies_to_profiles,
+    map_antibodies_to_profiles_v2,
     normalize_counts,
     optimize_cell_proportions,
+    optimize_cell_proportions_per_marker,
     optimize_gene_expression,
 )
 from .utils import (
@@ -400,6 +403,10 @@ class CitegeistModel:
         # Laplacian smoothing parameters
         lambda_laplacian=0.1,
         laplacian_k=8,
+        # Per-marker beta parameters
+        per_marker_beta=True,
+        beta_min=0.1,
+        beta_max=2.0,
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -418,6 +425,10 @@ class CitegeistModel:
             skip_finetuning (bool): If True, skip the finetuning step and return global proportions only
             lambda_laplacian (float): Weight for Laplacian spatial smoothing (default: 0.1, 0 to disable)
             laplacian_k (int): Number of neighbors for Laplacian graph (default: 8)
+            per_marker_beta (bool): If True (default), use per-marker beta learning which preserves
+                marker-level signal variation. If False, use legacy per-celltype beta with marker averaging.
+            beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.1)
+            beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
         """
 
         if radius is None:
@@ -428,10 +439,6 @@ class CitegeistModel:
 
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
-
-        profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(
-            self.antibody_capture_adata, self.cell_profile_dict
-        )
 
         # Extract spatial coordinates for Laplacian smoothing
         coords = None
@@ -445,66 +452,150 @@ class CitegeistModel:
                 logging.warning("No spatial coordinates found for Laplacian smoothing - disabling")
                 lambda_laplacian = 0
 
-        try:
-            logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
-                        f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
-
-            Y_values, beta_values = optimize_cell_proportions(
-                profile_based_antibody_data,
-                cell_type_names,
-                unknown_threshold=unknown_threshold,
-                min_celltype_threshold=min_celltype_threshold,
-                redundancy_threshold=redundancy_threshold,
-                warn_only=validation_warn_only,
-                # Laplacian smoothing parameters
-                lambda_laplacian=lambda_laplacian,
-                coords=coords,
-                laplacian_k=laplacian_k,
-            )
-        except ValueError as e:
-            # Re-raise validation errors with sample context
-            error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
-            logging.error(error_msg)
-            raise ValueError(error_msg) from e
-
         spot_names = self.antibody_capture_adata.obs_names
 
-        # Optionally skip finetuning (useful for auto-profile discovery benchmarks)
-        if skip_finetuning:
-            logging.info("Skipping finetuning step (skip_finetuning=True)")
-            global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-            # Return global proportions for both when skipping finetuning
-            finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
-        else:
-            # Create finetuning output directory
-            finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+        if per_marker_beta:
+            # ====== NEW PER-MARKER BETA APPROACH ======
+            logging.info("Using per-marker beta optimization (preserves marker-level signal variation)")
 
-            os.makedirs(finetune_output_dir, exist_ok=True)
-
-            if self.antibody_capture_adata is None:
-                raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
-
-            Y_prev, beta_prev = finetune_cell_proportions(
-                profile_based_antibody_data,
-                cell_type_names,
-                Y_values,
-                beta_values,
-                self.antibody_capture_adata,
-                radius=radius,
-                max_workers=max_workers,
-                checkpoint_interval=checkpoint_interval,
-                output_dir=finetune_output_dir,
-                rerun=True,
-                beta_vary=True,
-                tolerance=tolerance,
-                max_iterations=max_iterations,
-                lambda_reg=lambda_reg,
-                alpha=alpha,
-                max_y_change=max_y_change,
+            # Get marker-level data instead of averaged profiles
+            marker_level_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
+                self.antibody_capture_adata, self.cell_profile_dict
             )
 
-            global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-            finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+            try:
+                logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
+                            f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
+
+                Y_values, beta_values, marker_beta_dict = optimize_cell_proportions_per_marker(
+                    marker_level_data=marker_level_data,
+                    marker_names=marker_names,
+                    assignment_matrix=assignment_matrix,
+                    cell_type_names=cell_type_names,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                    lambda_reg=lambda_reg,
+                    alpha=alpha,
+                    beta_min=beta_min,
+                    beta_max=beta_max,
+                    unknown_threshold=unknown_threshold,
+                    min_celltype_threshold=min_celltype_threshold,
+                    redundancy_threshold=redundancy_threshold,
+                    warn_only=validation_warn_only,
+                    lambda_laplacian=lambda_laplacian,
+                    coords=coords,
+                    laplacian_k=laplacian_k,
+                )
+
+                # Store marker betas for downstream analysis
+                self.results["marker_beta"] = marker_beta_dict
+
+            except ValueError as e:
+                error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
+                logging.error(error_msg)
+                raise ValueError(error_msg) from e
+
+            # Optionally skip finetuning
+            if skip_finetuning:
+                logging.info("Skipping finetuning step (skip_finetuning=True)")
+                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+                finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
+            else:
+                # Create finetuning output directory
+                finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+                os.makedirs(finetune_output_dir, exist_ok=True)
+
+                if self.antibody_capture_adata is None:
+                    raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+
+                Y_prev, beta_prev = finetune_cell_proportions_per_marker(
+                    marker_level_data=marker_level_data,
+                    marker_names=marker_names,
+                    assignment_matrix=assignment_matrix,
+                    cell_type_names=cell_type_names,
+                    initial_Y_values=Y_values,
+                    initial_beta_values=beta_values,
+                    adata=self.antibody_capture_adata,
+                    radius=radius,
+                    tolerance=tolerance,
+                    lambda_reg=lambda_reg,
+                    alpha=alpha,
+                    max_iterations=max_iterations,
+                    max_y_change=max_y_change,
+                    beta_vary=True,
+                    beta_min=beta_min,
+                    beta_max=beta_max,
+                    max_workers=max_workers,
+                    checkpoint_interval=checkpoint_interval,
+                    output_dir=finetune_output_dir,
+                    rerun=True,
+                )
+
+                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+                finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+
+        else:
+            # ====== LEGACY PER-CELLTYPE BETA APPROACH ======
+            logging.info("Using legacy per-celltype beta optimization (averages markers per cell type)")
+
+            profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(
+                self.antibody_capture_adata, self.cell_profile_dict
+            )
+
+            try:
+                logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
+                            f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
+
+                Y_values, beta_values = optimize_cell_proportions(
+                    profile_based_antibody_data,
+                    cell_type_names,
+                    unknown_threshold=unknown_threshold,
+                    min_celltype_threshold=min_celltype_threshold,
+                    redundancy_threshold=redundancy_threshold,
+                    warn_only=validation_warn_only,
+                    lambda_laplacian=lambda_laplacian,
+                    coords=coords,
+                    laplacian_k=laplacian_k,
+                )
+            except ValueError as e:
+                error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
+                logging.error(error_msg)
+                raise ValueError(error_msg) from e
+
+            # Optionally skip finetuning
+            if skip_finetuning:
+                logging.info("Skipping finetuning step (skip_finetuning=True)")
+                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+                finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
+            else:
+                # Create finetuning output directory
+                finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
+                os.makedirs(finetune_output_dir, exist_ok=True)
+
+                if self.antibody_capture_adata is None:
+                    raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+
+                Y_prev, beta_prev = finetune_cell_proportions(
+                    profile_based_antibody_data,
+                    cell_type_names,
+                    Y_values,
+                    beta_values,
+                    self.antibody_capture_adata,
+                    radius=radius,
+                    max_workers=max_workers,
+                    checkpoint_interval=checkpoint_interval,
+                    output_dir=finetune_output_dir,
+                    rerun=True,
+                    beta_vary=True,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                    lambda_reg=lambda_reg,
+                    alpha=alpha,
+                    max_y_change=max_y_change,
+                )
+
+                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+                finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
 
         global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
         finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
@@ -515,6 +606,9 @@ class CitegeistModel:
         finetuned_cell_type_proportions_df.to_csv(
             os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_finetuned_results.csv")
         )
+
+        # Store to self.results for use by run_cell_expression_pass1
+        self.results["cell_prop"] = finetuned_cell_type_proportions_df
 
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 

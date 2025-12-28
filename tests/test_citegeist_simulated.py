@@ -442,6 +442,15 @@ def main():
                         help='Laplacian smoothing weight for spatial coherence (default: 0.1, 0 to disable)')
     parser.add_argument('--laplacian-k', type=int, default=8,
                         help='Number of neighbors for Laplacian graph (default: 8)')
+    # Per-marker beta parameters
+    parser.add_argument('--per-marker-beta', action='store_true', default=True,
+                        help='Use per-marker beta learning (default: True, preserves marker-level signal)')
+    parser.add_argument('--no-per-marker-beta', dest='per_marker_beta', action='store_false',
+                        help='Use legacy per-celltype beta (averages markers)')
+    parser.add_argument('--beta-min', type=float, default=0.1,
+                        help='Minimum beta value for per-marker optimization (default: 0.1)')
+    parser.add_argument('--beta-max', type=float, default=2.0,
+                        help='Maximum beta value for per-marker optimization (default: 2.0)')
 
     args = parser.parse_args()
 
@@ -750,6 +759,10 @@ def main():
             # Laplacian smoothing parameters
             lambda_laplacian=args.lambda_laplacian,
             laplacian_k=args.laplacian_k,
+            # Per-marker beta parameters
+            per_marker_beta=args.per_marker_beta,
+            beta_min=args.beta_min,
+            beta_max=args.beta_max,
         )
 
         logging.info(f"Completed cell proportion inference for {sample_name}.")

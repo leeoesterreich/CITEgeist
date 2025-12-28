@@ -56,6 +56,13 @@ MAX_PROFILES=15            # Maximum number of profiles to select
 LAMBDA_LAPLACIAN=0.1       # Laplacian smoothing weight (0 to disable)
 LAPLACIAN_K=8              # Number of neighbors for Laplacian graph
 
+# Per-marker beta parameters (Module 3 optimization)
+# Per-marker beta learns individual scaling factors for each marker instead of averaging
+# This preserves signal variation between markers of the same cell type (e.g., CD3D vs CD8A)
+PER_MARKER_BETA=true       # true = new per-marker beta, false = legacy per-celltype beta
+BETA_MIN=0.1               # Minimum beta value (prevents degenerate solutions)
+BETA_MAX=2.0               # Maximum beta value (allows intensity differences)
+
 # Calculate indices based on array task ID
 # Order: profile_mode -> test_set -> alpha_elastic -> max_y_change
 # Total: 2 * 2 * 2 * 3 = 24 combinations
@@ -111,7 +118,18 @@ CMD="python tests/test_citegeist_simulated.py \
     --alpha_elastic $alpha_elastic \
     --max_y_change $max_y_change \
     --input_folder $INPUT_FOLDER \
-    --output_folder $OUTPUT_FOLDER"
+    --output_folder $OUTPUT_FOLDER \
+    --beta-min $BETA_MIN \
+    --beta-max $BETA_MAX"
+
+# Add per-marker beta flag (default is enabled, use --no-per-marker-beta to disable)
+if [ "$PER_MARKER_BETA" == "true" ]; then
+    CMD="$CMD --per-marker-beta"
+    echo "  - per_marker_beta=true (preserving marker-level signal)"
+else
+    CMD="$CMD --no-per-marker-beta"
+    echo "  - per_marker_beta=false (legacy per-celltype averaging)"
+fi
 
 # Add auto-profiles flags if in auto mode (spatial colocalization pipeline)
 if [ "$PROFILE_MODE" == "auto" ]; then
