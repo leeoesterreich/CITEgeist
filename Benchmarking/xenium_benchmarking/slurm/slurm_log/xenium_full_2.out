@@ -1,0 +1,52 @@
+[2025-12-27 20:31:43] Job started for region 2
+Setting up environment...
+CITEgeist environment activated.
+Gurobi module loaded.
+
+============================================
+Processing Region 2
+============================================
+Input directory: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data
+Output directory: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output
+
+CitegeistModel initialized successfully.
+Filtered gene expression data: 405 → 396 genes (count > 0 in at least 1.0% of spots, mean expression > 1.1 in nonzero spots). Remaining spots: 1352 Filtered spots: 1352 to 1352
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_46', 'spot_47', 'spot_48', 'spot_49', 'spot_50'], dtype='object')
+Parquet spot names format: ['spot_46' 'spot_47' 'spot_48' 'spot_49' 'spot_50']
+Added layer: Epithelial_genes_pass1 (Shape: (1352, 396))
+Added layer: Dendritic_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: Unknown_genes_pass1 (Shape: (1352, 396))
+Added layer: Macrophages_genes_pass1 (Shape: (1352, 396))
+Added layer: Plasma_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: CD4+_T_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: B_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: NK_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: Endothelial_genes_pass1 (Shape: (1352, 396))
+Added layer: CD8+_T_cells_genes_pass1 (Shape: (1352, 396))
+Added layer: Fibroblasts_genes_pass1 (Shape: (1352, 396))
+✅ Returning the internal AnnData object.
+
+Before sorting:
+CSV spots 1-10: ['spot_1077', 'spot_1078', 'spot_1079', 'spot_1080', 'spot_1081', 'spot_1082', 'spot_1083', 'spot_1084', 'spot_1085', 'spot_1087']
+AnnData spots 1-10: ['spot_46', 'spot_47', 'spot_48', 'spot_49', 'spot_50', 'spot_51', 'spot_52', 'spot_53', 'spot_54', 'spot_55']
+
+After sorting:
+CSV spots 1-10: ['spot_46', 'spot_47', 'spot_48', 'spot_49', 'spot_50', 'spot_51', 'spot_52', 'spot_53', 'spot_54', 'spot_55']
+AnnData spots 1-10: ['spot_46', 'spot_47', 'spot_48', 'spot_49', 'spot_50', 'spot_51', 'spot_52', 'spot_53', 'spot_54', 'spot_55']
+✅ Cell type proportions have been appended to adata.obs and results['cell_prop']
+
+Pipeline complete!
+Results saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output
+
+============================================
+[2025-12-27 20:33:56] Region 2 completed
+Runtime: 133 seconds (2.21 minutes)
+============================================

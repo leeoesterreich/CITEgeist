@@ -1,0 +1,86 @@
+============================================
+Module 5: Cross-Sample Integration
+============================================
+Start time: Sat Dec 27 07:26:42 PM EST 2025
+
+
+============================================================
+Aggregating Results from All Regions
+============================================================
+Region 0: Loaded
+Region 1: Loaded
+Region 2: Loaded
+Region 3: Loaded
+Region 4: Loaded
+
+============================================================
+Proportion Deconvolution Metrics
+============================================================
+
+Cell Proportion Benchmarking (n=5 regions):
+  JSD (median):  0.6325 ± 0.0158
+  RMSE (global): 0.1729 ± 0.0074
+  MAE (global):  0.1047 ± 0.0033
+  Pearson r:     0.2326 ± 0.0392
+
+============================================================
+Gene Expression Deconvolution Metrics
+============================================================
+
+GEX Deconvolution Benchmarking (n=5 regions):
+  RMSE (mean):   0.7000 ± 0.0130
+  NRMSE (mean):  0.1199 ± 0.0042
+  MAE (mean):    0.2146 ± 0.0048
+  Pearson r:     0.0691 ± 0.0097
+
+============================================================
+Timing Summary
+============================================================
+Region 0: 146.5s (2.4 min)
+  - preprocessing: 0.0s
+  - proportions: 110.1s
+  - expression: 36.1s
+  - module4: 0.2s
+Region 1: 362.8s (6.0 min)
+  - preprocessing: 0.0s
+  - proportions: 293.2s
+  - expression: 68.7s
+  - module4: 0.9s
+Region 2: 273.9s (4.6 min)
+  - preprocessing: 0.0s
+  - proportions: 206.6s
+  - expression: 66.5s
+  - module4: 0.8s
+Region 3: 303.0s (5.0 min)
+  - preprocessing: 0.0s
+  - proportions: 224.9s
+  - expression: 77.1s
+  - module4: 0.9s
+Region 4: 190.0s (3.2 min)
+  - preprocessing: 0.0s
+  - proportions: 114.6s
+  - expression: 74.5s
+  - module4: 0.9s
+
+Total pipeline time: 1276.2s (21.3 min)
+
+============================================================
+Module 5: Cross-Sample Integration
+============================================================
+Found 5 sample directories
+Integration step failed: integrate_samples() got an unexpected keyword argument 'sample_dirs'
+(This may be expected if Module 4 results are not available)
+
+============================================================
+Saving Final Report
+============================================================
+Report saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/metrics/final_benchmark_report.json
+Summary saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/metrics/benchmark_summary.csv
+
+============================================================
+XENIUM BENCHMARKING COMPLETE
+============================================================
+
+============================================
+Integration complete at Sat Dec 27 07:26:50 PM EST 2025
+============================================

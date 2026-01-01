@@ -1,0 +1,76 @@
+============================================
+Module 5: Cross-Sample Integration
+============================================
+Start time: Sat Dec 27 05:58:07 PM EST 2025
+
+
+============================================================
+Aggregating Results from All Regions
+============================================================
+Region 0: Loaded
+Region 1: Loaded
+Region 2: Loaded
+Region 3: Loaded
+Region 4: Loaded
+
+============================================================
+Proportion Deconvolution Metrics
+============================================================
+
+Cell Proportion Benchmarking (n=5 regions):
+  JSD (median):  nan ± nan
+  RMSE (global): 0.1734 ± 0.0092
+  MAE (global):  0.1047 ± 0.0040
+  Pearson r:     0.2432 ± 0.0409
+
+============================================================
+Timing Summary
+============================================================
+Region 0: 293.1s (4.9 min)
+  - preprocessing: 0.0s
+  - proportions: 223.7s
+  - expression: 68.5s
+  - module4: 0.9s
+Region 1: 314.4s (5.2 min)
+  - preprocessing: 0.0s
+  - proportions: 250.8s
+  - expression: 63.0s
+  - module4: 0.6s
+Region 2: 222.7s (3.7 min)
+  - preprocessing: 0.0s
+  - proportions: 159.7s
+  - expression: 62.4s
+  - module4: 0.6s
+Region 3: 258.4s (4.3 min)
+  - preprocessing: 0.0s
+  - proportions: 187.5s
+  - expression: 70.2s
+  - module4: 0.6s
+Region 4: 157.1s (2.6 min)
+  - preprocessing: 0.1s
+  - proportions: 89.5s
+  - expression: 67.0s
+  - module4: 0.6s
+
+Total pipeline time: 1245.8s (20.8 min)
+
+============================================================
+Module 5: Cross-Sample Integration
+============================================================
+Found 5 sample directories
+Integration step failed: integrate_samples() got an unexpected keyword argument 'sample_dirs'
+(This may be expected if Module 4 results are not available)
+
+============================================================
+Saving Final Report
+============================================================
+Report saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/metrics/final_benchmark_report.json
+Summary saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/metrics/benchmark_summary.csv
+
+============================================================
+XENIUM BENCHMARKING COMPLETE
+============================================================
+
+============================================
+Integration complete at Sat Dec 27 05:58:51 PM EST 2025
+============================================

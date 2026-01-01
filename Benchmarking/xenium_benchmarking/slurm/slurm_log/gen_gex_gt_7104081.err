@@ -1,0 +1,95 @@
+2025-12-27 19:15:21,293 - INFO - Loading Xenium data...
+2025-12-27 19:15:21,294 - INFO - Loading Xenium data from /ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma
+2025-12-27 19:15:22,507 - INFO - Loaded matrix: 465534 cells x 543 features
+2025-12-27 19:15:22,899 - INFO - Loaded cell metadata: 465534 cells
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2025-12-27 19:15:23,247 - INFO - Final shape after filtering: (465534, 543)
+2025-12-27 19:15:23,253 - INFO - Splitting: 405 genes, 27 proteins
+2025-12-27 19:15:23,495 - INFO -   Cells: 465534
+2025-12-27 19:15:23,495 - INFO -   Genes: 405
+2025-12-27 19:15:23,495 - INFO -   Proteins: 27
+2025-12-27 19:15:23,495 - INFO - 
+Creating pseudo-Visium spots...
+2025-12-27 19:15:23,497 - INFO - Tissue boundaries: x=[1.5, 11473.0], y=[3.4, 5805.1]
+2025-12-27 19:15:23,504 - INFO - Created hexagonal grid: 7672 spots (55.0µm diameter, 100.0µm spacing)
+2025-12-27 19:15:23,690 - INFO - Cell assignment: 128006 assigned (27.5%), 337528 unassigned
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2025-12-27 19:15:27,915 - INFO - Filtered spots: 7672 -> 7054 (min_cells=3)
+2025-12-27 19:15:27,918 - INFO - Spot statistics: mean=18.1 cells/spot, median=16.0, range=[3, 63]
+2025-12-27 19:15:27,921 - INFO -   Created 7054 spots
+2025-12-27 19:15:27,921 - INFO - 
+Classifying cells by protein expression...
+2025-12-27 19:15:28,540 - INFO - Using percentile thresholding (percentile=50.0)
+2025-12-27 19:15:28,757 - INFO - Cell type distribution:
+Fibroblasts        110496
+Macrophages        104961
+CD4+ T cells        56732
+CD8+ T cells        44373
+Unassigned          40598
+Endothelial         36183
+Epithelial          33872
+B cells             23262
+Dendritic cells      9056
+Plasma cells         5881
+NK cells              120
+Name: count, dtype: int64
+2025-12-27 19:15:28,789 - INFO -   Cell type distribution:
+2025-12-27 19:15:28,789 - INFO -     Fibroblasts: 110496 (23.7%)
+2025-12-27 19:15:28,789 - INFO -     Macrophages: 104961 (22.5%)
+2025-12-27 19:15:28,789 - INFO -     CD4+ T cells: 56732 (12.2%)
+2025-12-27 19:15:28,789 - INFO -     CD8+ T cells: 44373 (9.5%)
+2025-12-27 19:15:28,789 - INFO -     Unknown: 40598 (8.7%)
+2025-12-27 19:15:28,789 - INFO -     Endothelial: 36183 (7.8%)
+2025-12-27 19:15:28,789 - INFO -     Epithelial: 33872 (7.3%)
+2025-12-27 19:15:28,789 - INFO -     B cells: 23262 (5.0%)
+2025-12-27 19:15:28,789 - INFO -     Dendritic cells: 9056 (1.9%)
+2025-12-27 19:15:28,789 - INFO -     Plasma cells: 5881 (1.3%)
+2025-12-27 19:15:28,789 - INFO -     NK cells: 120 (0.0%)
+2025-12-27 19:15:28,789 - INFO - 
+Calculating GEX ground truth for all spots...
+2025-12-27 19:15:28,803 - INFO - Calculating GEX ground truth for 11 cell types, 7054 spots
+2025-12-27 19:15:28,803 - INFO -   Processing B cells...
+2025-12-27 19:15:31,869 - INFO -     B cells: 548 spots with expression
+2025-12-27 19:15:31,869 - INFO -   Processing CD4+ T cells...
+2025-12-27 19:15:35,897 - INFO -     CD4+ T cells: 3620 spots with expression
+2025-12-27 19:15:35,897 - INFO -   Processing CD8+ T cells...
+2025-12-27 19:15:40,051 - INFO -     CD8+ T cells: 4056 spots with expression
+2025-12-27 19:15:40,051 - INFO -   Processing Dendritic cells...
+2025-12-27 19:15:43,409 - INFO -     Dendritic cells: 1437 spots with expression
+2025-12-27 19:15:43,409 - INFO -   Processing Endothelial...
+2025-12-27 19:15:47,366 - INFO -     Endothelial: 3289 spots with expression
+2025-12-27 19:15:47,366 - INFO -   Processing Epithelial...
+2025-12-27 19:15:51,551 - INFO -     Epithelial: 4124 spots with expression
+2025-12-27 19:15:51,551 - INFO -   Processing Fibroblasts...
+2025-12-27 19:15:56,272 - INFO -     Fibroblasts: 5731 spots with expression
+2025-12-27 19:15:56,272 - INFO -   Processing Macrophages...
+2025-12-27 19:16:01,064 - INFO -     Macrophages: 6004 spots with expression
+2025-12-27 19:16:01,064 - INFO -   Processing NK cells...
+2025-12-27 19:16:03,902 - INFO -     NK cells: 32 spots with expression
+2025-12-27 19:16:03,902 - INFO -   Processing Plasma cells...
+2025-12-27 19:16:06,979 - INFO -     Plasma cells: 563 spots with expression
+2025-12-27 19:16:06,979 - INFO -   Processing Unknown...
+2025-12-27 19:16:11,220 - INFO -     Unknown: 4215 spots with expression
+2025-12-27 19:16:11,220 - INFO - 
+Splitting into 5 regions...
+2025-12-27 19:16:11,220 - INFO - Region 0: 1407 spots (19.9%)
+2025-12-27 19:16:11,220 - INFO - Region 1: 1417 spots (20.1%)
+2025-12-27 19:16:11,220 - INFO - Region 2: 1352 spots (19.2%)
+2025-12-27 19:16:11,220 - INFO - Region 3: 1464 spots (20.8%)
+2025-12-27 19:16:11,220 - INFO - Region 4: 1414 spots (20.0%)
+2025-12-27 19:16:11,220 - INFO - 
+Saving GEX ground truth per region...
+2025-12-27 19:16:11,220 - INFO - Region 0 (1407 spots):
+2025-12-27 19:16:13,124 - INFO -   Saved 11 cell type GEX files to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data/ground_truth_gex/Xenium_region_0
+2025-12-27 19:16:13,124 - INFO - Region 1 (1417 spots):
+2025-12-27 19:16:15,011 - INFO -   Saved 11 cell type GEX files to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data/ground_truth_gex/Xenium_region_1
+2025-12-27 19:16:15,011 - INFO - Region 2 (1352 spots):
+2025-12-27 19:16:16,800 - INFO -   Saved 11 cell type GEX files to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data/ground_truth_gex/Xenium_region_2
+2025-12-27 19:16:16,800 - INFO - Region 3 (1464 spots):
+2025-12-27 19:16:18,744 - INFO -   Saved 11 cell type GEX files to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data/ground_truth_gex/Xenium_region_3
+2025-12-27 19:16:18,744 - INFO - Region 4 (1414 spots):
+2025-12-27 19:16:20,638 - INFO -   Saved 11 cell type GEX files to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/data/ground_truth_gex/Xenium_region_4
+2025-12-27 19:16:20,638 - INFO - 
+GEX ground truth generation complete!

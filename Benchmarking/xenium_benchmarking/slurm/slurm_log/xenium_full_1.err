@@ -1,0 +1,1600 @@
+2025-12-27 20:31:58,969 - INFO - ============================================================
+2025-12-27 20:31:58,969 - INFO - Region 1: Loading data
+2025-12-27 20:31:58,969 - INFO - ============================================================
+2025-12-27 20:31:59,035 - INFO -   GEX shape: (1417, 405)
+2025-12-27 20:31:59,035 - INFO -   Protein shape: (1417, 27)
+2025-12-27 20:31:59,035 - INFO -   Ground truth shape: (1417, 14)
+2025-12-27 20:31:59,035 - INFO - 
+============================================================
+2025-12-27 20:31:59,035 - INFO - Region 1: Module 1-2 - Preprocessing
+2025-12-27 20:31:59,035 - INFO - ============================================================
+2025-12-27 20:31:59,035 - INFO - Logging initialized.
+2025-12-27 20:31:59,035 - INFO - ✓ Automatically added 'Unknown' cell type to capture uncharacterized populations
+2025-12-27 20:31:59,056 - INFO - Normalization stats:
+2025-12-27 20:31:59,056 - INFO - Original median total: 1621.00
+2025-12-27 20:31:59,056 - INFO - Mean scaled total: 10000.33
+2025-12-27 20:31:59,056 - INFO - Max scaled value: 5387.00
+2025-12-27 20:31:59,059 - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2025-12-27 20:31:59,060 - INFO -   Preprocessing completed in 0.0s
+2025-12-27 20:31:59,060 - INFO -   Genes after filtering: 392
+2025-12-27 20:31:59,060 - INFO - 
+============================================================
+2025-12-27 20:31:59,060 - INFO - Region 1: Module 3a - Cell Proportion Estimation
+2025-12-27 20:31:59,060 - INFO - ============================================================
+2025-12-27 20:31:59,060 - INFO - Using Laplacian smoothing with lambda=0.1, k=8
+2025-12-27 20:31:59,060 - INFO - Using per-marker beta optimization (preserves marker-level signal variation)
+2025-12-27 20:31:59,060 - INFO - Mapped 13 markers to 11 cell types (preserving marker-level data)
+2025-12-27 20:31:59,060 - INFO - Running Stage 1 cell proportion optimization with validation thresholds: Unknown<5.0%, CellTypes>1.0%, Redundancy<10%
+2025-12-27 20:31:59,060 - INFO - Per-marker beta optimization: 1417 spots, 13 markers, 11 cell types
+2025-12-27 20:31:59,060 - INFO - Markers with assignments: 13/13
+2025-12-27 20:31:59,068 - INFO - Laplacian smoothing enabled: lambda=0.1, k=8
+2025-12-27 20:31:59,068 - INFO - 
+Iteration 1
+2025-12-27 20:31:59,096 - INFO - Set parameter LicenseID to value 276015
+2025-12-27 20:31:59,096 - INFO - Set parameter GURO_PAR_SPECIAL
+2025-12-27 20:31:59,097 - INFO - Set parameter TokenServer to value "license.crc.pitt.edu"
+2025-12-27 20:32:03,405 - INFO - Change in beta: 2.699848, Change in Y: 16.925831
+2025-12-27 20:32:03,405 - INFO - 
+Iteration 2
+2025-12-27 20:32:07,982 - INFO - Change in beta: 0.390809, Change in Y: 4.500702
+2025-12-27 20:32:07,982 - INFO - 
+Iteration 3
+2025-12-27 20:32:12,095 - INFO - Change in beta: 0.039718, Change in Y: 0.444398
+2025-12-27 20:32:12,095 - INFO - 
+Iteration 4
+2025-12-27 20:32:16,301 - INFO - Change in beta: 0.004627, Change in Y: 0.052182
+2025-12-27 20:32:16,302 - INFO - 
+Iteration 5
+2025-12-27 20:32:20,391 - INFO - Change in beta: 0.001499, Change in Y: 0.010259
+2025-12-27 20:32:20,391 - INFO - 
+Iteration 6
+2025-12-27 20:32:24,590 - INFO - Change in beta: 0.000538, Change in Y: 0.003165
+2025-12-27 20:32:24,590 - INFO - 
+Iteration 7
+2025-12-27 20:32:28,816 - INFO - Change in beta: 0.000209, Change in Y: 0.001071
+2025-12-27 20:32:28,816 - INFO - 
+Iteration 8
+2025-12-27 20:32:32,999 - INFO - Change in beta: 0.000085, Change in Y: 0.000396
+2025-12-27 20:32:33,000 - INFO - 
+Iteration 9
+2025-12-27 20:32:37,506 - INFO - Change in beta: 0.000035, Change in Y: 0.000155
+2025-12-27 20:32:37,506 - INFO - 
+Iteration 10
+2025-12-27 20:32:42,097 - INFO - Change in beta: 0.000014, Change in Y: 0.000063
+2025-12-27 20:32:42,097 - INFO - Convergence achieved.
+2025-12-27 20:32:42,097 - INFO - Validating cell type proportions after Stage 1 optimization...
+2025-12-27 20:32:42,098 - INFO - ✓ Cell type validation passed (proportions + redundancy)
+2025-12-27 20:32:42,098 - INFO -   - Unknown: 2.13% (threshold < 5%)
+2025-12-27 20:32:42,098 - INFO -   - CD4+ T cells: 15.15%
+2025-12-27 20:32:42,098 - INFO -   - CD8+ T cells: 15.64%
+2025-12-27 20:32:42,098 - INFO -   - B cells: 2.13%
+2025-12-27 20:32:42,098 - INFO -   - Plasma cells: 2.13%
+2025-12-27 20:32:42,098 - INFO -   - Macrophages: 17.59%
+2025-12-27 20:32:42,098 - INFO -   - Dendritic cells: 22.89%
+2025-12-27 20:32:42,098 - INFO -   - NK cells: 3.14%
+2025-12-27 20:32:42,098 - INFO -   - Epithelial: 2.60%
+2025-12-27 20:32:42,098 - INFO -   - Endothelial: 5.99%
+2025-12-27 20:32:42,098 - INFO -   - Fibroblasts: 7.27%
+2025-12-27 20:32:42,098 - INFO - Beta range: [0.050, 1.000], mean: 0.599
+2025-12-27 20:32:42,120 - INFO - Skipping finetuning step (skip_finetuning=True)
+2025-12-27 20:32:42,150 - INFO -   Proportion estimation completed in 43.1s
+2025-12-27 20:32:42,150 - INFO - 
+============================================================
+2025-12-27 20:32:42,150 - INFO - Region 1: Benchmarking Proportions
+2025-12-27 20:32:42,150 - INFO - ============================================================
+2025-12-27 20:32:42,151 - INFO -   Filtered to spots with cells: 1379
+2025-12-27 20:32:42,151 - INFO -   Common spots: 1379
+2025-12-27 20:32:42,151 - INFO -   Common cell types (excluding Unknown): ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Dendritic cells', 'Endothelial', 'Epithelial', 'Fibroblasts', 'Macrophages', 'NK cells', 'Plasma cells']
+2025-12-27 20:32:42,152 - INFO -   GT row sums after renorm: mean=0.9964
+2025-12-27 20:32:42,152 - INFO -   Pred row sums after renorm: mean=1.0000
+2025-12-27 20:32:42,171 - INFO -   JSD (median): 0.6972
+2025-12-27 20:32:42,171 - INFO -   RMSE (global): 0.1980
+2025-12-27 20:32:42,171 - INFO -   MAE (global): 0.1287
+2025-12-27 20:32:42,171 - INFO -   Pearson r: 0.1045
+2025-12-27 20:32:42,182 - INFO - 
+============================================================
+2025-12-27 20:32:42,182 - INFO - Region 1: Module 3b - Gene Expression Deconvolution
+2025-12-27 20:32:42,182 - INFO - ============================================================
+2025-12-27 20:32:42,182 - INFO - Starting Pass 1: Error minimization with enrichment weights...
+2025-12-27 20:32:42,183 - INFO - Starting analysis for Xenium_region_1
+2025-12-27 20:32:42,183 - INFO - Already completed spots: 0
+2025-12-27 20:32:42,183 - INFO - Using enrichment weights - Global: 0.5, Local: 0.5
+2025-12-27 20:32:42,183 - INFO - Using 128 workers
+2025-12-27 20:32:42,183 - INFO - Processing 1417 remaining spots
+Deconvoluting Remaining Spots:   0%|          | 0/1417 [00:00<?, ?it/s]2025-12-27 20:32:42,799 - INFO - Solution found for spot 0
+2025-12-27 20:32:42,809 - INFO - Solution found for spot 2
+2025-12-27 20:32:42,813 - INFO - Solution found for spot 3
+2025-12-27 20:32:42,831 - INFO - Solution found for spot 4
+2025-12-27 20:32:42,831 - INFO - Solution found for spot 1
+2025-12-27 20:32:42,832 - INFO - Solution found for spot 6
+2025-12-27 20:32:42,841 - INFO - Solution found for spot 5
+2025-12-27 20:32:42,890 - INFO - Solution found for spot 7
+2025-12-27 20:32:42,912 - INFO - Solution found for spot 10
+Deconvoluting Remaining Spots:   0%|          | 1/1417 [00:00<04:31,  5.21it/s]2025-12-27 20:32:42,927 - INFO - Solution found for spot 8
+2025-12-27 20:32:42,960 - INFO - Solution found for spot 9
+2025-12-27 20:32:42,973 - INFO - Solution found for spot 11
+2025-12-27 20:32:42,993 - INFO - Solution found for spot 17
+2025-12-27 20:32:43,039 - INFO - Solution found for spot 13
+Deconvoluting Remaining Spots:   0%|          | 5/1417 [00:00<01:16, 18.51it/s]2025-12-27 20:32:43,091 - INFO - Solution found for spot 22
+2025-12-27 20:32:43,098 - INFO - Solution found for spot 14
+2025-12-27 20:32:43,114 - INFO - Solution found for spot 18
+2025-12-27 20:32:43,130 - INFO - Solution found for spot 19
+Deconvoluting Remaining Spots:   1%|          | 8/1417 [00:00<01:12, 19.32it/s]2025-12-27 20:32:43,195 - INFO - Solution found for spot 16
+2025-12-27 20:32:43,205 - INFO - Solution found for spot 23
+2025-12-27 20:32:43,233 - INFO - Solution found for spot 15
+2025-12-27 20:32:43,264 - INFO - Solution found for spot 26
+2025-12-27 20:32:43,271 - INFO - Solution found for spot 32
+2025-12-27 20:32:43,282 - INFO - Solution found for spot 25
+2025-12-27 20:32:43,295 - INFO - Solution found for spot 21
+Deconvoluting Remaining Spots:   1%|          | 16/1417 [00:00<00:38, 36.80it/s]2025-12-27 20:32:43,305 - INFO - Solution found for spot 20
+2025-12-27 20:32:43,306 - INFO - Solution found for spot 31
+2025-12-27 20:32:43,312 - INFO - Solution found for spot 27
+2025-12-27 20:32:43,319 - INFO - Solution found for spot 28
+2025-12-27 20:32:43,337 - INFO - Solution found for spot 12
+2025-12-27 20:32:43,429 - INFO - Solution found for spot 24
+2025-12-27 20:32:43,449 - INFO - Solution found for spot 37
+Deconvoluting Remaining Spots:   1%|▏         | 21/1417 [00:00<00:40, 34.07it/s]2025-12-27 20:32:43,544 - INFO - Solution found for spot 38
+2025-12-27 20:32:43,546 - INFO - Solution found for spot 30
+2025-12-27 20:32:43,563 - INFO - Solution found for spot 29
+2025-12-27 20:32:43,563 - INFO - Solution found for spot 36
+2025-12-27 20:32:43,581 - INFO - Solution found for spot 34
+2025-12-27 20:32:43,596 - INFO - Solution found for spot 35
+2025-12-27 20:32:43,600 - INFO - Solution found for spot 40
+Deconvoluting Remaining Spots:   2%|▏         | 26/1417 [00:00<00:40, 34.49it/s]2025-12-27 20:32:43,620 - INFO - Solution found for spot 33
+2025-12-27 20:32:43,632 - INFO - Solution found for spot 39
+2025-12-27 20:32:43,697 - INFO - Solution found for spot 44
+2025-12-27 20:32:43,698 - INFO - Solution found for spot 43
+2025-12-27 20:32:43,713 - INFO - Solution found for spot 45
+2025-12-27 20:32:43,724 - INFO - Solution found for spot 41
+2025-12-27 20:32:43,728 - INFO - Solution found for spot 42
+2025-12-27 20:32:43,748 - INFO - Solution found for spot 51
+Deconvoluting Remaining Spots:   2%|▏         | 34/1417 [00:01<00:34, 40.50it/s]2025-12-27 20:32:43,772 - INFO - Solution found for spot 49
+2025-12-27 20:32:43,792 - INFO - Solution found for spot 55
+2025-12-27 20:32:43,799 - INFO - Solution found for spot 48
+2025-12-27 20:32:43,799 - INFO - Solution found for spot 46
+2025-12-27 20:32:43,876 - INFO - Solution found for spot 58
+2025-12-27 20:32:43,913 - INFO - Solution found for spot 52
+2025-12-27 20:32:43,931 - INFO - Solution found for spot 47
+2025-12-27 20:32:43,948 - INFO - Solution found for spot 57
+Deconvoluting Remaining Spots:   3%|▎         | 39/1417 [00:01<00:40, 34.35it/s]2025-12-27 20:32:43,990 - INFO - Solution found for spot 54
+2025-12-27 20:32:44,002 - INFO - Solution found for spot 50
+2025-12-27 20:32:44,009 - INFO - Solution found for spot 53
+2025-12-27 20:32:44,024 - INFO - Solution found for spot 59
+2025-12-27 20:32:44,027 - INFO - Solution found for spot 60
+2025-12-27 20:32:44,048 - INFO - Solution found for spot 61
+2025-12-27 20:32:44,053 - INFO - Solution found for spot 56
+Deconvoluting Remaining Spots:   3%|▎         | 46/1417 [00:01<00:33, 41.08it/s]2025-12-27 20:32:44,091 - INFO - Solution found for spot 64
+2025-12-27 20:32:44,160 - INFO - Solution found for spot 65
+2025-12-27 20:32:44,171 - INFO - Solution found for spot 63
+2025-12-27 20:32:44,189 - INFO - Solution found for spot 62
+2025-12-27 20:32:44,256 - INFO - Solution found for spot 73
+Deconvoluting Remaining Spots:   4%|▎         | 51/1417 [00:01<00:37, 36.07it/s]2025-12-27 20:32:44,270 - INFO - Solution found for spot 78
+2025-12-27 20:32:44,284 - INFO - Solution found for spot 67
+2025-12-27 20:32:44,303 - INFO - Solution found for spot 72
+2025-12-27 20:32:44,319 - INFO - Solution found for spot 70
+2025-12-27 20:32:44,329 - INFO - Solution found for spot 74
+Deconvoluting Remaining Spots:   4%|▍         | 55/1417 [00:01<00:37, 36.35it/s]2025-12-27 20:32:44,377 - INFO - Solution found for spot 68
+2025-12-27 20:32:44,404 - INFO - Solution found for spot 71
+2025-12-27 20:32:44,414 - INFO - Solution found for spot 66
+2025-12-27 20:32:44,424 - INFO - Solution found for spot 69
+2025-12-27 20:32:44,435 - INFO - Solution found for spot 79
+2025-12-27 20:32:44,456 - INFO - Solution found for spot 76
+2025-12-27 20:32:44,472 - INFO - Solution found for spot 75
+2025-12-27 20:32:44,477 - INFO - Solution found for spot 77
+2025-12-27 20:32:44,488 - INFO - Solution found for spot 82
+2025-12-27 20:32:44,510 - INFO - Solution found for spot 81
+Deconvoluting Remaining Spots:   4%|▍         | 59/1417 [00:01<00:40, 33.52it/s]2025-12-27 20:32:44,519 - INFO - Solution found for spot 89
+2025-12-27 20:32:44,521 - INFO - Solution found for spot 80
+Deconvoluting Remaining Spots:   5%|▍         | 68/1417 [00:01<00:31, 42.66it/s]2025-12-27 20:32:44,656 - INFO - Solution found for spot 88
+2025-12-27 20:32:44,663 - INFO - Solution found for spot 85
+2025-12-27 20:32:44,670 - INFO - Solution found for spot 83
+2025-12-27 20:32:44,681 - INFO - Solution found for spot 86
+2025-12-27 20:32:44,691 - INFO - Solution found for spot 87
+2025-12-27 20:32:44,701 - INFO - Solution found for spot 90
+2025-12-27 20:32:44,707 - INFO - Solution found for spot 84
+2025-12-27 20:32:44,747 - INFO - Solution found for spot 91
+Deconvoluting Remaining Spots:   5%|▌         | 76/1417 [00:02<00:28, 47.55it/s]2025-12-27 20:32:44,788 - INFO - Solution found for spot 97
+2025-12-27 20:32:44,853 - INFO - Solution found for spot 95
+2025-12-27 20:32:44,868 - INFO - Solution found for spot 100
+2025-12-27 20:32:44,885 - INFO - Solution found for spot 96
+2025-12-27 20:32:44,898 - INFO - Solution found for spot 94
+2025-12-27 20:32:44,906 - INFO - Solution found for spot 92
+2025-12-27 20:32:44,912 - INFO - Solution found for spot 103
+Deconvoluting Remaining Spots:   6%|▌         | 82/1417 [00:02<00:28, 46.65it/s]2025-12-27 20:32:44,948 - INFO - Solution found for spot 101
+2025-12-27 20:32:44,960 - INFO - Solution found for spot 108
+2025-12-27 20:32:44,971 - INFO - Solution found for spot 93
+2025-12-27 20:32:44,976 - INFO - Solution found for spot 102
+2025-12-27 20:32:45,088 - INFO - Solution found for spot 99
+Deconvoluting Remaining Spots:   6%|▌         | 87/1417 [00:02<00:33, 40.30it/s]2025-12-27 20:32:45,111 - INFO - Solution found for spot 109
+2025-12-27 20:32:45,121 - INFO - Solution found for spot 110
+2025-12-27 20:32:45,125 - INFO - Solution found for spot 114
+2025-12-27 20:32:45,127 - INFO - Solution found for spot 98
+2025-12-27 20:32:45,151 - INFO - Solution found for spot 104
+2025-12-27 20:32:45,161 - INFO - Solution found for spot 105
+2025-12-27 20:32:45,170 - INFO - Solution found for spot 106
+2025-12-27 20:32:45,177 - INFO - Solution found for spot 107
+2025-12-27 20:32:45,199 - INFO - Solution found for spot 111
+Deconvoluting Remaining Spots:   7%|▋         | 93/1417 [00:02<00:30, 44.00it/s]2025-12-27 20:32:45,240 - INFO - Solution found for spot 112
+2025-12-27 20:32:45,319 - INFO - Solution found for spot 113
+2025-12-27 20:32:45,326 - INFO - Solution found for spot 115
+2025-12-27 20:32:45,334 - INFO - Solution found for spot 116
+Deconvoluting Remaining Spots:   7%|▋         | 100/1417 [00:02<00:28, 46.41it/s]2025-12-27 20:32:45,376 - INFO - Solution found for spot 125
+2025-12-27 20:32:45,403 - INFO - Saved checkpoint after 100 completed spots
+Deconvoluting Remaining Spots:   7%|▋         | 106/1417 [00:02<00:26, 49.40it/s]2025-12-27 20:32:45,458 - INFO - Solution found for spot 124
+2025-12-27 20:32:45,461 - INFO - Solution found for spot 131
+2025-12-27 20:32:45,486 - INFO - Solution found for spot 126
+2025-12-27 20:32:45,533 - INFO - Solution found for spot 117
+2025-12-27 20:32:45,549 - INFO - Solution found for spot 121
+2025-12-27 20:32:45,561 - INFO - Solution found for spot 122
+2025-12-27 20:32:45,570 - INFO - Solution found for spot 118
+2025-12-27 20:32:45,600 - INFO - Solution found for spot 128
+2025-12-27 20:32:45,600 - INFO - Solution found for spot 123
+2025-12-27 20:32:45,614 - INFO - Solution found for spot 135
+2025-12-27 20:32:45,618 - INFO - Solution found for spot 130
+2025-12-27 20:32:45,631 - INFO - Solution found for spot 119
+2025-12-27 20:32:45,637 - INFO - Solution found for spot 129
+Deconvoluting Remaining Spots:   8%|▊         | 112/1417 [00:02<00:32, 39.91it/s]2025-12-27 20:32:45,674 - INFO - Solution found for spot 141
+2025-12-27 20:32:45,713 - INFO - Solution found for spot 139
+2025-12-27 20:32:45,713 - INFO - Solution found for spot 138
+2025-12-27 20:32:45,714 - INFO - Solution found for spot 140
+2025-12-27 20:32:45,730 - INFO - Solution found for spot 147
+2025-12-27 20:32:45,732 - INFO - Solution found for spot 127
+2025-12-27 20:32:45,746 - INFO - Solution found for spot 143
+2025-12-27 20:32:45,761 - INFO - Solution found for spot 120
+Deconvoluting Remaining Spots:   8%|▊         | 117/1417 [00:03<00:32, 40.46it/s]2025-12-27 20:32:45,821 - INFO - Solution found for spot 137
+2025-12-27 20:32:45,836 - INFO - Solution found for spot 133
+2025-12-27 20:32:45,839 - INFO - Solution found for spot 136
+2025-12-27 20:32:45,862 - INFO - Solution found for spot 132
+2025-12-27 20:32:45,896 - INFO - Solution found for spot 134
+Deconvoluting Remaining Spots:   9%|▊         | 122/1417 [00:03<00:34, 37.58it/s]2025-12-27 20:32:46,030 - INFO - Solution found for spot 144
+2025-12-27 20:32:46,043 - INFO - Solution found for spot 145
+2025-12-27 20:32:46,055 - INFO - Solution found for spot 156
+Deconvoluting Remaining Spots:   9%|▉         | 132/1417 [00:03<00:27, 46.51it/s]2025-12-27 20:32:46,098 - INFO - Solution found for spot 155
+2025-12-27 20:32:46,102 - INFO - Solution found for spot 154
+2025-12-27 20:32:46,103 - INFO - Solution found for spot 146
+2025-12-27 20:32:46,112 - INFO - Solution found for spot 142
+2025-12-27 20:32:46,127 - INFO - Solution found for spot 149
+2025-12-27 20:32:46,149 - INFO - Solution found for spot 153
+2025-12-27 20:32:46,165 - INFO - Solution found for spot 151
+2025-12-27 20:32:46,165 - INFO - Solution found for spot 148
+2025-12-27 20:32:46,181 - INFO - Solution found for spot 150
+2025-12-27 20:32:46,190 - INFO - Solution found for spot 152
+2025-12-27 20:32:46,195 - INFO - Solution found for spot 158
+2025-12-27 20:32:46,200 - INFO - Solution found for spot 164
+2025-12-27 20:32:46,200 - INFO - Solution found for spot 157
+Deconvoluting Remaining Spots:  10%|▉         | 137/1417 [00:03<00:28, 44.85it/s]2025-12-27 20:32:46,229 - INFO - Solution found for spot 165
+2025-12-27 20:32:46,265 - INFO - Solution found for spot 160
+2025-12-27 20:32:46,273 - INFO - Solution found for spot 161
+2025-12-27 20:32:46,278 - INFO - Solution found for spot 159
+2025-12-27 20:32:46,291 - INFO - Solution found for spot 163
+2025-12-27 20:32:46,292 - INFO - Solution found for spot 162
+Deconvoluting Remaining Spots:  10%|█         | 143/1417 [00:03<00:29, 43.72it/s]2025-12-27 20:32:46,450 - INFO - Solution found for spot 171
+2025-12-27 20:32:46,481 - INFO - Solution found for spot 166
+2025-12-27 20:32:46,545 - INFO - Solution found for spot 167
+Deconvoluting Remaining Spots:  10%|█         | 148/1417 [00:03<00:34, 36.42it/s]2025-12-27 20:32:46,570 - INFO - Solution found for spot 172
+2025-12-27 20:32:46,573 - INFO - Solution found for spot 173
+2025-12-27 20:32:46,610 - INFO - Solution found for spot 168
+2025-12-27 20:32:46,630 - INFO - Solution found for spot 183
+2025-12-27 20:32:46,638 - INFO - Solution found for spot 176
+2025-12-27 20:32:46,641 - INFO - Solution found for spot 177
+2025-12-27 20:32:46,642 - INFO - Solution found for spot 169
+2025-12-27 20:32:46,655 - INFO - Solution found for spot 181
+2025-12-27 20:32:46,675 - INFO - Solution found for spot 182
+Deconvoluting Remaining Spots:  11%|█         | 155/1417 [00:03<00:30, 41.87it/s]2025-12-27 20:32:46,681 - INFO - Solution found for spot 174
+2025-12-27 20:32:46,685 - INFO - Solution found for spot 170
+2025-12-27 20:32:46,696 - INFO - Solution found for spot 179
+2025-12-27 20:32:46,700 - INFO - Solution found for spot 180
+2025-12-27 20:32:46,708 - INFO - Solution found for spot 178
+2025-12-27 20:32:46,709 - INFO - Solution found for spot 175
+Deconvoluting Remaining Spots:  11%|█▏        | 162/1417 [00:04<00:26, 48.07it/s]2025-12-27 20:32:46,787 - INFO - Solution found for spot 192
+2025-12-27 20:32:46,854 - INFO - Solution found for spot 194
+2025-12-27 20:32:46,866 - INFO - Solution found for spot 185
+2025-12-27 20:32:46,878 - INFO - Solution found for spot 190
+2025-12-27 20:32:46,882 - INFO - Solution found for spot 186
+Deconvoluting Remaining Spots:  12%|█▏        | 169/1417 [00:04<00:23, 52.88it/s]2025-12-27 20:32:46,904 - INFO - Solution found for spot 187
+2025-12-27 20:32:46,911 - INFO - Solution found for spot 184
+2025-12-27 20:32:46,924 - INFO - Solution found for spot 188
+2025-12-27 20:32:47,004 - INFO - Solution found for spot 189
+2025-12-27 20:32:47,018 - INFO - Solution found for spot 191
+Deconvoluting Remaining Spots:  12%|█▏        | 175/1417 [00:04<00:25, 49.00it/s]2025-12-27 20:32:47,045 - INFO - Solution found for spot 193
+2025-12-27 20:32:47,061 - INFO - Solution found for spot 195
+2025-12-27 20:32:47,070 - INFO - Solution found for spot 196
+2025-12-27 20:32:47,077 - INFO - Solution found for spot 197
+2025-12-27 20:32:47,090 - INFO - Solution found for spot 198
+2025-12-27 20:32:47,101 - INFO - Solution found for spot 203
+2025-12-27 20:32:47,109 - INFO - Solution found for spot 199
+2025-12-27 20:32:47,129 - INFO - Solution found for spot 200
+2025-12-27 20:32:47,136 - INFO - Solution found for spot 201
+2025-12-27 20:32:47,140 - INFO - Solution found for spot 206
+2025-12-27 20:32:47,157 - INFO - Solution found for spot 202
+2025-12-27 20:32:47,183 - INFO - Solution found for spot 207
+2025-12-27 20:32:47,225 - INFO - Solution found for spot 205
+2025-12-27 20:32:47,237 - INFO - Solution found for spot 212
+2025-12-27 20:32:47,262 - INFO - Solution found for spot 211
+2025-12-27 20:32:47,269 - INFO - Solution found for spot 213
+2025-12-27 20:32:47,281 - INFO - Solution found for spot 209
+2025-12-27 20:32:47,294 - INFO - Solution found for spot 204
+Deconvoluting Remaining Spots:  13%|█▎        | 181/1417 [00:04<00:33, 36.37it/s]Deconvoluting Remaining Spots:  13%|█▎        | 186/1417 [00:04<00:32, 38.40it/s]2025-12-27 20:32:47,412 - INFO - Solution found for spot 226
+2025-12-27 20:32:47,413 - INFO - Solution found for spot 215
+2025-12-27 20:32:47,433 - INFO - Solution found for spot 214
+2025-12-27 20:32:47,441 - INFO - Solution found for spot 217
+2025-12-27 20:32:47,448 - INFO - Solution found for spot 220
+2025-12-27 20:32:47,472 - INFO - Solution found for spot 208
+2025-12-27 20:32:47,522 - INFO - Solution found for spot 218
+2025-12-27 20:32:47,530 - INFO - Solution found for spot 210
+2025-12-27 20:32:47,532 - INFO - Solution found for spot 219
+2025-12-27 20:32:47,563 - INFO - Solution found for spot 224
+2025-12-27 20:32:47,588 - INFO - Solution found for spot 223
+2025-12-27 20:32:47,598 - INFO - Solution found for spot 228
+2025-12-27 20:32:47,603 - INFO - Solution found for spot 229
+2025-12-27 20:32:47,645 - INFO - Solution found for spot 221
+Deconvoluting Remaining Spots:  13%|█▎        | 191/1417 [00:04<00:39, 30.96it/s]2025-12-27 20:32:47,674 - INFO - Solution found for spot 216
+2025-12-27 20:32:47,693 - INFO - Solution found for spot 227
+2025-12-27 20:32:47,719 - INFO - Solution found for spot 222
+2025-12-27 20:32:47,735 - INFO - Solution found for spot 231
+2025-12-27 20:32:47,750 - INFO - Solution found for spot 232
+2025-12-27 20:32:47,762 - INFO - Solution found for spot 225
+Deconvoluting Remaining Spots:  14%|█▍        | 198/1417 [00:05<00:33, 36.88it/s]2025-12-27 20:32:47,844 - INFO - Solution found for spot 233
+2025-12-27 20:32:47,850 - INFO - Solution found for spot 230
+2025-12-27 20:32:47,879 - INFO - Solution found for spot 234
+2025-12-27 20:32:47,895 - INFO - Solution found for spot 239
+2025-12-27 20:32:47,904 - INFO - Solution found for spot 247
+2025-12-27 20:32:47,911 - INFO - Solution found for spot 246
+2025-12-27 20:32:47,920 - INFO - Solution found for spot 240
+2025-12-27 20:32:47,924 - INFO - Solution found for spot 241
+2025-12-27 20:32:47,955 - INFO - Solution found for spot 238
+2025-12-27 20:32:47,963 - INFO - Solution found for spot 236
+2025-12-27 20:32:48,010 - INFO - Solution found for spot 237
+2025-12-27 20:32:48,071 - INFO - Solution found for spot 235
+2025-12-27 20:32:48,076 - INFO - Solution found for spot 242
+2025-12-27 20:32:48,082 - INFO - Solution found for spot 243
+2025-12-27 20:32:48,100 - INFO - Solution found for spot 244
+2025-12-27 20:32:48,106 - INFO - Solution found for spot 253
+2025-12-27 20:32:48,140 - INFO - Solution found for spot 248
+2025-12-27 20:32:48,178 - INFO - Solution found for spot 245
+2025-12-27 20:32:48,224 - INFO - Solution found for spot 260
+2025-12-27 20:32:48,238 - INFO - Solution found for spot 252
+2025-12-27 20:32:48,280 - INFO - Solution found for spot 250
+2025-12-27 20:32:48,288 - INFO - Solution found for spot 255
+2025-12-27 20:32:48,288 - INFO - Solution found for spot 254
+2025-12-27 20:32:48,296 - INFO - Solution found for spot 259
+2025-12-27 20:32:48,314 - INFO - Solution found for spot 256
+2025-12-27 20:32:48,315 - INFO - Saved checkpoint after 200 completed spots
+Deconvoluting Remaining Spots:  14%|█▍        | 203/1417 [00:05<00:58, 20.76it/s]2025-12-27 20:32:48,325 - INFO - Solution found for spot 257
+2025-12-27 20:32:48,327 - INFO - Solution found for spot 249
+2025-12-27 20:32:48,342 - INFO - Solution found for spot 251
+2025-12-27 20:32:48,401 - INFO - Solution found for spot 262
+Deconvoluting Remaining Spots:  16%|█▌        | 220/1417 [00:05<00:29, 40.08it/s]2025-12-27 20:32:48,430 - INFO - Solution found for spot 258
+2025-12-27 20:32:48,437 - INFO - Solution found for spot 261
+2025-12-27 20:32:48,466 - INFO - Solution found for spot 268
+2025-12-27 20:32:48,520 - INFO - Solution found for spot 270
+2025-12-27 20:32:48,549 - INFO - Solution found for spot 263
+Deconvoluting Remaining Spots:  16%|█▌        | 227/1417 [00:05<00:27, 43.14it/s]2025-12-27 20:32:48,564 - INFO - Solution found for spot 269
+2025-12-27 20:32:48,568 - INFO - Solution found for spot 271
+2025-12-27 20:32:48,664 - INFO - Solution found for spot 266
+2025-12-27 20:32:48,664 - INFO - Solution found for spot 265
+2025-12-27 20:32:48,679 - INFO - Solution found for spot 267
+Deconvoluting Remaining Spots:  17%|█▋        | 237/1417 [00:05<00:23, 50.89it/s]2025-12-27 20:32:48,704 - INFO - Solution found for spot 264
+2025-12-27 20:32:48,705 - INFO - Solution found for spot 273
+2025-12-27 20:32:48,709 - INFO - Solution found for spot 272
+2025-12-27 20:32:48,745 - INFO - Solution found for spot 275
+2025-12-27 20:32:48,749 - INFO - Solution found for spot 274
+2025-12-27 20:32:48,764 - INFO - Solution found for spot 279
+Deconvoluting Remaining Spots:  17%|█▋        | 245/1417 [00:06<00:21, 53.70it/s]2025-12-27 20:32:48,845 - INFO - Solution found for spot 278
+2025-12-27 20:32:48,865 - INFO - Solution found for spot 286
+2025-12-27 20:32:48,868 - INFO - Solution found for spot 288
+2025-12-27 20:32:48,943 - INFO - Solution found for spot 284
+Deconvoluting Remaining Spots:  18%|█▊        | 252/1417 [00:06<00:22, 52.57it/s]2025-12-27 20:32:48,951 - INFO - Solution found for spot 285
+2025-12-27 20:32:48,953 - INFO - Solution found for spot 276
+2025-12-27 20:32:48,965 - INFO - Solution found for spot 282
+2025-12-27 20:32:48,982 - INFO - Solution found for spot 281
+2025-12-27 20:32:48,985 - INFO - Solution found for spot 287
+2025-12-27 20:32:48,985 - INFO - Solution found for spot 277
+2025-12-27 20:32:48,994 - INFO - Solution found for spot 293
+2025-12-27 20:32:49,003 - INFO - Solution found for spot 280
+2025-12-27 20:32:49,030 - INFO - Solution found for spot 289
+2025-12-27 20:32:49,038 - INFO - Solution found for spot 291
+2025-12-27 20:32:49,061 - INFO - Solution found for spot 283
+2025-12-27 20:32:49,069 - INFO - Solution found for spot 290
+2025-12-27 20:32:49,078 - INFO - Solution found for spot 296
+2025-12-27 20:32:49,082 - INFO - Solution found for spot 292
+2025-12-27 20:32:49,122 - INFO - Solution found for spot 295
+2025-12-27 20:32:49,129 - INFO - Solution found for spot 297
+Deconvoluting Remaining Spots:  18%|█▊        | 259/1417 [00:06<00:24, 47.48it/s]2025-12-27 20:32:49,171 - INFO - Solution found for spot 294
+2025-12-27 20:32:49,215 - INFO - Solution found for spot 301
+2025-12-27 20:32:49,283 - INFO - Solution found for spot 303
+2025-12-27 20:32:49,297 - INFO - Solution found for spot 299
+2025-12-27 20:32:49,307 - INFO - Solution found for spot 302
+2025-12-27 20:32:49,312 - INFO - Solution found for spot 298
+Deconvoluting Remaining Spots:  19%|█▊        | 265/1417 [00:06<00:26, 43.02it/s]2025-12-27 20:32:49,329 - INFO - Solution found for spot 300
+2025-12-27 20:32:49,341 - INFO - Solution found for spot 304
+2025-12-27 20:32:49,405 - INFO - Solution found for spot 307
+Deconvoluting Remaining Spots:  20%|█▉        | 277/1417 [00:06<00:20, 56.88it/s]2025-12-27 20:32:49,456 - INFO - Solution found for spot 314
+2025-12-27 20:32:49,456 - INFO - Solution found for spot 306
+2025-12-27 20:32:49,467 - INFO - Solution found for spot 315
+2025-12-27 20:32:49,477 - INFO - Solution found for spot 312
+2025-12-27 20:32:49,491 - INFO - Solution found for spot 311
+2025-12-27 20:32:49,498 - INFO - Solution found for spot 305
+2025-12-27 20:32:49,517 - INFO - Solution found for spot 313
+2025-12-27 20:32:49,590 - INFO - Solution found for spot 316
+2025-12-27 20:32:49,591 - INFO - Solution found for spot 326
+2025-12-27 20:32:49,603 - INFO - Solution found for spot 323
+2025-12-27 20:32:49,652 - INFO - Solution found for spot 318
+2025-12-27 20:32:49,685 - INFO - Solution found for spot 321
+2025-12-27 20:32:49,713 - INFO - Solution found for spot 308
+2025-12-27 20:32:49,723 - INFO - Solution found for spot 309
+Deconvoluting Remaining Spots:  20%|██        | 284/1417 [00:07<00:28, 40.04it/s]2025-12-27 20:32:49,783 - INFO - Solution found for spot 310
+2025-12-27 20:32:49,807 - INFO - Solution found for spot 329
+2025-12-27 20:32:49,831 - INFO - Solution found for spot 317
+2025-12-27 20:32:49,847 - INFO - Solution found for spot 332
+2025-12-27 20:32:49,898 - INFO - Solution found for spot 325
+2025-12-27 20:32:49,901 - INFO - Solution found for spot 330
+2025-12-27 20:32:49,911 - INFO - Solution found for spot 333
+Deconvoluting Remaining Spots:  20%|██        | 290/1417 [00:07<00:29, 38.69it/s]2025-12-27 20:32:49,950 - INFO - Solution found for spot 324
+2025-12-27 20:32:49,973 - INFO - Solution found for spot 331
+2025-12-27 20:32:49,979 - INFO - Solution found for spot 334
+2025-12-27 20:32:50,015 - INFO - Solution found for spot 327
+2025-12-27 20:32:50,022 - INFO - Solution found for spot 320
+Deconvoluting Remaining Spots:  21%|██        | 298/1417 [00:07<00:24, 45.29it/s]2025-12-27 20:32:50,042 - INFO - Solution found for spot 322
+2025-12-27 20:32:50,045 - INFO - Solution found for spot 328
+2025-12-27 20:32:50,074 - INFO - Solution found for spot 319
+2025-12-27 20:32:50,083 - INFO - Solution found for spot 346
+2025-12-27 20:32:50,099 - INFO - Solution found for spot 343
+2025-12-27 20:32:50,112 - INFO - Solution found for spot 342
+2025-12-27 20:32:50,119 - INFO - Solution found for spot 340
+2025-12-27 20:32:50,168 - INFO - Solution found for spot 345
+2025-12-27 20:32:50,173 - INFO - Solution found for spot 341
+2025-12-27 20:32:50,178 - INFO - Solution found for spot 337
+2025-12-27 20:32:50,191 - INFO - Solution found for spot 338
+2025-12-27 20:32:50,200 - INFO - Solution found for spot 339
+2025-12-27 20:32:50,263 - INFO - Solution found for spot 368
+2025-12-27 20:32:50,278 - INFO - Solution found for spot 360
+2025-12-27 20:32:50,286 - INFO - Solution found for spot 335
+2025-12-27 20:32:50,308 - INFO - Solution found for spot 336
+2025-12-27 20:32:50,327 - INFO - Solution found for spot 366
+2025-12-27 20:32:50,339 - INFO - Solution found for spot 367
+2025-12-27 20:32:50,341 - INFO - Solution found for spot 344
+2025-12-27 20:32:50,395 - INFO - Solution found for spot 351
+2025-12-27 20:32:50,411 - INFO - Solution found for spot 352
+2025-12-27 20:32:50,427 - INFO - Solution found for spot 350
+2025-12-27 20:32:50,433 - INFO - Solution found for spot 349
+2025-12-27 20:32:50,436 - INFO - Solution found for spot 348
+2025-12-27 20:32:50,443 - INFO - Solution found for spot 353
+2025-12-27 20:32:50,455 - INFO - Solution found for spot 347
+2025-12-27 20:32:50,473 - INFO - Solution found for spot 365
+2025-12-27 20:32:50,518 - INFO - Solution found for spot 358
+2025-12-27 20:32:50,560 - INFO - Solution found for spot 355
+2025-12-27 20:32:50,579 - INFO - Solution found for spot 359
+2025-12-27 20:32:50,595 - INFO - Solution found for spot 361
+2025-12-27 20:32:50,597 - INFO - Solution found for spot 356
+2025-12-27 20:32:50,610 - INFO - Solution found for spot 363
+2025-12-27 20:32:50,629 - INFO - Solution found for spot 354
+2025-12-27 20:32:50,634 - INFO - Solution found for spot 357
+2025-12-27 20:32:50,651 - INFO - Solution found for spot 362
+2025-12-27 20:32:50,676 - INFO - Solution found for spot 371
+2025-12-27 20:32:50,685 - INFO - Solution found for spot 383
+2025-12-27 20:32:50,690 - INFO - Solution found for spot 369
+2025-12-27 20:32:50,696 - INFO - Solution found for spot 364
+2025-12-27 20:32:50,775 - INFO - Solution found for spot 378
+2025-12-27 20:32:50,794 - INFO - Solution found for spot 372
+2025-12-27 20:32:50,828 - INFO - Solution found for spot 373
+2025-12-27 20:32:50,839 - INFO - Solution found for spot 374
+2025-12-27 20:32:50,859 - INFO - Solution found for spot 375
+2025-12-27 20:32:50,885 - INFO - Saved checkpoint after 300 completed spots
+Deconvoluting Remaining Spots:  21%|██▏       | 304/1417 [00:08<00:57, 19.22it/s]2025-12-27 20:32:50,893 - INFO - Solution found for spot 381
+2025-12-27 20:32:50,904 - INFO - Solution found for spot 370
+2025-12-27 20:32:50,911 - INFO - Solution found for spot 377
+2025-12-27 20:32:50,928 - INFO - Solution found for spot 389
+2025-12-27 20:32:50,934 - INFO - Solution found for spot 376
+2025-12-27 20:32:50,946 - INFO - Solution found for spot 380
+2025-12-27 20:32:50,956 - INFO - Solution found for spot 386
+2025-12-27 20:32:50,962 - INFO - Solution found for spot 379
+Deconvoluting Remaining Spots:  24%|██▍       | 337/1417 [00:08<00:22, 47.03it/s]2025-12-27 20:32:51,120 - INFO - Solution found for spot 385
+Deconvoluting Remaining Spots:  24%|██▍       | 347/1417 [00:08<00:20, 53.33it/s]2025-12-27 20:32:51,182 - INFO - Solution found for spot 388
+2025-12-27 20:32:51,191 - INFO - Solution found for spot 384
+2025-12-27 20:32:51,198 - INFO - Solution found for spot 382
+2025-12-27 20:32:51,211 - INFO - Solution found for spot 387
+2025-12-27 20:32:51,224 - INFO - Solution found for spot 398
+2025-12-27 20:32:51,262 - INFO - Solution found for spot 391
+2025-12-27 20:32:51,283 - INFO - Solution found for spot 392
+2025-12-27 20:32:51,300 - INFO - Solution found for spot 390
+2025-12-27 20:32:51,303 - INFO - Solution found for spot 394
+2025-12-27 20:32:51,341 - INFO - Solution found for spot 393
+2025-12-27 20:32:51,348 - INFO - Solution found for spot 401
+Deconvoluting Remaining Spots:  25%|██▌       | 356/1417 [00:08<00:20, 51.70it/s]2025-12-27 20:32:51,376 - INFO - Solution found for spot 399
+2025-12-27 20:32:51,389 - INFO - Solution found for spot 404
+2025-12-27 20:32:51,402 - INFO - Solution found for spot 400
+2025-12-27 20:32:51,429 - INFO - Solution found for spot 397
+2025-12-27 20:32:51,432 - INFO - Solution found for spot 396
+2025-12-27 20:32:51,462 - INFO - Solution found for spot 403
+2025-12-27 20:32:51,466 - INFO - Solution found for spot 402
+Deconvoluting Remaining Spots:  26%|██▌       | 364/1417 [00:08<00:18, 55.69it/s]2025-12-27 20:32:51,550 - INFO - Solution found for spot 395
+2025-12-27 20:32:51,602 - INFO - Solution found for spot 410
+2025-12-27 20:32:51,621 - INFO - Solution found for spot 405
+2025-12-27 20:32:51,639 - INFO - Solution found for spot 409
+2025-12-27 20:32:51,658 - INFO - Solution found for spot 407
+2025-12-27 20:32:51,658 - INFO - Solution found for spot 408
+Deconvoluting Remaining Spots:  26%|██▋       | 372/1417 [00:08<00:20, 50.25it/s]2025-12-27 20:32:51,680 - INFO - Solution found for spot 412
+2025-12-27 20:32:51,682 - INFO - Solution found for spot 419
+2025-12-27 20:32:51,689 - INFO - Solution found for spot 406
+2025-12-27 20:32:51,689 - INFO - Solution found for spot 414
+2025-12-27 20:32:51,694 - INFO - Solution found for spot 411
+2025-12-27 20:32:51,708 - INFO - Solution found for spot 420
+2025-12-27 20:32:51,718 - INFO - Solution found for spot 416
+2025-12-27 20:32:51,738 - INFO - Solution found for spot 413
+2025-12-27 20:32:51,755 - INFO - Solution found for spot 415
+2025-12-27 20:32:51,779 - INFO - Solution found for spot 417
+2025-12-27 20:32:51,784 - INFO - Solution found for spot 425
+2025-12-27 20:32:51,812 - INFO - Solution found for spot 426
+2025-12-27 20:32:51,826 - INFO - Solution found for spot 418
+Deconvoluting Remaining Spots:  27%|██▋       | 379/1417 [00:09<00:21, 49.27it/s]2025-12-27 20:32:51,839 - INFO - Solution found for spot 421
+2025-12-27 20:32:51,855 - INFO - Solution found for spot 422
+2025-12-27 20:32:51,856 - INFO - Solution found for spot 423
+2025-12-27 20:32:51,907 - INFO - Solution found for spot 429
+2025-12-27 20:32:51,941 - INFO - Solution found for spot 424
+Deconvoluting Remaining Spots:  27%|██▋       | 385/1417 [00:09<00:22, 45.87it/s]2025-12-27 20:32:52,018 - INFO - Solution found for spot 428
+2025-12-27 20:32:52,021 - INFO - Solution found for spot 441
+2025-12-27 20:32:52,033 - INFO - Solution found for spot 427
+2025-12-27 20:32:52,045 - INFO - Solution found for spot 442
+2025-12-27 20:32:52,083 - INFO - Solution found for spot 436
+2025-12-27 20:32:52,098 - INFO - Solution found for spot 440
+Deconvoluting Remaining Spots:  28%|██▊       | 395/1417 [00:09<00:19, 53.74it/s]2025-12-27 20:32:52,142 - INFO - Solution found for spot 432
+2025-12-27 20:32:52,149 - INFO - Solution found for spot 435
+2025-12-27 20:32:52,176 - INFO - Solution found for spot 433
+2025-12-27 20:32:52,180 - INFO - Solution found for spot 438
+2025-12-27 20:32:52,182 - INFO - Solution found for spot 437
+2025-12-27 20:32:52,192 - INFO - Solution found for spot 431
+2025-12-27 20:32:52,198 - INFO - Solution found for spot 439
+2025-12-27 20:32:52,244 - INFO - Solution found for spot 444
+2025-12-27 20:32:52,248 - INFO - Solution found for spot 430
+2025-12-27 20:32:52,244 - INFO - Solution found for spot 450
+2025-12-27 20:32:52,277 - INFO - Solution found for spot 434
+2025-12-27 20:32:52,296 - INFO - Solution found for spot 445
+2025-12-27 20:32:52,423 - INFO - Solution found for spot 443
+2025-12-27 20:32:52,433 - INFO - Solution found for spot 451
+2025-12-27 20:32:52,438 - INFO - Solution found for spot 446
+2025-12-27 20:32:52,472 - INFO - Solution found for spot 466
+2025-12-27 20:32:52,479 - INFO - Solution found for spot 448
+2025-12-27 20:32:52,499 - INFO - Solution found for spot 447
+2025-12-27 20:32:52,540 - INFO - Solution found for spot 449
+2025-12-27 20:32:52,556 - INFO - Solution found for spot 458
+2025-12-27 20:32:52,570 - INFO - Solution found for spot 455
+2025-12-27 20:32:52,590 - INFO - Solution found for spot 456
+2025-12-27 20:32:52,640 - INFO - Solution found for spot 459
+2025-12-27 20:32:52,648 - INFO - Solution found for spot 457
+2025-12-27 20:32:52,656 - INFO - Solution found for spot 460
+2025-12-27 20:32:52,697 - INFO - Solution found for spot 454
+2025-12-27 20:32:52,709 - INFO - Solution found for spot 453
+2025-12-27 20:32:52,723 - INFO - Solution found for spot 452
+2025-12-27 20:32:52,824 - INFO - Solution found for spot 462
+2025-12-27 20:32:52,826 - INFO - Solution found for spot 465
+2025-12-27 20:32:52,887 - INFO - Solution found for spot 478
+2025-12-27 20:32:52,890 - INFO - Solution found for spot 461
+2025-12-27 20:32:52,921 - INFO - Solution found for spot 464
+2025-12-27 20:32:52,986 - INFO - Saved checkpoint after 400 completed spots
+Deconvoluting Remaining Spots:  28%|██▊       | 402/1417 [00:10<00:46, 21.92it/s]2025-12-27 20:32:52,996 - INFO - Solution found for spot 479
+2025-12-27 20:32:53,000 - INFO - Solution found for spot 468
+2025-12-27 20:32:53,005 - INFO - Solution found for spot 469
+2025-12-27 20:32:53,014 - INFO - Solution found for spot 467
+2025-12-27 20:32:53,023 - INFO - Solution found for spot 480
+2025-12-27 20:32:53,054 - INFO - Solution found for spot 477
+2025-12-27 20:32:53,067 - INFO - Solution found for spot 470
+2025-12-27 20:32:53,069 - INFO - Solution found for spot 472
+2025-12-27 20:32:53,098 - INFO - Solution found for spot 463
+Deconvoluting Remaining Spots:  31%|███       | 439/1417 [00:10<00:17, 56.11it/s]2025-12-27 20:32:53,118 - INFO - Solution found for spot 474
+2025-12-27 20:32:53,144 - INFO - Solution found for spot 476
+2025-12-27 20:32:53,145 - INFO - Solution found for spot 475
+2025-12-27 20:32:53,147 - INFO - Solution found for spot 473
+2025-12-27 20:32:53,152 - INFO - Solution found for spot 471
+2025-12-27 20:32:53,158 - INFO - Solution found for spot 482
+2025-12-27 20:32:53,170 - INFO - Solution found for spot 486
+2025-12-27 20:32:53,190 - INFO - Solution found for spot 487
+2025-12-27 20:32:53,243 - INFO - Solution found for spot 494
+2025-12-27 20:32:53,251 - INFO - Solution found for spot 488
+2025-12-27 20:32:53,259 - INFO - Solution found for spot 485
+2025-12-27 20:32:53,270 - INFO - Solution found for spot 481
+2025-12-27 20:32:53,306 - INFO - Solution found for spot 484
+2025-12-27 20:32:53,345 - INFO - Solution found for spot 483
+Deconvoluting Remaining Spots:  32%|███▏      | 451/1417 [00:10<00:18, 52.45it/s]2025-12-27 20:32:53,477 - INFO - Solution found for spot 492
+2025-12-27 20:32:53,486 - INFO - Solution found for spot 490
+2025-12-27 20:32:53,493 - INFO - Solution found for spot 489
+2025-12-27 20:32:53,514 - INFO - Solution found for spot 491
+2025-12-27 20:32:53,519 - INFO - Solution found for spot 502
+2025-12-27 20:32:53,533 - INFO - Solution found for spot 498
+2025-12-27 20:32:53,537 - INFO - Solution found for spot 496
+2025-12-27 20:32:53,568 - INFO - Solution found for spot 493
+2025-12-27 20:32:53,570 - INFO - Solution found for spot 501
+2025-12-27 20:32:53,570 - INFO - Solution found for spot 495
+2025-12-27 20:32:53,603 - INFO - Solution found for spot 505
+2025-12-27 20:32:53,605 - INFO - Solution found for spot 500
+2025-12-27 20:32:53,621 - INFO - Solution found for spot 504
+2025-12-27 20:32:53,665 - INFO - Solution found for spot 503
+2025-12-27 20:32:53,694 - INFO - Solution found for spot 497
+2025-12-27 20:32:53,716 - INFO - Solution found for spot 510
+2025-12-27 20:32:53,727 - INFO - Solution found for spot 511
+2025-12-27 20:32:53,732 - INFO - Solution found for spot 499
+2025-12-27 20:32:53,777 - INFO - Solution found for spot 508
+2025-12-27 20:32:53,786 - INFO - Solution found for spot 516
+2025-12-27 20:32:53,798 - INFO - Solution found for spot 514
+Deconvoluting Remaining Spots:  33%|███▎      | 461/1417 [00:11<00:23, 41.39it/s]2025-12-27 20:32:53,830 - INFO - Solution found for spot 515
+2025-12-27 20:32:53,852 - INFO - Solution found for spot 506
+2025-12-27 20:32:53,860 - INFO - Solution found for spot 507
+2025-12-27 20:32:53,864 - INFO - Solution found for spot 509
+2025-12-27 20:32:53,873 - INFO - Solution found for spot 513
+2025-12-27 20:32:53,891 - INFO - Solution found for spot 519
+2025-12-27 20:32:53,896 - INFO - Solution found for spot 518
+2025-12-27 20:32:53,921 - INFO - Solution found for spot 512
+2025-12-27 20:32:53,928 - INFO - Solution found for spot 525
+2025-12-27 20:32:53,942 - INFO - Solution found for spot 526
+2025-12-27 20:32:53,945 - INFO - Solution found for spot 517
+Deconvoluting Remaining Spots:  33%|███▎      | 469/1417 [00:11<00:23, 40.69it/s]2025-12-27 20:32:54,033 - INFO - Solution found for spot 529
+2025-12-27 20:32:54,068 - INFO - Solution found for spot 520
+2025-12-27 20:32:54,085 - INFO - Solution found for spot 523
+2025-12-27 20:32:54,085 - INFO - Solution found for spot 527
+2025-12-27 20:32:54,089 - INFO - Solution found for spot 528
+2025-12-27 20:32:54,094 - INFO - Solution found for spot 531
+2025-12-27 20:32:54,105 - INFO - Solution found for spot 524
+2025-12-27 20:32:54,108 - INFO - Solution found for spot 530
+2025-12-27 20:32:54,122 - INFO - Solution found for spot 522
+Deconvoluting Remaining Spots:  34%|███▍      | 479/1417 [00:11<00:20, 45.76it/s]2025-12-27 20:32:54,172 - INFO - Solution found for spot 521
+2025-12-27 20:32:54,275 - INFO - Solution found for spot 533
+2025-12-27 20:32:54,316 - INFO - Solution found for spot 532
+2025-12-27 20:32:54,328 - INFO - Solution found for spot 542
+2025-12-27 20:32:54,357 - INFO - Solution found for spot 535
+2025-12-27 20:32:54,367 - INFO - Solution found for spot 534
+Deconvoluting Remaining Spots:  34%|███▍      | 486/1417 [00:11<00:21, 42.45it/s]2025-12-27 20:32:54,406 - INFO - Solution found for spot 540
+2025-12-27 20:32:54,417 - INFO - Solution found for spot 538
+2025-12-27 20:32:54,448 - INFO - Solution found for spot 539
+2025-12-27 20:32:54,461 - INFO - Solution found for spot 541
+2025-12-27 20:32:54,490 - INFO - Solution found for spot 536
+2025-12-27 20:32:54,494 - INFO - Solution found for spot 548
+2025-12-27 20:32:54,512 - INFO - Solution found for spot 543
+2025-12-27 20:32:54,532 - INFO - Solution found for spot 537
+Deconvoluting Remaining Spots:  35%|███▍      | 492/1417 [00:11<00:23, 40.09it/s]2025-12-27 20:32:54,585 - INFO - Solution found for spot 545
+2025-12-27 20:32:54,626 - INFO - Solution found for spot 551
+2025-12-27 20:32:54,637 - INFO - Solution found for spot 544
+2025-12-27 20:32:54,641 - INFO - Solution found for spot 550
+2025-12-27 20:32:54,645 - INFO - Solution found for spot 556
+2025-12-27 20:32:54,645 - INFO - Solution found for spot 547
+Deconvoluting Remaining Spots:  35%|███▌      | 499/1417 [00:11<00:20, 44.11it/s]2025-12-27 20:32:54,676 - INFO - Solution found for spot 555
+2025-12-27 20:32:54,680 - INFO - Solution found for spot 549
+2025-12-27 20:32:54,716 - INFO - Solution found for spot 557
+2025-12-27 20:32:54,719 - INFO - Solution found for spot 546
+2025-12-27 20:32:54,781 - INFO - Solution found for spot 552
+2025-12-27 20:32:54,796 - INFO - Solution found for spot 554
+2025-12-27 20:32:54,812 - INFO - Solution found for spot 564
+2025-12-27 20:32:54,812 - INFO - Solution found for spot 553
+2025-12-27 20:32:54,823 - INFO - Solution found for spot 561
+2025-12-27 20:32:54,842 - INFO - Solution found for spot 563
+2025-12-27 20:32:54,862 - INFO - Solution found for spot 559
+2025-12-27 20:32:54,893 - INFO - Solution found for spot 558
+2025-12-27 20:32:54,906 - INFO - Solution found for spot 560
+2025-12-27 20:32:54,916 - INFO - Solution found for spot 565
+2025-12-27 20:32:54,965 - INFO - Solution found for spot 571
+2025-12-27 20:32:54,982 - INFO - Solution found for spot 562
+2025-12-27 20:32:54,991 - INFO - Solution found for spot 567
+2025-12-27 20:32:54,994 - INFO - Solution found for spot 576
+2025-12-27 20:32:55,002 - INFO - Solution found for spot 570
+2025-12-27 20:32:55,030 - INFO - Solution found for spot 568
+2025-12-27 20:32:55,108 - INFO - Solution found for spot 566
+2025-12-27 20:32:55,115 - INFO - Solution found for spot 569
+2025-12-27 20:32:55,153 - INFO - Solution found for spot 575
+2025-12-27 20:32:55,174 - INFO - Solution found for spot 574
+2025-12-27 20:32:55,233 - INFO - Solution found for spot 578
+2025-12-27 20:32:55,249 - INFO - Solution found for spot 572
+2025-12-27 20:32:55,356 - INFO - Solution found for spot 579
+2025-12-27 20:32:55,372 - INFO - Solution found for spot 580
+2025-12-27 20:32:55,390 - INFO - Solution found for spot 573
+2025-12-27 20:32:55,400 - INFO - Solution found for spot 585
+2025-12-27 20:32:55,431 - INFO - Solution found for spot 583
+2025-12-27 20:32:55,436 - INFO - Solution found for spot 577
+2025-12-27 20:32:55,448 - INFO - Solution found for spot 587
+2025-12-27 20:32:55,455 - INFO - Solution found for spot 599
+2025-12-27 20:32:55,464 - INFO - Solution found for spot 584
+2025-12-27 20:32:55,471 - INFO - Solution found for spot 582
+2025-12-27 20:32:55,480 - INFO - Solution found for spot 586
+2025-12-27 20:32:55,503 - INFO - Solution found for spot 592
+2025-12-27 20:32:55,533 - INFO - Solution found for spot 590
+2025-12-27 20:32:55,534 - INFO - Solution found for spot 581
+2025-12-27 20:32:55,548 - INFO - Solution found for spot 598
+2025-12-27 20:32:55,553 - INFO - Solution found for spot 588
+2025-12-27 20:32:55,568 - INFO - Solution found for spot 593
+2025-12-27 20:32:55,661 - INFO - Solution found for spot 589
+2025-12-27 20:32:55,684 - INFO - Solution found for spot 591
+2025-12-27 20:32:55,717 - INFO - Solution found for spot 594
+2025-12-27 20:32:55,749 - INFO - Solution found for spot 613
+2025-12-27 20:32:55,780 - INFO - Solution found for spot 602
+2025-12-27 20:32:55,794 - INFO - Solution found for spot 600
+2025-12-27 20:32:55,794 - INFO - Solution found for spot 605
+2025-12-27 20:32:55,804 - INFO - Solution found for spot 607
+2025-12-27 20:32:55,809 - INFO - Saved checkpoint after 500 completed spots
+Deconvoluting Remaining Spots:  36%|███▌      | 505/1417 [00:13<00:56, 16.10it/s]2025-12-27 20:32:55,814 - INFO - Solution found for spot 601
+2025-12-27 20:32:55,817 - INFO - Solution found for spot 612
+2025-12-27 20:32:55,847 - INFO - Solution found for spot 604
+2025-12-27 20:32:55,884 - INFO - Solution found for spot 603
+2025-12-27 20:32:55,890 - INFO - Solution found for spot 611
+2025-12-27 20:32:55,897 - INFO - Solution found for spot 606
+2025-12-27 20:32:55,942 - INFO - Solution found for spot 595
+2025-12-27 20:32:55,942 - INFO - Solution found for spot 596
+Deconvoluting Remaining Spots:  40%|████      | 567/1417 [00:13<00:13, 63.90it/s]2025-12-27 20:32:55,962 - INFO - Solution found for spot 608
+2025-12-27 20:32:56,007 - INFO - Solution found for spot 597
+2025-12-27 20:32:56,026 - INFO - Solution found for spot 610
+2025-12-27 20:32:56,033 - INFO - Solution found for spot 609
+2025-12-27 20:32:56,050 - INFO - Solution found for spot 615
+2025-12-27 20:32:56,079 - INFO - Solution found for spot 614
+2025-12-27 20:32:56,115 - INFO - Solution found for spot 621
+2025-12-27 20:32:56,124 - INFO - Solution found for spot 618
+2025-12-27 20:32:56,155 - INFO - Solution found for spot 617
+2025-12-27 20:32:56,184 - INFO - Solution found for spot 619
+2025-12-27 20:32:56,192 - INFO - Solution found for spot 626
+2025-12-27 20:32:56,194 - INFO - Solution found for spot 616
+2025-12-27 20:32:56,199 - INFO - Solution found for spot 620
+2025-12-27 20:32:56,229 - INFO - Solution found for spot 627
+2025-12-27 20:32:56,249 - INFO - Solution found for spot 624
+2025-12-27 20:32:56,260 - INFO - Solution found for spot 629
+Deconvoluting Remaining Spots:  41%|████      | 583/1417 [00:13<00:13, 60.62it/s]2025-12-27 20:32:56,282 - INFO - Solution found for spot 625
+2025-12-27 20:32:56,304 - INFO - Solution found for spot 623
+2025-12-27 20:32:56,315 - INFO - Solution found for spot 634
+2025-12-27 20:32:56,315 - INFO - Solution found for spot 633
+2025-12-27 20:32:56,358 - INFO - Solution found for spot 622
+2025-12-27 20:32:56,362 - INFO - Solution found for spot 628
+2025-12-27 20:32:56,429 - INFO - Solution found for spot 630
+2025-12-27 20:32:56,454 - INFO - Solution found for spot 632
+2025-12-27 20:32:56,487 - INFO - Solution found for spot 631
+Deconvoluting Remaining Spots:  42%|████▏     | 596/1417 [00:13<00:13, 59.89it/s]2025-12-27 20:32:56,508 - INFO - Solution found for spot 648
+2025-12-27 20:32:56,561 - INFO - Solution found for spot 639
+2025-12-27 20:32:56,578 - INFO - Solution found for spot 641
+2025-12-27 20:32:56,593 - INFO - Solution found for spot 635
+2025-12-27 20:32:56,647 - INFO - Solution found for spot 642
+2025-12-27 20:32:56,671 - INFO - Solution found for spot 637
+2025-12-27 20:32:56,675 - INFO - Solution found for spot 636
+2025-12-27 20:32:56,718 - INFO - Solution found for spot 640
+2025-12-27 20:32:56,779 - INFO - Solution found for spot 638
+2025-12-27 20:32:56,779 - INFO - Solution found for spot 643
+2025-12-27 20:32:56,783 - INFO - Solution found for spot 647
+2025-12-27 20:32:56,785 - INFO - Solution found for spot 659
+2025-12-27 20:32:56,800 - INFO - Solution found for spot 644
+2025-12-27 20:32:56,813 - INFO - Solution found for spot 645
+2025-12-27 20:32:56,825 - INFO - Solution found for spot 649
+2025-12-27 20:32:56,830 - INFO - Solution found for spot 650
+2025-12-27 20:32:56,833 - INFO - Solution found for spot 646
+2025-12-27 20:32:56,889 - INFO - Solution found for spot 651
+2025-12-27 20:32:56,958 - INFO - Solution found for spot 654
+2025-12-27 20:32:56,997 - INFO - Solution found for spot 673
+2025-12-27 20:32:57,015 - INFO - Solution found for spot 661
+2025-12-27 20:32:57,042 - INFO - Solution found for spot 663
+2025-12-27 20:32:57,052 - INFO - Solution found for spot 656
+2025-12-27 20:32:57,096 - INFO - Solution found for spot 653
+2025-12-27 20:32:57,124 - INFO - Solution found for spot 652
+2025-12-27 20:32:57,124 - INFO - Solution found for spot 655
+2025-12-27 20:32:57,136 - INFO - Solution found for spot 658
+2025-12-27 20:32:57,143 - INFO - Solution found for spot 664
+2025-12-27 20:32:57,150 - INFO - Solution found for spot 657
+2025-12-27 20:32:57,156 - INFO - Solution found for spot 671
+2025-12-27 20:32:57,160 - INFO - Solution found for spot 672
+2025-12-27 20:32:57,174 - INFO - Solution found for spot 666
+2025-12-27 20:32:57,186 - INFO - Solution found for spot 660
+2025-12-27 20:32:57,186 - INFO - Solution found for spot 669
+2025-12-27 20:32:57,190 - INFO - Solution found for spot 662
+2025-12-27 20:32:57,257 - INFO - Solution found for spot 676
+2025-12-27 20:32:57,267 - INFO - Solution found for spot 665
+2025-12-27 20:32:57,276 - INFO - Solution found for spot 670
+2025-12-27 20:32:57,280 - INFO - Solution found for spot 677
+2025-12-27 20:32:57,316 - INFO - Solution found for spot 668
+2025-12-27 20:32:57,326 - INFO - Solution found for spot 674
+2025-12-27 20:32:57,329 - INFO - Solution found for spot 682
+2025-12-27 20:32:57,348 - INFO - Solution found for spot 683
+2025-12-27 20:32:57,349 - INFO - Solution found for spot 675
+2025-12-27 20:32:57,386 - INFO - Solution found for spot 684
+2025-12-27 20:32:57,429 - INFO - Solution found for spot 667
+2025-12-27 20:32:57,450 - INFO - Solution found for spot 680
+2025-12-27 20:32:57,482 - INFO - Solution found for spot 678
+2025-12-27 20:32:57,488 - INFO - Solution found for spot 679
+2025-12-27 20:32:57,516 - INFO - Solution found for spot 685
+2025-12-27 20:32:57,520 - INFO - Solution found for spot 681
+2025-12-27 20:32:57,551 - INFO - Solution found for spot 689
+2025-12-27 20:32:57,677 - INFO - Solution found for spot 688
+2025-12-27 20:32:57,738 - INFO - Solution found for spot 690
+2025-12-27 20:32:57,749 - INFO - Solution found for spot 710
+2025-12-27 20:32:57,761 - INFO - Solution found for spot 693
+2025-12-27 20:32:57,761 - INFO - Saved checkpoint after 600 completed spots
+Deconvoluting Remaining Spots:  43%|████▎     | 607/1417 [00:15<00:29, 27.53it/s]2025-12-27 20:32:57,769 - INFO - Solution found for spot 692
+2025-12-27 20:32:57,770 - INFO - Solution found for spot 691
+2025-12-27 20:32:57,772 - INFO - Solution found for spot 687
+2025-12-27 20:32:57,781 - INFO - Solution found for spot 686
+2025-12-27 20:32:57,822 - INFO - Solution found for spot 697
+2025-12-27 20:32:57,828 - INFO - Solution found for spot 696
+Deconvoluting Remaining Spots:  46%|████▌     | 655/1417 [00:15<00:13, 57.32it/s]2025-12-27 20:32:57,884 - INFO - Solution found for spot 705
+2025-12-27 20:32:57,898 - INFO - Solution found for spot 695
+2025-12-27 20:32:57,913 - INFO - Solution found for spot 694
+2025-12-27 20:32:57,979 - INFO - Solution found for spot 700
+2025-12-27 20:32:57,990 - INFO - Solution found for spot 699
+2025-12-27 20:32:58,032 - INFO - Solution found for spot 698
+2025-12-27 20:32:58,034 - INFO - Solution found for spot 701
+2025-12-27 20:32:58,046 - INFO - Solution found for spot 703
+2025-12-27 20:32:58,053 - INFO - Solution found for spot 702
+2025-12-27 20:32:58,133 - INFO - Solution found for spot 704
+2025-12-27 20:32:58,140 - INFO - Solution found for spot 708
+2025-12-27 20:32:58,144 - INFO - Solution found for spot 707
+2025-12-27 20:32:58,158 - INFO - Solution found for spot 709
+2025-12-27 20:32:58,158 - INFO - Solution found for spot 711
+2025-12-27 20:32:58,180 - INFO - Solution found for spot 712
+2025-12-27 20:32:58,232 - INFO - Solution found for spot 706
+Deconvoluting Remaining Spots:  48%|████▊     | 674/1417 [00:15<00:13, 55.81it/s]2025-12-27 20:32:58,238 - INFO - Solution found for spot 723
+2025-12-27 20:32:58,268 - INFO - Solution found for spot 714
+2025-12-27 20:32:58,275 - INFO - Solution found for spot 713
+2025-12-27 20:32:58,297 - INFO - Solution found for spot 722
+2025-12-27 20:32:58,303 - INFO - Solution found for spot 715
+2025-12-27 20:32:58,327 - INFO - Solution found for spot 717
+2025-12-27 20:32:58,346 - INFO - Solution found for spot 724
+2025-12-27 20:32:58,393 - INFO - Solution found for spot 720
+2025-12-27 20:32:58,415 - INFO - Solution found for spot 735
+2025-12-27 20:32:58,422 - INFO - Solution found for spot 721
+2025-12-27 20:32:58,422 - INFO - Solution found for spot 718
+2025-12-27 20:32:58,429 - INFO - Solution found for spot 716
+2025-12-27 20:32:58,457 - INFO - Solution found for spot 719
+2025-12-27 20:32:58,459 - INFO - Solution found for spot 726
+2025-12-27 20:32:58,467 - INFO - Solution found for spot 728
+2025-12-27 20:32:58,476 - INFO - Solution found for spot 732
+2025-12-27 20:32:58,482 - INFO - Solution found for spot 727
+2025-12-27 20:32:58,487 - INFO - Solution found for spot 725
+Deconvoluting Remaining Spots:  49%|████▊     | 689/1417 [00:15<00:12, 56.37it/s]2025-12-27 20:32:58,506 - INFO - Solution found for spot 733
+2025-12-27 20:32:58,528 - INFO - Solution found for spot 736
+2025-12-27 20:32:58,542 - INFO - Solution found for spot 730
+2025-12-27 20:32:58,555 - INFO - Solution found for spot 734
+2025-12-27 20:32:58,565 - INFO - Solution found for spot 729
+2025-12-27 20:32:58,596 - INFO - Solution found for spot 737
+2025-12-27 20:32:58,628 - INFO - Solution found for spot 731
+2025-12-27 20:32:58,633 - INFO - Solution found for spot 738
+2025-12-27 20:32:58,713 - INFO - Solution found for spot 742
+2025-12-27 20:32:58,722 - INFO - Solution found for spot 747
+2025-12-27 20:32:58,739 - INFO - Solution found for spot 748
+2025-12-27 20:32:58,745 - INFO - Solution found for spot 740
+2025-12-27 20:32:58,764 - INFO - Solution found for spot 739
+2025-12-27 20:32:58,774 - INFO - Solution found for spot 743
+2025-12-27 20:32:58,777 - INFO - Solution found for spot 746
+2025-12-27 20:32:58,792 - INFO - Solution found for spot 741
+2025-12-27 20:32:58,797 - INFO - Solution found for spot 744
+2025-12-27 20:32:58,817 - INFO - Solution found for spot 745
+2025-12-27 20:32:58,822 - INFO - Solution found for spot 753
+2025-12-27 20:32:58,891 - INFO - Solution found for spot 749
+2025-12-27 20:32:59,038 - INFO - Solution found for spot 752
+2025-12-27 20:32:59,097 - INFO - Solution found for spot 750
+2025-12-27 20:32:59,111 - INFO - Solution found for spot 751
+2025-12-27 20:32:59,124 - INFO - Solution found for spot 754
+2025-12-27 20:32:59,137 - INFO - Solution found for spot 757
+2025-12-27 20:32:59,143 - INFO - Solution found for spot 764
+2025-12-27 20:32:59,163 - INFO - Solution found for spot 755
+2025-12-27 20:32:59,179 - INFO - Solution found for spot 760
+2025-12-27 20:32:59,189 - INFO - Solution found for spot 762
+2025-12-27 20:32:59,236 - INFO - Solution found for spot 761
+2025-12-27 20:32:59,240 - INFO - Solution found for spot 759
+2025-12-27 20:32:59,243 - INFO - Solution found for spot 763
+2025-12-27 20:32:59,250 - INFO - Solution found for spot 756
+2025-12-27 20:32:59,290 - INFO - Solution found for spot 765
+2025-12-27 20:32:59,325 - INFO - Solution found for spot 758
+2025-12-27 20:32:59,382 - INFO - Solution found for spot 774
+2025-12-27 20:32:59,405 - INFO - Solution found for spot 772
+2025-12-27 20:32:59,420 - INFO - Solution found for spot 771
+2025-12-27 20:32:59,494 - INFO - Solution found for spot 768
+2025-12-27 20:32:59,501 - INFO - Solution found for spot 775
+2025-12-27 20:32:59,502 - INFO - Solution found for spot 769
+2025-12-27 20:32:59,518 - INFO - Solution found for spot 766
+2025-12-27 20:32:59,543 - INFO - Solution found for spot 767
+2025-12-27 20:32:59,551 - INFO - Solution found for spot 773
+2025-12-27 20:32:59,584 - INFO - Solution found for spot 770
+2025-12-27 20:32:59,644 - INFO - Solution found for spot 777
+2025-12-27 20:32:59,667 - INFO - Solution found for spot 778
+2025-12-27 20:32:59,674 - INFO - Solution found for spot 776
+2025-12-27 20:32:59,717 - INFO - Solution found for spot 779
+2025-12-27 20:32:59,723 - INFO - Solution found for spot 784
+2025-12-27 20:32:59,805 - INFO - Solution found for spot 791
+2025-12-27 20:32:59,815 - INFO - Solution found for spot 785
+2025-12-27 20:32:59,818 - INFO - Solution found for spot 797
+2025-12-27 20:32:59,838 - INFO - Solution found for spot 781
+2025-12-27 20:32:59,845 - INFO - Solution found for spot 790
+2025-12-27 20:32:59,854 - INFO - Solution found for spot 783
+2025-12-27 20:32:59,863 - INFO - Solution found for spot 782
+2025-12-27 20:32:59,906 - INFO - Solution found for spot 792
+2025-12-27 20:32:59,917 - INFO - Solution found for spot 796
+2025-12-27 20:32:59,920 - INFO - Solution found for spot 793
+2025-12-27 20:32:59,926 - INFO - Solution found for spot 786
+2025-12-27 20:32:59,948 - INFO - Solution found for spot 780
+2025-12-27 20:33:00,010 - INFO - Solution found for spot 789
+2025-12-27 20:33:00,020 - INFO - Solution found for spot 788
+2025-12-27 20:33:00,025 - INFO - Solution found for spot 805
+2025-12-27 20:33:00,053 - INFO - Solution found for spot 795
+2025-12-27 20:33:00,063 - INFO - Solution found for spot 787
+2025-12-27 20:33:00,115 - INFO - Solution found for spot 802
+2025-12-27 20:33:00,128 - INFO - Solution found for spot 806
+2025-12-27 20:33:00,129 - INFO - Solution found for spot 803
+2025-12-27 20:33:00,166 - INFO - Solution found for spot 798
+2025-12-27 20:33:00,170 - INFO - Solution found for spot 801
+2025-12-27 20:33:00,194 - INFO - Solution found for spot 804
+2025-12-27 20:33:00,198 - INFO - Solution found for spot 794
+2025-12-27 20:33:00,204 - INFO - Solution found for spot 799
+2025-12-27 20:33:00,212 - INFO - Solution found for spot 800
+2025-12-27 20:33:00,220 - INFO - Solution found for spot 808
+2025-12-27 20:33:00,241 - INFO - Solution found for spot 809
+2025-12-27 20:33:00,252 - INFO - Solution found for spot 807
+2025-12-27 20:33:00,269 - INFO - Solution found for spot 815
+2025-12-27 20:33:00,280 - INFO - Solution found for spot 814
+2025-12-27 20:33:00,301 - INFO - Solution found for spot 812
+2025-12-27 20:33:00,307 - INFO - Solution found for spot 810
+2025-12-27 20:33:00,324 - INFO - Solution found for spot 816
+2025-12-27 20:33:00,329 - INFO - Solution found for spot 817
+2025-12-27 20:33:00,348 - INFO - Solution found for spot 811
+2025-12-27 20:33:00,362 - INFO - Solution found for spot 813
+2025-12-27 20:33:00,430 - INFO - Solution found for spot 821
+2025-12-27 20:33:00,442 - INFO - Solution found for spot 820
+2025-12-27 20:33:00,449 - INFO - Solution found for spot 819
+2025-12-27 20:33:00,470 - INFO - Solution found for spot 818
+2025-12-27 20:33:00,519 - INFO - Solution found for spot 828
+2025-12-27 20:33:00,700 - INFO - Solution found for spot 829
+2025-12-27 20:33:00,705 - INFO - Saved checkpoint after 700 completed spots
+Deconvoluting Remaining Spots:  50%|████▉     | 702/1417 [00:17<00:35, 20.23it/s]2025-12-27 20:33:00,714 - INFO - Solution found for spot 833
+2025-12-27 20:33:00,758 - INFO - Solution found for spot 830
+2025-12-27 20:33:00,758 - INFO - Solution found for spot 822
+2025-12-27 20:33:00,758 - INFO - Solution found for spot 827
+2025-12-27 20:33:00,761 - INFO - Solution found for spot 823
+2025-12-27 20:33:00,779 - INFO - Solution found for spot 825
+2025-12-27 20:33:00,782 - INFO - Solution found for spot 831
+Deconvoluting Remaining Spots:  55%|█████▌    | 781/1417 [00:18<00:11, 53.69it/s]2025-12-27 20:33:00,843 - INFO - Solution found for spot 826
+2025-12-27 20:33:00,867 - INFO - Solution found for spot 839
+2025-12-27 20:33:00,876 - INFO - Solution found for spot 848
+2025-12-27 20:33:00,879 - INFO - Solution found for spot 840
+2025-12-27 20:33:00,891 - INFO - Solution found for spot 847
+2025-12-27 20:33:00,903 - INFO - Solution found for spot 832
+2025-12-27 20:33:00,935 - INFO - Solution found for spot 824
+2025-12-27 20:33:00,949 - INFO - Solution found for spot 835
+2025-12-27 20:33:00,966 - INFO - Solution found for spot 837
+2025-12-27 20:33:00,987 - INFO - Solution found for spot 834
+2025-12-27 20:33:01,018 - INFO - Solution found for spot 836
+2025-12-27 20:33:01,020 - INFO - Solution found for spot 838
+2025-12-27 20:33:01,070 - INFO - Solution found for spot 859
+2025-12-27 20:33:01,120 - INFO - Solution found for spot 843
+2025-12-27 20:33:01,147 - INFO - Solution found for spot 844
+2025-12-27 20:33:01,157 - INFO - Solution found for spot 841
+2025-12-27 20:33:01,183 - INFO - Solution found for spot 846
+2025-12-27 20:33:01,212 - INFO - Solution found for spot 842
+2025-12-27 20:33:01,231 - INFO - Solution found for spot 845
+2025-12-27 20:33:01,254 - INFO - Solution found for spot 850
+2025-12-27 20:33:01,266 - INFO - Solution found for spot 852
+2025-12-27 20:33:01,269 - INFO - Solution found for spot 851
+2025-12-27 20:33:01,316 - INFO - Solution found for spot 858
+2025-12-27 20:33:01,324 - INFO - Solution found for spot 862
+2025-12-27 20:33:01,362 - INFO - Solution found for spot 865
+2025-12-27 20:33:01,369 - INFO - Solution found for spot 853
+2025-12-27 20:33:01,378 - INFO - Solution found for spot 856
+2025-12-27 20:33:01,379 - INFO - Solution found for spot 857
+2025-12-27 20:33:01,387 - INFO - Solution found for spot 855
+2025-12-27 20:33:01,411 - INFO - Solution found for spot 854
+2025-12-27 20:33:01,456 - INFO - Solution found for spot 864
+2025-12-27 20:33:01,475 - INFO - Solution found for spot 866
+2025-12-27 20:33:01,534 - INFO - Solution found for spot 860
+2025-12-27 20:33:01,561 - INFO - Solution found for spot 861
+2025-12-27 20:33:01,567 - INFO - Solution found for spot 863
+2025-12-27 20:33:01,596 - INFO - Solution found for spot 868
+2025-12-27 20:33:01,604 - INFO - Solution found for spot 849
+2025-12-27 20:33:01,616 - INFO - Solution found for spot 867
+2025-12-27 20:33:01,696 - INFO - Solution found for spot 873
+2025-12-27 20:33:01,751 - INFO - Solution found for spot 883
+2025-12-27 20:33:01,773 - INFO - Solution found for spot 881
+2025-12-27 20:33:01,784 - INFO - Solution found for spot 870
+2025-12-27 20:33:01,788 - INFO - Solution found for spot 869
+2025-12-27 20:33:01,788 - INFO - Solution found for spot 877
+2025-12-27 20:33:01,803 - INFO - Solution found for spot 871
+2025-12-27 20:33:01,810 - INFO - Solution found for spot 872
+2025-12-27 20:33:01,837 - INFO - Solution found for spot 875
+2025-12-27 20:33:01,838 - INFO - Solution found for spot 882
+2025-12-27 20:33:01,844 - INFO - Solution found for spot 879
+2025-12-27 20:33:01,859 - INFO - Solution found for spot 886
+2025-12-27 20:33:01,883 - INFO - Solution found for spot 876
+2025-12-27 20:33:01,884 - INFO - Solution found for spot 878
+2025-12-27 20:33:01,888 - INFO - Solution found for spot 880
+2025-12-27 20:33:01,891 - INFO - Solution found for spot 874
+2025-12-27 20:33:01,910 - INFO - Solution found for spot 884
+2025-12-27 20:33:01,966 - INFO - Solution found for spot 887
+2025-12-27 20:33:01,998 - INFO - Solution found for spot 885
+2025-12-27 20:33:02,116 - INFO - Solution found for spot 893
+2025-12-27 20:33:02,127 - INFO - Solution found for spot 891
+2025-12-27 20:33:02,138 - INFO - Solution found for spot 888
+2025-12-27 20:33:02,167 - INFO - Solution found for spot 896
+2025-12-27 20:33:02,187 - INFO - Solution found for spot 895
+2025-12-27 20:33:02,193 - INFO - Solution found for spot 898
+2025-12-27 20:33:02,225 - INFO - Solution found for spot 890
+2025-12-27 20:33:02,233 - INFO - Solution found for spot 889
+2025-12-27 20:33:02,242 - INFO - Solution found for spot 892
+2025-12-27 20:33:02,272 - INFO - Solution found for spot 897
+2025-12-27 20:33:02,278 - INFO - Solution found for spot 894
+2025-12-27 20:33:02,319 - INFO - Solution found for spot 899
+2025-12-27 20:33:02,413 - INFO - Solution found for spot 904
+2025-12-27 20:33:02,424 - INFO - Solution found for spot 901
+2025-12-27 20:33:02,442 - INFO - Solution found for spot 906
+2025-12-27 20:33:02,463 - INFO - Solution found for spot 905
+2025-12-27 20:33:02,469 - INFO - Solution found for spot 907
+2025-12-27 20:33:02,476 - INFO - Solution found for spot 903
+2025-12-27 20:33:02,480 - INFO - Solution found for spot 902
+2025-12-27 20:33:02,498 - INFO - Solution found for spot 910
+2025-12-27 20:33:02,506 - INFO - Solution found for spot 909
+2025-12-27 20:33:02,507 - INFO - Solution found for spot 900
+2025-12-27 20:33:02,519 - INFO - Solution found for spot 908
+2025-12-27 20:33:02,542 - INFO - Solution found for spot 916
+2025-12-27 20:33:02,570 - INFO - Solution found for spot 913
+2025-12-27 20:33:02,583 - INFO - Solution found for spot 911
+2025-12-27 20:33:02,589 - INFO - Solution found for spot 912
+2025-12-27 20:33:02,600 - INFO - Solution found for spot 915
+2025-12-27 20:33:02,620 - INFO - Solution found for spot 914
+2025-12-27 20:33:02,748 - INFO - Solution found for spot 917
+2025-12-27 20:33:02,772 - INFO - Solution found for spot 926
+2025-12-27 20:33:02,915 - INFO - Solution found for spot 923
+2025-12-27 20:33:02,963 - INFO - Solution found for spot 931
+2025-12-27 20:33:02,981 - INFO - Solution found for spot 928
+2025-12-27 20:33:02,988 - INFO - Solution found for spot 919
+2025-12-27 20:33:02,997 - INFO - Solution found for spot 922
+2025-12-27 20:33:03,008 - INFO - Solution found for spot 927
+2025-12-27 20:33:03,023 - INFO - Saved checkpoint after 800 completed spots
+Deconvoluting Remaining Spots:  57%|█████▋    | 807/1417 [00:20<00:20, 29.49it/s]2025-12-27 20:33:03,024 - INFO - Solution found for spot 937
+2025-12-27 20:33:03,028 - INFO - Solution found for spot 918
+2025-12-27 20:33:03,035 - INFO - Solution found for spot 936
+2025-12-27 20:33:03,035 - INFO - Solution found for spot 920
+2025-12-27 20:33:03,047 - INFO - Solution found for spot 935
+2025-12-27 20:33:03,055 - INFO - Solution found for spot 924
+2025-12-27 20:33:03,062 - INFO - Solution found for spot 939
+2025-12-27 20:33:03,086 - INFO - Solution found for spot 934
+2025-12-27 20:33:03,088 - INFO - Solution found for spot 921
+2025-12-27 20:33:03,100 - INFO - Solution found for spot 925
+2025-12-27 20:33:03,114 - INFO - Solution found for spot 949
+2025-12-27 20:33:03,153 - INFO - Solution found for spot 950
+2025-12-27 20:33:03,168 - INFO - Solution found for spot 929
+2025-12-27 20:33:03,185 - INFO - Solution found for spot 933
+2025-12-27 20:33:03,212 - INFO - Solution found for spot 932
+2025-12-27 20:33:03,225 - INFO - Solution found for spot 930
+2025-12-27 20:33:03,240 - INFO - Solution found for spot 938
+2025-12-27 20:33:03,270 - INFO - Solution found for spot 943
+2025-12-27 20:33:03,296 - INFO - Solution found for spot 942
+2025-12-27 20:33:03,308 - INFO - Solution found for spot 947
+2025-12-27 20:33:03,319 - INFO - Solution found for spot 946
+2025-12-27 20:33:03,327 - INFO - Solution found for spot 940
+2025-12-27 20:33:03,398 - INFO - Solution found for spot 945
+2025-12-27 20:33:03,419 - INFO - Solution found for spot 948
+2025-12-27 20:33:03,446 - INFO - Solution found for spot 941
+2025-12-27 20:33:03,452 - INFO - Solution found for spot 944
+2025-12-27 20:33:03,459 - INFO - Solution found for spot 953
+2025-12-27 20:33:03,462 - INFO - Solution found for spot 954
+2025-12-27 20:33:03,497 - INFO - Solution found for spot 952
+2025-12-27 20:33:03,533 - INFO - Solution found for spot 951
+2025-12-27 20:33:03,587 - INFO - Solution found for spot 956
+2025-12-27 20:33:03,596 - INFO - Solution found for spot 957
+2025-12-27 20:33:03,631 - INFO - Solution found for spot 960
+2025-12-27 20:33:03,653 - INFO - Solution found for spot 955
+2025-12-27 20:33:03,666 - INFO - Solution found for spot 959
+2025-12-27 20:33:03,687 - INFO - Solution found for spot 958
+2025-12-27 20:33:03,693 - INFO - Solution found for spot 961
+2025-12-27 20:33:03,708 - INFO - Solution found for spot 967
+2025-12-27 20:33:03,754 - INFO - Solution found for spot 964
+2025-12-27 20:33:03,789 - INFO - Solution found for spot 968
+2025-12-27 20:33:03,806 - INFO - Solution found for spot 962
+2025-12-27 20:33:03,821 - INFO - Solution found for spot 963
+2025-12-27 20:33:03,834 - INFO - Solution found for spot 966
+2025-12-27 20:33:03,835 - INFO - Solution found for spot 965
+2025-12-27 20:33:03,846 - INFO - Solution found for spot 972
+2025-12-27 20:33:03,884 - INFO - Solution found for spot 970
+2025-12-27 20:33:03,888 - INFO - Solution found for spot 981
+2025-12-27 20:33:03,891 - INFO - Solution found for spot 971
+2025-12-27 20:33:03,899 - INFO - Solution found for spot 980
+2025-12-27 20:33:03,927 - INFO - Solution found for spot 979
+2025-12-27 20:33:03,941 - INFO - Solution found for spot 973
+2025-12-27 20:33:03,953 - INFO - Solution found for spot 975
+2025-12-27 20:33:03,984 - INFO - Solution found for spot 969
+2025-12-27 20:33:03,988 - INFO - Solution found for spot 976
+2025-12-27 20:33:03,991 - INFO - Solution found for spot 978
+2025-12-27 20:33:04,108 - INFO - Solution found for spot 982
+2025-12-27 20:33:04,142 - INFO - Solution found for spot 984
+2025-12-27 20:33:04,159 - INFO - Solution found for spot 977
+2025-12-27 20:33:04,177 - INFO - Solution found for spot 985
+2025-12-27 20:33:04,206 - INFO - Solution found for spot 987
+2025-12-27 20:33:04,214 - INFO - Solution found for spot 986
+2025-12-27 20:33:04,226 - INFO - Solution found for spot 983
+2025-12-27 20:33:04,272 - INFO - Solution found for spot 974
+2025-12-27 20:33:04,298 - INFO - Solution found for spot 992
+2025-12-27 20:33:04,306 - INFO - Solution found for spot 988
+2025-12-27 20:33:04,332 - INFO - Solution found for spot 991
+2025-12-27 20:33:04,341 - INFO - Solution found for spot 989
+2025-12-27 20:33:04,350 - INFO - Solution found for spot 990
+2025-12-27 20:33:04,400 - INFO - Solution found for spot 993
+2025-12-27 20:33:04,424 - INFO - Solution found for spot 998
+2025-12-27 20:33:04,448 - INFO - Solution found for spot 994
+2025-12-27 20:33:04,457 - INFO - Solution found for spot 997
+2025-12-27 20:33:04,482 - INFO - Solution found for spot 1005
+2025-12-27 20:33:04,499 - INFO - Solution found for spot 1006
+2025-12-27 20:33:04,503 - INFO - Solution found for spot 996
+2025-12-27 20:33:04,529 - INFO - Solution found for spot 995
+2025-12-27 20:33:04,568 - INFO - Solution found for spot 1002
+2025-12-27 20:33:04,568 - INFO - Solution found for spot 1004
+2025-12-27 20:33:04,577 - INFO - Solution found for spot 1001
+2025-12-27 20:33:04,582 - INFO - Solution found for spot 1007
+2025-12-27 20:33:04,590 - INFO - Solution found for spot 1003
+2025-12-27 20:33:04,603 - INFO - Solution found for spot 999
+2025-12-27 20:33:04,607 - INFO - Solution found for spot 1000
+2025-12-27 20:33:04,699 - INFO - Solution found for spot 1008
+2025-12-27 20:33:04,725 - INFO - Solution found for spot 1011
+2025-12-27 20:33:04,761 - INFO - Solution found for spot 1010
+2025-12-27 20:33:04,796 - INFO - Solution found for spot 1009
+2025-12-27 20:33:04,840 - INFO - Solution found for spot 1013
+2025-12-27 20:33:04,852 - INFO - Solution found for spot 1012
+2025-12-27 20:33:04,857 - INFO - Solution found for spot 1015
+2025-12-27 20:33:04,865 - INFO - Solution found for spot 1021
+2025-12-27 20:33:04,866 - INFO - Solution found for spot 1016
+2025-12-27 20:33:04,900 - INFO - Solution found for spot 1014
+2025-12-27 20:33:04,916 - INFO - Solution found for spot 1017
+2025-12-27 20:33:04,933 - INFO - Solution found for spot 1018
+2025-12-27 20:33:04,944 - INFO - Solution found for spot 1019
+2025-12-27 20:33:04,953 - INFO - Solution found for spot 1023
+2025-12-27 20:33:04,982 - INFO - Solution found for spot 1022
+2025-12-27 20:33:04,991 - INFO - Solution found for spot 1020
+2025-12-27 20:33:04,994 - INFO - Solution found for spot 1024
+2025-12-27 20:33:05,112 - INFO - Solution found for spot 1025
+2025-12-27 20:33:05,124 - INFO - Solution found for spot 1026
+2025-12-27 20:33:05,129 - INFO - Saved checkpoint after 900 completed spots
+Deconvoluting Remaining Spots:  64%|██████▎   | 901/1417 [00:22<00:14, 36.19it/s]2025-12-27 20:33:05,133 - INFO - Solution found for spot 1028
+2025-12-27 20:33:05,156 - INFO - Solution found for spot 1027
+2025-12-27 20:33:05,167 - INFO - Solution found for spot 1030
+2025-12-27 20:33:05,194 - INFO - Solution found for spot 1029
+Deconvoluting Remaining Spots:  70%|██████▉   | 989/1417 [00:22<00:07, 60.10it/s]2025-12-27 20:33:05,307 - INFO - Solution found for spot 1038
+2025-12-27 20:33:05,342 - INFO - Solution found for spot 1036
+2025-12-27 20:33:05,349 - INFO - Solution found for spot 1033
+2025-12-27 20:33:05,359 - INFO - Solution found for spot 1034
+2025-12-27 20:33:05,366 - INFO - Solution found for spot 1032
+2025-12-27 20:33:05,371 - INFO - Solution found for spot 1037
+2025-12-27 20:33:05,377 - INFO - Solution found for spot 1041
+2025-12-27 20:33:05,409 - INFO - Solution found for spot 1031
+2025-12-27 20:33:05,421 - INFO - Solution found for spot 1035
+2025-12-27 20:33:05,430 - INFO - Solution found for spot 1039
+2025-12-27 20:33:05,480 - INFO - Solution found for spot 1046
+2025-12-27 20:33:05,490 - INFO - Solution found for spot 1040
+2025-12-27 20:33:05,517 - INFO - Solution found for spot 1042
+2025-12-27 20:33:05,543 - INFO - Solution found for spot 1050
+2025-12-27 20:33:05,554 - INFO - Solution found for spot 1043
+2025-12-27 20:33:05,575 - INFO - Solution found for spot 1044
+2025-12-27 20:33:05,602 - INFO - Solution found for spot 1047
+2025-12-27 20:33:05,611 - INFO - Solution found for spot 1049
+2025-12-27 20:33:05,623 - INFO - Solution found for spot 1048
+2025-12-27 20:33:05,626 - INFO - Solution found for spot 1045
+2025-12-27 20:33:05,661 - INFO - Solution found for spot 1052
+2025-12-27 20:33:05,693 - INFO - Solution found for spot 1056
+2025-12-27 20:33:05,712 - INFO - Solution found for spot 1051
+2025-12-27 20:33:05,742 - INFO - Solution found for spot 1053
+2025-12-27 20:33:05,753 - INFO - Solution found for spot 1054
+2025-12-27 20:33:05,760 - INFO - Solution found for spot 1058
+2025-12-27 20:33:05,819 - INFO - Solution found for spot 1055
+2025-12-27 20:33:05,823 - INFO - Solution found for spot 1057
+2025-12-27 20:33:05,846 - INFO - Solution found for spot 1065
+2025-12-27 20:33:05,849 - INFO - Solution found for spot 1066
+2025-12-27 20:33:05,853 - INFO - Solution found for spot 1062
+2025-12-27 20:33:05,866 - INFO - Solution found for spot 1063
+2025-12-27 20:33:05,895 - INFO - Solution found for spot 1060
+2025-12-27 20:33:05,900 - INFO - Solution found for spot 1059
+2025-12-27 20:33:05,928 - INFO - Solution found for spot 1061
+2025-12-27 20:33:05,948 - INFO - Solution found for spot 1064
+2025-12-27 20:33:05,985 - INFO - Solution found for spot 1072
+2025-12-27 20:33:06,002 - INFO - Solution found for spot 1077
+2025-12-27 20:33:06,008 - INFO - Solution found for spot 1076
+2025-12-27 20:33:06,029 - INFO - Solution found for spot 1075
+2025-12-27 20:33:06,032 - INFO - Solution found for spot 1074
+2025-12-27 20:33:06,036 - INFO - Solution found for spot 1073
+2025-12-27 20:33:06,061 - INFO - Solution found for spot 1071
+2025-12-27 20:33:06,093 - INFO - Solution found for spot 1070
+2025-12-27 20:33:06,100 - INFO - Solution found for spot 1081
+2025-12-27 20:33:06,109 - INFO - Solution found for spot 1068
+2025-12-27 20:33:06,171 - INFO - Solution found for spot 1079
+2025-12-27 20:33:06,179 - INFO - Solution found for spot 1078
+2025-12-27 20:33:06,191 - INFO - Solution found for spot 1069
+2025-12-27 20:33:06,194 - INFO - Solution found for spot 1080
+2025-12-27 20:33:06,230 - INFO - Solution found for spot 1067
+2025-12-27 20:33:06,247 - INFO - Solution found for spot 1083
+2025-12-27 20:33:06,276 - INFO - Solution found for spot 1084
+2025-12-27 20:33:06,278 - INFO - Solution found for spot 1082
+2025-12-27 20:33:06,318 - INFO - Solution found for spot 1087
+2025-12-27 20:33:06,335 - INFO - Solution found for spot 1085
+2025-12-27 20:33:06,432 - INFO - Solution found for spot 1089
+2025-12-27 20:33:06,474 - INFO - Solution found for spot 1092
+2025-12-27 20:33:06,480 - INFO - Solution found for spot 1086
+2025-12-27 20:33:06,484 - INFO - Solution found for spot 1090
+2025-12-27 20:33:06,532 - INFO - Solution found for spot 1088
+2025-12-27 20:33:06,549 - INFO - Solution found for spot 1091
+2025-12-27 20:33:06,557 - INFO - Solution found for spot 1093
+2025-12-27 20:33:06,586 - INFO - Solution found for spot 1097
+2025-12-27 20:33:06,628 - INFO - Solution found for spot 1095
+2025-12-27 20:33:06,632 - INFO - Solution found for spot 1096
+2025-12-27 20:33:06,644 - INFO - Solution found for spot 1094
+2025-12-27 20:33:06,654 - INFO - Solution found for spot 1106
+2025-12-27 20:33:06,680 - INFO - Solution found for spot 1098
+2025-12-27 20:33:06,728 - INFO - Solution found for spot 1115
+2025-12-27 20:33:06,777 - INFO - Solution found for spot 1101
+2025-12-27 20:33:06,802 - INFO - Solution found for spot 1116
+2025-12-27 20:33:06,826 - INFO - Solution found for spot 1112
+2025-12-27 20:33:06,835 - INFO - Solution found for spot 1099
+2025-12-27 20:33:06,841 - INFO - Solution found for spot 1104
+2025-12-27 20:33:06,863 - INFO - Solution found for spot 1100
+2025-12-27 20:33:06,890 - INFO - Solution found for spot 1110
+2025-12-27 20:33:06,891 - INFO - Solution found for spot 1111
+2025-12-27 20:33:06,898 - INFO - Solution found for spot 1102
+2025-12-27 20:33:06,899 - INFO - Solution found for spot 1103
+2025-12-27 20:33:06,912 - INFO - Solution found for spot 1113
+2025-12-27 20:33:06,922 - INFO - Solution found for spot 1109
+2025-12-27 20:33:06,937 - INFO - Solution found for spot 1114
+2025-12-27 20:33:06,946 - INFO - Solution found for spot 1108
+2025-12-27 20:33:06,955 - INFO - Solution found for spot 1105
+2025-12-27 20:33:06,973 - INFO - Solution found for spot 1107
+2025-12-27 20:33:07,148 - INFO - Solution found for spot 1126
+2025-12-27 20:33:07,205 - INFO - Solution found for spot 1120
+2025-12-27 20:33:07,214 - INFO - Solution found for spot 1121
+2025-12-27 20:33:07,223 - INFO - Solution found for spot 1119
+2025-12-27 20:33:07,230 - INFO - Solution found for spot 1117
+2025-12-27 20:33:07,249 - INFO - Solution found for spot 1124
+2025-12-27 20:33:07,262 - INFO - Solution found for spot 1129
+2025-12-27 20:33:07,272 - INFO - Solution found for spot 1118
+2025-12-27 20:33:07,286 - INFO - Solution found for spot 1122
+2025-12-27 20:33:07,290 - INFO - Solution found for spot 1127
+2025-12-27 20:33:07,292 - INFO - Solution found for spot 1125
+2025-12-27 20:33:07,305 - INFO - Solution found for spot 1132
+2025-12-27 20:33:07,321 - INFO - Solution found for spot 1123
+2025-12-27 20:33:07,366 - INFO - Solution found for spot 1135
+2025-12-27 20:33:07,415 - INFO - Solution found for spot 1131
+2025-12-27 20:33:07,424 - INFO - Solution found for spot 1141
+2025-12-27 20:33:07,505 - INFO - Solution found for spot 1130
+2025-12-27 20:33:07,591 - INFO - Solution found for spot 1145
+2025-12-27 20:33:07,591 - INFO - Solution found for spot 1156
+2025-12-27 20:33:07,611 - INFO - Solution found for spot 1147
+2025-12-27 20:33:07,619 - INFO - Solution found for spot 1138
+2025-12-27 20:33:07,632 - INFO - Solution found for spot 1150
+2025-12-27 20:33:07,635 - INFO - Solution found for spot 1140
+2025-12-27 20:33:07,641 - INFO - Solution found for spot 1143
+2025-12-27 20:33:07,662 - INFO - Solution found for spot 1137
+2025-12-27 20:33:07,666 - INFO - Solution found for spot 1133
+2025-12-27 20:33:07,669 - INFO - Solution found for spot 1159
+2025-12-27 20:33:07,670 - INFO - Solution found for spot 1146
+2025-12-27 20:33:07,675 - INFO - Solution found for spot 1136
+2025-12-27 20:33:07,686 - INFO - Solution found for spot 1149
+2025-12-27 20:33:07,688 - INFO - Solution found for spot 1151
+2025-12-27 20:33:07,727 - INFO - Solution found for spot 1139
+2025-12-27 20:33:07,740 - INFO - Solution found for spot 1134
+2025-12-27 20:33:07,744 - INFO - Solution found for spot 1144
+2025-12-27 20:33:07,746 - INFO - Solution found for spot 1153
+2025-12-27 20:33:07,750 - INFO - Solution found for spot 1158
+2025-12-27 20:33:07,755 - INFO - Solution found for spot 1142
+2025-12-27 20:33:07,759 - INFO - Solution found for spot 1148
+2025-12-27 20:33:07,759 - INFO - Solution found for spot 1128
+2025-12-27 20:33:07,778 - INFO - Solution found for spot 1154
+2025-12-27 20:33:07,781 - INFO - Solution found for spot 1155
+2025-12-27 20:33:07,786 - INFO - Solution found for spot 1152
+2025-12-27 20:33:07,830 - INFO - Solution found for spot 1171
+2025-12-27 20:33:07,857 - INFO - Solution found for spot 1160
+2025-12-27 20:33:07,889 - INFO - Solution found for spot 1169
+2025-12-27 20:33:07,899 - INFO - Solution found for spot 1157
+2025-12-27 20:33:07,912 - INFO - Solution found for spot 1161
+2025-12-27 20:33:07,918 - INFO - Solution found for spot 1170
+2025-12-27 20:33:07,943 - INFO - Saved checkpoint after 1000 completed spots
+Deconvoluting Remaining Spots:  72%|███████▏  | 1019/1417 [00:25<00:11, 34.48it/s]2025-12-27 20:33:07,954 - INFO - Solution found for spot 1166
+2025-12-27 20:33:07,962 - INFO - Solution found for spot 1163
+2025-12-27 20:33:07,964 - INFO - Solution found for spot 1165
+2025-12-27 20:33:07,992 - INFO - Solution found for spot 1164
+2025-12-27 20:33:07,995 - INFO - Solution found for spot 1173
+2025-12-27 20:33:08,033 - INFO - Solution found for spot 1168
+2025-12-27 20:33:08,049 - INFO - Solution found for spot 1162
+2025-12-27 20:33:08,145 - INFO - Solution found for spot 1179
+2025-12-27 20:33:08,204 - INFO - Solution found for spot 1167
+2025-12-27 20:33:08,276 - INFO - Solution found for spot 1186
+2025-12-27 20:33:08,278 - INFO - Solution found for spot 1172
+2025-12-27 20:33:08,303 - INFO - Solution found for spot 1175
+2025-12-27 20:33:08,314 - INFO - Solution found for spot 1181
+2025-12-27 20:33:08,344 - INFO - Solution found for spot 1174
+2025-12-27 20:33:08,367 - INFO - Solution found for spot 1184
+2025-12-27 20:33:08,380 - INFO - Solution found for spot 1183
+2025-12-27 20:33:08,452 - INFO - Solution found for spot 1185
+2025-12-27 20:33:08,457 - INFO - Solution found for spot 1194
+2025-12-27 20:33:08,465 - INFO - Solution found for spot 1176
+2025-12-27 20:33:08,467 - INFO - Solution found for spot 1177
+2025-12-27 20:33:08,498 - INFO - Solution found for spot 1182
+2025-12-27 20:33:08,510 - INFO - Solution found for spot 1187
+2025-12-27 20:33:08,511 - INFO - Solution found for spot 1180
+2025-12-27 20:33:08,521 - INFO - Solution found for spot 1178
+2025-12-27 20:33:08,643 - INFO - Solution found for spot 1193
+2025-12-27 20:33:08,671 - INFO - Solution found for spot 1190
+2025-12-27 20:33:08,700 - INFO - Solution found for spot 1189
+2025-12-27 20:33:08,709 - INFO - Solution found for spot 1191
+2025-12-27 20:33:08,720 - INFO - Solution found for spot 1188
+2025-12-27 20:33:08,756 - INFO - Solution found for spot 1205
+2025-12-27 20:33:08,772 - INFO - Solution found for spot 1192
+2025-12-27 20:33:08,831 - INFO - Solution found for spot 1206
+2025-12-27 20:33:08,839 - INFO - Solution found for spot 1204
+2025-12-27 20:33:08,843 - INFO - Solution found for spot 1195
+2025-12-27 20:33:08,847 - INFO - Solution found for spot 1196
+2025-12-27 20:33:08,868 - INFO - Solution found for spot 1199
+2025-12-27 20:33:08,891 - INFO - Solution found for spot 1200
+2025-12-27 20:33:08,897 - INFO - Solution found for spot 1201
+2025-12-27 20:33:08,905 - INFO - Solution found for spot 1203
+2025-12-27 20:33:08,919 - INFO - Solution found for spot 1198
+2025-12-27 20:33:08,968 - INFO - Solution found for spot 1207
+2025-12-27 20:33:08,971 - INFO - Solution found for spot 1202
+2025-12-27 20:33:08,983 - INFO - Solution found for spot 1197
+2025-12-27 20:33:09,002 - INFO - Solution found for spot 1209
+2025-12-27 20:33:09,015 - INFO - Solution found for spot 1208
+2025-12-27 20:33:09,057 - INFO - Solution found for spot 1210
+2025-12-27 20:33:09,065 - INFO - Solution found for spot 1211
+2025-12-27 20:33:09,097 - INFO - Solution found for spot 1212
+2025-12-27 20:33:09,106 - INFO - Solution found for spot 1214
+2025-12-27 20:33:09,131 - INFO - Solution found for spot 1216
+2025-12-27 20:33:09,139 - INFO - Solution found for spot 1218
+2025-12-27 20:33:09,142 - INFO - Solution found for spot 1213
+2025-12-27 20:33:09,146 - INFO - Solution found for spot 1217
+2025-12-27 20:33:09,153 - INFO - Solution found for spot 1215
+2025-12-27 20:33:09,169 - INFO - Solution found for spot 1219
+2025-12-27 20:33:09,329 - INFO - Solution found for spot 1231
+2025-12-27 20:33:09,419 - INFO - Solution found for spot 1229
+2025-12-27 20:33:09,432 - INFO - Solution found for spot 1220
+2025-12-27 20:33:09,439 - INFO - Solution found for spot 1230
+2025-12-27 20:33:09,494 - INFO - Solution found for spot 1224
+2025-12-27 20:33:09,500 - INFO - Solution found for spot 1228
+2025-12-27 20:33:09,519 - INFO - Solution found for spot 1225
+2025-12-27 20:33:09,528 - INFO - Solution found for spot 1226
+2025-12-27 20:33:09,544 - INFO - Solution found for spot 1227
+2025-12-27 20:33:09,549 - INFO - Solution found for spot 1223
+2025-12-27 20:33:09,560 - INFO - Solution found for spot 1221
+2025-12-27 20:33:09,609 - INFO - Solution found for spot 1233
+2025-12-27 20:33:09,611 - INFO - Solution found for spot 1222
+2025-12-27 20:33:09,619 - INFO - Solution found for spot 1234
+2025-12-27 20:33:09,628 - INFO - Solution found for spot 1238
+2025-12-27 20:33:09,630 - INFO - Solution found for spot 1232
+2025-12-27 20:33:09,677 - INFO - Solution found for spot 1237
+2025-12-27 20:33:09,686 - INFO - Solution found for spot 1236
+2025-12-27 20:33:09,705 - INFO - Solution found for spot 1235
+2025-12-27 20:33:09,771 - INFO - Solution found for spot 1252
+2025-12-27 20:33:09,780 - INFO - Solution found for spot 1251
+2025-12-27 20:33:09,790 - INFO - Solution found for spot 1249
+2025-12-27 20:33:09,842 - INFO - Solution found for spot 1248
+2025-12-27 20:33:09,885 - INFO - Solution found for spot 1239
+2025-12-27 20:33:09,893 - INFO - Solution found for spot 1254
+2025-12-27 20:33:09,924 - INFO - Solution found for spot 1244
+2025-12-27 20:33:09,938 - INFO - Solution found for spot 1243
+2025-12-27 20:33:09,944 - INFO - Solution found for spot 1247
+2025-12-27 20:33:09,945 - INFO - Solution found for spot 1242
+2025-12-27 20:33:09,962 - INFO - Solution found for spot 1253
+2025-12-27 20:33:09,969 - INFO - Solution found for spot 1240
+2025-12-27 20:33:09,971 - INFO - Solution found for spot 1241
+2025-12-27 20:33:09,974 - INFO - Solution found for spot 1245
+2025-12-27 20:33:09,984 - INFO - Solution found for spot 1250
+2025-12-27 20:33:09,990 - INFO - Solution found for spot 1246
+2025-12-27 20:33:10,014 - INFO - Solution found for spot 1255
+2025-12-27 20:33:10,028 - INFO - Solution found for spot 1256
+2025-12-27 20:33:10,059 - INFO - Solution found for spot 1274
+2025-12-27 20:33:10,068 - INFO - Solution found for spot 1272
+2025-12-27 20:33:10,073 - INFO - Solution found for spot 1257
+2025-12-27 20:33:10,092 - INFO - Solution found for spot 1273
+2025-12-27 20:33:10,188 - INFO - Solution found for spot 1268
+2025-12-27 20:33:10,197 - INFO - Solution found for spot 1265
+2025-12-27 20:33:10,203 - INFO - Solution found for spot 1269
+2025-12-27 20:33:10,205 - INFO - Solution found for spot 1259
+2025-12-27 20:33:10,218 - INFO - Solution found for spot 1271
+2025-12-27 20:33:10,237 - INFO - Solution found for spot 1266
+2025-12-27 20:33:10,244 - INFO - Solution found for spot 1262
+2025-12-27 20:33:10,247 - INFO - Solution found for spot 1258
+2025-12-27 20:33:10,252 - INFO - Solution found for spot 1270
+2025-12-27 20:33:10,271 - INFO - Solution found for spot 1267
+2025-12-27 20:33:10,283 - INFO - Solution found for spot 1260
+2025-12-27 20:33:10,287 - INFO - Solution found for spot 1263
+2025-12-27 20:33:10,291 - INFO - Solution found for spot 1261
+2025-12-27 20:33:10,305 - INFO - Solution found for spot 1264
+2025-12-27 20:33:10,392 - INFO - Solution found for spot 1275
+2025-12-27 20:33:10,401 - INFO - Solution found for spot 1280
+2025-12-27 20:33:10,432 - INFO - Solution found for spot 1276
+2025-12-27 20:33:10,534 - INFO - Solution found for spot 1278
+2025-12-27 20:33:10,546 - INFO - Solution found for spot 1281
+2025-12-27 20:33:10,588 - INFO - Solution found for spot 1282
+2025-12-27 20:33:10,626 - INFO - Solution found for spot 1279
+2025-12-27 20:33:10,633 - INFO - Solution found for spot 1277
+2025-12-27 20:33:10,636 - INFO - Solution found for spot 1283
+2025-12-27 20:33:10,740 - INFO - Solution found for spot 1292
+2025-12-27 20:33:10,751 - INFO - Saved checkpoint after 1100 completed spots
+Deconvoluting Remaining Spots:  78%|███████▊  | 1101/1417 [00:28<00:09, 32.15it/s]2025-12-27 20:33:10,772 - INFO - Solution found for spot 1294
+2025-12-27 20:33:10,781 - INFO - Solution found for spot 1284
+2025-12-27 20:33:10,793 - INFO - Solution found for spot 1296
+2025-12-27 20:33:10,804 - INFO - Solution found for spot 1285
+2025-12-27 20:33:10,850 - INFO - Solution found for spot 1290
+2025-12-27 20:33:10,854 - INFO - Solution found for spot 1287
+2025-12-27 20:33:10,864 - INFO - Solution found for spot 1293
+2025-12-27 20:33:10,872 - INFO - Solution found for spot 1291
+2025-12-27 20:33:10,881 - INFO - Solution found for spot 1289
+2025-12-27 20:33:10,893 - INFO - Solution found for spot 1286
+2025-12-27 20:33:10,905 - INFO - Solution found for spot 1288
+2025-12-27 20:33:10,926 - INFO - Solution found for spot 1309
+2025-12-27 20:33:10,937 - INFO - Solution found for spot 1308
+2025-12-27 20:33:10,959 - INFO - Solution found for spot 1295
+2025-12-27 20:33:11,038 - INFO - Solution found for spot 1301
+2025-12-27 20:33:11,056 - INFO - Solution found for spot 1297
+2025-12-27 20:33:11,064 - INFO - Solution found for spot 1300
+2025-12-27 20:33:11,067 - INFO - Solution found for spot 1303
+2025-12-27 20:33:11,088 - INFO - Solution found for spot 1302
+2025-12-27 20:33:11,115 - INFO - Solution found for spot 1304
+2025-12-27 20:33:11,116 - INFO - Solution found for spot 1299
+2025-12-27 20:33:11,121 - INFO - Solution found for spot 1298
+2025-12-27 20:33:11,165 - INFO - Solution found for spot 1305
+2025-12-27 20:33:11,194 - INFO - Solution found for spot 1307
+2025-12-27 20:33:11,217 - INFO - Solution found for spot 1306
+2025-12-27 20:33:11,256 - INFO - Solution found for spot 1312
+2025-12-27 20:33:11,267 - INFO - Solution found for spot 1315
+2025-12-27 20:33:11,282 - INFO - Solution found for spot 1313
+2025-12-27 20:33:11,286 - INFO - Solution found for spot 1317
+2025-12-27 20:33:11,329 - INFO - Solution found for spot 1310
+2025-12-27 20:33:11,346 - INFO - Solution found for spot 1311
+2025-12-27 20:33:11,362 - INFO - Solution found for spot 1316
+2025-12-27 20:33:11,387 - INFO - Solution found for spot 1314
+2025-12-27 20:33:11,415 - INFO - Solution found for spot 1318
+2025-12-27 20:33:11,437 - INFO - Solution found for spot 1320
+2025-12-27 20:33:11,454 - INFO - Solution found for spot 1319
+2025-12-27 20:33:11,471 - INFO - Solution found for spot 1321
+2025-12-27 20:33:11,479 - INFO - Solution found for spot 1322
+2025-12-27 20:33:11,551 - INFO - Solution found for spot 1334
+2025-12-27 20:33:11,577 - INFO - Solution found for spot 1324
+2025-12-27 20:33:11,660 - INFO - Solution found for spot 1325
+2025-12-27 20:33:11,663 - INFO - Solution found for spot 1327
+2025-12-27 20:33:11,683 - INFO - Solution found for spot 1328
+2025-12-27 20:33:11,701 - INFO - Solution found for spot 1330
+2025-12-27 20:33:11,704 - INFO - Solution found for spot 1332
+2025-12-27 20:33:11,721 - INFO - Solution found for spot 1323
+2025-12-27 20:33:11,738 - INFO - Solution found for spot 1340
+2025-12-27 20:33:11,743 - INFO - Solution found for spot 1329
+2025-12-27 20:33:11,750 - INFO - Solution found for spot 1336
+2025-12-27 20:33:11,771 - INFO - Solution found for spot 1331
+2025-12-27 20:33:11,785 - INFO - Solution found for spot 1335
+2025-12-27 20:33:11,790 - INFO - Solution found for spot 1326
+2025-12-27 20:33:11,802 - INFO - Solution found for spot 1333
+2025-12-27 20:33:11,805 - INFO - Solution found for spot 1341
+2025-12-27 20:33:11,842 - INFO - Solution found for spot 1339
+2025-12-27 20:33:11,879 - INFO - Solution found for spot 1343
+2025-12-27 20:33:11,905 - INFO - Solution found for spot 1342
+2025-12-27 20:33:11,911 - INFO - Solution found for spot 1337
+2025-12-27 20:33:11,922 - INFO - Solution found for spot 1338
+2025-12-27 20:33:11,933 - INFO - Solution found for spot 1345
+2025-12-27 20:33:11,936 - INFO - Solution found for spot 1344
+2025-12-27 20:33:11,951 - INFO - Solution found for spot 1348
+2025-12-27 20:33:11,994 - INFO - Solution found for spot 1346
+2025-12-27 20:33:12,004 - INFO - Solution found for spot 1347
+2025-12-27 20:33:12,018 - INFO - Solution found for spot 1349
+2025-12-27 20:33:12,057 - INFO - Solution found for spot 1350
+2025-12-27 20:33:12,256 - INFO - Solution found for spot 1355
+2025-12-27 20:33:12,278 - INFO - Solution found for spot 1356
+2025-12-27 20:33:12,293 - INFO - Solution found for spot 1361
+2025-12-27 20:33:12,298 - INFO - Solution found for spot 1352
+2025-12-27 20:33:12,314 - INFO - Solution found for spot 1371
+2025-12-27 20:33:12,327 - INFO - Solution found for spot 1367
+2025-12-27 20:33:12,341 - INFO - Solution found for spot 1360
+2025-12-27 20:33:12,350 - INFO - Solution found for spot 1358
+2025-12-27 20:33:12,362 - INFO - Solution found for spot 1368
+2025-12-27 20:33:12,378 - INFO - Solution found for spot 1364
+2025-12-27 20:33:12,390 - INFO - Solution found for spot 1369
+2025-12-27 20:33:12,399 - INFO - Solution found for spot 1357
+2025-12-27 20:33:12,402 - INFO - Solution found for spot 1366
+2025-12-27 20:33:12,414 - INFO - Solution found for spot 1354
+2025-12-27 20:33:12,459 - INFO - Solution found for spot 1365
+2025-12-27 20:33:12,466 - INFO - Solution found for spot 1353
+2025-12-27 20:33:12,474 - INFO - Solution found for spot 1351
+2025-12-27 20:33:12,481 - INFO - Solution found for spot 1362
+2025-12-27 20:33:12,486 - INFO - Solution found for spot 1363
+2025-12-27 20:33:12,495 - INFO - Solution found for spot 1359
+2025-12-27 20:33:12,499 - INFO - Solution found for spot 1370
+2025-12-27 20:33:12,513 - INFO - Solution found for spot 1375
+2025-12-27 20:33:12,520 - INFO - Solution found for spot 1377
+2025-12-27 20:33:12,544 - INFO - Solution found for spot 1374
+2025-12-27 20:33:12,579 - INFO - Solution found for spot 1373
+2025-12-27 20:33:12,604 - INFO - Solution found for spot 1376
+2025-12-27 20:33:12,617 - INFO - Solution found for spot 1372
+2025-12-27 20:33:12,677 - INFO - Solution found for spot 1386
+2025-12-27 20:33:12,691 - INFO - Solution found for spot 1383
+2025-12-27 20:33:12,756 - INFO - Solution found for spot 1379
+2025-12-27 20:33:12,800 - INFO - Solution found for spot 1378
+2025-12-27 20:33:12,825 - INFO - Solution found for spot 1388
+2025-12-27 20:33:12,834 - INFO - Solution found for spot 1385
+2025-12-27 20:33:12,840 - INFO - Solution found for spot 1382
+2025-12-27 20:33:12,856 - INFO - Solution found for spot 1381
+2025-12-27 20:33:12,866 - INFO - Solution found for spot 1387
+2025-12-27 20:33:12,877 - INFO - Solution found for spot 1380
+2025-12-27 20:33:12,894 - INFO - Solution found for spot 1389
+2025-12-27 20:33:12,902 - INFO - Solution found for spot 1393
+2025-12-27 20:33:12,905 - INFO - Solution found for spot 1384
+2025-12-27 20:33:12,912 - INFO - Solution found for spot 1390
+2025-12-27 20:33:12,936 - INFO - Solution found for spot 1394
+2025-12-27 20:33:12,946 - INFO - Solution found for spot 1392
+2025-12-27 20:33:12,976 - INFO - Solution found for spot 1391
+2025-12-27 20:33:12,999 - INFO - Solution found for spot 1395
+2025-12-27 20:33:13,023 - INFO - Solution found for spot 1398
+2025-12-27 20:33:13,039 - INFO - Solution found for spot 1399
+2025-12-27 20:33:13,047 - INFO - Solution found for spot 1400
+2025-12-27 20:33:13,086 - INFO - Solution found for spot 1408
+2025-12-27 20:33:13,100 - INFO - Solution found for spot 1406
+2025-12-27 20:33:13,111 - INFO - Solution found for spot 1410
+2025-12-27 20:33:13,124 - INFO - Solution found for spot 1407
+2025-12-27 20:33:13,195 - INFO - Solution found for spot 1396
+2025-12-27 20:33:13,212 - INFO - Solution found for spot 1409
+2025-12-27 20:33:13,225 - INFO - Solution found for spot 1402
+2025-12-27 20:33:13,246 - INFO - Solution found for spot 1397
+2025-12-27 20:33:13,255 - INFO - Solution found for spot 1404
+2025-12-27 20:33:13,262 - INFO - Solution found for spot 1403
+2025-12-27 20:33:13,271 - INFO - Solution found for spot 1405
+2025-12-27 20:33:13,279 - INFO - Solution found for spot 1411
+2025-12-27 20:33:13,320 - INFO - Solution found for spot 1401
+2025-12-27 20:33:13,347 - INFO - Solution found for spot 1413
+2025-12-27 20:33:13,353 - INFO - Solution found for spot 1412
+2025-12-27 20:33:13,353 - INFO - Solution found for spot 1416
+2025-12-27 20:33:13,356 - INFO - Solution found for spot 1415
+2025-12-27 20:33:13,405 - INFO - Solution found for spot 1414
+2025-12-27 20:33:13,411 - INFO - Saved checkpoint after 1200 completed spots
+Deconvoluting Remaining Spots:  85%|████████▍ | 1201/1417 [00:30<00:06, 34.19it/s]2025-12-27 20:33:13,902 - INFO - Saved checkpoint after 1300 completed spots
+Deconvoluting Remaining Spots:  92%|█████████▏| 1301/1417 [00:31<00:02, 49.37it/s]2025-12-27 20:33:14,270 - INFO - Saved checkpoint after 1400 completed spots
+Deconvoluting Remaining Spots:  99%|█████████▉| 1401/1417 [00:31<00:00, 68.83it/s]Deconvoluting Remaining Spots: 100%|██████████| 1417/1417 [00:31<00:00, 44.93it/s]
+2025-12-27 20:33:14,892 - INFO - Saved final results with 1417 completed spots
+2025-12-27 20:33:15,117 - INFO - Saved profiles to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_gene_expression_pass1.parquet with cell types: ['CD4+ T cells', 'CD8+ T cells', 'B cells', 'Plasma cells', 'Macrophages', 'Dendritic cells', 'NK cells', 'Epithelial', 'Endothelial', 'Fibroblasts', 'Unknown']
+2025-12-27 20:33:15,203 - INFO - Successfully added layer: CD8+_T_cells_genes_pass1
+2025-12-27 20:33:15,218 - INFO - Successfully added layer: B_cells_genes_pass1
+2025-12-27 20:33:15,233 - INFO - Successfully added layer: NK_cells_genes_pass1
+2025-12-27 20:33:15,247 - INFO - Successfully added layer: Plasma_cells_genes_pass1
+2025-12-27 20:33:15,261 - INFO - Successfully added layer: Dendritic_cells_genes_pass1
+2025-12-27 20:33:15,275 - INFO - Successfully added layer: Epithelial_genes_pass1
+2025-12-27 20:33:15,289 - INFO - Successfully added layer: Unknown_genes_pass1
+2025-12-27 20:33:15,304 - INFO - Successfully added layer: CD4+_T_cells_genes_pass1
+2025-12-27 20:33:15,318 - INFO - Successfully added layer: Endothelial_genes_pass1
+2025-12-27 20:33:15,332 - INFO - Successfully added layer: Fibroblasts_genes_pass1
+2025-12-27 20:33:15,347 - INFO - Successfully added layer: Macrophages_genes_pass1
+2025-12-27 20:33:15,430 - INFO - Exported layer 'CD8+_T_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/CD8+_T_cells_layer_pass1.csv'
+2025-12-27 20:33:15,504 - INFO - Exported layer 'B_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/B_cells_layer_pass1.csv'
+2025-12-27 20:33:15,585 - INFO - Exported layer 'NK_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/NK_cells_layer_pass1.csv'
+2025-12-27 20:33:15,663 - INFO - Exported layer 'Plasma_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Plasma_cells_layer_pass1.csv'
+2025-12-27 20:33:15,743 - INFO - Exported layer 'Dendritic_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Dendritic_cells_layer_pass1.csv'
+2025-12-27 20:33:15,821 - INFO - Exported layer 'Epithelial_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Epithelial_layer_pass1.csv'
+2025-12-27 20:33:15,903 - INFO - Exported layer 'Unknown_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Unknown_layer_pass1.csv'
+2025-12-27 20:33:15,984 - INFO - Exported layer 'CD4+_T_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/CD4+_T_cells_layer_pass1.csv'
+2025-12-27 20:33:16,067 - INFO - Exported layer 'Endothelial_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Endothelial_layer_pass1.csv'
+2025-12-27 20:33:16,145 - INFO - Exported layer 'Fibroblasts_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Fibroblasts_layer_pass1.csv'
+2025-12-27 20:33:16,226 - INFO - Exported layer 'Macrophages_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Macrophages_layer_pass1.csv'
+2025-12-27 20:33:16,226 - INFO -   Gene expression deconvolution completed in 34.0s
+2025-12-27 20:33:16,226 - INFO - 
+============================================================
+2025-12-27 20:33:16,226 - INFO - Region 1: Benchmarking GEX Deconvolution
+2025-12-27 20:33:16,226 - INFO - ============================================================
+2025-12-27 20:33:16,343 - INFO -   Dendritic cells: RMSE=0.5838, NRMSE=0.1075, MAE=0.1086, r=0.0419
+2025-12-27 20:33:16,397 - INFO -   B cells: RMSE=0.3250, NRMSE=0.0533, MAE=0.0405, r=-0.0077
+2025-12-27 20:33:16,430 - INFO -   Macrophages: RMSE=0.8989, NRMSE=0.1342, MAE=0.3640, r=0.1001
+2025-12-27 20:33:16,481 - INFO -   Fibroblasts: RMSE=0.9206, NRMSE=0.1398, MAE=0.3781, r=0.1435
+2025-12-27 20:33:16,566 - INFO -   Plasma cells: RMSE=0.3022, NRMSE=0.0574, MAE=0.0408, r=0.0298
+2025-12-27 20:33:16,621 - INFO -   Epithelial: RMSE=0.7808, NRMSE=0.1142, MAE=0.2332, r=0.0758
+2025-12-27 20:33:16,675 - INFO -   CD8+ T cells: RMSE=0.8061, NRMSE=0.1672, MAE=0.2331, r=0.0615
+2025-12-27 20:33:16,738 - INFO -   Endothelial: RMSE=0.8353, NRMSE=0.1528, MAE=0.2499, r=0.0719
+2025-12-27 20:33:16,789 - INFO -   NK cells: RMSE=0.7869, NRMSE=0.2476, MAE=0.1732, r=-0.0042
+2025-12-27 20:33:16,823 - INFO -   Unknown: RMSE=0.8894, NRMSE=0.1330, MAE=0.3019, r=0.0987
+2025-12-27 20:33:16,876 - INFO -   CD4+ T cells: RMSE=0.8296, NRMSE=0.1449, MAE=0.2411, r=0.0674
+2025-12-27 20:33:16,876 - INFO -   RMSE (mean): 0.7069
+2025-12-27 20:33:16,876 - INFO -   NRMSE (mean): 0.1319
+2025-12-27 20:33:16,876 - INFO -   MAE (mean): 0.2063
+2025-12-27 20:33:16,876 - INFO -   Pearson r (mean): 0.0580
+2025-12-27 20:33:16,876 - INFO - 
+============================================================
+2025-12-27 20:33:16,876 - INFO - Region 1: Module 4 - Program Discovery
+2025-12-27 20:33:16,876 - INFO - ============================================================
+2025-12-27 20:33:16,888 - INFO -   Found 11 deconvolved layers
+2025-12-27 20:33:16,888 - INFO - Stacking 11 deconvolved layers: ['CD8+_T_cells', 'B_cells', 'NK_cells', 'Plasma_cells', 'Dendritic_cells', 'Epithelial', 'Unknown', 'CD4+_T_cells', 'Endothelial', 'Fibroblasts', 'Macrophages']
+2025-12-27 20:33:16,888 - INFO -   Input: 1417 spots × 392 genes
+2025-12-27 20:33:16,888 - INFO -   Output: 15587 rows × 392 genes
+2025-12-27 20:33:17,051 - INFO -   Created stacked AnnData: (15587, 392)
+2025-12-27 20:33:17,052 - ERROR -   Module 4 failed: too many values to unpack (expected 2)
+2025-12-27 20:33:17,052 - INFO -   Module 4 completed in 0.2s
+2025-12-27 20:33:17,052 - INFO - 
+============================================================
+2025-12-27 20:33:17,052 - INFO - Region 1: Exporting Results
+2025-12-27 20:33:17,052 - INFO - ============================================================
+2025-12-27 20:33:17,139 - INFO - 
+============================================================
+2025-12-27 20:33:17,139 - INFO - Region 1: Pipeline Complete
+2025-12-27 20:33:17,139 - INFO - ============================================================
+2025-12-27 20:33:17,139 - INFO -   Total time: 77.3s (1.3 min)
+2025-12-27 20:33:17,139 - INFO -   Output: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1
