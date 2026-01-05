@@ -51,7 +51,7 @@ class MarkerPairColocalization:
 
     # Continuous similarity metrics (binarization-free)
     cosine_similarity: float  # Scale-invariant pattern similarity
-    bivariate_morans_i: float  # Spatial cross-correlation
+    bivariate_morans_i: float  # Spatial cross-correlation (aggregated if multi-scale)
     bivariate_morans_pvalue: float  # P-value from permutation test
 
     # Neighborhood analysis (binary-based, kept for backwards compatibility)
@@ -62,6 +62,11 @@ class MarkerPairColocalization:
 
     # Combined score
     colocalization_score: float  # Weighted combination of all metrics
+
+    # Multi-scale analysis (optional, for detailed analysis)
+    bivariate_morans_per_scale: Optional[Dict[int, float]] = None  # k -> I value
+    bivariate_morans_pvalue_per_scale: Optional[Dict[int, float]] = None  # k -> p-value
+    bivariate_morans_best_scale: Optional[int] = None  # Scale with highest signal
 
 
 @dataclass
@@ -336,6 +341,82 @@ def _compute_bivariate_morans_i_pvalue(
     return observed_i, float(p_value)
 
 
+def _compute_bivariate_morans_i_multiscale(
+    values_a: NDArray[np.floating],
+    values_b: NDArray[np.floating],
+    multi_scale_neighbors: Dict[int, List[List[int]]],
+    rng: np.random.Generator,
+    n_perm: int = 199,
+    aggregation: str = "max",
+) -> Tuple[float, float, Dict[int, float], Dict[int, float], int]:
+    """
+    Compute bivariate Moran's I at multiple spatial scales.
+
+    Larger neighborhoods may capture colocalization signal better in mixed/scattered
+    data where cell types are interspersed rather than clustered.
+
+    Args:
+        values_a: Expression values for marker A (n_spots,).
+        values_b: Expression values for marker B (n_spots,).
+        multi_scale_neighbors: Dict mapping k -> neighbor list for that scale.
+        rng: Random number generator.
+        n_perm: Number of permutations per scale (default: 199).
+        aggregation: How to aggregate across scales - "max", "mean", or "weighted".
+
+    Returns:
+        Tuple of:
+        - aggregated_i: Final bivariate Moran's I (aggregated across scales)
+        - aggregated_pvalue: Combined p-value
+        - scale_values: Dict mapping k -> I value at that scale
+        - scale_pvalues: Dict mapping k -> p-value at that scale
+        - best_scale: Scale (k value) with highest signal
+    """
+    scale_values = {}
+    scale_pvalues = {}
+
+    # Reduce permutations per scale to maintain reasonable runtime
+    effective_n_perm = max(49, n_perm // len(multi_scale_neighbors))
+
+    for k, neighbors_k in multi_scale_neighbors.items():
+        i_val, p_val = _compute_bivariate_morans_i_pvalue(
+            values_a, values_b, neighbors_k, rng, n_perm=effective_n_perm
+        )
+        scale_values[k] = i_val
+        scale_pvalues[k] = p_val
+
+    # Aggregation
+    scales = list(scale_values.keys())
+    values_array = np.array([scale_values[k] for k in scales])
+    pvalues_array = np.array([scale_pvalues[k] for k in scales])
+
+    if aggregation == "max":
+        # Use the scale with highest bivariate Moran's I
+        best_idx = np.argmax(values_array)
+        aggregated_i = values_array[best_idx]
+        aggregated_pvalue = pvalues_array[best_idx]
+        best_scale = scales[best_idx]
+    elif aggregation == "mean":
+        # Average across scales
+        aggregated_i = np.mean(values_array)
+        # Fisher's method for combining p-values
+        pvalues_clipped = np.clip(pvalues_array, 1e-10, 1.0)
+        chi2_stat = -2 * np.sum(np.log(pvalues_clipped))
+        from scipy.stats import chi2
+        aggregated_pvalue = 1 - chi2.cdf(chi2_stat, df=2 * len(pvalues_array))
+        best_scale = scales[np.argmax(values_array)]
+    elif aggregation == "weighted":
+        # Weight by absolute value (higher |I| = more weight)
+        weights = np.abs(values_array) + 0.01
+        weights = weights / weights.sum()
+        aggregated_i = np.sum(weights * values_array)
+        aggregated_pvalue = np.min(pvalues_array)  # Most conservative
+        best_scale = scales[np.argmax(values_array)]
+    else:
+        raise ValueError(f"Invalid aggregation method: {aggregation}")
+
+    return aggregated_i, aggregated_pvalue, scale_values, scale_pvalues, best_scale
+
+
 def _compute_neighbor_enrichment(
     binary_a: NDArray[np.bool_],
     binary_b: NDArray[np.bool_],
@@ -455,6 +536,8 @@ def _process_marker_pair(
     neighbors: List[List[int]],
     n_permutations: int,
     seed: int,
+    multi_scale_neighbors: Optional[Dict[int, List[List[int]]]] = None,
+    multi_scale_aggregation: str = "max",
 ) -> MarkerPairColocalization:
     """
     Process a single marker pair for colocalization analysis.
@@ -470,6 +553,8 @@ def _process_marker_pair(
         neighbors: Neighbor list per spot.
         n_permutations: Number of permutations for significance testing.
         seed: Random seed (will be adjusted by pair indices for reproducibility).
+        multi_scale_neighbors: Optional dict mapping k -> neighbor list for multi-scale analysis.
+        multi_scale_aggregation: Aggregation method for multi-scale ("max", "mean", "weighted").
 
     Returns:
         MarkerPairColocalization object for this pair.
@@ -498,11 +583,23 @@ def _process_marker_pair(
 
     # Continuous similarity metrics (binarization-free) - used for score
     cosine_sim = _compute_cosine_similarity(values_a, values_b)
-    # Bivariate Moran's I with permutation test - default for FDR correction
-    # Uses smoothed data to reduce noise and improve detection in mixed tissue
-    bivariate_i, bivariate_pval = _compute_bivariate_morans_i_pvalue(
-        smooth_a, smooth_b, neighbors, rng, n_perm=n_permutations
-    )
+
+    # Bivariate Moran's I - single-scale or multi-scale
+    if multi_scale_neighbors is not None and len(multi_scale_neighbors) > 1:
+        # Multi-scale analysis: compute at multiple k values and aggregate
+        bivariate_i, bivariate_pval, scale_values, scale_pvalues, best_scale = \
+            _compute_bivariate_morans_i_multiscale(
+                smooth_a, smooth_b, multi_scale_neighbors, rng,
+                n_perm=n_permutations, aggregation=multi_scale_aggregation
+            )
+    else:
+        # Single-scale (backward compatible)
+        bivariate_i, bivariate_pval = _compute_bivariate_morans_i_pvalue(
+            smooth_a, smooth_b, neighbors, rng, n_perm=n_permutations
+        )
+        scale_values = None
+        scale_pvalues = None
+        best_scale = None
 
     # Neighborhood metrics (binary-based, alternative for high-seg data)
     # Binarization focuses on PEAK expression spots - stricter but works for clear boundaries
@@ -531,6 +628,9 @@ def _process_marker_pair(
         neighbor_enrichment_pvalue=enrich_pvalue,
         mutual_neighbor_enrichment=mutual_enrich,
         colocalization_score=score,
+        bivariate_morans_per_scale=scale_values,
+        bivariate_morans_pvalue_per_scale=scale_pvalues,
+        bivariate_morans_best_scale=best_scale,
     )
 
 
@@ -574,6 +674,9 @@ def analyze_marker_colocalization(
     n_permutations: int = 199,
     seed: int = 1234,
     verbose: bool = True,
+    # Multi-scale neighborhood parameters
+    multi_scale_k: Optional[List[int]] = None,
+    multi_scale_aggregation: str = "max",
 ) -> ColocalizationResult:
     """
     Analyze pairwise spatial colocalization between markers.
@@ -697,11 +800,24 @@ def analyze_marker_colocalization(
         n_cpus = os.cpu_count() or 1
         logging.info(f"Running parallel colocalization analysis with {n_cpus if n_jobs == -1 else n_jobs} workers...")
 
+    # Build multi-scale neighbor graphs if requested
+    if multi_scale_k is not None and len(multi_scale_k) > 1:
+        if verbose:
+            logging.info(f"Building multi-scale neighbor graphs (k={multi_scale_k})...")
+        multi_scale_neighbors = {
+            k: _build_neighbor_graph(coords, k) for k in multi_scale_k
+        }
+        if verbose:
+            logging.info(f"Multi-scale aggregation method: {multi_scale_aggregation}")
+    else:
+        multi_scale_neighbors = None
+
     # Run in parallel using joblib
     pairs = Parallel(n_jobs=n_jobs, verbose=0)(
         delayed(_process_marker_pair)(
             i, j, analyze_names, analyze_X, analyze_X_smooth, binary,
-            neighbors, n_permutations, seed
+            neighbors, n_permutations, seed,
+            multi_scale_neighbors, multi_scale_aggregation
         )
         for i, j in pair_indices
     )
@@ -2197,6 +2313,7 @@ def select_profiles(
     min_spatial_explained: float = 0.90,
     min_protein_explained: float = 0.90,
     max_profiles: int = 15,
+    min_profiles: int = 5,
     neighbor_k: int = 8,
     verbose: bool = False,
 ) -> ProfileSelectionResult:
@@ -2223,6 +2340,7 @@ def select_profiles(
         min_spatial_explained: Target fraction of spatial variance (default: 0.90)
         min_protein_explained: Target fraction of protein signal variance (default: 0.90)
         max_profiles: Maximum number of profiles to select (default: 15)
+        min_profiles: Minimum profiles to select before checking marginal gain (default: 5)
         neighbor_k: K for spatial neighbor graph (default: 8)
         verbose: Whether to print progress
 
