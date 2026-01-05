@@ -675,7 +675,7 @@ def analyze_marker_colocalization(
     seed: int = 1234,
     verbose: bool = True,
     # Multi-scale neighborhood parameters
-    multi_scale_k: Optional[List[int]] = None,
+    multi_scale_k: Optional[List[int]] = [6, 12, 24, 48, 64],
     multi_scale_aggregation: str = "max",
 ) -> ColocalizationResult:
     """
@@ -704,6 +704,12 @@ def analyze_marker_colocalization(
             Higher values give more precise p-values but take longer.
         seed: Random seed for reproducibility (default: 1234).
         verbose: Log progress information (default: True).
+        multi_scale_k: List of k values for multi-scale neighborhood analysis
+            (default: [6, 12, 24, 48, 64]). Computes bivariate Moran's I at each scale
+            and aggregates according to multi_scale_aggregation. Set to None to disable.
+            Scales >= n_spots are automatically filtered out.
+        multi_scale_aggregation: How to aggregate across scales - "max" (default),
+            "mean", or "weighted". "max" selects the best signal at optimal scale.
 
     Returns:
         ColocalizationResult with DataFrame of marker pairs ranked by colocalization score.
@@ -802,13 +808,24 @@ def analyze_marker_colocalization(
 
     # Build multi-scale neighbor graphs if requested
     if multi_scale_k is not None and len(multi_scale_k) > 1:
-        if verbose:
-            logging.info(f"Building multi-scale neighbor graphs (k={multi_scale_k})...")
-        multi_scale_neighbors = {
-            k: _build_neighbor_graph(coords, k) for k in multi_scale_k
-        }
-        if verbose:
-            logging.info(f"Multi-scale aggregation method: {multi_scale_aggregation}")
+        # Filter out k values >= n_spots (can't have more neighbors than spots)
+        valid_scales = [k for k in multi_scale_k if k < n_spots]
+        if len(valid_scales) < len(multi_scale_k) and verbose:
+            skipped = [k for k in multi_scale_k if k >= n_spots]
+            logging.warning(f"Skipping scales {skipped} (>= n_spots={n_spots})")
+        if len(valid_scales) > 1:
+            if verbose:
+                logging.info(f"Building multi-scale neighbor graphs (k={valid_scales})...")
+            multi_scale_neighbors = {
+                k: _build_neighbor_graph(coords, k) for k in valid_scales
+            }
+            if verbose:
+                logging.info(f"Multi-scale aggregation method: {multi_scale_aggregation}")
+        else:
+            # Fall back to single-scale if not enough valid scales
+            multi_scale_neighbors = None
+            if verbose:
+                logging.info("Only one valid scale available, using single-scale mode")
     else:
         multi_scale_neighbors = None
 
