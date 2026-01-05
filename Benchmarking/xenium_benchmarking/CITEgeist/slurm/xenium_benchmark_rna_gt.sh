@@ -9,12 +9,23 @@
 #SBATCH --cluster=htc                      # Cluster
 #SBATCH --partition=htc                    # Partition
 #SBATCH --array=0-4                        # 5 regions
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # ============================================================================
-# Xenium Benchmarking - CITEgeist with RNA-based Ground Truth
+# Xenium Benchmarking - CITEgeist with AUTO PROFILE DISCOVERY
 # ============================================================================
-# This script runs CITEgeist on pseudo-Visium spots created from Xenium
-# single-cell data, using RNA-based clustering for ground truth.
+# This script runs CITEgeist on pseudo-Visium spots using the UNSIMPLIFIED
+# 10-cell-type RNA clustering for ground truth.
+#
+# IMPORTANT: Uses Module 1-2 (Auto Profile Discovery) to discover cell profiles
+# from protein colocalization patterns instead of hardcoded dictionaries.
+# This is the proper way to benchmark CITEgeist.
+#
+# Ground Truth Cell types (10):
+# 1. CD8+ T cells     2. Macrophages    3. Mixed Immune    4. Epithelial
+# 5. Myofibroblasts   6. Stromal        7. Endothelial     8. B cells
+# 9. Proliferating T  10. Vascular Stromal
 #
 # Reference:
 #   Zhao et al. (2025). "Benchmarking cell type annotation methods for 10x
@@ -34,8 +45,8 @@ REPO_ROOT="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist"
 PSEUDOVISIUM_DIR="${REPO_ROOT}/Benchmarking/xenium_pseudovisium"
 BENCH_DIR="${REPO_ROOT}/Benchmarking/xenium_benchmarking"
 CITEGEIST_DIR="${BENCH_DIR}/CITEgeist"
-INPUT_DIR="${PSEUDOVISIUM_DIR}/data_rna_gt"    # RNA-based ground truth data
-OUTPUT_DIR="${CITEGEIST_DIR}/output_rna_gt"
+INPUT_DIR="${PSEUDOVISIUM_DIR}/data_granular_gt"    # Granular 10-cell-type ground truth data
+OUTPUT_DIR="${CITEGEIST_DIR}/output_autodiscovery"
 SLURM_LOG_DIR="${CITEGEIST_DIR}/slurm/slurm_log"
 
 # Create directories if needed
@@ -76,15 +87,16 @@ echo -e "${GREEN}Gurobi module loaded.${RESET}"
 # ============================================================================
 
 REGION_ID=$SLURM_ARRAY_TASK_ID
-echo -e "${YELLOW}Processing region ${REGION_ID} with RNA-based ground truth${RESET}"
+echo -e "${YELLOW}Processing region ${REGION_ID} with GRANULAR 10-cell-type ground truth${RESET}"
 echo -e "${BLUE}Input directory: ${INPUT_DIR}${RESET}"
 echo -e "${BLUE}Output directory: ${OUTPUT_DIR}${RESET}"
 
 # Change to repo root
 cd "${REPO_ROOT}"
 
-# Run CITEgeist benchmark with RNA-based cell profiles
-# Includes both cell proportion estimation AND gene expression deconvolution
+# Run CITEgeist benchmark with AUTO PROFILE DISCOVERY (Module 1-2)
+# Let CITEgeist discover cell profiles from protein colocalization patterns
+# This is the proper way to run CITEgeist without hardcoded dictionaries
 echo -e "${BLUE}Running CITEgeist on region ${REGION_ID}...${RESET}"
 python "${CITEGEIST_DIR}/src/run_benchmark.py" \
     --region-id ${REGION_ID} \
@@ -95,7 +107,10 @@ python "${CITEGEIST_DIR}/src/run_benchmark.py" \
     --alpha-elastic 0.7 \
     --max-y-change 0.4 \
     --min-counts 25 \
-    --use-rna-profiles \
+    --use-autodiscovery \
+    --n-permutations 199 \
+    --fdr-threshold 0.05 \
+    --variance-target 0.90 \
     --run-gex
 
 if [ $? -ne 0 ]; then

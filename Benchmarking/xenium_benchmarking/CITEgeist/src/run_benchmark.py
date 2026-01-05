@@ -24,6 +24,12 @@ REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT / "CITEgeist"))
 
 from model.citegeist_model import CitegeistModel
+from model.marker_interest import identify_interesting_markers
+from model.spatial_colocalization import (
+    analyze_marker_colocalization,
+    discover_profiles,
+    select_profiles,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -182,6 +188,11 @@ def run_citegeist_on_region(
     mean_expression_threshold: float = 1.1,
     prefix: str = "Xenium",
     run_gex: bool = False,
+    use_autodiscovery: bool = False,
+    n_permutations: int = 199,
+    fdr_threshold: float = 0.05,
+    top_k: int = 5,
+    variance_target: float = 0.90,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist deconvolution on a single region.
@@ -202,11 +213,16 @@ def run_citegeist_on_region(
         mean_expression_threshold: Min mean expression in nonzero spots
         prefix: Filename prefix
         run_gex: Whether to run gene expression deconvolution (Pass 1)
+        use_autodiscovery: Use Module 1-2 to auto-discover cell profiles from protein data
+        n_permutations: Number of permutations for colocalization analysis
+        fdr_threshold: FDR threshold for profile discovery
+        top_k: Top-k neighbors for mutual sparsification
+        variance_target: Target variance for profile selection (dual checkpoint: spatial and protein)
 
     Returns:
         Dict with run statistics and output paths
     """
-    if cell_profile_dict is None:
+    if cell_profile_dict is None and not use_autodiscovery:
         cell_profile_dict = XENIUM_CELL_PROFILE_DICT
 
     input_dir = Path(input_dir)
@@ -237,6 +253,115 @@ def run_citegeist_on_region(
         gene_expression_adata=adata_gex,
         antibody_capture_adata=adata_protein,
     )
+
+    # Auto-discover cell profiles from protein data (Module 1-2)
+    discovery_stats = {}
+    if use_autodiscovery:
+        logger.info("=" * 60)
+        logger.info("Running Auto Profile Discovery (Module 1-2)")
+        logger.info("=" * 60)
+
+        # Get raw protein data and coordinates
+        X_protein = adata_protein.X
+        if hasattr(X_protein, 'toarray'):
+            X_protein = X_protein.toarray()
+        coords = adata_protein.obsm.get('spatial', None)
+        if coords is None:
+            # Try to get from obs
+            if 'x' in adata_protein.obs.columns and 'y' in adata_protein.obs.columns:
+                coords = adata_protein.obs[['x', 'y']].values
+            else:
+                raise ValueError("No spatial coordinates found in protein data")
+        marker_names = list(adata_protein.var_names)
+
+        # Module 1: Identify interesting markers
+        logger.info("Module 1: Identifying interesting markers...")
+        interest_result = identify_interesting_markers(
+            X=X_protein,
+            coords=coords,
+            marker_names=marker_names,
+            morans_k=8,
+            verbose=True,
+        )
+        interesting_markers = interest_result.interesting_markers
+        logger.info(f"Module 1: Found {len(interesting_markers)} interesting markers")
+
+        if len(interesting_markers) < 2:
+            logger.warning("Not enough interesting markers. Using all markers.")
+            interesting_markers = marker_names
+
+        # Module 2a: Analyze marker colocalization
+        logger.info("Module 2a: Analyzing marker colocalization...")
+        coloc_result = analyze_marker_colocalization(
+            X=X_protein,
+            coords=coords,
+            marker_names=marker_names,
+            markers_to_analyze=interesting_markers,
+            neighbor_k=8,
+            n_permutations=n_permutations,
+            seed=42,
+            verbose=True,
+        )
+        logger.info(f"Module 2a: Found {len(coloc_result.pairs)} significant marker pairs")
+
+        # Module 2b: Discover profiles
+        logger.info("Module 2b: Discovering profiles...")
+        discovery_result = discover_profiles(
+            colocalization_result=coloc_result,
+            fdr_alpha=fdr_threshold,
+            top_k=top_k,
+            seed=42,
+            verbose=True,
+        )
+        logger.info(f"Module 2b: Discovered {len(discovery_result.profiles)} candidate profiles")
+        for i, profile in enumerate(discovery_result.profiles):
+            logger.info(f"  {i+1}. {profile}")
+
+        # Module 2c: Select profiles by spatial variance
+        logger.info("Module 2c: Selecting profiles by spatial variance...")
+        selection_result = select_profiles(
+            X=X_protein,
+            coords=coords,
+            marker_names=marker_names,
+            profiles=discovery_result.profiles,
+            interesting_markers=interesting_markers,
+            colocalization_result=coloc_result,
+            min_spatial_explained=variance_target,
+            min_protein_explained=variance_target,  # Dual variance checkpoint
+            verbose=True,
+        )
+
+        selected_profiles = selection_result.selected_profiles
+        n_selected = selection_result.optimal_n
+        total_ve = float(selection_result.variance_explained[n_selected - 1]) if n_selected > 0 else 0.0
+
+        logger.info(f"Module 2c: Selected {len(selected_profiles)} profiles")
+        logger.info(f"  Spatial variance explained: {total_ve:.1%}")
+        logger.info(f"  Stopping reason: {selection_result.stopping_reason}")
+
+        for i, profile in enumerate(selected_profiles):
+            logger.info(f"  {i+1}. {profile}")
+
+        # Convert to cell_profile_dict format
+        cell_profile_dict = {}
+        for i, profile in enumerate(selected_profiles):
+            profile_name = f"Profile_{i+1}"
+            markers_list = list(profile) if not isinstance(profile, list) else profile
+            cell_profile_dict[profile_name] = {"Major": markers_list}
+
+        logger.info(f"Created cell_profile_dict with {len(cell_profile_dict)} profiles")
+        logger.info("=" * 60)
+
+        # Store discovery stats
+        discovery_stats = {
+            "n_interesting_markers": len(interesting_markers),
+            "n_colocalization_pairs": len(coloc_result.pairs),
+            "n_candidate_profiles": len(discovery_result.profiles),
+            "n_selected_profiles": len(selected_profiles),
+            "variance_explained": total_ve,
+            "stopping_reason": selection_result.stopping_reason,
+            "profiles": {k: v["Major"] for k, v in cell_profile_dict.items()},
+        }
 
     # Load cell profile dictionary
     model.load_cell_profile_dict(cell_profile_dict)
@@ -321,6 +446,8 @@ def run_citegeist_on_region(
         "output_dir": str(result_dir),
         "prop_csv": str(prop_csv),
         "gex_layers_dir": str(output_dir / f"{sample_name}_pass1" / "layers") if run_gex else None,
+        "use_autodiscovery": use_autodiscovery,
+        "discovery_stats": discovery_stats if use_autodiscovery else None,
     }
 
     # Save stats
@@ -458,6 +585,29 @@ def main():
         action="store_true",
         help="Run gene expression deconvolution (Pass 1) after cell proportions",
     )
+    parser.add_argument(
+        "--use-autodiscovery",
+        action="store_true",
+        help="Use Module 1-2 to auto-discover cell profiles from protein data (recommended)",
+    )
+    parser.add_argument(
+        "--n-permutations",
+        type=int,
+        default=199,
+        help="Number of permutations for colocalization analysis",
+    )
+    parser.add_argument(
+        "--fdr-threshold",
+        type=float,
+        default=0.05,
+        help="FDR threshold for profile discovery",
+    )
+    parser.add_argument(
+        "--variance-target",
+        type=float,
+        default=0.90,
+        help="Target variance explained for profile selection (dual checkpoint: spatial and protein)",
+    )
 
     args = parser.parse_args()
 
@@ -468,7 +618,10 @@ def main():
     )
 
     # Select cell profile dict based on flags
-    if args.use_granular_profiles:
+    if args.use_autodiscovery:
+        cell_profile_dict = None  # Will be discovered automatically
+        logger.info("Using AUTO PROFILE DISCOVERY (Module 1-2) - profiles will be discovered from protein data")
+    elif args.use_granular_profiles:
         cell_profile_dict = GRANULAR_CELL_PROFILE_DICT
         logger.info("Using GRANULAR cell profile dict (10 cell types, unsimplified RNA clustering)")
     elif args.use_rna_profiles:
@@ -490,6 +643,10 @@ def main():
         max_y_change=args.max_y_change,
         min_counts=args.min_counts,
         run_gex=args.run_gex,
+        use_autodiscovery=args.use_autodiscovery,
+        n_permutations=args.n_permutations,
+        fdr_threshold=args.fdr_threshold,
+        variance_target=args.variance_target,
     )
 
     print(f"\nCompleted region {args.region_id}")

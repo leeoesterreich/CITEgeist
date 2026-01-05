@@ -72,6 +72,7 @@ class ColocalizationResult:
     marker_names: List[str]
     n_spots: int
     neighbor_k: int
+    marker_specificity: Dict[str, float] = field(default_factory=dict)  # Gini-based specificity scores
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert to ranked DataFrame sorted by colocalization_score descending."""
@@ -711,11 +712,25 @@ def analyze_marker_colocalization(
     # Sort by score
     pairs.sort(key=lambda x: x.colocalization_score, reverse=True)
 
+    # Compute marker specificity (Gini coefficient)
+    # Higher = more specific (concentrated in few spots), Lower = more promiscuous
+    marker_specificity = _compute_marker_specificity(analyze_X, analyze_names)
+
+    if verbose:
+        # Log promiscuous markers (specificity < 0.3)
+        promiscuous = [m for m, s in marker_specificity.items() if s < 0.3]
+        specific = [m for m, s in marker_specificity.items() if s > 0.6]
+        if promiscuous:
+            logging.info(f"Promiscuous markers (Gini < 0.3): {promiscuous}")
+        if specific:
+            logging.info(f"Highly specific markers (Gini > 0.6): {specific[:5]}...")
+
     result = ColocalizationResult(
         pairs=pairs,
         marker_names=analyze_names,
         n_spots=n_spots,
         neighbor_k=neighbor_k,
+        marker_specificity=marker_specificity,
     )
 
     if verbose:
@@ -1606,7 +1621,7 @@ def discover_profiles(
     colocalization_result: ColocalizationResult,
     *,
     fdr_alpha: float = 0.05,
-    top_k: int = 3,
+    top_k: int = 5,
     min_score: Optional[float] = None,
     use_triangle_assembly: bool = False,
     pvalue_source: str = "bivariate_morans",
@@ -1665,6 +1680,7 @@ def discover_profiles(
     """
     pairs = colocalization_result.pairs
     all_markers = colocalization_result.marker_names
+    marker_specificity = colocalization_result.marker_specificity
 
     if verbose:
         logging.info(f"Discovering profiles from {len(pairs)} marker pairs...")
@@ -1685,12 +1701,15 @@ def discover_profiles(
                 f"Raw p-value filter [{pvalue_source}] (fallback): {len(fdr_pairs)}/{len(pairs)} pairs"
             )
 
-    # Step 2: Apply mutual top-k sparsification
+    # Step 2: Apply mutual top-k sparsification WITH specificity weighting
+    # This downweights edges involving promiscuous markers (low Gini, like CD45)
     if top_k > 0:
-        topk_pairs = _apply_mutual_topk(fdr_pairs, k=top_k)
+        # Use specificity if available, otherwise None (no weighting)
+        specificity_for_topk = marker_specificity if marker_specificity else None
+        topk_pairs = _apply_mutual_topk(fdr_pairs, k=top_k, specificity=specificity_for_topk)
         if verbose:
             logging.info(
-                f"Mutual top-{top_k} sparsification: {len(topk_pairs)}/{len(fdr_pairs)} pairs"
+                f"Mutual top-{top_k} sparsification (specificity-weighted): {len(topk_pairs)}/{len(fdr_pairs)} pairs"
             )
     else:
         topk_pairs = fdr_pairs
@@ -1980,6 +1999,51 @@ class ProfileSelectionResult:
         )
 
 
+def _compute_protein_variance_explained(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+) -> float:
+    """
+    Compute fraction of protein signal variance explained by profile activities.
+
+    This measures how much of the total variance in protein expression data
+    is captured by the markers included in the selected profiles.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column
+        profiles: List of profiles (each is a list of marker names)
+
+    Returns:
+        Fraction of total variance explained (0 to 1)
+    """
+    if len(profiles) == 0:
+        return 0.0
+
+    # Get all markers covered by profiles
+    covered_markers = set()
+    for profile in profiles:
+        covered_markers.update(profile)
+
+    # Find column indices for covered markers
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+    covered_idx = [marker_to_idx[m] for m in covered_markers if m in marker_to_idx]
+
+    if len(covered_idx) == 0:
+        return 0.0
+
+    # Compute total variance across all markers
+    total_var = np.var(X, axis=0).sum()
+    if total_var == 0:
+        return 1.0
+
+    # Compute variance explained by covered markers
+    covered_var = np.var(X[:, covered_idx], axis=0).sum()
+
+    return float(covered_var / total_var)
+
+
 def _compute_spatial_variance_explained(
     X: NDArray[np.floating],
     coords: NDArray[np.floating],
@@ -2131,16 +2195,23 @@ def select_profiles(
     interesting_markers: List[str],
     colocalization_result: "ColocalizationResult",
     min_spatial_explained: float = 0.90,
-    min_marginal_gain: float = 0.005,
+    min_protein_explained: float = 0.90,
     max_profiles: int = 15,
     neighbor_k: int = 8,
     verbose: bool = False,
 ) -> ProfileSelectionResult:
     """
-    Module 2c: Select profiles by spatial variance contribution.
+    Module 2c: Select profiles by dual variance contribution.
 
     Greedily selects profiles that maximize spatial variance explained,
-    stopping when the target is reached or marginal gains become too small.
+    stopping when BOTH variance targets are reached.
+
+    Uses dual variance checkpoints:
+    1. Protein signal variance - fraction of total marker variance covered
+    2. Spatial coverage - Moran's I weighted spatial variance explained
+
+    Selection continues by rank (best contributing profile first) until
+    BOTH targets reach 90% or all profiles are exhausted.
 
     Args:
         X: Expression matrix (n_spots, n_markers), should be RAW (not CLR-transformed)
@@ -2150,7 +2221,7 @@ def select_profiles(
         interesting_markers: Markers identified as spatially interesting (Module 1)
         colocalization_result: Result from Module 2a (for reference)
         min_spatial_explained: Target fraction of spatial variance (default: 0.90)
-        min_marginal_gain: Minimum marginal gain to continue (default: 0.5%)
+        min_protein_explained: Target fraction of protein signal variance (default: 0.90)
         max_profiles: Maximum number of profiles to select (default: 15)
         neighbor_k: K for spatial neighbor graph (default: 8)
         verbose: Whether to print progress
@@ -2160,8 +2231,9 @@ def select_profiles(
     """
     if verbose:
         logger.info(f"Module 2c: Selecting from {len(profiles)} candidate profiles")
-        logger.info(f"  Target: {min_spatial_explained:.0%} spatial variance explained")
-        logger.info(f"  Min marginal gain: {min_marginal_gain:.1%}")
+        logger.info(f"  Target spatial variance: {min_spatial_explained:.0%}")
+        logger.info(f"  Target protein variance: {min_protein_explained:.0%}")
+        logger.info(f"  Selection: by rank until BOTH targets met")
 
     if len(profiles) == 0:
         return ProfileSelectionResult(
@@ -2201,32 +2273,36 @@ def select_profiles(
             stopping_reason = "No remaining profiles"
             break
 
-        if i > 0 and best_gain < min_marginal_gain:
-            stopping_reason = f"Marginal gain ({best_gain:.3%}) below threshold ({min_marginal_gain:.1%})"
-            break
-
-        # Add best profile
+        # Add best profile (no marginal gain check - select until variance targets met)
         selected.append(best_profile)
         remaining.pop(best_idx)
 
-        # Compute metrics
-        current_ve = _compute_spatial_variance_explained(
+        # Compute metrics - dual variance checkpoints
+        current_spatial_ve = _compute_spatial_variance_explained(
             X, coords, marker_names, selected, neighbor_k
+        )
+        current_protein_ve = _compute_protein_variance_explained(
+            X, marker_names, selected
         )
         current_smooth = _compute_proportion_smoothness(
             X, coords, marker_names, selected, neighbor_k
         )
 
-        variance_explained_list.append(current_ve)
+        variance_explained_list.append(current_spatial_ve)
         smoothness_list.append(current_smooth)
         marginal_gains_list.append(best_gain)
 
         if verbose:
-            print(f"  [{i+1}] Added {best_profile} (gain: {best_gain:.3%}, total VE: {current_ve:.1%})")
+            print(f"  [{i+1}] Added {best_profile} (gain: {best_gain:.3%}, "
+                  f"spatial: {current_spatial_ve:.1%}, protein: {current_protein_ve:.1%})")
 
-        # Check if target reached
-        if current_ve >= min_spatial_explained:
-            stopping_reason = f"Target variance ({min_spatial_explained:.0%}) reached"
+        # Check if BOTH variance targets reached (dual checkpoint)
+        spatial_met = current_spatial_ve >= min_spatial_explained
+        protein_met = current_protein_ve >= min_protein_explained
+
+        if spatial_met and protein_met:
+            stopping_reason = (f"Both targets reached "
+                             f"(spatial: {current_spatial_ve:.0%}, protein: {current_protein_ve:.0%})")
             break
 
     return ProfileSelectionResult(
