@@ -8,6 +8,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --cluster=htc
 #SBATCH --partition=htc
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Run RCTD deconvolution on Xenium pseudo-Visium regions
 # Array job: processes regions 0-4
@@ -22,9 +24,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 RCTD_DIR="${BASE_DIR}/RCTD"
 SRC_DIR="${RCTD_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_rna_gt"
-REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed/rctd"
-OUTPUT_DIR="${RCTD_DIR}/output_rna_gt"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
+REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed_granular/rctd"
+OUTPUT_DIR="${RCTD_DIR}/output_granular"
 TEMP_DIR="${OUTPUT_DIR}/temp_csvs"
 
 echo "=============================================="

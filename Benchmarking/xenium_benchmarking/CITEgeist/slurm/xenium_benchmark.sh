@@ -9,6 +9,8 @@
 #SBATCH --cluster=htc                     # Cluster
 #SBATCH --partition=htc                   # Partition
 #SBATCH --array=0-4                       # 5 regions
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # ============================================================================
 # Xenium Benchmarking - CITEgeist on Pseudo-Visium Data

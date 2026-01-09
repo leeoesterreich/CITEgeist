@@ -8,6 +8,8 @@
 #SBATCH --time=01:00:00
 #SBATCH --cluster=htc
 #SBATCH --partition=htc
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # ============================================================================
 # Mode C: Compare Benchmark Results

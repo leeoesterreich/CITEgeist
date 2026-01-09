@@ -8,6 +8,8 @@
 #SBATCH --time=02:00:00                  # Time limit
 #SBATCH --cluster=htc                    # Cluster
 #SBATCH --partition=htc                  # Partition
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 # Dependency removed - run manually after array job completes
 
 # ============================================================================

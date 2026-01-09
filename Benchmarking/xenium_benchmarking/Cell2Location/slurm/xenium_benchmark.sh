@@ -9,6 +9,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cluster=gpu
 #SBATCH --partition=a100
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Run Cell2Location deconvolution on Xenium pseudo-Visium regions
 # Array job: processes regions 0-4
@@ -26,9 +28,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 C2L_DIR="${BASE_DIR}/Cell2Location"
 SRC_DIR="${C2L_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_rna_gt"
-REF_DIR="${C2L_DIR}/reference_model"
-OUTPUT_DIR="${C2L_DIR}/output_rna_gt"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
+REF_DIR="${C2L_DIR}/reference_model_granular"
+OUTPUT_DIR="${C2L_DIR}/output_granular"
 
 echo "=============================================="
 echo "Cell2Location Xenium Benchmark - Region ${REGION_ID}"

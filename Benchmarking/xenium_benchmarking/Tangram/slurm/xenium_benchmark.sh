@@ -9,6 +9,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cluster=gpu
 #SBATCH --partition=a100
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Run Tangram deconvolution on Xenium pseudo-Visium regions
 # Array job: processes regions 0-4
@@ -22,9 +24,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 TG_DIR="${BASE_DIR}/Tangram"
 SRC_DIR="${TG_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_rna_gt"
-REF_PATH="${BASE_DIR}/reference_data/GSE156632/processed/tangram/reference.h5ad"
-OUTPUT_DIR="${TG_DIR}/output_rna_gt"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
+REF_PATH="${BASE_DIR}/reference_data/GSE156632/processed_granular/tangram/reference.h5ad"
+OUTPUT_DIR="${TG_DIR}/output_granular"
 
 echo "=============================================="
 echo "Tangram Xenium Benchmark - Region ${REGION_ID}"

@@ -8,6 +8,8 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --cluster=htc
 #SBATCH --partition=htc
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Run Seurat TransferData deconvolution on Xenium pseudo-Visium regions
 # Array job: processes regions 0-4
@@ -22,9 +24,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 SEURAT_DIR="${BASE_DIR}/Seurat"
 SRC_DIR="${SEURAT_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_rna_gt"
-REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed/seurat"
-OUTPUT_DIR="${SEURAT_DIR}/output_rna_gt"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
+REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed_granular/seurat"
+OUTPUT_DIR="${SEURAT_DIR}/output_granular"
 TEMP_DIR="${OUTPUT_DIR}/temp_csvs"
 
 # Environment paths (use source activate with full path)

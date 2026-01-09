@@ -9,6 +9,8 @@
 #SBATCH --cluster=htc
 #SBATCH --partition=htc
 #SBATCH --array=0-4
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # ============================================================================
 # Mode A: Profile Discovery Evaluation

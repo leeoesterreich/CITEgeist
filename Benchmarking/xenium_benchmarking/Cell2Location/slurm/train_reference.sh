@@ -8,6 +8,8 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cluster=gpu
 #SBATCH --partition=a100
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Train Cell2Location reference model on GSE156632
 # This is a one-time job that creates the reference signatures
@@ -22,8 +24,8 @@ echo "Loaded CUDA: $(nvcc --version 2>/dev/null | grep release || echo 'CUDA loa
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 C2L_DIR="${BASE_DIR}/Cell2Location"
 SRC_DIR="${C2L_DIR}/src"
-REF_DATA="${BASE_DIR}/reference_data/GSE156632/processed/cell2location/reference.h5ad"
-OUTPUT_DIR="${C2L_DIR}/reference_model"
+REF_DATA="${BASE_DIR}/reference_data/GSE156632/processed_granular/cell2location/reference.h5ad"
+OUTPUT_DIR="${C2L_DIR}/reference_model_granular"
 
 echo "=============================================="
 echo "Cell2Location Reference Training"
