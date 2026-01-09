@@ -200,6 +200,152 @@ def process_data(adata: sc.AnnData, radius: int = 4) -> Dict[str, np.ndarray]:
 - Be mindful of AnnData object memory footprint
 - Consider checkpointing for long-running computations
 
+## CITEgeist Pipeline: Module Definitions (1-5)
+
+CITEgeist is organized into 5 modules that form a complete spatial multi-omics analysis pipeline:
+
+### Module 1: Marker Interest Detection (Auto Protein Marker Prediction)
+
+**File**: `CITEgeist/model/marker_interest.py`
+
+**Purpose**: Identifies spatially-variable protein markers from CITE-seq antibody data worth analyzing further.
+
+**Method**: Uses three statistical tests to score marker "interestingness":
+- **Kurtosis gating**: Peaked distributions (kurtosis > 2.0) indicate real signal vs flat noise
+- **Gaussian Mixture Model (GMM)**: 2-component GMM separates signal from background, calculates SNR
+- **Moran's I**: Spatial autocorrelation on raw data to detect spatially clustered markers
+
+**Output**: `MarkerInterestResult` with ranked markers and decision logic
+- `interesting_markers`: Pass EITHER kurtosis OR Moran's I gate (plus GMM filter)
+- `boring_markers`: Fail both gates or GMM filter
+
+**Test**: `tests/test_module_one_marker_detection.py`
+
+---
+
+### Module 2: Profile Assembly (Cell Type Marker Profile Discovery)
+
+**File**: `CITEgeist/model/spatial_colocalization.py`
+
+**Purpose**: Automatically discovers cell type protein marker profiles from spatial colocalization patterns.
+
+#### Module 2a: Marker Colocalization Analysis
+- Analyzes spatial relationships: same-spot co-occurrence, expression correlation, adjacent-spot enrichment, bivariate Moran's I
+- Output: `ColocalizationResult` with scored marker pairs
+
+#### Module 2b: Profile Discovery
+- Builds significance-filtered graph from colocalization p-values
+- Finds connected components (separate lineages)
+- Hierarchical clustering + dynamic tree cutting to extract profiles
+- Output: `ProfileDiscoveryResult` with discovered profiles and dendrogram
+
+#### Module 2c: Profile Selection
+- Function: `select_profiles_by_reconstruction()`
+- Uses reconstruction accuracy to determine optimal number of profiles
+- Ensures selected profiles have good coverage and non-redundancy
+
+**Tests**: `tests/test_module2_profile_discovery.py`, `tests/test_module2c_profile_selection.py`
+
+---
+
+### Module 3: Cell Type Proportion & Gene Expression Deconvolution
+
+**Files**: `CITEgeist/model/gurobi_impl.py` (optimization), `CITEgeist/model/citegeist_model.py` (orchestration)
+
+**Purpose**: Two-pass optimization for deconvoluting spatial transcriptomics using CITE-seq antibody references.
+
+#### Pass 1: Cell-type Proportion Estimation (`run_cell_proportion_model()`)
+- Maps antibodies to cell type profiles (from Module 2)
+- Solves quadratic programming: minimize reconstruction error
+- Features: per-marker beta optimization, Laplacian spatial smoothing, validation thresholds
+- Finetuning: Optimizes proportions locally using neighbors
+- Output: `cell_prop_global_results.csv`, `cell_prop_finetuned_results.csv`
+
+#### Pass 2: Gene Expression Deconvolution (`run_cell_expression_pass1()`)
+- Uses proportions from Pass 1 to deconvolve gene expression
+- Minimizes reconstruction error with enrichment weights (global + local)
+- Produces deconvolved gene expression layers (one per cell type per spot)
+- Output: `gene_expression_pass1.parquet` + AnnData layers
+
+**Key Functions**:
+- `optimize_cell_proportions()` / `optimize_cell_proportions_per_marker()`: Pass 1
+- `optimize_gene_expression()`: Pass 2
+- `compute_global_prior()`: Creates expression prior
+
+**Test**: `tests/test_citegeist_simulated.py`
+
+---
+
+### Module 4: Protein-Anchored Spatial Transcriptomic Program Discovery
+
+**File**: `CITEgeist/model/anchored_program_discovery.py`
+
+**Purpose**: Discovers gene expression programs from deconvolved cell-type-specific expression layers (Module 3 output), validated against protein profiles (Module 2).
+
+**Method**:
+1. For each cell type anchor (from Module 2 profiles):
+   - Extract deconvolved expression layer from Module 3
+   - Weight by cell type proportions
+   - Non-negative matrix factorization (NMF) to discover K programs
+   - Compute Moran's I for spatial coherence
+   - Identify spatial subpopulations via k-means clustering
+
+**Output**: `AnchoredProgramDiscoveryResult` containing:
+- `SpatialProgram`: Top genes, loadings, variance explained, Moran's I
+- `SpatialSubpopulation`: Spatially distinct subpopulations within each anchor
+- Gene loadings (W matrix) and spot loadings (H matrix)
+
+#### Module 4b: Bivariate Program Relationships
+- Function: `analyze_program_relationships()`
+- Computes bivariate Moran's I between pairs of programs
+- Identifies co-localized (positive I) vs exclusive (negative I) programs
+- Output: `BivariateProgramResult`
+
+**Test**: `tests/test_module4_deconvolved.py`
+
+---
+
+### Module 5: Cross-Sample Integration
+
+**File**: `CITEgeist/model/cross_sample_integration.py`
+
+**Purpose**: Integrates gene expression programs across multiple patient samples, producing a similarity network of conserved programs and relationships.
+
+**Method**:
+1. Per-sample analysis from Module 4 (W matrices, H matrices, programs)
+2. Module 4b provides bivariate Moran's I within each sample
+3. Cross-sample integration:
+   - Aligns programs using Harmony-style batch correction
+   - PCA embedding in integrated latent space
+   - Hierarchical clustering to match equivalent programs across patients
+4. Relationship conservation:
+   - Compares program pairs for consistent relationships across samples
+   - Builds similarity network of aligned programs
+
+**Output**: `IntegrationResult` containing:
+- `AlignedProgram`: Programs aligned across samples with consensus signatures
+- `ConservedRelationship`: Bivariate relationships that persist across patients
+- Conservation scores and relationship types ('co-localized', 'exclusive', 'variable')
+
+**Test**: `tests/test_cross_sample_integration.py`
+
+---
+
+### Module Summary Table
+
+| Module | Name | Input | Output | Key File |
+|--------|------|-------|--------|----------|
+| **1** | Marker Interest Detection | Raw antibody data | Ranked interesting markers | `marker_interest.py` |
+| **2a** | Marker Colocalization | Interesting markers | Scored marker pairs | `spatial_colocalization.py` |
+| **2b** | Profile Discovery | Marker pairs | Cell type profiles | `spatial_colocalization.py` |
+| **2c** | Profile Selection | Multiple profiles | Optimal profiles | `spatial_colocalization.py` |
+| **3** | Deconvolution (2-Pass) | GEX + antibody profiles | Proportions + deconvolved layers | `gurobi_impl.py`, `citegeist_model.py` |
+| **4** | Anchored Programs | Deconvolved layers | Spatial programs per cell type | `anchored_program_discovery.py` |
+| **4b** | Bivariate Relationships | Program H matrices | Program-pair correlations | `anchored_program_discovery.py` |
+| **5** | Cross-sample Integration | Multi-sample programs | Conserved relationships | `cross_sample_integration.py` |
+
+---
+
 ## Key Model Components
 
 ### CitegeistModel Class
@@ -212,18 +358,14 @@ Primary interface in `CITEgeist/model/citegeist_model.py`
 **Key Methods:**
 - `preprocess_gene_expression()` - Normalizes and filters gene expression data
 - `preprocess_antibody()` - Processes antibody capture data
-- `map_antibodies_to_cell_profiles()` - Maps antibodies to cell type profiles
-- `optimize_proportions()` - Pass 1: Cell type proportion optimization
-- `optimize_gene_expression()` - Pass 2: Gene expression deconvolution
-- `export_results()` - Saves results to output folder
-
-### Two-Pass Approach
-1. **Pass 1**: Cell-type proportion estimation using antibody data
-2. **Pass 2**: Gene expression deconvolution using proportions from Pass 1
+- `load_cell_profile_dict()` - Loads cell type to marker mappings (or use Module 2 for auto-discovery)
+- `run_cell_proportion_model()` - Module 3 Pass 1: Cell type proportion optimization
+- `run_cell_expression_pass1()` - Module 3 Pass 2: Gene expression deconvolution
 
 ### Gurobi Implementation
 Located in `gurobi_impl.py`:
 - `optimize_cell_proportions()` - Quadratic programming for proportions
+- `optimize_cell_proportions_per_marker()` - Per-marker beta optimization variant
 - `optimize_gene_expression()` - Gene expression optimization
 - `compute_global_prior()` - Computes spatial priors for regularization
 
@@ -486,6 +628,7 @@ If using CITEgeist in research, cite the bioRxiv preprint:
 8. **Update checkpointing** if adding new model state
 9. **Preserve scientific accuracy** - this is research code with biological interpretation
 10. **Respect the publication timeline** - main branch is frozen until publication
+11. **Use sbatch for big jobs** - For computationally intensive tasks (loading large datasets, running benchmarks, etc.), submit via SLURM sbatch rather than running interactively. This prevents timeouts and allows proper resource allocation.
 
 ### Before Committing:
 
@@ -508,6 +651,39 @@ If uncertain about:
 
 ---
 
-**Last Updated**: 2025-11-14
+## Current Progress Summary (January 2026)
+
+### Module Implementation Status
+
+| Module | Name | Status |
+|--------|------|--------|
+| **1** | Marker Interest Detection | COMPLETE |
+| **2a** | Marker Colocalization | COMPLETE |
+| **2b** | Profile Discovery | COMPLETE |
+| **2c** | Profile Selection | COMPLETE |
+| **3** | Deconvolution (Proportions + GEX) | COMPLETE |
+| **4** | Anchored Program Discovery | COMPLETE |
+| **4b** | Bivariate Relationships | COMPLETE |
+| **5** | Cross-Sample Integration | COMPLETE |
+
+**All 5 core modules are fully implemented with comprehensive test coverage.**
+
+### Xenium Benchmarking Status
+
+The multi-method benchmarking framework compares CITEgeist against Cell2Location, Tangram, RCTD, and Seurat on 14 Xenium pseudo-Visium regions with 10 granular RNA-based cell type ground truth.
+
+**Directory**: `Benchmarking/xenium_benchmarking/{CITEgeist,Cell2Location,RCTD,Seurat,Tangram,evaluation}/`
+
+### Recent Cleanup (January 2026)
+
+1. Removed 60 obsolete top-level benchmark files (refactored to method-specific directories)
+2. Added SLURM mail directives to all 11 benchmark scripts
+3. Fixed evaluation script for Seurat/Tangram output normalization
+
+For full details, see: `docs/PROGRESS_REPORT.md`
+
+---
+
+**Last Updated**: 2026-01-09
 **Repository**: https://github.com/leeoesterreich/CITEgeist
 **Status**: Active Development (Pre-Publication)
