@@ -37,47 +37,221 @@ logger = logging.getLogger(__name__)
 # Method configurations
 METHODS = {
     "CITEgeist": {
-        "output_dir": "CITEgeist/output_rna_gt",
-        "pred_pattern": "{sample_name}_cell_prop_finetuned_results.csv",
+        "output_dir": "CITEgeist/output_autodiscovery",  # Auto-discovered profiles
+        "pred_pattern": "{sample_name}/{sample_name}_deconv_predictions.csv",
         "has_gex": True,
         "gex_dir": "{sample_name}_pass1/layers/pass1",
-        "gex_pattern": "underscore_pass1",  # B_cells_layer_pass1.csv
+        "gex_pattern": "underscore_pass1",  # Profile_1_layer_pass1.csv
+        "uses_autodiscovery": True,  # Flag for profile mapping
     },
     "Cell2Location": {
-        "output_dir": "Cell2Location/output_rna_gt",
+        "output_dir": "Cell2Location/output_granular",
         "pred_pattern": "{sample_name}/{sample_name}_cell_prop_finetuned_results.csv",
         "has_gex": True,
         "gex_dir": "{sample_name}/layers",
         "gex_pattern": "space_layer",  # B cells_layer.csv
     },
     "Tangram": {
-        "output_dir": "Tangram/output_rna_gt",
+        "output_dir": "Tangram/output_granular",
         "pred_pattern": "{sample_name}/{sample_name}_cell_prop_finetuned_results.csv",
         "has_gex": True,
         "gex_dir": "{sample_name}/layers",
         "gex_pattern": "space_layer",  # B cells_layer.csv
     },
     "RCTD": {
-        "output_dir": "RCTD/output_rna_gt",
+        "output_dir": "RCTD/output_granular",
         "pred_pattern": "{sample_name}/{sample_name}_cell_prop_finetuned_results.csv",
         "has_gex": False,
     },
     "Seurat": {
-        "output_dir": "Seurat/output_rna_gt",
+        "output_dir": "Seurat/output_granular",
         "pred_pattern": "{sample_name}/{sample_name}_cell_prop_finetuned_results.csv",
         "has_gex": False,
     },
 }
 
-# Target cell types
+# Target cell types (10 granular types from Xenium RNA k-means clusters)
 TARGET_CELL_TYPES = [
     "B cells",
-    "T cells",
+    "CD8+ T cells",
     "Macrophages",
-    "Fibroblasts",
+    "Mixed Immune",
+    "Myofibroblasts",
+    "Stromal",
     "Epithelial",
     "Endothelial",
+    "Proliferating T",
+    "Vascular Stromal",
 ]
+
+# Marker-to-cell-type mapping for auto-discovery profile matching
+# Based on GRANULAR_CELL_PROFILE_DICT markers
+MARKER_TO_CELLTYPE = {
+    "CD3E": ["CD8+ T cells", "Mixed Immune", "Proliferating T"],
+    "CD8A": ["CD8+ T cells", "Mixed Immune"],
+    "CD68": ["Macrophages"],
+    "HLA-DR": ["Macrophages", "Mixed Immune"],
+    "CD163": ["Macrophages"],
+    "PanCK": ["Epithelial"],
+    "E-Cadherin": ["Epithelial"],
+    "alphaSMA": ["Myofibroblasts"],
+    "Vimentin": ["Myofibroblasts", "Stromal", "Epithelial", "Endothelial", "Vascular Stromal"],
+    "CD31": ["Endothelial", "Vascular Stromal"],
+    "CD20": ["B cells"],
+    "CD45": ["B cells", "CD8+ T cells", "Mixed Immune"],
+    "CD45RA": ["B cells"],
+    "PCNA": ["Proliferating T"],
+    "Ki-67": ["Proliferating T"],
+    "CD16": ["Macrophages"],
+    "CD4": ["Mixed Immune"],
+    "GranzymeB": ["CD8+ T cells"],
+}
+
+# Seurat R-style to standard cell type name mapping
+SEURAT_NAME_MAPPING = {
+    "B.cells": "B cells",
+    "CD8..T.cells": "CD8+ T cells",
+    "CD8+.T.cells": "CD8+ T cells",
+    "Macrophages": "Macrophages",
+    "Mixed.Immune": "Mixed Immune",
+    "Myofibroblasts": "Myofibroblasts",
+    "Stromal": "Stromal",
+    "Epithelial": "Epithelial",
+    "Endothelial": "Endothelial",
+    "Proliferating.T": "Proliferating T",
+    "Vascular.Stromal": "Vascular Stromal",
+}
+
+
+def normalize_celltype_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize cell type column names from R-style (dots) to standard format.
+
+    Seurat outputs use R-style naming with dots instead of spaces/special chars:
+    - "CD8..T.cells" -> "CD8+ T cells"
+    - "Mixed.Immune" -> "Mixed Immune"
+
+    Args:
+        df: DataFrame with R-style column names
+
+    Returns:
+        DataFrame with normalized column names
+    """
+    new_columns = {}
+    for col in df.columns:
+        if col in SEURAT_NAME_MAPPING:
+            new_columns[col] = SEURAT_NAME_MAPPING[col]
+        else:
+            # General normalization: replace dots with spaces, handle common patterns
+            normalized = col.replace(".", " ").replace("  ", "+ ")
+            # Fix common patterns
+            normalized = normalized.replace("CD8  T cells", "CD8+ T cells")
+            new_columns[col] = normalized
+
+    return df.rename(columns=new_columns)
+
+
+def normalize_proportions(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Normalize proportions so each row sums to 1.0.
+
+    Tangram outputs non-normalized values (weights/counts) that need
+    normalization before comparison with other methods.
+
+    Args:
+        df: DataFrame with proportion values
+
+    Returns:
+        DataFrame with row-normalized proportions
+    """
+    row_sums = df.sum(axis=1)
+    # Avoid division by zero
+    row_sums = row_sums.replace(0, 1)
+    return df.div(row_sums, axis=0)
+
+
+def map_autodiscovery_to_celltypes(
+    pred_df: pd.DataFrame,
+    stats_path: Path,
+) -> Tuple[pd.DataFrame, Dict[str, str]]:
+    """
+    Map auto-discovered profiles to ground truth cell types.
+
+    Uses marker overlap to find the best-matching cell type for each profile.
+
+    Args:
+        pred_df: DataFrame with Profile_1, Profile_2, etc. columns
+        stats_path: Path to run_stats.json containing discovered profile markers
+
+    Returns:
+        Tuple of (mapped DataFrame with cell type columns, mapping dict)
+    """
+    # Load discovery stats
+    if not stats_path.exists():
+        logger.warning(f"Stats file not found: {stats_path}")
+        return pred_df, {}
+
+    with open(stats_path) as f:
+        stats = json.load(f)
+
+    discovery_stats = stats.get("discovery_stats")
+    if not discovery_stats:
+        logger.warning("No discovery_stats in stats file")
+        return pred_df, {}
+
+    profiles = discovery_stats.get("profiles", {})
+    if not profiles:
+        logger.warning("No profiles in discovery_stats")
+        return pred_df, {}
+
+    # Map each profile to best-matching cell type
+    profile_to_celltype = {}
+    celltype_scores = {ct: {} for ct in TARGET_CELL_TYPES}
+
+    for profile_name, markers in profiles.items():
+        # Count how many markers map to each cell type
+        ct_counts = {ct: 0 for ct in TARGET_CELL_TYPES}
+        for marker in markers:
+            if marker in MARKER_TO_CELLTYPE:
+                for ct in MARKER_TO_CELLTYPE[marker]:
+                    ct_counts[ct] += 1
+
+        # Find best match
+        if max(ct_counts.values()) > 0:
+            best_ct = max(ct_counts, key=ct_counts.get)
+            profile_to_celltype[profile_name] = best_ct
+            celltype_scores[best_ct][profile_name] = ct_counts[best_ct]
+            logger.debug(f"  {profile_name} ({markers}) -> {best_ct} (score: {ct_counts[best_ct]})")
+        else:
+            # No marker match, assign to Unknown
+            profile_to_celltype[profile_name] = "Unknown"
+
+    logger.info(f"Profile mapping: {profile_to_celltype}")
+
+    # Create mapped DataFrame
+    # Sum proportions for profiles mapped to the same cell type
+    mapped_data = {}
+    for ct in TARGET_CELL_TYPES:
+        matching_profiles = [p for p, c in profile_to_celltype.items() if c == ct]
+        if matching_profiles:
+            # Sum proportions from all profiles mapped to this cell type
+            mapped_data[ct] = pred_df[[p for p in matching_profiles if p in pred_df.columns]].sum(axis=1)
+        else:
+            mapped_data[ct] = 0.0
+
+    # Handle Unknown column
+    if "Unknown" in pred_df.columns:
+        unknown_profiles = [p for p, c in profile_to_celltype.items() if c == "Unknown"]
+        unknown_cols = ["Unknown"] + [p for p in unknown_profiles if p in pred_df.columns]
+        mapped_data["Unknown"] = pred_df[[c for c in unknown_cols if c in pred_df.columns]].sum(axis=1)
+
+    mapped_df = pd.DataFrame(mapped_data, index=pred_df.index)
+
+    # Normalize to sum to 1
+    row_sums = mapped_df.sum(axis=1)
+    mapped_df = mapped_df.div(row_sums, axis=0)
+
+    return mapped_df, profile_to_celltype
 
 
 def calculate_proportion_metrics(
@@ -330,6 +504,19 @@ def evaluate_method_region(
         pred_df = pd.read_csv(pred_path, index_col=0)
         gt_df = pd.read_csv(gt_path, index_col=0)
 
+        # Apply method-specific normalizations
+        if method == "Seurat":
+            # Seurat uses R-style dot notation for column names
+            logger.debug(f"Normalizing Seurat cell type names: {list(pred_df.columns)}")
+            pred_df = normalize_celltype_names(pred_df)
+            logger.debug(f"After normalization: {list(pred_df.columns)}")
+
+        if method == "Tangram":
+            # Tangram outputs non-normalized weights, normalize to sum to 1
+            logger.debug(f"Normalizing Tangram proportions (sample row sum before: {pred_df.iloc[0].sum():.2f})")
+            pred_df = normalize_proportions(pred_df)
+            logger.debug(f"After normalization (sample row sum: {pred_df.iloc[0].sum():.2f})")
+
         # Align spots
         common_spots = pred_df.index.intersection(gt_df.index)
         if len(common_spots) == 0:
@@ -339,9 +526,22 @@ def evaluate_method_region(
         pred_aligned = pred_df.loc[common_spots]
         gt_aligned = gt_df.loc[common_spots]
 
-        # Get cell types
+        # Get cell types from ground truth
         metadata_cols = ["n_cells", "spot_x", "spot_y", "x", "y", "Unknown"]
         cell_types = [c for c in gt_aligned.columns if c not in metadata_cols]
+
+        # Handle auto-discovery profile mapping
+        profile_mapping = {}
+        if config.get("uses_autodiscovery", False):
+            # Find run_stats.json to get discovered profile markers
+            stats_path = pred_path.parent / "run_stats.json"
+            if stats_path.exists():
+                logger.info(f"Mapping auto-discovered profiles to cell types for {method} region {region_id}")
+                pred_aligned, profile_mapping = map_autodiscovery_to_celltypes(
+                    pred_aligned, stats_path
+                )
+            else:
+                logger.warning(f"No run_stats.json found for auto-discovery mapping: {stats_path}")
 
         # Calculate proportion metrics
         metrics = calculate_proportion_metrics(gt_aligned, pred_aligned, cell_types)
@@ -349,6 +549,8 @@ def evaluate_method_region(
         metrics["method"] = method
         metrics["n_spots"] = len(common_spots)
         metrics["n_cell_types"] = len(cell_types)
+        if profile_mapping:
+            metrics["profile_mapping"] = profile_mapping
 
         # Calculate GEX metrics if available
         if config.get("has_gex", False):
