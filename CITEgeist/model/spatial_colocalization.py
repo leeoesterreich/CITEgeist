@@ -1528,6 +1528,8 @@ def _dynamic_tree_cut(
     Cut dendrogram using gap-based adaptive method.
 
     Looks for large jumps in merge distances to identify natural cluster boundaries.
+    Conservative for small lineages (3-5 markers) that have already passed
+    FDR, top-k, and initial gap-splitting criteria.
 
     Args:
         linkage_matrix: scipy linkage matrix.
@@ -1554,7 +1556,35 @@ def _dynamic_tree_cut(
     if len(gaps) == 0:
         return np.zeros(n_markers, dtype=int)
 
-    # Find large gaps using adaptive method
+    # For small lineages (3-5 markers), be very conservative about cutting
+    # These lineages already passed FDR, top-k, GMM threshold, and gap-based splitting
+    # Only cut if there's an extremely clear gap (>= 3x median)
+    if n_markers <= 5:
+        max_gap = np.max(gaps)
+        median_gap = np.median(gaps)
+
+        # Require gap to be at least 3x median for small lineages
+        if median_gap <= 0 or max_gap / median_gap < 3.0:
+            # No clear internal structure - keep as single cluster
+            return np.zeros(n_markers, dtype=int)
+
+        # Found a clear gap - cut there
+        max_gap_idx = np.argmax(gaps)
+        cut_distance = distances[max_gap_idx + 1] - 1e-10
+
+        try:
+            clusters = fcluster(linkage_matrix, t=cut_distance, criterion='distance')
+            # Only accept if we don't create singletons
+            cluster_sizes = np.bincount(clusters)
+            if np.min(cluster_sizes) >= 2:
+                return clusters
+            else:
+                # Would create singletons - keep as single cluster
+                return np.zeros(n_markers, dtype=int)
+        except Exception:
+            return np.zeros(n_markers, dtype=int)
+
+    # For larger lineages (6+ markers), use adaptive GMM-based method
     n_components, threshold, is_large = _find_gap_threshold_gmm(gaps)
 
     if n_components > 1 and np.any(is_large):
@@ -1572,7 +1602,8 @@ def _dynamic_tree_cut(
         except Exception:
             pass
 
-    # Fallback: use inconsistency-based method
+    # Fallback for large lineages: use inconsistency-based method
+    # But penalize creating many small clusters
     try:
         incons = inconsistent(linkage_matrix, d=2)
         best_t = 1.0
@@ -1582,13 +1613,18 @@ def _dynamic_tree_cut(
             try:
                 clusters = fcluster(linkage_matrix, t=t, criterion='inconsistent', depth=2)
                 n_clusters = len(set(clusters))
+                cluster_sizes = np.bincount(clusters)
+                min_cluster_size = np.min(cluster_sizes)
 
                 if n_clusters == 1:
-                    score = 0
+                    score = 0.5  # Slight preference for keeping together
                 elif n_clusters == n_markers:
-                    score = 0
+                    score = 0  # Penalize all singletons
+                elif min_cluster_size < 2:
+                    score = 0.1  # Penalize creating singletons
                 else:
-                    score = n_clusters * (n_markers - n_clusters) / n_markers
+                    # Prefer fewer, larger clusters
+                    score = min_cluster_size / n_markers
 
                 if score > best_score:
                     best_score = score
@@ -1599,8 +1635,8 @@ def _dynamic_tree_cut(
         clusters = fcluster(linkage_matrix, t=best_t, criterion='inconsistent', depth=2)
         return clusters
     except Exception:
-        # Ultimate fallback
-        return np.arange(n_markers)
+        # Ultimate fallback - keep as single cluster
+        return np.zeros(n_markers, dtype=int)
 
 
 def _compute_modularity(
