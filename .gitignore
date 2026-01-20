@@ -189,3 +189,6 @@ benchmarking/
 simulation/
 # Archived duplicates
 _archive_duplicates/
+
+# Git worktrees
+.worktrees/
