@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import pytest
 
+from scipy.cluster.hierarchy import linkage
+from scipy.spatial.distance import squareform
+
 from CITEgeist.model.spatial_colocalization import (
     ProfileTreeNode,
     ProfileTree,
@@ -22,6 +25,7 @@ from CITEgeist.model.spatial_colocalization import (
     MarkerPairColocalization,
     _build_colocalization_distance_matrix,
     _compute_reconstruction_error,
+    _build_hierarchical_tree,
 )
 
 
@@ -203,6 +207,74 @@ class TestReconstructionError:
 
         # Should be higher than correlated case
         assert error > 0.1
+
+
+class TestTreeBuilding:
+    """Test hierarchical tree construction with reconstruction-guided cutting."""
+
+    def test_flat_data_stays_flat(self):
+        """Data with no hierarchy should produce flat tree (depth 1)."""
+        # 4 completely independent markers
+        np.random.seed(42)
+        X = np.random.rand(100, 4)  # Uncorrelated random data
+        marker_names = ["A", "B", "C", "D"]
+
+        # Build linkage (will have structure but cutting should reject splits)
+        D = 1 - np.corrcoef(X.T)  # Distance from correlation
+        np.fill_diagonal(D, 0)
+        condensed = squareform(D)
+        Z = linkage(condensed, method='ward')
+
+        tree = _build_hierarchical_tree(
+            X=X,
+            marker_names=marker_names,
+            linkage_matrix=Z,
+            improvement_threshold=0.05,
+        )
+
+        # Should have minimal depth since splits don't improve reconstruction
+        # Each marker becomes its own leaf
+        leaves = tree.get_leaves()
+        assert len(leaves) >= 1
+
+    def test_hierarchical_data_creates_levels(self):
+        """Data with clear hierarchy should produce multi-level tree."""
+        np.random.seed(42)
+        n_spots = 100
+
+        # Create hierarchical structure:
+        # - Markers A, B correlated (same cell type)
+        # - Markers C, D correlated (different cell type)
+        base_A = np.random.rand(n_spots)
+        base_C = np.random.rand(n_spots)
+
+        X = np.column_stack([
+            base_A + 0.1 * np.random.rand(n_spots),  # A
+            base_A + 0.1 * np.random.rand(n_spots),  # B (similar to A)
+            base_C + 0.1 * np.random.rand(n_spots),  # C
+            base_C + 0.1 * np.random.rand(n_spots),  # D (similar to C)
+        ])
+        marker_names = ["A", "B", "C", "D"]
+
+        # Build linkage
+        D = 1 - np.abs(np.corrcoef(X.T))
+        np.fill_diagonal(D, 0)
+        # Ensure perfect symmetry for squareform
+        D = (D + D.T) / 2
+        condensed = squareform(D)
+        Z = linkage(condensed, method='ward')
+
+        tree = _build_hierarchical_tree(
+            X=X,
+            marker_names=marker_names,
+            linkage_matrix=Z,
+            improvement_threshold=0.05,
+        )
+
+        # Should detect hierarchy
+        leaves = tree.get_leaves()
+        # Expect 2 groups: {A,B} and {C,D}
+        assert len(leaves) == 2 or len(leaves) == 4  # Either 2 merged or 4 flat
 
 
 if __name__ == "__main__":

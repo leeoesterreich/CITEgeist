@@ -1167,6 +1167,199 @@ def _compute_reconstruction_error(
         return 1.0  # Return max error on failure
 
 
+def _compute_tree_depth(node: ProfileTreeNode) -> int:
+    """Compute maximum depth of tree from given node."""
+    if node.is_leaf:
+        return node.depth + 1
+    return max(_compute_tree_depth(c) for c in node.children)
+
+
+def _get_leaf_indices(scipy_node) -> List[int]:
+    """
+    Get all leaf indices under a scipy ClusterNode.
+
+    Args:
+        scipy_node: A scipy ClusterNode from to_tree()
+
+    Returns:
+        List of leaf indices (original marker positions)
+    """
+    if scipy_node.is_leaf():
+        return [scipy_node.id]
+    left_indices = _get_leaf_indices(scipy_node.get_left())
+    right_indices = _get_leaf_indices(scipy_node.get_right())
+    return left_indices + right_indices
+
+
+def _recursive_tree_cut(
+    scipy_node,
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    improvement_threshold: float,
+    current_depth: int,
+    max_depth: int,
+    parent_id: Optional[str],
+) -> ProfileTreeNode:
+    """
+    Recursively build tree with reconstruction-guided cutting.
+
+    At each node, check if splitting improves reconstruction.
+    If improvement > threshold, split. Otherwise, stop.
+
+    Args:
+        scipy_node: Scipy ClusterNode from to_tree()
+        X: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column
+        improvement_threshold: Min reconstruction improvement to split
+        current_depth: Current depth in tree
+        max_depth: Maximum tree depth (safety limit)
+        parent_id: ID of parent node
+
+    Returns:
+        ProfileTreeNode representing this subtree
+    """
+    node_id = f"node_{scipy_node.id}"
+
+    # Get markers in this subtree
+    leaf_indices = _get_leaf_indices(scipy_node)
+    node_markers = [marker_names[i] for i in leaf_indices if i < len(marker_names)]
+
+    # Base case: leaf node or max depth reached
+    if scipy_node.is_leaf() or current_depth >= max_depth:
+        return ProfileTreeNode(
+            node_id=node_id,
+            markers=node_markers,
+            children=[],
+            parent_id=parent_id,
+            depth=current_depth,
+        )
+
+    # Get left and right children markers
+    left_indices = _get_leaf_indices(scipy_node.get_left())
+    right_indices = _get_leaf_indices(scipy_node.get_right())
+    left_markers = [marker_names[i] for i in left_indices if i < len(marker_names)]
+    right_markers = [marker_names[i] for i in right_indices if i < len(marker_names)]
+
+    # Skip split if either side is empty
+    if len(left_markers) == 0 or len(right_markers) == 0:
+        return ProfileTreeNode(
+            node_id=node_id,
+            markers=node_markers,
+            children=[],
+            parent_id=parent_id,
+            depth=current_depth,
+        )
+
+    # Compute reconstruction error: merged vs split
+    error_merged = _compute_reconstruction_error(X, marker_names, node_markers)
+    error_left = _compute_reconstruction_error(X, marker_names, left_markers)
+    error_right = _compute_reconstruction_error(X, marker_names, right_markers)
+
+    # Weighted average error for split case
+    error_split = (
+        error_left * len(left_markers) + error_right * len(right_markers)
+    ) / len(node_markers)
+
+    # Compute improvement
+    if error_merged > 1e-10:
+        improvement = (error_merged - error_split) / error_merged
+    else:
+        improvement = 0.0
+
+    # Decision: split or stop
+    if improvement > improvement_threshold:
+        # Split is worthwhile - recurse on children
+        left_child = _recursive_tree_cut(
+            scipy_node.get_left(), X, marker_names,
+            improvement_threshold, current_depth + 1, max_depth, node_id
+        )
+        right_child = _recursive_tree_cut(
+            scipy_node.get_right(), X, marker_names,
+            improvement_threshold, current_depth + 1, max_depth, node_id
+        )
+
+        return ProfileTreeNode(
+            node_id=node_id,
+            markers=[],  # Internal nodes don't own markers directly
+            children=[left_child, right_child],
+            parent_id=parent_id,
+            depth=current_depth,
+        )
+    else:
+        # Stop here - this is a leaf
+        return ProfileTreeNode(
+            node_id=node_id,
+            markers=node_markers,
+            children=[],
+            parent_id=parent_id,
+            depth=current_depth,
+        )
+
+
+def _build_hierarchical_tree(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    linkage_matrix: NDArray[np.floating],
+    improvement_threshold: float = 0.05,
+    max_depth: int = 5,
+) -> ProfileTree:
+    """
+    Build hierarchical profile tree with reconstruction-guided cutting.
+
+    This function converts a scipy linkage matrix into a ProfileTree by
+    recursively deciding whether to split nodes based on reconstruction
+    improvement. At each internal node, we compare:
+    - Error of reconstructing all markers together (merged)
+    - Weighted average error of reconstructing left/right children separately
+
+    If splitting improves reconstruction by more than improvement_threshold,
+    we continue splitting. Otherwise, we stop and create a leaf node.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column in X
+        linkage_matrix: Scipy linkage matrix from hierarchical clustering
+        improvement_threshold: Minimum relative reconstruction improvement
+            required to split a node (default 5%). Higher values create
+            shallower trees.
+        max_depth: Maximum tree depth as safety limit (default 5)
+
+    Returns:
+        ProfileTree with reconstruction-guided structure. Leaf nodes contain
+        marker sets that should be treated as single profiles.
+
+    Example:
+        >>> from scipy.cluster.hierarchy import linkage
+        >>> from scipy.spatial.distance import squareform
+        >>> X = np.random.rand(100, 4)
+        >>> D = 1 - np.corrcoef(X.T)
+        >>> np.fill_diagonal(D, 0)
+        >>> Z = linkage(squareform(D), method='ward')
+        >>> tree = _build_hierarchical_tree(X, ["A", "B", "C", "D"], Z)
+        >>> leaves = tree.get_leaves()
+    """
+    from scipy.cluster.hierarchy import to_tree
+
+    # Convert scipy linkage to tree structure
+    scipy_root = to_tree(linkage_matrix)
+
+    # Recursively build ProfileTree with reconstruction-guided cutting
+    root_node = _recursive_tree_cut(
+        scipy_node=scipy_root,
+        X=X,
+        marker_names=marker_names,
+        improvement_threshold=improvement_threshold,
+        current_depth=0,
+        max_depth=max_depth,
+        parent_id=None,
+    )
+
+    # Compute actual depth
+    n_levels = _compute_tree_depth(root_node)
+
+    return ProfileTree(root=root_node, n_levels=n_levels)
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
