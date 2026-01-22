@@ -2486,3 +2486,380 @@ def select_profiles(
         marginal_gains=np.array(marginal_gains_list),
     )
 
+
+# =============================================================================
+# Module 2d: Hierarchical Profile Resolution with Negative Markers
+# =============================================================================
+
+
+@dataclass
+class ResolvedProfile:
+    """A cell type profile with positive and negative markers."""
+
+    name: str
+    positive_markers: List[str]  # Markers that should be HIGH for this cell type
+    negative_markers: List[str]  # Markers that should be LOW for this cell type
+    parent_profile: Optional[str] = None  # If derived from another profile
+    residual_fraction: Optional[float] = None  # Fraction of spots in residual pattern
+
+    def to_dict(self) -> Dict[str, List[str]]:
+        """Convert to dictionary format for Module 3."""
+        return {
+            "positive": self.positive_markers,
+            "negative": self.negative_markers,
+        }
+
+
+@dataclass
+class HierarchicalProfileResult:
+    """Results from hierarchical profile resolution with negative markers."""
+
+    resolved_profiles: Dict[str, ResolvedProfile]  # name -> ResolvedProfile
+    shared_markers: Dict[str, List[str]]  # marker -> list of profiles sharing it
+    residual_markers: Dict[str, Dict[str, float]]  # marker -> {profile: residual_fraction}
+    n_original_profiles: int
+    n_resolved_profiles: int
+
+    def to_profile_dict(self) -> Dict[str, Dict[str, List[str]]]:
+        """Convert to dictionary format for Module 3 optimization."""
+        return {
+            name: profile.to_dict()
+            for name, profile in self.resolved_profiles.items()
+        }
+
+    def summary(self) -> str:
+        """Return a summary string."""
+        lines = [
+            f"Hierarchical Profile Resolution:",
+            f"  Original profiles: {self.n_original_profiles}",
+            f"  Resolved profiles: {self.n_resolved_profiles}",
+            f"  Shared markers: {len(self.shared_markers)}",
+            "",
+            "Resolved Profiles:",
+        ]
+        for name, profile in self.resolved_profiles.items():
+            pos = ", ".join(profile.positive_markers)
+            neg = ", ".join(profile.negative_markers) if profile.negative_markers else "none"
+            lines.append(f"  {name}:")
+            lines.append(f"    positive: [{pos}]")
+            lines.append(f"    negative: [{neg}]")
+        return "\n".join(lines)
+
+
+def _compute_marker_threshold(
+    values: NDArray[np.floating],
+    method: str = "gmm",
+) -> float:
+    """
+    Compute threshold for marker positivity.
+
+    Args:
+        values: Expression values for a marker (n_spots,).
+        method: Thresholding method ('gmm', 'otsu', 'percentile').
+
+    Returns:
+        Threshold value separating positive from negative.
+    """
+    if method == "gmm":
+        from sklearn.mixture import GaussianMixture
+
+        # Fit 2-component GMM
+        gmm = GaussianMixture(n_components=2, random_state=42)
+        gmm.fit(values.reshape(-1, 1))
+
+        # Threshold is midpoint between component means
+        means = gmm.means_.flatten()
+        threshold = np.mean(means)
+        return float(threshold)
+
+    elif method == "otsu":
+        # Otsu's method for bimodal distributions
+        from skimage.filters import threshold_otsu
+
+        return float(threshold_otsu(values))
+
+    else:  # percentile
+        return float(np.percentile(values, 75))
+
+
+def detect_residual_signal(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+    *,
+    residual_threshold: float = 0.10,
+    threshold_method: str = "gmm",
+    min_positive_spots: int = 50,
+    verbose: bool = True,
+) -> Dict[str, Dict[str, float]]:
+    """
+    Detect markers with significant signal outside their primary profile context.
+
+    For each marker M in a multi-marker profile P, checks whether M has
+    substantial signal in spots where the OTHER markers in P are low.
+    This indicates M participates in multiple biological contexts.
+
+    Example:
+        Profile EMT = {Vimentin, E-Cadherin}
+        - If Vimentin is high in spots where E-Cadherin is LOW,
+          Vimentin has "residual signal" → defines a second population (Stromal)
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        marker_names: List of marker names.
+        profiles: List of discovered profiles (each is a list of marker names).
+        residual_threshold: Minimum fraction of marker-positive spots that
+            must show residual pattern (default: 0.10 = 10%).
+        threshold_method: Method for determining marker positivity
+            ('gmm', 'otsu', 'percentile').
+        min_positive_spots: Minimum number of positive spots required (default: 50).
+        verbose: Log progress information.
+
+    Returns:
+        Dict mapping marker -> {source_profile_key: residual_fraction}
+        where source_profile_key identifies which profile the marker came from.
+    """
+    n_spots, n_markers = X.shape
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+    residual_markers: Dict[str, Dict[str, float]] = {}
+
+    if verbose:
+        logger.info(f"Detecting residual signal for {len(profiles)} profiles...")
+
+    # Compute thresholds for all markers
+    thresholds = {}
+    for marker in marker_names:
+        idx = marker_to_idx[marker]
+        thresholds[marker] = _compute_marker_threshold(X[:, idx], method=threshold_method)
+
+    for profile_idx, profile in enumerate(profiles):
+        if len(profile) < 2:
+            continue  # Single-marker profiles can't have residual by definition
+
+        profile_key = f"profile_{profile_idx}"
+
+        for marker in profile:
+            m_idx = marker_to_idx.get(marker)
+            if m_idx is None:
+                continue
+
+            other_markers = [m for m in profile if m != marker]
+            if not other_markers:
+                continue
+
+            # Spots where this marker is positive
+            marker_positive = X[:, m_idx] > thresholds[marker]
+            n_marker_positive = marker_positive.sum()
+
+            if n_marker_positive < min_positive_spots:
+                continue  # Not enough positive spots to assess
+
+            # Spots where OTHER markers in the profile are positive
+            other_indices = [marker_to_idx[m] for m in other_markers if m in marker_to_idx]
+            if not other_indices:
+                continue
+
+            # "Profile context" = spots where at least one other marker is high
+            other_positive = np.zeros(n_spots, dtype=bool)
+            for idx in other_indices:
+                other_positive |= (X[:, idx] > thresholds[marker_names[idx]])
+
+            # Residual = marker positive BUT other markers negative
+            residual_spots = marker_positive & ~other_positive
+            residual_fraction = residual_spots.sum() / n_marker_positive
+
+            if residual_fraction >= residual_threshold:
+                if marker not in residual_markers:
+                    residual_markers[marker] = {}
+                residual_markers[marker][profile_key] = residual_fraction
+
+                if verbose:
+                    logger.info(
+                        f"  {marker} has {residual_fraction:.1%} residual signal "
+                        f"outside profile {profile}"
+                    )
+
+    if verbose:
+        logger.info(f"Found {len(residual_markers)} markers with residual signal")
+
+    return residual_markers
+
+
+def resolve_hierarchical_profiles(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+    profile_names: Optional[List[str]] = None,
+    *,
+    residual_threshold: float = 0.10,
+    threshold_method: str = "gmm",
+    min_positive_spots: int = 50,
+    auto_name_profiles: bool = True,
+    verbose: bool = True,
+) -> HierarchicalProfileResult:
+    """
+    Resolve overlapping profiles by adding negative markers.
+
+    This is the main function for Module 2d. It:
+    1. Detects markers with residual signal (appear outside their profile context)
+    2. Creates new profiles for "marker alone" patterns
+    3. Adds negative markers to distinguish overlapping profiles
+
+    Example:
+        Input profiles: [{Vimentin, E-Cadherin}]  (EMT)
+        If Vimentin has residual signal (high Vim, low E-Cad spots exist):
+        Output:
+          - EMT: positive=[Vimentin, E-Cadherin], negative=[]
+          - Stromal: positive=[Vimentin], negative=[E-Cadherin]
+
+    Args:
+        X: Expression matrix (n_spots, n_markers).
+        marker_names: List of marker names.
+        profiles: List of discovered profiles from Module 2b/2c.
+        profile_names: Optional names for input profiles. If None, auto-generated.
+        residual_threshold: Minimum residual fraction to create new profile.
+        threshold_method: Method for marker positivity ('gmm', 'otsu', 'percentile').
+        min_positive_spots: Minimum positive spots for residual detection.
+        auto_name_profiles: If True, attempt to name profiles based on known markers.
+        verbose: Log progress information.
+
+    Returns:
+        HierarchicalProfileResult with resolved profiles including negative markers.
+    """
+    if verbose:
+        logger.info("=" * 60)
+        logger.info("Module 2d: Hierarchical Profile Resolution")
+        logger.info("=" * 60)
+
+    # Generate profile names if not provided
+    if profile_names is None:
+        profile_names = [f"Profile_{i}" for i in range(len(profiles))]
+
+    # Step 1: Detect residual signal
+    residual_markers = detect_residual_signal(
+        X, marker_names, profiles,
+        residual_threshold=residual_threshold,
+        threshold_method=threshold_method,
+        min_positive_spots=min_positive_spots,
+        verbose=verbose,
+    )
+
+    # Step 2: Build shared marker mapping
+    shared_markers: Dict[str, List[str]] = {}
+    for i, profile in enumerate(profiles):
+        for marker in profile:
+            if marker not in shared_markers:
+                shared_markers[marker] = []
+            shared_markers[marker].append(profile_names[i])
+
+    # Filter to only markers appearing in multiple profiles OR with residual
+    shared_markers = {
+        m: profs for m, profs in shared_markers.items()
+        if len(profs) > 1 or m in residual_markers
+    }
+
+    if verbose and shared_markers:
+        logger.info(f"Shared/residual markers: {list(shared_markers.keys())}")
+
+    # Step 3: Create resolved profiles
+    resolved_profiles: Dict[str, ResolvedProfile] = {}
+
+    for i, (profile, name) in enumerate(zip(profiles, profile_names)):
+        # Start with original profile (positive markers only)
+        resolved_profiles[name] = ResolvedProfile(
+            name=name,
+            positive_markers=list(profile),
+            negative_markers=[],
+            parent_profile=None,
+        )
+
+    # Step 4: For markers with residual signal, create new profiles and add negatives
+    for marker, residual_info in residual_markers.items():
+        for source_profile_key, residual_fraction in residual_info.items():
+            # Find the source profile
+            profile_idx = int(source_profile_key.split("_")[1])
+            source_profile = profiles[profile_idx]
+            source_name = profile_names[profile_idx]
+
+            # Get the other markers in the source profile (these become negatives)
+            other_markers = [m for m in source_profile if m != marker]
+
+            if not other_markers:
+                continue
+
+            # Create new profile for "marker alone" pattern
+            # Name it based on the marker or use a descriptive name
+            new_name = f"{marker}_only"
+
+            # Check if this marker also appears in other profiles
+            # If so, collect ALL distinguishing markers as negatives
+            all_negative_markers = set(other_markers)
+
+            # Also check other profiles that share this marker
+            for other_profile_idx, other_profile in enumerate(profiles):
+                if other_profile_idx == profile_idx:
+                    continue
+                if marker in other_profile:
+                    # This profile also has the marker - its unique markers are negatives
+                    unique_to_other = [m for m in other_profile if m != marker]
+                    all_negative_markers.update(unique_to_other)
+
+            resolved_profiles[new_name] = ResolvedProfile(
+                name=new_name,
+                positive_markers=[marker],
+                negative_markers=sorted(all_negative_markers),
+                parent_profile=source_name,
+                residual_fraction=residual_fraction,
+            )
+
+            if verbose:
+                logger.info(
+                    f"Created '{new_name}': positive=[{marker}], "
+                    f"negative={sorted(all_negative_markers)}"
+                )
+
+    # Step 5: For profiles sharing markers, ensure they have distinguishing negatives
+    # This handles cases where two profiles share a marker but neither has residual
+    marker_to_profiles = {}
+    for name, profile in resolved_profiles.items():
+        for marker in profile.positive_markers:
+            if marker not in marker_to_profiles:
+                marker_to_profiles[marker] = []
+            marker_to_profiles[marker].append(name)
+
+    for marker, profile_names_sharing in marker_to_profiles.items():
+        if len(profile_names_sharing) <= 1:
+            continue
+
+        # Multiple profiles share this marker - ensure they have distinguishing negatives
+        for name in profile_names_sharing:
+            profile = resolved_profiles[name]
+
+            # Other profiles' unique positive markers become this profile's negatives
+            for other_name in profile_names_sharing:
+                if other_name == name:
+                    continue
+
+                other_profile = resolved_profiles[other_name]
+                # Markers that are positive in OTHER but not in THIS
+                distinguishing = [
+                    m for m in other_profile.positive_markers
+                    if m not in profile.positive_markers and m not in profile.negative_markers
+                ]
+
+                if distinguishing:
+                    profile.negative_markers.extend(distinguishing)
+                    profile.negative_markers = sorted(set(profile.negative_markers))
+
+    if verbose:
+        logger.info("-" * 60)
+        logger.info(f"Resolution complete: {len(profiles)} -> {len(resolved_profiles)} profiles")
+
+    return HierarchicalProfileResult(
+        resolved_profiles=resolved_profiles,
+        shared_markers=shared_markers,
+        residual_markers=residual_markers,
+        n_original_profiles=len(profiles),
+        n_resolved_profiles=len(resolved_profiles),
+    )
+

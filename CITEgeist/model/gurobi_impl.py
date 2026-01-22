@@ -342,6 +342,291 @@ def map_antibodies_to_profiles_v2(adata, cell_profile_dict):
     return marker_level_data, existing_markers, assignment_matrix, cell_type_names
 
 
+def map_antibodies_to_profiles_with_negatives(adata, cell_profile_dict):
+    """
+    Map antibody capture data with support for negative markers.
+
+    Extends map_antibodies_to_profiles_v2 to also extract negative marker information.
+    Negative markers are proteins that should NOT be expressed in a cell type.
+    For example, Stromal cells are Vimentin+ but CD31-, CD68-, CD3E-.
+
+    Args:
+        adata (AnnData): Antibody capture AnnData object.
+        cell_profile_dict (dict): Dictionary mapping cell types to antibody markers.
+            Format: {
+                "CellType": {
+                    "Major": ["Marker1", "Marker2"],
+                    "Negative": ["NegMarker1", "NegMarker2"]  # NEW
+                }, ...
+            }
+
+    Returns:
+        Tuple of:
+        - marker_level_data (np.ndarray): (N_spots, M_markers) normalized antibody data
+        - marker_names (List[str]): Ordered list of marker names
+        - assignment_matrix (np.ndarray): (M_markers, T_celltypes) binary positive assignment
+        - negative_matrix (np.ndarray): (M_markers, T_celltypes) binary negative assignment
+        - cell_type_names (List[str]): Ordered list of cell type names
+    """
+    # Step 1: Collect all markers (positive and negative)
+    all_markers = set()
+    for profile_markers in cell_profile_dict.values():
+        all_markers.update(profile_markers.get("Major", []))
+        all_markers.update(profile_markers.get("Negative", []))
+
+    # Step 2: Filter to markers that exist in adata
+    existing_markers = [m for m in all_markers if m in adata.var_names]
+
+    if len(existing_markers) == 0:
+        logging.info("Adata variables: %s", adata.var_names)
+        logging.info("Profile markers: %s", all_markers)
+        raise ValueError("No matching antibody markers found in adata.var_names.")
+
+    # Step 3: Extract marker-level data
+    adata.var_names_make_unique()
+    marker_indices = [np.where(adata.var_names == m)[0][0] for m in existing_markers]
+
+    antibody_data = adata.X.toarray() if hasattr(adata.X, "toarray") else adata.X
+    marker_level_data = antibody_data[:, marker_indices].astype(np.float64)
+
+    # Step 4: Normalize per-marker
+    col_max = np.max(marker_level_data, axis=0)
+    zero_cols = col_max == 0
+    if np.any(zero_cols):
+        logging.warning(f"Zero columns detected. Adding epsilon.")
+        col_max[zero_cols] = 1e-6
+    marker_level_data = marker_level_data / col_max
+
+    # Step 5: Build assignment matrices
+    cell_type_names = list(cell_profile_dict.keys())
+    M = len(existing_markers)
+    T = len(cell_type_names)
+
+    assignment_matrix = np.zeros((M, T), dtype=np.float64)
+    negative_matrix = np.zeros((M, T), dtype=np.float64)
+
+    marker_to_idx = {name: i for i, name in enumerate(existing_markers)}
+
+    for j, (ct_name, markers_dict) in enumerate(cell_profile_dict.items()):
+        # Positive markers
+        for marker in markers_dict.get("Major", []):
+            if marker in marker_to_idx:
+                m = marker_to_idx[marker]
+                assignment_matrix[m, j] = 1.0
+
+        # Negative markers
+        for marker in markers_dict.get("Negative", []):
+            if marker in marker_to_idx:
+                m = marker_to_idx[marker]
+                negative_matrix[m, j] = 1.0
+
+    n_positive = int(assignment_matrix.sum())
+    n_negative = int(negative_matrix.sum())
+    logging.info(f"Mapped {M} markers to {T} cell types ({n_positive} positive, {n_negative} negative)")
+
+    return marker_level_data, existing_markers, assignment_matrix, negative_matrix, cell_type_names
+
+
+def optimize_cell_proportions_with_negatives(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    negative_matrix: np.ndarray,
+    cell_type_names: List[str],
+    tolerance: float = 1e-4,
+    max_iterations: int = 50,
+    lambda_reg: float = 1.0,
+    lambda_neg: float = 0.5,
+    alpha: float = 0.5,
+    normalize_beta: bool = True,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
+    unknown_threshold: float = 0.10,
+    min_celltype_threshold: float = 0.01,
+    redundancy_threshold: float = 0.2,
+    warn_only: bool = True,
+    lambda_laplacian: float = 0.1,
+    coords: Optional[np.ndarray] = None,
+    laplacian_k: int = 8,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
+    """
+    Optimize cell proportions with negative marker penalty.
+
+    Extends optimize_cell_proportions_per_marker to penalize cell type assignments
+    when negative markers are expressed. This prevents over-assignment to cell types
+    like Stromal that have broad positive markers (Vimentin) but should be excluded
+    when other specific markers (CD31, CD68, CD3E) are present.
+
+    Mathematical formulation:
+        Minimize: sum_{i,m} (S[i,m] - beta[m] * Y[i, owner(m)])^2
+                  + lambda_reg * regularization
+                  + lambda_neg * sum_{i,j} Y[i,j] * (S @ neg_matrix)[i,j]
+
+    The negative penalty term pushes Y[i,j] toward 0 when negative markers for
+    cell type j are expressed at spot i.
+
+    Args:
+        marker_level_data: N x M matrix of normalized antibody data
+        marker_names: List of marker names (length M)
+        assignment_matrix: M x T binary matrix for positive markers
+        negative_matrix: M x T binary matrix for negative markers
+        cell_type_names: List of cell type names (length T)
+        lambda_neg: Weight for negative marker penalty (default: 0.5)
+        [other args same as optimize_cell_proportions_per_marker]
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray, Dict]: Y_values, beta_values, marker_betas
+    """
+    import gurobipy as gp
+    from gurobipy import GRB
+
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # Compute negative penalty per spot per cell type
+    # neg_penalty[i,j] = sum_m S[i,m] * negative_matrix[m,j]
+    neg_penalty = marker_level_data @ negative_matrix  # (N, T)
+
+    # Normalize negative penalty to [0, 1] range per cell type
+    neg_max = neg_penalty.max(axis=0, keepdims=True)
+    neg_max[neg_max == 0] = 1.0
+    neg_penalty = neg_penalty / neg_max
+
+    logging.info(f"Negative penalty range: {neg_penalty.min():.3f} - {neg_penalty.max():.3f}")
+
+    # Build spatial Laplacian if requested
+    L_coo = None
+    use_laplacian = lambda_laplacian > 0 and coords is not None
+    if use_laplacian:
+        from scipy.spatial import cKDTree
+        from scipy.sparse import coo_matrix
+
+        tree = cKDTree(coords)
+        distances, indices = tree.query(coords, k=laplacian_k + 1)
+
+        rows, cols, data = [], [], []
+        for i in range(N):
+            neighbors = indices[i, 1:]  # Exclude self
+            degree = len(neighbors)
+            rows.append(i)
+            cols.append(i)
+            data.append(float(degree))
+            for j in neighbors:
+                rows.append(i)
+                cols.append(j)
+                data.append(-1.0)
+
+        L_coo = coo_matrix((data, (rows, cols)), shape=(N, N))
+        logging.info(f"Built Laplacian with k={laplacian_k} neighbors")
+
+    # Initialize Y and beta
+    Y = np.ones((N, T)) / T
+    beta = np.ones(M)
+
+    # EM iterations
+    for iteration in range(max_iterations):
+        Y_old = Y.copy()
+
+        # E-step: Update Y given beta
+        env = gp.Env(empty=True)
+        env.setParam("OutputFlag", 0)
+        env.start()
+        model = gp.Model(env=env)
+
+        Y_vars = model.addMVar((N, T), lb=0.0, ub=1.0, name="Y")
+
+        # Build objective using efficient Gurobi operations
+        obj = gp.QuadExpr()
+
+        # Reconstruction: sum_m sum_j sum_i (S[i,m] - beta[m] * Y[i,j])^2 for owned markers
+        for m in range(M):
+            owner_indices = np.where(assignment_matrix[m, :] > 0)[0]
+            if len(owner_indices) == 0:
+                continue
+
+            S_m = marker_level_data[:, m]
+            b_m = beta[m]
+
+            for j in owner_indices:
+                # (S - b*Y)^2 = S^2 - 2*S*b*Y + b^2*Y^2
+                # Constant term: sum_i S[i]^2
+                obj.addConstant(np.sum(S_m ** 2))
+                # Linear term: -2*b*sum_i S[i]*Y[i,j]
+                for i in range(N):
+                    obj.addTerms(-2 * b_m * S_m[i], Y_vars[i, j])
+                # Quadratic term: b^2 * sum_i Y[i,j]^2
+                for i in range(N):
+                    obj.addTerms(b_m * b_m, Y_vars[i, j], Y_vars[i, j])
+
+        # Regularization: alpha * L1 + (1-alpha) * L2
+        for j in range(T):
+            for i in range(N):
+                obj.addTerms(lambda_reg * alpha, Y_vars[i, j])  # L1
+                obj.addTerms(lambda_reg * (1 - alpha), Y_vars[i, j], Y_vars[i, j])  # L2
+
+        # Negative marker penalty: lambda_neg * sum_j sum_i Y[i,j] * neg_penalty[i,j]
+        for j in range(T):
+            if negative_matrix[:, j].sum() > 0:
+                for i in range(N):
+                    obj.addTerms(lambda_neg * neg_penalty[i, j], Y_vars[i, j])
+
+        # Laplacian smoothing
+        if use_laplacian and L_coo is not None:
+            L_rows = L_coo.row
+            L_cols = L_coo.col
+            L_data = L_coo.data
+            for j in range(T):
+                for idx in range(len(L_data)):
+                    r, c, v = L_rows[idx], L_cols[idx], L_data[idx]
+                    obj += lambda_laplacian * v * Y_vars[r, j] * Y_vars[c, j]
+
+        model.setObjective(obj, GRB.MINIMIZE)
+
+        # Constraint: proportions sum to <= 1
+        for i in range(N):
+            model.addConstr(gp.quicksum(Y_vars[i, :]) <= 1.0)
+
+        model.optimize()
+
+        if model.Status != GRB.OPTIMAL:
+            logging.warning(f"Iteration {iteration}: Gurobi status {model.Status}")
+            break
+
+        Y = Y_vars.X.copy()
+
+        # M-step: Update beta given Y
+        for m in range(M):
+            owner_indices = np.where(assignment_matrix[m, :] > 0)[0]
+            if len(owner_indices) == 0:
+                continue
+
+            S_m = marker_level_data[:, m]
+            Y_sum = np.zeros(N)
+            for j in owner_indices:
+                Y_sum += Y[:, j]
+
+            numerator = np.dot(S_m, Y_sum)
+            denominator = np.dot(Y_sum, Y_sum) + 1e-8
+            beta[m] = np.clip(numerator / denominator, beta_min, beta_max)
+
+        if normalize_beta:
+            beta = beta / beta.max()
+
+        # Check convergence
+        delta = np.abs(Y - Y_old).max()
+        if delta < tolerance:
+            logging.info(f"Converged at iteration {iteration} (delta={delta:.6f})")
+            break
+
+    # Build marker_betas dict
+    marker_betas = {marker_names[m]: float(beta[m]) for m in range(M)}
+
+    logging.info(f"Final Y range: {Y.min():.3f} - {Y.max():.3f}")
+    logging.info(f"Final beta range: {beta.min():.3f} - {beta.max():.3f}")
+
+    return Y, beta, marker_betas
+
+
 def optimize_cell_proportions(
     profile_based_antibody_data: np.ndarray,
     cell_type_names: List[str],
@@ -816,6 +1101,300 @@ def validate_cell_proportions(
     for idx, (celltype, mean_prop) in enumerate(zip(cell_type_names, mean_proportions)):
         if celltype != "Unknown":
             logging.info(f"  - {celltype}: {mean_prop*100:.2f}%")
+
+
+def optimize_cell_proportions_with_negatives(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    positive_assignment: np.ndarray,
+    negative_assignment: np.ndarray,
+    cell_type_names: List[str],
+    tolerance: float = 1e-4,
+    max_iterations: int = 50,
+    lambda_reg: float = 1.0,
+    lambda_neg: float = 1.0,
+    alpha: float = 0.5,
+    normalize_beta: bool = True,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
+    unknown_threshold: float = 0.05,
+    min_celltype_threshold: float = 0.01,
+    redundancy_threshold: float = 0.2,
+    warn_only: bool = True,
+    lambda_laplacian: float = 0.1,
+    coords: Optional[np.ndarray] = None,
+    laplacian_k: int = 8,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
+    """
+    Optimize cell type proportions with both positive and negative marker constraints.
+
+    This extends the per-marker beta optimization to handle negative markers,
+    enabling flow cytometry-style gating logic where cell types are defined by
+    markers that should be HIGH (positive) and markers that should be LOW (negative).
+
+    Mathematical formulation:
+        Minimize: sum_{i,t} [
+            sum_{m in positive[t]} (S[i,m] - beta[m,t] * Y[i,t])^2
+            + lambda_neg * sum_{m in negative[t]} (S[i,m] * Y[i,t])^2
+        ] + regularization
+
+    The negative marker term (S[i,m] * Y[i,t])^2 penalizes high cell type proportion
+    when the negative marker is high, but has no effect when the marker is low.
+
+    Args:
+        marker_level_data: N x M matrix of normalized antibody data.
+        marker_names: List of marker names (length M).
+        positive_assignment: M x T matrix where A[m,t]=1 if marker m is POSITIVE for cell type t.
+        negative_assignment: M x T matrix where A[m,t]=1 if marker m is NEGATIVE for cell type t.
+        cell_type_names: List of cell type names (length T).
+        tolerance: Convergence tolerance for EM algorithm.
+        max_iterations: Maximum number of iterations.
+        lambda_reg: Regularization strength for elastic net.
+        lambda_neg: Weight for negative marker penalty (default: 1.0).
+        alpha: L1-L2 tradeoff factor (0 = L2, 1 = L1).
+        normalize_beta: Whether to normalize beta values so max=1.
+        beta_min: Minimum allowed beta value.
+        beta_max: Maximum allowed beta value.
+        unknown_threshold: Maximum allowed mean proportion for Unknown.
+        min_celltype_threshold: Minimum required mean proportion for cell types.
+        redundancy_threshold: Maximum allowed fraction of redundant types.
+        warn_only: If True, only warn on validation failures.
+        lambda_laplacian: Weight for Laplacian smoothing.
+        coords: Spatial coordinates, shape (N, 2). Required if lambda_laplacian > 0.
+        laplacian_k: Number of neighbors for Laplacian graph.
+
+    Returns:
+        Tuple of:
+        - Y_values (np.ndarray): (N, T) cell type proportions
+        - beta_values (np.ndarray): (M, T) per-marker-per-type scaling factors
+        - marker_beta_dict (Dict[str, float]): {marker_name: mean_beta_value}
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # Validate assignment matrix shapes
+    if positive_assignment.shape != (M, T):
+        raise ValueError(
+            f"positive_assignment shape {positive_assignment.shape} != expected ({M}, {T})"
+        )
+    if negative_assignment.shape != (M, T):
+        raise ValueError(
+            f"negative_assignment shape {negative_assignment.shape} != expected ({M}, {T})"
+        )
+
+    # Count positive and negative assignments
+    n_positive = int(positive_assignment.sum())
+    n_negative = int(negative_assignment.sum())
+    logging.info(
+        f"Optimization with negative markers: {N} spots, {M} markers, {T} cell types"
+    )
+    logging.info(f"  Positive assignments: {n_positive}, Negative assignments: {n_negative}")
+    logging.info(f"  lambda_neg: {lambda_neg}")
+
+    # Build spatial Laplacian if requested
+    L_coo = None
+    use_laplacian = lambda_laplacian > 0 and coords is not None
+    if use_laplacian:
+        if coords.shape[0] != N:
+            raise ValueError(f"coords has {coords.shape[0]} rows but data has {N} spots")
+        L = build_spatial_laplacian(coords, k=laplacian_k, normed=True)
+        L_coo = L.tocoo()
+        logging.info(f"Laplacian smoothing enabled: lambda={lambda_laplacian}, k={laplacian_k}")
+    elif lambda_laplacian > 0 and coords is None:
+        logging.warning("lambda_laplacian > 0 but coords not provided. Laplacian smoothing disabled.")
+
+    # Initialize beta (per-marker-per-type for positive markers)
+    beta_values = np.ones((M, T), dtype=np.float64)
+    beta_prev = np.zeros((M, T))
+    Y_prev = np.zeros((N, T))
+
+    iteration = 0
+    while iteration < max_iterations:
+        logging.info(f"\nIteration {iteration + 1}")
+
+        model = gp.Model("CellProportions_WithNegatives")
+        model.setParam("OutputFlag", 0)
+
+        # Define Y variables: Y[i, t] = proportion of cell type t at spot i
+        Y = model.addVars(N, T, lb=0, ub=1, vtype=GRB.CONTINUOUS, name="Y")
+
+        # Build objective
+        error_terms = []
+
+        for i in range(N):
+            for t in range(T):
+                # Positive marker terms: (S[i,m] - beta[m,t] * Y[i,t])^2
+                for m in range(M):
+                    if positive_assignment[m, t] > 0:
+                        S_im = marker_level_data[i, m]
+                        beta_mt = beta_values[m, t]
+                        Y_it = Y[i, t]
+                        error_terms.append((S_im - beta_mt * Y_it) * (S_im - beta_mt * Y_it))
+
+                    # Negative marker terms: lambda_neg * (S[i,m] * Y[i,t])^2
+                    if negative_assignment[m, t] > 0:
+                        S_im = marker_level_data[i, m]
+                        Y_it = Y[i, t]
+                        # Penalty: if S_im is high AND Y_it is high, big penalty
+                        error_terms.append(lambda_neg * S_im * S_im * Y_it * Y_it)
+
+        total_error = gp.quicksum(error_terms)
+
+        # Regularization terms (elastic net on Y)
+        l1_term = gp.quicksum(Y[i, t] for i in range(N) for t in range(T))
+        l2_term = gp.quicksum(Y[i, t] * Y[i, t] for i in range(N) for t in range(T))
+        regularization_term = lambda_reg * (alpha * l1_term + (1 - alpha) * l2_term)
+
+        # Laplacian smoothing term
+        laplacian_term = 0
+        if use_laplacian and L_coo is not None:
+            laplacian_terms = []
+            for idx in range(L_coo.nnz):
+                i_spot = L_coo.row[idx]
+                j_spot = L_coo.col[idx]
+                L_val = L_coo.data[idx]
+                for t in range(T):
+                    laplacian_terms.append(L_val * Y[i_spot, t] * Y[j_spot, t])
+            laplacian_term = lambda_laplacian * gp.quicksum(laplacian_terms)
+
+        model.setObjective(total_error + regularization_term + laplacian_term, GRB.MINIMIZE)
+
+        # Sum of proportions constraints
+        for i in range(N):
+            model.addConstr(gp.quicksum(Y[i, t] for t in range(T)) >= 0.9)
+            model.addConstr(gp.quicksum(Y[i, t] for t in range(T)) <= 1.2)
+
+        try:
+            model.optimize()
+        except Exception as e:
+            logging.error(f"Optimization error: {str(e)}")
+            raise ValueError("Gurobi optimization failed") from e
+
+        if model.status != GRB.OPTIMAL:
+            raise ValueError(f"Gurobi optimization failed to converge (status: {model.status})")
+
+        Y_values = np.array([[Y[i, t].X for t in range(T)] for i in range(N)])
+
+        # Update beta for positive markers (closed-form solution per marker-type pair)
+        beta_new = np.ones((M, T), dtype=np.float64)
+        for m in range(M):
+            for t in range(T):
+                if positive_assignment[m, t] > 0:
+                    Y_t = Y_values[:, t]  # (N,)
+                    S_m = marker_level_data[:, m]  # (N,)
+
+                    denominator = np.dot(Y_t, Y_t) + 1e-9
+                    beta_new[m, t] = np.dot(S_m, Y_t) / denominator
+                    beta_new[m, t] = np.clip(beta_new[m, t], beta_min, beta_max)
+
+        # Optionally normalize beta so max=1 per cell type
+        if normalize_beta:
+            for t in range(T):
+                max_beta_t = np.max(beta_new[:, t])
+                if max_beta_t > 0:
+                    beta_new[:, t] = beta_new[:, t] / max_beta_t
+
+        # Convergence check
+        beta_diff = np.linalg.norm(beta_new - beta_prev)
+        Y_diff = np.linalg.norm(Y_values - Y_prev)
+
+        logging.info(f"Change in beta: {beta_diff:.6f}, Change in Y: {Y_diff:.6f}")
+        if beta_diff < tolerance and Y_diff < tolerance:
+            logging.info("Convergence achieved.")
+            break
+
+        beta_values = beta_new.copy()
+        beta_prev = beta_new.copy()
+        Y_prev = Y_values.copy()
+        iteration += 1
+
+    # Validate cell type proportions
+    logging.info("Validating cell type proportions...")
+    validate_cell_proportions(
+        Y_values,
+        cell_type_names,
+        profile_based_antibody_data=None,
+        unknown_threshold=unknown_threshold,
+        min_celltype_threshold=min_celltype_threshold,
+        redundancy_threshold=redundancy_threshold,
+        warn_only=warn_only,
+    )
+
+    # Build marker-beta dictionary (average across cell types for interpretability)
+    marker_beta_dict = {}
+    for m, marker in enumerate(marker_names):
+        positive_betas = beta_new[m, positive_assignment[m, :] > 0]
+        if len(positive_betas) > 0:
+            marker_beta_dict[marker] = float(np.mean(positive_betas))
+        else:
+            marker_beta_dict[marker] = 1.0
+
+    # Log summary statistics
+    logging.info(f"Beta statistics:")
+    for t, cell_type in enumerate(cell_type_names):
+        positive_markers_t = [marker_names[m] for m in range(M) if positive_assignment[m, t] > 0]
+        negative_markers_t = [marker_names[m] for m in range(M) if negative_assignment[m, t] > 0]
+        logging.info(f"  {cell_type}: positive={positive_markers_t}, negative={negative_markers_t}")
+
+    return Y_values, beta_new, marker_beta_dict
+
+
+def build_assignment_matrices_from_profiles(
+    marker_names: List[str],
+    profile_dict: Dict[str, Dict[str, List[str]]],
+) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """
+    Build positive and negative assignment matrices from profile dictionary.
+
+    Args:
+        marker_names: List of all marker names.
+        profile_dict: Dictionary of profiles with positive/negative markers.
+            Format: {cell_type: {"positive": [...], "negative": [...]}}
+
+    Returns:
+        Tuple of:
+        - positive_assignment: (M, T) matrix
+        - negative_assignment: (M, T) matrix
+        - cell_type_names: List of cell type names
+    """
+    cell_type_names = list(profile_dict.keys())
+    M = len(marker_names)
+    T = len(cell_type_names)
+
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+
+    positive_assignment = np.zeros((M, T), dtype=np.float64)
+    negative_assignment = np.zeros((M, T), dtype=np.float64)
+
+    for t, cell_type in enumerate(cell_type_names):
+        profile = profile_dict[cell_type]
+
+        # Handle both old format (list of markers) and new format (dict with positive/negative)
+        if isinstance(profile, list):
+            # Old format: all markers are positive
+            positive_markers = profile
+            negative_markers = []
+        elif isinstance(profile, dict):
+            positive_markers = profile.get("positive", [])
+            negative_markers = profile.get("negative", [])
+            # Also check for Major/Minor format (legacy)
+            if not positive_markers and "Major" in profile:
+                positive_markers = profile.get("Major", []) + profile.get("Minor", [])
+                negative_markers = profile.get("Negative", [])
+        else:
+            raise ValueError(f"Unknown profile format for {cell_type}: {type(profile)}")
+
+        for marker in positive_markers:
+            if marker in marker_to_idx:
+                m_idx = marker_to_idx[marker]
+                positive_assignment[m_idx, t] = 1.0
+
+        for marker in negative_markers:
+            if marker in marker_to_idx:
+                m_idx = marker_to_idx[marker]
+                negative_assignment[m_idx, t] = 1.0
+
+    return positive_assignment, negative_assignment, cell_type_names
 
 
 def finetune_cell_proportions(
