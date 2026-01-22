@@ -12,7 +12,7 @@ import logging
 import time
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -113,6 +113,287 @@ RNA_CELL_PROFILE_DICT = {
     },
 }
 
+# Achievable 8-cell type profile dictionary (realistic distinguishable types)
+# These 8 types collapse the 10 granular types to only those distinguishable
+# by the 27-antibody panel. Based on marker availability analysis 2026-01-20:
+#
+# Limitations of 27-antibody panel:
+# - Stromal/Vascular Stromal: Both VIM+, missing DCN/LUM/PDGFRB/RGS5 to distinguish
+# - Mixed Immune: CD3E+HLA-DR interface, maps to CD4+ T cells
+# - Proliferating T: CD3E+PCNA, difficult to distinguish from CD8+ T cells
+#
+# GT Type Mapping for evaluation (10→8):
+# - B cells → B cells
+# - CD4+ T cells → Mixed Immune (activated CD4+ T cells show HLA-DR)
+# - CD8+ T cells → CD8+ T cells + Proliferating T (both CD3E+, CD8A distinguishes)
+# - Macrophages → Macrophages
+# - Endothelial → Endothelial
+# - Epithelial → Epithelial
+# - Myofibroblasts → Myofibroblasts
+# - Stromal → Stromal + Vascular Stromal (indistinguishable with panel)
+ACHIEVABLE_CELL_PROFILE_DICT = {
+    "B cells": {
+        "Major": ["CD20"],
+        "Minor": ["CD45RA"],
+    },
+    "CD4+ T cells": {
+        "Major": ["CD3E", "CD4"],
+        "Minor": ["CD45RO"],
+    },
+    "CD8+ T cells": {
+        "Major": ["CD3E", "CD8A"],
+        "Minor": ["GranzymeB"],
+    },
+    "Macrophages": {
+        "Major": ["CD68", "CD163"],
+        "Minor": ["CD16"],
+    },
+    "Endothelial": {
+        "Major": ["CD31"],
+        "Minor": [],
+    },
+    "Epithelial": {
+        "Major": ["PanCK", "E-Cadherin"],
+        "Minor": ["Beta-catenin"],
+    },
+    "Myofibroblasts": {
+        "Major": ["alphaSMA"],
+        "Minor": [],
+    },
+    "Stromal": {
+        "Major": ["Vimentin"],
+        "Minor": [],
+    },
+}
+
+# Mapping from 10 GT types to 8 achievable types for evaluation
+GT_TO_ACHIEVABLE_MAPPING = {
+    "B cells": "B cells",
+    "Mixed Immune": "CD4+ T cells",  # T/myeloid interface with HLA-DR
+    "CD8+ T cells": "CD8+ T cells",
+    "Proliferating T": "CD8+ T cells",  # Merge with CD8+ (both CD3E+)
+    "Macrophages": "Macrophages",
+    "Endothelial": "Endothelial",
+    "Epithelial": "Epithelial",
+    "Myofibroblasts": "Myofibroblasts",
+    "Stromal": "Stromal",
+    "Vascular Stromal": "Stromal",  # Merge with Stromal (both VIM+)
+}
+
+# Achievable 7-cell type profile dictionary (most conservative definition)
+# Merges Myofibroblasts + Stromal → Fibroblasts because:
+# - Both express Vimentin (99% of cells in both clusters)
+# - alphaSMA is higher in Myofibroblasts (mean=108) but also present in Stromal (mean=20)
+# - The overlap makes them indistinguishable at the spot level
+#
+# This is the most conservative achievable benchmark based on 2026-01-21 analysis.
+ACHIEVABLE_7_CELL_PROFILE_DICT = {
+    "B cells": {
+        "Major": ["CD20"],
+        "Minor": ["CD45RA"],
+    },
+    "CD4+ T cells": {
+        "Major": ["CD3E", "CD4"],
+        "Minor": ["CD45RO"],
+    },
+    "CD8+ T cells": {
+        "Major": ["CD3E", "CD8A"],
+        "Minor": ["GranzymeB"],
+    },
+    "Macrophages": {
+        "Major": ["CD68", "CD163"],
+        "Minor": ["CD16"],
+    },
+    "Endothelial": {
+        "Major": ["CD31"],
+        "Minor": [],
+    },
+    "Epithelial": {
+        "Major": ["PanCK"],  # E-Cadherin removed - does not co-localize (score=0.42)
+        "Minor": [],
+    },
+    "Fibroblasts": {
+        "Major": ["alphaSMA", "Vimentin"],
+        "Minor": [],
+    },
+}
+
+# Mapping from 10 GT types to 7 achievable types for evaluation
+GT_TO_ACHIEVABLE_7_MAPPING = {
+    "B cells": "B cells",
+    "Mixed Immune": "CD4+ T cells",  # T/myeloid interface with HLA-DR
+    "CD8+ T cells": "CD8+ T cells",
+    "Proliferating T": "CD8+ T cells",  # Merge with CD8+ (both CD3E+)
+    "Macrophages": "Macrophages",
+    "Endothelial": "Endothelial",
+    "Vascular Stromal": "Endothelial",  # CD31+ perivascular
+    "Epithelial": "Epithelial",
+    "Myofibroblasts": "Fibroblasts",  # Merge - both VIM+
+    "Stromal": "Fibroblasts",  # Merge - both VIM+
+}
+
+# Spatially-Validated 8-cell type profile dictionary (based on actual colocalization)
+# These definitions are derived from bivariate Moran's I analysis across 5 Xenium regions
+# (2026-01-22 analysis). Key findings:
+#
+# - PanCK + E-Cadherin: score = 0.42 (weak, do NOT co-localize in this data)
+# - Vimentin + E-Cadherin: score = 0.85 (strong EMT signal)
+# - alphaSMA + Vimentin: score = 0.83 (weaker than Vim+ECad)
+#
+# This captures cell STATES (EMT, exhausted T, M2 macs) not just cell TYPES.
+# See docs/plans/2026-01-22-revised-gt-definitions-design.md for full analysis.
+SPATIALLY_VALIDATED_CELL_PROFILE_DICT = {
+    # Core immune populations (validated by colocalization)
+    "B cells": {
+        "Major": ["CD20", "CD45RA"],     # Score: 0.86
+        "Minor": [],
+    },
+    "Macrophages": {
+        "Major": ["CD68", "CD16"],        # Score: 0.90
+        "Minor": [],
+    },
+    "T cells": {
+        "Major": ["CD3E", "CD45RO"],      # Score: 0.88 (pan-T marker)
+        "Minor": [],
+    },
+    # Functional immune states (validated by colocalization)
+    "Exhausted T cells": {
+        "Major": ["CD8A", "PD-1"],        # Score: 0.87
+        "Minor": [],
+    },
+    "M2 Macrophages": {
+        "Major": ["CD163"],               # Singleton, polarization marker
+        "Minor": [],
+    },
+    # Structural populations
+    "Endothelial": {
+        "Major": ["CD31"],                # Singleton, consistent
+        "Minor": [],
+    },
+    "Epithelial": {
+        "Major": ["PanCK"],               # True epithelial (NOT E-Cadherin)
+        "Minor": [],
+    },
+    # EMT/Hybrid population
+    "EMT cells": {
+        "Major": ["Vimentin", "E-Cadherin"],  # Score: 0.85 (hybrid state)
+        "Minor": [],
+    },
+}
+
+# Mapping from 10 GT types to 8 spatially-validated types for evaluation
+GT_TO_SPATIALLY_VALIDATED_MAPPING = {
+    "B cells": "B cells",
+    "Mixed Immune": "T cells",            # T cell interface
+    "CD8+ T cells": "Exhausted T cells",  # Functional state
+    "Proliferating T": "T cells",         # Pan-T
+    "Macrophages": "Macrophages",
+    "Endothelial": "Endothelial",
+    "Vascular Stromal": "Endothelial",    # CD31+ perivascular
+    "Epithelial": "Epithelial",
+    "Myofibroblasts": "EMT cells",        # EMT transitional state
+    "Stromal": "EMT cells",               # Vimentin+ maps to EMT
+}
+
+# Negative marker competition rules for post-hoc redistribution
+# Format: (loser_type, winner_type, discriminating_marker)
+# When the discriminating marker is high, proportions are redistributed from loser to winner
+NEGATIVE_MARKER_COMPETITIONS = [
+    # Stromal (Vimentin+) is distinguishable from other types by negative markers:
+    ('Stromal', 'Endothelial', 'CD31'),       # Endothelial: CD31+, Stromal: CD31-
+    ('Stromal', 'Macrophages', 'CD68'),       # Macrophages: CD68+, Stromal: CD68-
+    ('Stromal', 'CD8+ T cells', 'CD3E'),      # T cells: CD3E+, Stromal: CD3E-
+    ('Stromal', 'CD4+ T cells', 'CD3E'),      # CD4+ T cells also CD3E+
+    ('Stromal', 'Myofibroblasts', 'alphaSMA'),# Myofibroblasts: alphaSMA+, Stromal: alphaSMA-
+    ('Stromal', 'Epithelial', 'PanCK'),       # Epithelial: PanCK+, Stromal: PanCK-
+    # Additional competitions for marker disambiguation
+    ('Myofibroblasts', 'Macrophages', 'CD68'),  # Macrophages: CD68+
+    ('Myofibroblasts', 'CD8+ T cells', 'CD3E'), # T cells: CD3E+
+]
+
+
+def apply_negative_marker_redistribution(
+    proportions: np.ndarray,
+    protein_data: np.ndarray,
+    protein_names: List[str],
+    cell_type_names: List[str],
+    competitions: List[Tuple[str, str, str]] = None,
+    transfer_fraction: float = 0.6,
+) -> np.ndarray:
+    """
+    Apply competition-based redistribution using negative marker logic.
+
+    When a discriminating marker is high, proportion is transferred from the
+    loser cell type to the winner cell type. This implements the negative
+    marker constraint in a post-hoc manner.
+
+    Args:
+        proportions: Cell type proportions array (n_spots, n_types) or DataFrame
+        protein_data: Protein expression matrix (n_spots, n_proteins)
+        protein_names: List of protein names
+        cell_type_names: List of cell type names (matching proportions columns)
+        competitions: List of (loser, winner, marker) tuples
+        transfer_fraction: Fraction of proportion to transfer when marker is high
+
+    Returns:
+        Adjusted proportions array (normalized to sum to 1)
+    """
+    if competitions is None:
+        competitions = NEGATIVE_MARKER_COMPETITIONS
+
+    # Convert DataFrame to numpy array if needed
+    if isinstance(proportions, pd.DataFrame):
+        adjusted = proportions.values.copy()
+    else:
+        adjusted = proportions.copy()
+
+    # Ensure protein_data is numpy array
+    if hasattr(protein_data, 'toarray'):
+        protein_data = protein_data.toarray()
+    elif isinstance(protein_data, pd.DataFrame):
+        protein_data = protein_data.values
+
+    protein_name_to_idx = {name: i for i, name in enumerate(protein_names)}
+    cell_type_to_idx = {name: i for i, name in enumerate(cell_type_names)}
+
+    for loser, winner, marker in competitions:
+        # Skip if cell types or marker not present
+        if loser not in cell_type_to_idx:
+            continue
+        if winner not in cell_type_to_idx:
+            continue
+        if marker not in protein_name_to_idx:
+            continue
+
+        loser_idx = cell_type_to_idx[loser]
+        winner_idx = cell_type_to_idx[winner]
+        marker_idx = protein_name_to_idx[marker]
+
+        # Get marker expression
+        marker_expr = protein_data[:, marker_idx]
+
+        # Calculate threshold (median of nonzero values)
+        nonzero = marker_expr[marker_expr > 0]
+        if len(nonzero) == 0:
+            continue
+        threshold = np.percentile(nonzero, 50)
+
+        # Transfer proportion where marker is high
+        high_marker = marker_expr > threshold
+        transfer = adjusted[high_marker, loser_idx] * transfer_fraction
+
+        # Apply transfer
+        adjusted[high_marker, loser_idx] -= transfer
+        adjusted[high_marker, winner_idx] += transfer
+
+    # Normalize to sum to 1
+    row_sums = adjusted.sum(axis=1, keepdims=True)
+    row_sums[row_sums == 0] = 1  # Avoid division by zero
+    adjusted = adjusted / row_sums
+
+    return adjusted
+
+
 # Granular 10-cell type profile dictionary (unsimplified RNA clustering)
 # These 10 cell types match the unsimplified RNA k-means clusters.
 # This provides maximum granularity to highlight CITEgeist's proteomic advantage.
@@ -128,7 +409,7 @@ RNA_CELL_PROFILE_DICT = {
 # Cluster 8: B cells          - CD20=293, CD45RA=398
 # Cluster 9: Proliferating T  - CD3E=679, PCNA=83
 # Cluster 10: Vascular Stromal - CD31=53, Vimentin=209
-GRANULAR_CELL_PROFILE_DICT = {
+GRANULAR_CELL_PROFILE_DICT: Dict[str, Dict[str, Any]] = {
     "CD8+ T cells": {
         "Major": ["CD3E", "CD8A"],
         "Minor": ["CD45", "GranzymeB"],
@@ -193,6 +474,8 @@ def run_citegeist_on_region(
     fdr_threshold: float = 0.05,
     top_k: int = 5,
     variance_target: float = 0.90,
+    use_negative_markers: bool = False,
+    transfer_fraction: float = 0.6,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist deconvolution on a single region.
@@ -218,6 +501,8 @@ def run_citegeist_on_region(
         fdr_threshold: FDR threshold for profile discovery
         top_k: Top-k neighbors for mutual sparsification
         variance_target: Target variance for profile selection (dual checkpoint: spatial and protein)
+        use_negative_markers: Apply negative marker redistribution post-hoc
+        transfer_fraction: Fraction of proportion to transfer (0-1)
 
     Returns:
         Dict with run statistics and output paths
@@ -396,6 +681,27 @@ def run_citegeist_on_region(
     prop_time = time.time() - start_time
     logger.info(f"Cell proportion optimization completed in {prop_time:.1f}s")
 
+    # Apply negative marker redistribution if requested
+    if use_negative_markers and finetuned_props is not None:
+        logger.info("Applying negative marker redistribution...")
+        # Get protein data
+        X_protein = adata_protein.X
+        if hasattr(X_protein, 'toarray'):
+            X_protein = X_protein.toarray()
+        protein_names = list(adata_protein.var_names)
+        # Note: cell_profile_dict.keys() already includes "Unknown" (added by model automatically)
+        cell_type_names = list(cell_profile_dict.keys())
+
+        finetuned_props = apply_negative_marker_redistribution(
+            proportions=finetuned_props,
+            protein_data=X_protein,
+            protein_names=protein_names,
+            cell_type_names=cell_type_names,
+            competitions=NEGATIVE_MARKER_COMPETITIONS,
+            transfer_fraction=transfer_fraction,
+        )
+        logger.info("Negative marker redistribution applied")
+
     # Run gene expression deconvolution if requested
     gex_time = 0.0
     if run_gex:
@@ -425,11 +731,12 @@ def run_citegeist_on_region(
     prop_csv = result_dir / "cell_proportions.csv"
 
     # Save proportions in benchmarking-compatible format
+    # Note: cell_profile_dict.keys() already includes "Unknown" (added by model automatically)
     if finetuned_props is not None:
         props_df = pd.DataFrame(
             finetuned_props,
             index=model.antibody_capture_adata.obs_names,
-            columns=list(cell_profile_dict.keys()) + ["Unknown"],
+            columns=list(cell_profile_dict.keys()),
         )
         props_df.to_csv(result_dir / f"{sample_name}_deconv_predictions.csv")
 
@@ -581,6 +888,16 @@ def main():
         help="Use granular cell profile dict (10 cell types matching unsimplified RNA clustering GT)",
     )
     parser.add_argument(
+        "--use-achievable-profiles",
+        action="store_true",
+        help="Use achievable cell profile dict (8 distinguishable types based on antibody panel)",
+    )
+    parser.add_argument(
+        "--use-achievable-7-profiles",
+        action="store_true",
+        help="Use achievable-7 cell profile dict (7 types, merges Myofibroblasts+Stromal→Fibroblasts)",
+    )
+    parser.add_argument(
         "--run-gex",
         action="store_true",
         help="Run gene expression deconvolution (Pass 1) after cell proportions",
@@ -608,6 +925,17 @@ def main():
         default=0.90,
         help="Target variance explained for profile selection (dual checkpoint: spatial and protein)",
     )
+    parser.add_argument(
+        "--use-negative-markers",
+        action="store_true",
+        help="Apply negative marker redistribution post-hoc (reduces Stromal over-prediction)",
+    )
+    parser.add_argument(
+        "--transfer-fraction",
+        type=float,
+        default=0.6,
+        help="Fraction of proportion to transfer during negative marker redistribution (0-1)",
+    )
 
     args = parser.parse_args()
 
@@ -621,6 +949,14 @@ def main():
     if args.use_autodiscovery:
         cell_profile_dict = None  # Will be discovered automatically
         logger.info("Using AUTO PROFILE DISCOVERY (Module 1-2) - profiles will be discovered from protein data")
+    elif args.use_achievable_7_profiles:
+        cell_profile_dict = ACHIEVABLE_7_CELL_PROFILE_DICT
+        logger.info("Using ACHIEVABLE-7 cell profile dict (7 types, most conservative)")
+        logger.info("GT type mapping: Myofibroblasts+Stromal→Fibroblasts, Vascular Stromal→Endothelial")
+    elif args.use_achievable_profiles:
+        cell_profile_dict = ACHIEVABLE_CELL_PROFILE_DICT
+        logger.info("Using ACHIEVABLE cell profile dict (8 distinguishable types based on antibody panel)")
+        logger.info("GT type mapping: Stromal+Vascular Stromal→Stromal, CD8+ T+Proliferating T→CD8+ T, Mixed Immune→CD4+ T")
     elif args.use_granular_profiles:
         cell_profile_dict = GRANULAR_CELL_PROFILE_DICT
         logger.info("Using GRANULAR cell profile dict (10 cell types, unsimplified RNA clustering)")
@@ -630,6 +966,10 @@ def main():
     else:
         cell_profile_dict = XENIUM_CELL_PROFILE_DICT
         logger.info("Using protein-based cell profile dict (10 cell types)")
+
+    # Log negative marker status
+    if args.use_negative_markers:
+        logger.info(f"Negative marker redistribution ENABLED (transfer_fraction={args.transfer_fraction})")
 
     # Run
     stats = run_citegeist_on_region(
@@ -647,6 +987,8 @@ def main():
         n_permutations=args.n_permutations,
         fdr_threshold=args.fdr_threshold,
         variance_target=args.variance_target,
+        use_negative_markers=args.use_negative_markers,
+        transfer_fraction=args.transfer_fraction,
     )
 
     print(f"\nCompleted region {args.region_id}")
