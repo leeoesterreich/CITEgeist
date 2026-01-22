@@ -18,6 +18,9 @@ from CITEgeist.model.spatial_colocalization import (
     ProfileTreeNode,
     ProfileTree,
     HierarchicalProfileResult,
+    ColocalizationResult,
+    MarkerPairColocalization,
+    _build_colocalization_distance_matrix,
 )
 
 
@@ -105,6 +108,64 @@ class TestHierarchicalProfileResult:
 
         assert isinstance(profile_dict, dict)
         assert profile_dict["CD4+ T"] == ["CD3", "CD4"]
+
+
+class TestDistanceMatrix:
+    """Test colocalization distance matrix construction."""
+
+    def test_distance_from_morans_i(self):
+        """Distance should be 1 - normalized Moran's I."""
+        # Create mock colocalization result with known Moran's I values
+        pairs = [
+            MarkerPairColocalization(
+                marker_a="A", marker_b="B",
+                jaccard_index=0.5, co_occurrence_spots=10, co_occurrence_fraction=0.1,
+                pearson_r=0.8, spearman_rho=0.75, correlation_pvalue=0.001,
+                cosine_similarity=0.85,
+                bivariate_morans_i=0.6,  # High colocalization
+                bivariate_morans_pvalue=0.001,
+                neighbor_enrichment_ab=1.5, neighbor_enrichment_ba=1.4,
+                neighbor_enrichment_pvalue=0.01, mutual_neighbor_enrichment=1.45,
+                colocalization_score=0.7,
+            ),
+            MarkerPairColocalization(
+                marker_a="A", marker_b="C",
+                jaccard_index=0.1, co_occurrence_spots=2, co_occurrence_fraction=0.02,
+                pearson_r=0.1, spearman_rho=0.05, correlation_pvalue=0.5,
+                cosine_similarity=0.15,
+                bivariate_morans_i=0.1,  # Low colocalization
+                bivariate_morans_pvalue=0.3,
+                neighbor_enrichment_ab=1.0, neighbor_enrichment_ba=1.0,
+                neighbor_enrichment_pvalue=0.5, mutual_neighbor_enrichment=1.0,
+                colocalization_score=0.15,
+            ),
+            MarkerPairColocalization(
+                marker_a="B", marker_b="C",
+                jaccard_index=0.2, co_occurrence_spots=4, co_occurrence_fraction=0.04,
+                pearson_r=0.2, spearman_rho=0.15, correlation_pvalue=0.2,
+                cosine_similarity=0.25,
+                bivariate_morans_i=0.2,
+                bivariate_morans_pvalue=0.1,
+                neighbor_enrichment_ab=1.1, neighbor_enrichment_ba=1.1,
+                neighbor_enrichment_pvalue=0.2, mutual_neighbor_enrichment=1.1,
+                colocalization_score=0.25,
+            ),
+        ]
+
+        coloc_result = ColocalizationResult(
+            pairs=pairs,
+            marker_names=["A", "B", "C"],
+            n_spots=100,
+            neighbor_k=6,
+        )
+
+        D, markers = _build_colocalization_distance_matrix(coloc_result)
+
+        assert D.shape == (3, 3)
+        assert markers == ["A", "B", "C"]
+        # D[A,B] should be smallest (highest Moran's I = 0.6)
+        assert D[0, 1] < D[0, 2]  # A-B closer than A-C
+        assert D[0, 1] < D[1, 2]  # A-B closer than B-C
 
 
 if __name__ == "__main__":

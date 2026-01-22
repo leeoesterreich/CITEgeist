@@ -1055,6 +1055,57 @@ class HierarchicalProfileResult:
         )
 
 
+def _build_colocalization_distance_matrix(
+    coloc_result: ColocalizationResult,
+) -> Tuple[NDArray[np.floating], List[str]]:
+    """
+    Build distance matrix from colocalization results.
+
+    Distance = 1 - normalized_bivariate_morans_I
+    High Moran's I (colocalized) -> low distance -> same branch
+
+    Args:
+        coloc_result: Result from analyze_marker_colocalization()
+
+    Returns:
+        Tuple of (distance_matrix, marker_names)
+        Distance matrix is symmetric with 0 on diagonal.
+    """
+    markers = coloc_result.marker_names
+    n_markers = len(markers)
+    marker_to_idx = {m: i for i, m in enumerate(markers)}
+
+    # Initialize with max distance (1.0 means no colocalization)
+    D = np.ones((n_markers, n_markers))
+    np.fill_diagonal(D, 0.0)
+
+    # Collect all Moran's I values for normalization
+    morans_values = [p.bivariate_morans_i for p in coloc_result.pairs]
+    if len(morans_values) == 0:
+        return D, markers
+
+    # Normalize Moran's I to [0, 1] range
+    # Moran's I can be negative (spatial dispersion), so shift and scale
+    min_i = min(morans_values)
+    max_i = max(morans_values)
+    range_i = max_i - min_i if max_i > min_i else 1.0
+
+    for pair in coloc_result.pairs:
+        i = marker_to_idx[pair.marker_a]
+        j = marker_to_idx[pair.marker_b]
+
+        # Normalize Moran's I to [0, 1]
+        normalized_i = (pair.bivariate_morans_i - min_i) / range_i
+
+        # Distance = 1 - normalized Moran's I
+        distance = 1.0 - normalized_i
+
+        D[i, j] = distance
+        D[j, i] = distance
+
+    return D, markers
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
