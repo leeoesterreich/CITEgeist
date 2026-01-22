@@ -26,6 +26,7 @@ from CITEgeist.model.spatial_colocalization import (
     _build_colocalization_distance_matrix,
     _compute_reconstruction_error,
     _build_hierarchical_tree,
+    _compute_nmf_weights,
 )
 
 
@@ -275,6 +276,42 @@ class TestTreeBuilding:
         leaves = tree.get_leaves()
         # Expect 2 groups: {A,B} and {C,D}
         assert len(leaves) == 2 or len(leaves) == 4  # Either 2 merged or 4 flat
+
+
+class TestNMFWeights:
+    """Test NMF weight learning at each tree level."""
+
+    def test_weights_for_two_children(self):
+        """NMF should assign weights to markers for each child branch."""
+        np.random.seed(42)
+        n_spots = 100
+
+        # Create data where A,B go with child1 and C,D go with child2
+        pattern1 = np.random.rand(n_spots)
+        pattern2 = np.random.rand(n_spots)
+
+        X = np.column_stack([
+            pattern1,  # A
+            pattern1 + 0.1 * np.random.rand(n_spots),  # B (like A)
+            pattern2,  # C
+            pattern2 + 0.1 * np.random.rand(n_spots),  # D (like C)
+        ])
+        marker_names = ["A", "B", "C", "D"]
+
+        # Create node with 2 children
+        child1 = ProfileTreeNode("c1", ["A", "B"], [], "root", 1)
+        child2 = ProfileTreeNode("c2", ["C", "D"], [], "root", 1)
+        root = ProfileTreeNode("root", [], [child1, child2], None, 0)
+
+        weights = _compute_nmf_weights(X, marker_names, root)
+
+        # Should have weights for each marker in each child
+        assert "c1" in weights
+        assert "c2" in weights
+        # A should have higher weight in c1
+        assert weights["c1"].get("A", 0) > weights["c2"].get("A", 0)
+        # C should have higher weight in c2
+        assert weights["c2"].get("C", 0) > weights["c1"].get("C", 0)
 
 
 if __name__ == "__main__":

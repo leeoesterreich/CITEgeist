@@ -1360,6 +1360,114 @@ def _build_hierarchical_tree(
     return ProfileTree(root=root_node, n_levels=n_levels)
 
 
+def _compute_nmf_weights(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    node: ProfileTreeNode,
+) -> Dict[str, Dict[str, float]]:
+    """
+    Compute NMF weights at an internal node.
+
+    Runs NMF with n_components = number of children to learn
+    how markers should be allocated to each child branch.
+
+    Args:
+        X: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column
+        node: Internal node with children
+
+    Returns:
+        Dict mapping child_id -> {marker: weight}
+    """
+    from sklearn.decomposition import NMF
+
+    if node.is_leaf or len(node.children) == 0:
+        return {}
+
+    # Get all markers in this subtree
+    all_markers = node.get_all_markers()
+    if len(all_markers) == 0:
+        return {c.node_id: {} for c in node.children}
+
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+    indices = [marker_to_idx[m] for m in all_markers if m in marker_to_idx]
+
+    if len(indices) == 0:
+        return {c.node_id: {} for c in node.children}
+
+    # Extract submatrix
+    X_node = X[:, indices]
+    X_node = np.maximum(X_node, 0)
+
+    # Number of components = number of children
+    n_components = len(node.children)
+    n_components = min(n_components, len(indices), X_node.shape[0] - 1)
+    n_components = max(1, n_components)
+
+    try:
+        nmf = NMF(n_components=n_components, init='nndsvda', max_iter=200, random_state=42)
+        W = nmf.fit_transform(X_node)  # (n_spots, n_components)
+        H = nmf.components_  # (n_components, n_markers_in_node)
+
+        # Map components to children based on which markers they load on
+        # H[k, j] = how much component k contributes to marker j
+
+        # Build list of markers in node order (matching X_node columns)
+        markers_in_node = [all_markers[i] for i in range(len(all_markers))
+                          if all_markers[i] in marker_to_idx]
+
+        # For each child, find which component best matches its markers
+        child_to_component = {}
+
+        for child_idx, child in enumerate(node.children):
+            child_markers = child.get_all_markers()
+            child_marker_indices = [markers_in_node.index(m) for m in child_markers
+                                    if m in markers_in_node]
+
+            if len(child_marker_indices) == 0:
+                child_to_component[child.node_id] = child_idx % n_components
+                continue
+
+            # Find component with highest average loading on child markers
+            best_component = 0
+            best_score = -np.inf
+            for comp_idx in range(n_components):
+                score = np.mean(H[comp_idx, child_marker_indices])
+                if score > best_score:
+                    best_score = score
+                    best_component = comp_idx
+
+            child_to_component[child.node_id] = best_component
+
+        # Build weights dict
+        weights: Dict[str, Dict[str, float]] = {}
+        for child in node.children:
+            comp_idx = child_to_component[child.node_id]
+            weights[child.node_id] = {}
+            for marker_idx, marker in enumerate(markers_in_node):
+                if marker_idx < H.shape[1]:
+                    weights[child.node_id][marker] = float(H[comp_idx, marker_idx])
+
+        # Normalize weights per marker (so they sum to 1 across children)
+        for marker in markers_in_node:
+            total = sum(weights[c.node_id].get(marker, 0) for c in node.children)
+            if total > 1e-10:
+                for child in node.children:
+                    if marker in weights[child.node_id]:
+                        weights[child.node_id][marker] /= total
+
+        return weights
+
+    except Exception as e:
+        logger.warning(f"NMF failed at node {node.node_id}: {e}")
+        # Fallback: equal weights
+        weights = {}
+        for child in node.children:
+            child_markers = child.get_all_markers()
+            weights[child.node_id] = {m: 1.0 / len(node.children) for m in child_markers}
+        return weights
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
