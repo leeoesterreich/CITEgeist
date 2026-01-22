@@ -27,6 +27,7 @@ from CITEgeist.model.spatial_colocalization import (
     _compute_reconstruction_error,
     _build_hierarchical_tree,
     _compute_nmf_weights,
+    _flatten_tree_to_profiles,
 )
 
 
@@ -312,6 +313,61 @@ class TestNMFWeights:
         assert weights["c1"].get("A", 0) > weights["c2"].get("A", 0)
         # C should have higher weight in c2
         assert weights["c2"].get("C", 0) > weights["c1"].get("C", 0)
+
+
+class TestFlattening:
+    """Test flattening hierarchical tree to flat profiles."""
+
+    def test_shared_marker_appears_in_multiple_profiles(self):
+        """Shared markers at parent should appear in all children profiles."""
+        # Tree: root(CD3) -> [CD4+ T(CD4), CD8+ T(CD8)]
+        # CD3 is shared, should appear in both flat profiles
+
+        child1 = ProfileTreeNode("cd4_t", ["CD4"], [], "root", 1)
+        child2 = ProfileTreeNode("cd8_t", ["CD8"], [], "root", 1)
+        root = ProfileTreeNode("root", ["CD3"], [child1, child2], None, 0)
+
+        # Mock weights: CD3 has equal weight to both children
+        all_weights = {
+            "root": {
+                "cd4_t": {"CD3": 0.5, "CD4": 0.9},
+                "cd8_t": {"CD3": 0.5, "CD8": 0.9},
+            }
+        }
+
+        tree = ProfileTree(root=root, n_levels=2)
+        flat_profiles, shared_markers = _flatten_tree_to_profiles(
+            tree, all_weights, min_weight=0.1
+        )
+
+        # Both profiles should contain CD3
+        assert "CD3" in flat_profiles["cd4_t"]
+        assert "CD3" in flat_profiles["cd8_t"]
+        # Each should have their specific marker
+        assert "CD4" in flat_profiles["cd4_t"]
+        assert "CD8" in flat_profiles["cd8_t"]
+        # CD3 should be marked as shared
+        assert "CD3" in shared_markers
+        assert set(shared_markers["CD3"]) == {"cd4_t", "cd8_t"}
+
+    def test_low_weight_markers_excluded(self):
+        """Markers with weight below threshold should be excluded."""
+        child1 = ProfileTreeNode("c1", ["A", "B"], [], "root", 1)
+        root = ProfileTreeNode("root", [], [child1], None, 0)
+
+        all_weights = {
+            "root": {
+                "c1": {"A": 0.8, "B": 0.01},  # B below threshold
+            }
+        }
+
+        tree = ProfileTree(root=root, n_levels=2)
+        flat_profiles, _ = _flatten_tree_to_profiles(
+            tree, all_weights, min_weight=0.05
+        )
+
+        assert "A" in flat_profiles["c1"]
+        assert "B" not in flat_profiles["c1"]
 
 
 if __name__ == "__main__":

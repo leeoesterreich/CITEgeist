@@ -1468,6 +1468,119 @@ def _compute_nmf_weights(
         return weights
 
 
+def _flatten_tree_to_profiles(
+    tree: ProfileTree,
+    all_weights: Dict[str, Dict[str, Dict[str, float]]],
+    min_weight: float = 0.05,
+) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+    """
+    Flatten hierarchical tree to flat profiles with weight propagation.
+
+    This function traverses the hierarchical profile tree and produces flat
+    marker profiles for each leaf node (cell type). Markers from ancestor nodes
+    are propagated down to leaves, with shared markers (like CD3 for T cells)
+    appearing in multiple child profiles.
+
+    Args:
+        tree: ProfileTree with hierarchy structure
+        all_weights: Nested dict: parent_id -> child_id -> marker -> weight
+        min_weight: Minimum weight to include marker in profile
+
+    Returns:
+        Tuple of:
+        - flat_profiles: Dict[cell_type_id, List[marker_names]]
+        - shared_markers: Dict[marker, List[cell_type_ids_that_share_it]]
+    """
+    flat_profiles: Dict[str, List[str]] = {}
+    marker_to_profiles: Dict[str, List[str]] = defaultdict(list)
+
+    # Get all leaves
+    leaves = tree.get_leaves()
+
+    for leaf in leaves:
+        # Collect all markers from leaf up to root with propagated weights
+        leaf_markers = _collect_markers_with_weights(
+            leaf, tree.root, all_weights, min_weight
+        )
+        flat_profiles[leaf.node_id] = list(leaf_markers.keys())
+
+        # Track which profiles contain each marker
+        for marker in leaf_markers:
+            marker_to_profiles[marker].append(leaf.node_id)
+
+    # Identify shared markers (appear in multiple profiles)
+    shared_markers = {
+        m: profiles for m, profiles in marker_to_profiles.items() if len(profiles) > 1
+    }
+
+    return flat_profiles, shared_markers
+
+
+def _collect_markers_with_weights(
+    leaf: ProfileTreeNode,
+    root: ProfileTreeNode,
+    all_weights: Dict[str, Dict[str, Dict[str, float]]],
+    min_weight: float,
+) -> Dict[str, float]:
+    """
+    Collect markers from leaf to root with propagated weights.
+
+    Traverses from leaf up to root, accumulating markers and their weights.
+    Markers from ancestor nodes are included if their weight to this leaf
+    branch exceeds min_weight.
+
+    Args:
+        leaf: The leaf node to collect markers for
+        root: The root of the tree
+        all_weights: Nested dict: parent_id -> child_id -> marker -> weight
+        min_weight: Minimum weight to include a marker
+
+    Returns:
+        Dict mapping marker name to its weight for this leaf
+    """
+    markers_with_weights: Dict[str, float] = {}
+
+    # Build path from root to leaf by DFS
+    def find_path(
+        node: ProfileTreeNode, target_id: str, path: List[str]
+    ) -> Optional[List[str]]:
+        if node.node_id == target_id:
+            return path
+        for child in node.children:
+            result = find_path(child, target_id, path + [child.node_id])
+            if result:
+                return result
+        return None
+
+    path = find_path(root, leaf.node_id, [root.node_id])
+    if path is None:
+        path = [root.node_id, leaf.node_id]
+
+    # For each step in the path, collect markers with weights
+    for i, node_id in enumerate(path[:-1]):
+        child_id = path[i + 1]
+
+        # Get weights from this node to its children
+        if node_id in all_weights and child_id in all_weights[node_id]:
+            weights = all_weights[node_id][child_id]
+            for marker, weight in weights.items():
+                if weight >= min_weight:
+                    # If marker already exists, keep the higher weight
+                    if (
+                        marker not in markers_with_weights
+                        or weight > markers_with_weights[marker]
+                    ):
+                        markers_with_weights[marker] = weight
+
+    # If no weights found (e.g., single-node tree), fall back to leaf markers
+    if len(markers_with_weights) == 0:
+        for marker in leaf.markers:
+            markers_with_weights[marker] = 1.0
+
+    # Filter by min_weight
+    return {m: w for m, w in markers_with_weights.items() if w >= min_weight}
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
