@@ -21,6 +21,7 @@ from CITEgeist.model.spatial_colocalization import (
     ColocalizationResult,
     MarkerPairColocalization,
     _build_colocalization_distance_matrix,
+    _compute_reconstruction_error,
 )
 
 
@@ -166,6 +167,42 @@ class TestDistanceMatrix:
         # D[A,B] should be smallest (highest Moran's I = 0.6)
         assert D[0, 1] < D[0, 2]  # A-B closer than A-C
         assert D[0, 1] < D[1, 2]  # A-B closer than B-C
+
+
+class TestReconstructionError:
+    """Test reconstruction error computation."""
+
+    def test_perfect_reconstruction(self):
+        """Error should be 0 for perfectly separable markers."""
+        # Two markers with identical patterns -> one profile reconstructs perfectly
+        X = np.array([
+            [1.0, 1.0],
+            [2.0, 2.0],
+            [3.0, 3.0],
+        ])
+        marker_names = ["A", "B"]
+        markers_in_node = ["A", "B"]
+
+        error = _compute_reconstruction_error(X, marker_names, markers_in_node)
+
+        # Should be very low (markers are identical patterns)
+        assert error < 0.1
+
+    def test_high_error_for_uncorrelated(self):
+        """Error should be higher for uncorrelated markers."""
+        # Two markers with opposite patterns
+        X = np.array([
+            [1.0, 3.0],
+            [2.0, 2.0],
+            [3.0, 1.0],
+        ])
+        marker_names = ["A", "B"]
+        markers_in_node = ["A", "B"]
+
+        error = _compute_reconstruction_error(X, marker_names, markers_in_node)
+
+        # Should be higher than correlated case
+        assert error > 0.1
 
 
 if __name__ == "__main__":

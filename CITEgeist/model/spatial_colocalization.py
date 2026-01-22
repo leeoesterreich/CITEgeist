@@ -1106,6 +1106,67 @@ def _build_colocalization_distance_matrix(
     return D, markers
 
 
+def _compute_reconstruction_error(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    markers_in_node: List[str],
+    n_components: int = 1,
+) -> float:
+    """
+    Compute reconstruction error for markers in a node using NMF.
+
+    Args:
+        X: Full expression matrix (n_spots, n_markers)
+        marker_names: Names for all markers in X
+        markers_in_node: Markers belonging to this node
+        n_components: Number of NMF components (default 1 for single node)
+
+    Returns:
+        Normalized reconstruction error (Frobenius norm / original norm)
+    """
+    from sklearn.decomposition import NMF
+
+    # Get indices for markers in this node
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+    indices = [marker_to_idx[m] for m in markers_in_node if m in marker_to_idx]
+
+    if len(indices) == 0:
+        return 1.0  # No markers -> max error
+
+    if len(indices) == 1:
+        return 0.0  # Single marker -> perfect reconstruction
+
+    # Extract submatrix
+    X_node = X[:, indices]
+
+    # Ensure non-negative
+    X_node = np.maximum(X_node, 0)
+
+    # Handle zero matrix
+    original_norm = np.linalg.norm(X_node, 'fro')
+    if original_norm < 1e-10:
+        return 0.0
+
+    # Fit NMF
+    n_comp = min(n_components, len(indices) - 1, X_node.shape[0] - 1)
+    n_comp = max(1, n_comp)
+
+    try:
+        nmf = NMF(n_components=n_comp, init='nndsvda', max_iter=200, random_state=42)
+        W = nmf.fit_transform(X_node)
+        H = nmf.components_
+
+        # Reconstruction
+        X_reconstructed = W @ H
+
+        # Normalized error
+        error_norm = np.linalg.norm(X_node - X_reconstructed, 'fro')
+        return error_norm / original_norm
+
+    except Exception:
+        return 1.0  # Return max error on failure
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
