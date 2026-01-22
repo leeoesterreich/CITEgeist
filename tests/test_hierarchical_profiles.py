@@ -1,16 +1,18 @@
 """
-Test script for Hierarchical Profile Discovery (Module 2b enhancement).
+Test script for Hierarchical Profile Discovery data structures.
 
-Tests the two-phase algorithm:
-1. Structure learning via hierarchical clustering on colocalization distances
-2. NMF weight learning with expression-weighted allocation
+Tests ProfileTreeNode and ProfileTree dataclasses used for
+representing hierarchical marker profiles.
 """
+
+import os
+import sys
+
+# Add project root to path for direct execution (pytest uses conftest.py)
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
 import pytest
-import sys
-
-sys.path.insert(0, '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/hierarchical-profiles')
 
 from CITEgeist.model.spatial_colocalization import ProfileTreeNode, ProfileTree
 
