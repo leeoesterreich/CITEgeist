@@ -292,8 +292,8 @@ def run_module4(
         n_subpopulations=3,
     )
 
-    logger.info(f"Discovered programs for {len(result.results)} cell types")
-    for ct, ct_result in result.results.items():
+    logger.info(f"Discovered programs for {len(result.results_by_anchor)} cell types")
+    for ct, ct_result in result.results_by_anchor.items():
         logger.info(f"  {ct}: {len(ct_result.programs)} programs")
 
     return result
@@ -374,11 +374,11 @@ def save_results(
     module4_summary = {
         "source": source,
         "region_id": region_id,
-        "n_cell_types": len(module4_result.results),
-        "cell_types": list(module4_result.results.keys()),
+        "n_cell_types": len(module4_result.results_by_anchor),
+        "cell_types": list(module4_result.results_by_anchor.keys()),
         "programs_per_type": {
             ct: len(ct_result.programs)
-            for ct, ct_result in module4_result.results.items()
+            for ct, ct_result in module4_result.results_by_anchor.items()
         },
     }
 
@@ -387,7 +387,7 @@ def save_results(
 
     # Save top genes per program
     top_genes_data = []
-    for ct, ct_result in module4_result.results.items():
+    for ct, ct_result in module4_result.results_by_anchor.items():
         for prog in ct_result.programs:
             top_genes_data.append({
                 "cell_type": ct,
