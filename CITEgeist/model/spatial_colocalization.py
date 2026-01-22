@@ -3117,3 +3117,195 @@ def select_profiles(
         marginal_gains=np.array(marginal_gains_list),
     )
 
+
+# =============================================================================
+# HIERARCHICAL NMF-BASED PROFILE DISCOVERY (Main Entry Point)
+# =============================================================================
+
+
+def discover_hierarchical_profiles(
+    coloc_result: ColocalizationResult,
+    antibody_expression: NDArray[np.floating],
+    marker_names: List[str],
+    improvement_threshold: float = 0.05,
+    min_marker_weight: float = 0.05,
+    max_depth: int = 5,
+    verbose: bool = True,
+) -> HierarchicalProfileResult:
+    """
+    Discover cell type profiles using hierarchical NMF.
+
+    Two-phase algorithm:
+    1. Structure learning: Hierarchical clustering on colocalization distances
+       with reconstruction-guided tree cutting
+    2. Weight learning: NMF at each level to learn marker allocation
+
+    Args:
+        coloc_result: Result from analyze_marker_colocalization()
+        antibody_expression: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column in expression matrix
+        improvement_threshold: Min reconstruction improvement to split (default 5%)
+        min_marker_weight: Min weight to include marker in profile (default 0.05)
+        max_depth: Maximum tree depth (default 5)
+        verbose: Log progress (default True)
+
+    Returns:
+        HierarchicalProfileResult with tree structure and flat profiles
+    """
+    if verbose:
+        logger.info("Starting hierarchical profile discovery...")
+
+    # Phase 1: Build colocalization distance matrix
+    if verbose:
+        logger.info("Phase 1: Building colocalization distance matrix...")
+
+    D, markers = _build_colocalization_distance_matrix(coloc_result)
+
+    if len(markers) < 2:
+        # Not enough markers for hierarchy
+        if verbose:
+            logger.info("Only 1 marker - returning single profile")
+        root = ProfileTreeNode("root", markers, [], None, 0)
+        tree = ProfileTree(root=root, n_levels=1)
+        return HierarchicalProfileResult(
+            tree=tree,
+            flat_profiles={"profile_0": markers},
+            depth_per_branch={},
+            shared_markers={},
+            reconstruction_error=0.0,
+        )
+
+    # Build hierarchical clustering
+    if verbose:
+        logger.info(f"Clustering {len(markers)} markers...")
+
+    condensed = squareform(D)
+    # Handle numerical issues
+    condensed = np.maximum(condensed, 0)
+
+    Z = linkage(condensed, method='ward')
+
+    # Phase 1b: Reconstruction-guided tree cutting
+    if verbose:
+        logger.info("Building tree with reconstruction-guided cutting...")
+
+    tree = _build_hierarchical_tree(
+        X=antibody_expression,
+        marker_names=marker_names,
+        linkage_matrix=Z,
+        improvement_threshold=improvement_threshold,
+        max_depth=max_depth,
+    )
+
+    if verbose:
+        logger.info(f"Tree depth: {tree.get_depth()}, leaves: {len(tree.get_leaves())}")
+
+    # Phase 2: NMF weight learning at each level
+    if verbose:
+        logger.info("Phase 2: Computing NMF weights at each level...")
+
+    all_weights: Dict[str, Dict[str, Dict[str, float]]] = {}
+    _compute_all_nmf_weights(tree.root, antibody_expression, marker_names, all_weights)
+
+    # Phase 3: Flatten to profiles
+    if verbose:
+        logger.info("Phase 3: Flattening tree to profiles...")
+
+    flat_profiles, shared_markers = _flatten_tree_to_profiles(
+        tree, all_weights, min_marker_weight
+    )
+
+    # Rename profiles to be more descriptive
+    renamed_profiles: Dict[str, List[str]] = {}
+    for i, (node_id, markers_list) in enumerate(flat_profiles.items()):
+        profile_name = f"profile_{i}"
+        renamed_profiles[profile_name] = markers_list
+
+    # Update shared_markers with new names
+    old_to_new = {old: f"profile_{i}" for i, old in enumerate(flat_profiles.keys())}
+    renamed_shared: Dict[str, List[str]] = {}
+    for marker, old_profiles in shared_markers.items():
+        renamed_shared[marker] = [old_to_new.get(p, p) for p in old_profiles]
+
+    # Compute final reconstruction error
+    final_error = _compute_final_reconstruction_error(
+        antibody_expression, marker_names, list(renamed_profiles.values())
+    )
+
+    if verbose:
+        logger.info(f"Discovered {len(renamed_profiles)} profiles, "
+                   f"{len(renamed_shared)} shared markers, "
+                   f"reconstruction error: {final_error:.4f}")
+
+    return HierarchicalProfileResult(
+        tree=tree,
+        flat_profiles=renamed_profiles,
+        depth_per_branch={},  # TODO: compute per-branch depth
+        shared_markers=renamed_shared,
+        reconstruction_error=final_error,
+    )
+
+
+def _compute_all_nmf_weights(
+    node: ProfileTreeNode,
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    all_weights: Dict[str, Dict[str, Dict[str, float]]],
+) -> None:
+    """Recursively compute NMF weights for all internal nodes."""
+    if node.is_leaf:
+        return
+
+    # Compute weights for this node
+    weights = _compute_nmf_weights(X, marker_names, node)
+    all_weights[node.node_id] = weights
+
+    # Recurse on children
+    for child in node.children:
+        _compute_all_nmf_weights(child, X, marker_names, all_weights)
+
+
+def _compute_final_reconstruction_error(
+    X: NDArray[np.floating],
+    marker_names: List[str],
+    profiles: List[List[str]],
+) -> float:
+    """Compute overall reconstruction error for final profiles."""
+    from scipy.optimize import nnls
+
+    if len(profiles) == 0:
+        return 1.0
+
+    marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+
+    # Build profile matrix: each column is mean expression of profile markers
+    profile_vectors = []
+    for profile in profiles:
+        indices = [marker_to_idx[m] for m in profile if m in marker_to_idx]
+        if len(indices) > 0:
+            profile_expr = X[:, indices].mean(axis=1)
+            profile_vectors.append(profile_expr)
+
+    if len(profile_vectors) == 0:
+        return 1.0
+
+    P = np.column_stack(profile_vectors)
+
+    # For each marker, compute reconstruction error
+    total_error = 0.0
+    all_markers = set(m for p in profiles for m in p)
+
+    for marker in all_markers:
+        if marker not in marker_to_idx:
+            continue
+        y = X[:, marker_to_idx[marker]]
+        try:
+            coeffs, _ = nnls(P, y)
+            y_pred = P @ coeffs
+            error = np.mean((y - y_pred) ** 2)
+            total_error += error
+        except Exception:
+            total_error += 1.0
+
+    return total_error / max(len(all_markers), 1)
+

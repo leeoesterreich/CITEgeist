@@ -28,6 +28,8 @@ from CITEgeist.model.spatial_colocalization import (
     _build_hierarchical_tree,
     _compute_nmf_weights,
     _flatten_tree_to_profiles,
+    discover_hierarchical_profiles,
+    analyze_marker_colocalization,
 )
 
 
@@ -368,6 +370,79 @@ class TestFlattening:
 
         assert "A" in flat_profiles["c1"]
         assert "B" not in flat_profiles["c1"]
+
+
+class TestDiscoverHierarchicalProfiles:
+    """Integration test for full hierarchical profile discovery."""
+
+    def test_simulated_flat_data(self):
+        """Flat data (no hierarchy) should produce flat profiles."""
+        np.random.seed(42)
+        n_spots = 200
+
+        # Create 4 independent cell types, 2 markers each
+        # No shared markers - should stay flat
+        profiles_gt = {
+            "type1": np.random.rand(n_spots),
+            "type2": np.random.rand(n_spots),
+        }
+
+        X = np.column_stack([
+            profiles_gt["type1"],
+            profiles_gt["type1"] + 0.1 * np.random.rand(n_spots),
+            profiles_gt["type2"],
+            profiles_gt["type2"] + 0.1 * np.random.rand(n_spots),
+        ])
+        marker_names = ["A", "B", "C", "D"]
+
+        # Create spatial coordinates (grid)
+        coords = np.array([[i % 14, i // 14] for i in range(n_spots)])
+
+        # Run colocalization analysis
+        coloc_result = analyze_marker_colocalization(
+            X, coords, marker_names, neighbor_k=6
+        )
+
+        # Run hierarchical discovery
+        result = discover_hierarchical_profiles(
+            coloc_result=coloc_result,
+            antibody_expression=X,
+            marker_names=marker_names,
+            improvement_threshold=0.05,
+        )
+
+        # Should produce profiles (exact count depends on data)
+        assert len(result.flat_profiles) >= 1
+        # Reconstruction error should be reasonable
+        assert result.reconstruction_error < 1.0
+
+    def test_output_compatible_with_module3(self):
+        """Output should be compatible with Module 3 profile dict format."""
+        np.random.seed(42)
+        n_spots = 100
+
+        X = np.random.rand(n_spots, 4)
+        marker_names = ["A", "B", "C", "D"]
+        coords = np.array([[i % 10, i // 10] for i in range(n_spots)])
+
+        coloc_result = analyze_marker_colocalization(
+            X, coords, marker_names, neighbor_k=6
+        )
+
+        result = discover_hierarchical_profiles(
+            coloc_result=coloc_result,
+            antibody_expression=X,
+            marker_names=marker_names,
+        )
+
+        profile_dict = result.to_profile_dict()
+
+        # Should be Dict[str, List[str]]
+        assert isinstance(profile_dict, dict)
+        for cell_type, markers in profile_dict.items():
+            assert isinstance(cell_type, str)
+            assert isinstance(markers, list)
+            assert all(isinstance(m, str) for m in markers)
 
 
 if __name__ == "__main__":
