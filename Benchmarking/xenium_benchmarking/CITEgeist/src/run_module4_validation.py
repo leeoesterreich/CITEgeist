@@ -244,7 +244,7 @@ def create_singlecell_layers(
     logger.info(f"Creating layers for {len(unique_types)} cell types")
 
     for ct in unique_types:
-        mask = cell_types == ct
+        mask = (cell_types == ct).values  # Convert to numpy array for sparse indexing
         layer_matrix = np.zeros(adata.X.shape)
 
         if hasattr(adata.X, 'toarray'):
