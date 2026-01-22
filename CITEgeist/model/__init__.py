@@ -8,9 +8,6 @@ from .gurobi_impl import (
     map_antibodies_to_profiles,
     optimize_cell_proportions,
     optimize_gene_expression,
-    # Module 3 with negative markers
-    optimize_cell_proportions_with_negatives,
-    build_assignment_matrices_from_profiles,
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
@@ -26,11 +23,6 @@ from .spatial_colocalization import (
     # Module 2c: Profile selection
     ProfileSelectionResult,
     select_profiles,
-    # Module 2d: Hierarchical profile resolution with negative markers
-    ResolvedProfile,
-    HierarchicalProfileResult,
-    detect_residual_signal,
-    resolve_hierarchical_profiles,
 )
 
 # Module 4: Protein-anchored program discovery
@@ -75,9 +67,6 @@ __all__ = [
     "map_antibodies_to_profiles",
     "optimize_cell_proportions",
     "optimize_gene_expression",
-    # Module 3 with negative markers
-    "optimize_cell_proportions_with_negatives",
-    "build_assignment_matrices_from_profiles",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
@@ -98,11 +87,6 @@ __all__ = [
     # Module 2c: Profile selection
     "ProfileSelectionResult",
     "select_profiles",
-    # Module 2d: Hierarchical profile resolution
-    "ResolvedProfile",
-    "HierarchicalProfileResult",
-    "detect_residual_signal",
-    "resolve_hierarchical_profiles",
     # Module 4: Protein-anchored program discovery
     "SpatialSubpopulation",
     "SpatialProgram",

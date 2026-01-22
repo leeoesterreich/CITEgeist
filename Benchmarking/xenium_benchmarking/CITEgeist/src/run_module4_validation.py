@@ -244,7 +244,7 @@ def create_singlecell_layers(
     logger.info(f"Creating layers for {len(unique_types)} cell types")
 
     for ct in unique_types:
-        mask = (cell_types == ct).values  # Convert to numpy array for sparse indexing
+        mask = cell_types == ct
         layer_matrix = np.zeros(adata.X.shape)
 
         if hasattr(adata.X, 'toarray'):
@@ -292,8 +292,8 @@ def run_module4(
         n_subpopulations=3,
     )
 
-    logger.info(f"Discovered programs for {len(result.results_by_anchor)} cell types")
-    for ct, ct_result in result.results_by_anchor.items():
+    logger.info(f"Discovered programs for {len(result.results)} cell types")
+    for ct, ct_result in result.results.items():
         logger.info(f"  {ct}: {len(ct_result.programs)} programs")
 
     return result
@@ -316,10 +316,10 @@ def run_module4b(
     logger.info("Running Module 4b: Bivariate Program Relationships")
 
     result = analyze_program_relationships(
-        result=module4_result,
+        module4_result=module4_result,
         adata=adata,
         n_permutations=99,
-        fdr_threshold=0.05,
+        fdr_alpha=0.05,
     )
 
     logger.info(f"Found {len(result.significant_pairs)} significant program pairs")
@@ -374,11 +374,11 @@ def save_results(
     module4_summary = {
         "source": source,
         "region_id": region_id,
-        "n_cell_types": len(module4_result.results_by_anchor),
-        "cell_types": list(module4_result.results_by_anchor.keys()),
+        "n_cell_types": len(module4_result.results),
+        "cell_types": list(module4_result.results.keys()),
         "programs_per_type": {
             ct: len(ct_result.programs)
-            for ct, ct_result in module4_result.results_by_anchor.items()
+            for ct, ct_result in module4_result.results.items()
         },
     }
 
@@ -387,7 +387,7 @@ def save_results(
 
     # Save top genes per program
     top_genes_data = []
-    for ct, ct_result in module4_result.results_by_anchor.items():
+    for ct, ct_result in module4_result.results.items():
         for prog in ct_result.programs:
             top_genes_data.append({
                 "cell_type": ct,
