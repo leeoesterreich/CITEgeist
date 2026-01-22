@@ -950,6 +950,62 @@ class ProfileDiscoveryResult:
         )
 
 
+@dataclass
+class ProfileTreeNode:
+    """A node in the hierarchical profile tree."""
+
+    node_id: str
+    markers: List[str]  # Markers assigned to THIS node (not descendants)
+    children: List["ProfileTreeNode"]
+    parent_id: Optional[str]
+    depth: int
+    nmf_weights: Optional[Dict[str, float]] = None  # marker -> weight from NMF
+
+    @property
+    def is_leaf(self) -> bool:
+        """True if this is a leaf node (no children)."""
+        return len(self.children) == 0
+
+    def get_all_markers(self) -> List[str]:
+        """Get all markers in this subtree (self + descendants)."""
+        markers = list(self.markers)
+        for child in self.children:
+            markers.extend(child.get_all_markers())
+        return markers
+
+
+@dataclass
+class ProfileTree:
+    """Hierarchical tree of marker profiles."""
+
+    root: ProfileTreeNode
+    n_levels: int
+
+    def get_leaves(self) -> List[ProfileTreeNode]:
+        """Return all leaf nodes (final cell type profiles)."""
+        leaves: List[ProfileTreeNode] = []
+        self._collect_leaves(self.root, leaves)
+        return leaves
+
+    def _collect_leaves(self, node: ProfileTreeNode, leaves: List[ProfileTreeNode]) -> None:
+        """Recursively collect leaf nodes."""
+        if node.is_leaf:
+            leaves.append(node)
+        else:
+            for child in node.children:
+                self._collect_leaves(child, leaves)
+
+    def get_depth(self) -> int:
+        """Return maximum depth of tree."""
+        return self._max_depth(self.root)
+
+    def _max_depth(self, node: ProfileTreeNode) -> int:
+        """Recursively compute max depth."""
+        if node.is_leaf:
+            return node.depth
+        return max(self._max_depth(c) for c in node.children)
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
