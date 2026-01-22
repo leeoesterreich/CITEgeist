@@ -316,10 +316,10 @@ def run_module4b(
     logger.info("Running Module 4b: Bivariate Program Relationships")
 
     result = analyze_program_relationships(
-        module4_result=module4_result,
+        result=module4_result,
         adata=adata,
         n_permutations=99,
-        fdr_alpha=0.05,
+        fdr_threshold=0.05,
     )
 
     logger.info(f"Found {len(result.significant_pairs)} significant program pairs")
