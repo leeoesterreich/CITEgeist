@@ -175,6 +175,18 @@ class TestBuildAssignmentMatrices:
         assert neg[ecad_idx, stromal_idx] == 1.0, "E-Cadherin should be negative for Stromal"
 
 
+def _gurobi_available():
+    """Check if Gurobi is available."""
+    try:
+        import gurobipy as gp
+        # Try to create a model to verify license
+        model = gp.Model()
+        model.dispose()
+        return True
+    except Exception:
+        return False
+
+
 class TestOptimizationWithNegatives:
     """Test Module 3 optimization with negative markers."""
 
@@ -234,18 +246,6 @@ class TestOptimizationWithNegatives:
 
         assert mean_stromal_in_stromal > mean_emt_in_stromal, \
             "Stromal should be higher than EMT in Stromal spots"
-
-
-def _gurobi_available():
-    """Check if Gurobi is available."""
-    try:
-        import gurobipy as gp
-        # Try to create a model to verify license
-        model = gp.Model()
-        model.dispose()
-        return True
-    except Exception:
-        return False
 
 
 if __name__ == "__main__":

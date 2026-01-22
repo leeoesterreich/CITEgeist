@@ -15,7 +15,7 @@ module load gurobi/12.0.3
 
 # Activate conda environment
 source /ihome/alee/alc376/.bashrc
-conda activate CITEgeist_env
+conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
 
 # Change to test directory
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/tests
