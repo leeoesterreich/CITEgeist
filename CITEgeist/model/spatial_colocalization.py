@@ -1006,6 +1006,55 @@ class ProfileTree:
         return max(self._max_depth(c) for c in node.children)
 
 
+@dataclass
+class HierarchicalProfileResult:
+    """Results from hierarchical profile discovery.
+
+    This container holds the complete hierarchical tree structure along with
+    flattened profiles that are compatible with downstream Module 3
+    deconvolution.
+
+    Attributes:
+        tree: Full hierarchical tree for inspection and visualization.
+        flat_profiles: Cell type -> list of markers, for Module 3 compatibility.
+        depth_per_branch: Branch name -> depth, indicating hierarchy complexity.
+        shared_markers: Marker -> list of cell types that share this marker.
+        reconstruction_error: Final reconstruction error from profile fitting.
+    """
+
+    tree: ProfileTree  # Full hierarchy for inspection
+    flat_profiles: Dict[str, List[str]]  # cell_type -> [markers] for Module 3
+    depth_per_branch: Dict[str, int]  # branch_name -> depth
+    shared_markers: Dict[str, List[str]]  # marker -> [cell_types that share it]
+    reconstruction_error: float  # Final reconstruction error
+
+    def to_profile_dict(self) -> Dict[str, List[str]]:
+        """Convert to Module 3 compatible profile dictionary.
+
+        Returns:
+            Dictionary mapping cell type names to marker lists, suitable
+            for use with CitegeistModel.load_cell_profile_dict().
+        """
+        return dict(self.flat_profiles)
+
+    def summary(self) -> str:
+        """Return a human-readable summary string.
+
+        Returns:
+            Multi-line string with key statistics about the hierarchical
+            profiles.
+        """
+        n_profiles = len(self.flat_profiles)
+        n_shared = len(self.shared_markers)
+        max_depth = self.tree.get_depth()
+        return (
+            f"Hierarchical profiles: {n_profiles} cell types\n"
+            f"Tree depth: {max_depth}\n"
+            f"Shared markers: {n_shared}\n"
+            f"Reconstruction error: {self.reconstruction_error:.4f}"
+        )
+
+
 def _apply_fdr_correction(
     pairs: List[MarkerPairColocalization],
     alpha: float = 0.05,
