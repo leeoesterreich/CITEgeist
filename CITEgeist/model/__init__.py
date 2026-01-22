@@ -23,6 +23,11 @@ from .spatial_colocalization import (
     # Module 2c: Profile selection
     ProfileSelectionResult,
     select_profiles,
+    # Module 2b enhancement: Hierarchical profile discovery
+    ProfileTreeNode,
+    ProfileTree,
+    HierarchicalProfileResult,
+    discover_hierarchical_profiles,
 )
 
 # Module 4: Protein-anchored program discovery
@@ -87,6 +92,11 @@ __all__ = [
     # Module 2c: Profile selection
     "ProfileSelectionResult",
     "select_profiles",
+    # Module 2b enhancement: Hierarchical profile discovery
+    "ProfileTreeNode",
+    "ProfileTree",
+    "HierarchicalProfileResult",
+    "discover_hierarchical_profiles",
     # Module 4: Protein-anchored program discovery
     "SpatialSubpopulation",
     "SpatialProgram",
