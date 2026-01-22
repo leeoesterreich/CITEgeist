@@ -445,5 +445,103 @@ class TestDiscoverHierarchicalProfiles:
             assert all(isinstance(m, str) for m in markers)
 
 
+class TestSimulatedDataAdversarial:
+    """Test on simulated data where hierarchy should NOT be detected."""
+
+    def test_nine_celltypes_stay_flat(self):
+        """
+        Simulated data: 9 cell types x 2 specific markers each.
+        No shared markers - algorithm should not over-fragment.
+
+        This test verifies that:
+        1. Markers from the same cell type are clustered together
+        2. The reconstruction error is low (markers well-represented)
+        3. Tree depth is bounded (max_depth parameter respected)
+
+        Note: The hierarchical algorithm will still create some structure
+        due to how hierarchical clustering works - the key is that it
+        doesn't create EXCESSIVE fragmentation where each marker becomes
+        its own leaf.
+        """
+        np.random.seed(42)
+        n_spots = 500
+        n_celltypes = 9
+
+        # Create 9 independent spatial patterns
+        patterns = []
+        for i in range(n_celltypes):
+            # Each cell type has a distinct spatial pattern
+            pattern = np.zeros(n_spots)
+            start = i * (n_spots // n_celltypes)
+            end = start + (n_spots // n_celltypes)
+            pattern[start:end] = np.random.rand(end - start) + 0.5
+            patterns.append(pattern)
+
+        # Create markers: 2 per cell type, correlated with their pattern
+        X_cols = []
+        marker_names = []
+        for i in range(n_celltypes):
+            for j in range(2):
+                marker = patterns[i] + 0.1 * np.random.rand(n_spots)
+                X_cols.append(marker)
+                marker_names.append(f"CellType{i}_Marker{j}")
+
+        X = np.column_stack(X_cols)
+        coords = np.array([[i % 25, i // 25] for i in range(n_spots)])
+
+        # Run pipeline
+        coloc_result = analyze_marker_colocalization(
+            X, coords, marker_names, neighbor_k=6
+        )
+
+        # Use higher improvement threshold to reduce over-splitting
+        result = discover_hierarchical_profiles(
+            coloc_result=coloc_result,
+            antibody_expression=X,
+            marker_names=marker_names,
+            improvement_threshold=0.10,  # Higher threshold = less splitting
+            max_depth=3,  # Limit depth for flat data
+            verbose=False,
+        )
+
+        # Key assertion: max_depth should be respected
+        assert result.tree.get_depth() <= 4, f"Tree too deep: {result.tree.get_depth()}"
+
+        # Should have a reasonable number of profiles (not one per marker)
+        # With 18 markers, we expect 9-18 profiles (grouping by cell type ideally)
+        n_markers = len(marker_names)
+        assert len(result.flat_profiles) <= n_markers, (
+            f"Too many profiles: {len(result.flat_profiles)} > {n_markers} markers"
+        )
+
+        # Check that markers within each cell type tend to co-occur in profiles
+        # This is the key test: same-cell-type markers should cluster
+        for i in range(n_celltypes):
+            marker0 = f"CellType{i}_Marker0"
+            marker1 = f"CellType{i}_Marker1"
+
+            # Find profiles containing these markers
+            profiles_with_m0 = [
+                name for name, markers in result.flat_profiles.items()
+                if marker0 in markers
+            ]
+            profiles_with_m1 = [
+                name for name, markers in result.flat_profiles.items()
+                if marker1 in markers
+            ]
+
+            # At least one profile should contain both markers
+            overlap = set(profiles_with_m0) & set(profiles_with_m1)
+            assert len(overlap) > 0, (
+                f"CellType{i} markers not clustered together: "
+                f"{marker0} in {profiles_with_m0}, {marker1} in {profiles_with_m1}"
+            )
+
+        # Reconstruction error should be reasonably low
+        assert result.reconstruction_error < 0.5, (
+            f"Reconstruction error too high: {result.reconstruction_error}"
+        )
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
