@@ -2148,3 +2148,105 @@ def _deconvolved_spatial_nmf(
     reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, 'fro')
 
     return W, H.T, reconstruction_error
+
+
+# =============================================================================
+# MODULE 4c: REGION-AWARE PROGRAM ANALYSIS
+# =============================================================================
+
+
+def analyze_program_regions(
+    result: AnchoredProgramResult,
+    adata: sc.AnnData,
+    region_column: str,
+    min_spots_per_region: int = 20,
+) -> AnchoredProgramResult:
+    """
+    Annotate programs with region enrichment statistics.
+
+    For each program, computes activity distribution across regions defined by
+    a categorical column in adata.obs, and tests for significant enrichment.
+
+    This is a post-hoc analysis step - programs are discovered first, then
+    analyzed for regional variation.
+
+    Args:
+        result: AnchoredProgramResult from discover_programs_from_layers()
+        adata: AnnData with region annotations in obs
+        region_column: Column in adata.obs defining regions (e.g., "D538G Mutation")
+        min_spots_per_region: Minimum spots required per region for analysis
+
+    Returns:
+        AnchoredProgramResult with region fields populated in each SpatialProgram
+
+    Example:
+        >>> result = discover_programs_from_layers(adata, ...)
+        >>> result = analyze_program_regions(result, adata, "D538G Mutation")
+        >>> for prog in result.programs:
+        ...     print(f"Program {prog.program_id}: enriched in {prog.enriched_region}")
+    """
+    from scipy.stats import mannwhitneyu, kruskal
+
+    if region_column not in adata.obs.columns:
+        raise ValueError(f"Region column '{region_column}' not found in adata.obs")
+
+    regions = adata.obs[region_column].unique()
+    n_regions = len(regions)
+
+    logger.info(f"Analyzing program regions using '{region_column}' ({n_regions} regions)")
+
+    # Get program activities (H matrix)
+    H = result.H  # Shape: (K_programs, n_spots)
+
+    # Analyze each program
+    for k, program in enumerate(result.programs):
+        h_k = H[k, :]  # Activity for this program across spots
+
+        # Compute mean activity per region
+        region_means = {}
+        region_activities = {}
+        for region in regions:
+            mask = (adata.obs[region_column] == region).values
+            if mask.sum() >= min_spots_per_region:
+                activities = h_k[mask]
+                region_means[str(region)] = float(np.mean(activities))
+                region_activities[str(region)] = activities
+
+        program.region_enrichment = region_means
+
+        # Skip statistical test if insufficient regions
+        if len(region_activities) < 2:
+            program.region_specificity = 0.0
+            program.region_pvalue = 1.0
+            program.enriched_region = None
+            continue
+
+        # Statistical test for region differences
+        activity_lists = list(region_activities.values())
+        if n_regions == 2:
+            # Mann-Whitney U for two regions
+            stat, pval = mannwhitneyu(activity_lists[0], activity_lists[1], alternative='two-sided')
+        else:
+            # Kruskal-Wallis for multiple regions
+            stat, pval = kruskal(*activity_lists)
+
+        program.region_pvalue = float(pval)
+
+        # Compute specificity score (coefficient of variation of region means)
+        means = np.array(list(region_means.values()))
+        if means.mean() > 0:
+            program.region_specificity = float(means.std() / means.mean())
+        else:
+            program.region_specificity = 0.0
+
+        # Identify enriched region
+        if pval < 0.05 and len(region_means) > 0:
+            program.enriched_region = max(region_means, key=region_means.get)
+        else:
+            program.enriched_region = None
+
+    n_enriched = sum(1 for p in result.programs if p.enriched_region is not None)
+    logger.info(f"Region analysis complete: {n_enriched}/{len(result.programs)} "
+                f"programs show significant region enrichment")
+
+    return result
