@@ -14,7 +14,7 @@ import numpy as np
 import scanpy as sc
 
 # Add CITEgeist to path
-REPO_ROOT = Path(__file__).parent.parent
+REPO_ROOT = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/hierarchical-profiles")
 sys.path.insert(0, str(REPO_ROOT))
 
 from CITEgeist.model.spatial_colocalization import (
@@ -29,8 +29,8 @@ def test_simulated_data():
     print("TEST 1: Simulated High-Seg Data")
     print("=" * 70)
 
-    # Load simulated data
-    sim_dir = REPO_ROOT.parent / "replicates/high_seg/h5ad_objects"
+    # Load simulated data (in main repo, not worktree)
+    sim_dir = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects")
     cite_path = sim_dir / "Wu_rep_1_CITE.h5ad"
 
     if not cite_path.exists():
@@ -89,8 +89,8 @@ def test_xenium_data():
     print("TEST 2: Xenium Data")
     print("=" * 70)
 
-    # Load Xenium data
-    xenium_dir = REPO_ROOT.parent / "Benchmarking/xenium_pseudovisium/data_granular_gt"
+    # Load Xenium data (in main repo, not worktree)
+    xenium_dir = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt")
     cite_path = xenium_dir / "h5ad_objects" / "Xenium_region_0_CITE.h5ad"
 
     if not cite_path.exists():

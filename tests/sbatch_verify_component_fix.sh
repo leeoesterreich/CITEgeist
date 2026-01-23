@@ -24,7 +24,7 @@ module load anaconda3/2023.09-0-python_3.11.5
 source activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
 
 PYTHON="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/bin/python"
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/hierarchical-profiles/tests"
 
 ${PYTHON} "${SCRIPT_DIR}/verify_component_fix.py"
 
