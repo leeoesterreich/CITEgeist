@@ -3534,6 +3534,92 @@ def select_profiles(
 # =============================================================================
 
 
+def _detect_adaptive_threshold(
+    topk_pairs: List[MarkerPairColocalization],
+    fdr_pairs: List[MarkerPairColocalization],
+    fallback: float = 0.85,
+    verbose: bool = True,
+) -> float:
+    """
+    Automatically detect the optimal adaptive ratio threshold for this sample.
+
+    Approach: Compute edge ratios (score / min(best_a, best_b)) and find the
+    largest gap in the distribution. Within-celltype edges cluster near 1.0,
+    cross-celltype bridges have lower ratios. The gap separates them.
+
+    Args:
+        topk_pairs: Pairs after top-k filtering
+        fdr_pairs: Pairs after FDR filtering (for computing best scores)
+        fallback: Fallback threshold if no clear gap is found
+        verbose: Log detection details
+
+    Returns:
+        Detected threshold ratio (between 0.75 and 0.95)
+    """
+    if len(topk_pairs) < 3:
+        return fallback
+
+    # Build per-marker best scores
+    marker_best: Dict[str, float] = defaultdict(float)
+    for p in fdr_pairs:
+        marker_best[p.marker_a] = max(marker_best[p.marker_a], p.colocalization_score)
+        marker_best[p.marker_b] = max(marker_best[p.marker_b], p.colocalization_score)
+
+    # Compute ratio for each edge
+    edge_ratios = []
+    for p in topk_pairs:
+        best_a = marker_best.get(p.marker_a, 0)
+        best_b = marker_best.get(p.marker_b, 0)
+        if min(best_a, best_b) > 0:
+            ratio = p.colocalization_score / min(best_a, best_b)
+            edge_ratios.append(ratio)
+
+    if len(edge_ratios) < 3:
+        return fallback
+
+    edge_ratios = np.array(sorted(edge_ratios))
+
+    # Find largest gap in the distribution
+    # Only consider gaps in the range [0.75, 0.95] - outside this range is unlikely to be useful
+    gaps = []
+    for i in range(len(edge_ratios) - 1):
+        lower = edge_ratios[i]
+        upper = edge_ratios[i + 1]
+        midpoint = (lower + upper) / 2
+        gap_size = upper - lower
+
+        # Only consider gaps where the midpoint is in [0.75, 0.95]
+        if 0.75 <= midpoint <= 0.95 and gap_size > 0.02:  # Min gap size of 2%
+            gaps.append((gap_size, midpoint, lower, upper))
+
+    if gaps:
+        # Use the largest gap
+        gaps.sort(reverse=True)
+        best_gap = gaps[0]
+        detected_threshold = best_gap[1]  # Use midpoint of gap
+
+        if verbose:
+            logger.info(f"Auto-detected threshold: {detected_threshold:.3f} "
+                       f"(gap of {best_gap[0]:.3f} between {best_gap[2]:.3f} and {best_gap[3]:.3f})")
+
+        return detected_threshold
+
+    # No clear gap found - use elbow detection
+    # Find where removing edges causes the biggest change in edge count
+    # This is a simpler heuristic: use the ratio at the 25th percentile
+    # (keeping top 75% of edges by ratio)
+    if len(edge_ratios) >= 4:
+        percentile_threshold = np.percentile(edge_ratios, 25)
+        if 0.75 <= percentile_threshold <= 0.95:
+            if verbose:
+                logger.info(f"Auto-detected threshold (25th percentile): {percentile_threshold:.3f}")
+            return percentile_threshold
+
+    if verbose:
+        logger.info(f"No clear gap found, using fallback threshold: {fallback}")
+    return fallback
+
+
 def discover_hierarchical_profiles(
     coloc_result: ColocalizationResult,
     antibody_expression: NDArray[np.floating],
@@ -3546,6 +3632,8 @@ def discover_hierarchical_profiles(
     neighbor_k: int = 6,
     fdr_alpha: float = 0.05,
     top_k: int = 3,
+    min_edge_score: float = 0.0,
+    adaptive_ratio_threshold: Optional[float] = None,
     verbose: bool = True,
 ) -> HierarchicalProfileResult:
     """
@@ -3572,6 +3660,13 @@ def discover_hierarchical_profiles(
         neighbor_k: Number of neighbors for spatial weights (default 6)
         fdr_alpha: FDR threshold for significant colocalization edges (default 0.05)
         top_k: Mutual top-k for edge sparsification (default 3)
+        min_edge_score: Minimum absolute colocalization score (default 0.0, disabled).
+            If > 0, edges below this threshold are removed regardless of adaptive filtering.
+        adaptive_ratio_threshold: Adaptive threshold as ratio to best partner.
+            For edge A-B to pass, score must be >= ratio * min(best_score_A, best_score_B).
+            - None (default): Auto-detect threshold by finding gap in ratio distribution
+            - 0.0: Disable adaptive filtering
+            - 0.75-0.95: Use fixed threshold (0.85 recommended if not auto-detecting)
         verbose: Log progress (default True)
 
     Returns:
@@ -3605,6 +3700,47 @@ def discover_hierarchical_profiles(
             logger.info(f"Mutual top-{top_k} sparsification: {len(topk_pairs)}/{len(fdr_pairs)} pairs")
     else:
         topk_pairs = fdr_pairs
+
+    # Apply adaptive ratio threshold
+    # For each marker, compute best partner score, then filter edges where
+    # score >= ratio * min(best_score_A, best_score_B)
+    # If threshold is None, auto-detect from data
+    if adaptive_ratio_threshold is None:
+        # Auto-detect threshold for this sample
+        adaptive_ratio_threshold = _detect_adaptive_threshold(
+            topk_pairs, fdr_pairs, fallback=0.85, verbose=verbose
+        )
+
+    if adaptive_ratio_threshold > 0:
+        # Build per-marker best scores from FDR pairs (before top-k, for broader context)
+        marker_best_score: Dict[str, float] = defaultdict(float)
+        for p in fdr_pairs:
+            marker_best_score[p.marker_a] = max(marker_best_score[p.marker_a], p.colocalization_score)
+            marker_best_score[p.marker_b] = max(marker_best_score[p.marker_b], p.colocalization_score)
+
+        pre_adaptive_count = len(topk_pairs)
+        adaptive_kept = []
+        for p in topk_pairs:
+            best_a = marker_best_score.get(p.marker_a, 0)
+            best_b = marker_best_score.get(p.marker_b, 0)
+            # Edge passes if score >= ratio * min(best_a, best_b)
+            # Using min ensures both markers consider this a strong partnership
+            threshold = adaptive_ratio_threshold * min(best_a, best_b)
+            if p.colocalization_score >= threshold:
+                adaptive_kept.append(p)
+
+        topk_pairs = adaptive_kept
+        if verbose:
+            logger.info(f"Adaptive ratio filter (>= {adaptive_ratio_threshold:.3f} * best): "
+                       f"{len(topk_pairs)}/{pre_adaptive_count} pairs")
+
+    # Apply minimum absolute edge score threshold (if specified)
+    # This is an additional safety filter for very noisy data
+    if min_edge_score > 0:
+        pre_threshold_count = len(topk_pairs)
+        topk_pairs = [p for p in topk_pairs if p.colocalization_score >= min_edge_score]
+        if verbose:
+            logger.info(f"Min edge score filter (>= {min_edge_score}): {len(topk_pairs)}/{pre_threshold_count} pairs")
 
     # Build edges and find connected components
     significant_edges = [
