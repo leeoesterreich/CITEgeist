@@ -293,6 +293,85 @@ def _compute_bivariate_morans_i(
     return float(bivariate_i)
 
 
+def _compute_bivariate_morans_i_with_weights(
+    values_a: NDArray[np.floating],
+    values_b: NDArray[np.floating],
+    spatial_weights: NDArray[np.floating],
+) -> float:
+    """
+    Fast bivariate Moran's I using precomputed spatial weights matrix.
+
+    This is optimized for repeated calls during tree building where the
+    spatial structure doesn't change but markers do.
+
+    Args:
+        values_a: Expression values for marker A (n_spots,).
+        values_b: Expression values for marker B (n_spots,).
+        spatial_weights: Row-normalized spatial weights matrix (n_spots, n_spots).
+            W[i,j] > 0 if j is a neighbor of i, rows should sum to 1.
+
+    Returns:
+        Bivariate Moran's I in range approximately [-1, 1].
+    """
+    # Center and standardize
+    mean_a = np.mean(values_a)
+    mean_b = np.mean(values_b)
+    std_a = np.std(values_a)
+    std_b = np.std(values_b)
+
+    if std_a < 1e-10 or std_b < 1e-10:
+        return 0.0
+
+    a_centered = (values_a - mean_a) / std_a
+    b_centered = (values_b - mean_b) / std_b
+
+    # Spatially-lagged B using matrix multiplication (fast!)
+    b_lagged = spatial_weights @ b_centered
+
+    # Bivariate Moran's I
+    bivariate_i = np.mean(a_centered * b_lagged)
+
+    return float(bivariate_i)
+
+
+def _build_spatial_weights_matrix(
+    coords: NDArray[np.floating],
+    k: int = 6,
+) -> NDArray[np.floating]:
+    """
+    Build row-normalized spatial weights matrix from coordinates.
+
+    Args:
+        coords: Spatial coordinates (n_spots, 2).
+        k: Number of nearest neighbors.
+
+    Returns:
+        Row-normalized spatial weights matrix (n_spots, n_spots).
+    """
+    from sklearn.neighbors import NearestNeighbors
+
+    n_spots = coords.shape[0]
+
+    # Find k nearest neighbors
+    nn = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree')
+    nn.fit(coords)
+    distances, indices = nn.kneighbors(coords)
+
+    # Build sparse-ish weights matrix (dense for simplicity, could optimize later)
+    W = np.zeros((n_spots, n_spots), dtype=np.float64)
+    for i in range(n_spots):
+        # Skip self (index 0), use neighbors (indices 1:k+1)
+        neighbor_indices = indices[i, 1:]
+        W[i, neighbor_indices] = 1.0
+
+    # Row-normalize
+    row_sums = W.sum(axis=1, keepdims=True)
+    row_sums[row_sums == 0] = 1.0  # Avoid division by zero
+    W = W / row_sums
+
+    return W
+
+
 def _compute_bivariate_morans_i_pvalue(
     values_a: NDArray[np.floating],
     values_b: NDArray[np.floating],
@@ -1195,22 +1274,31 @@ def _recursive_tree_cut(
     scipy_node,
     X: NDArray[np.floating],
     marker_names: List[str],
+    marker_indices: List[int],
+    spatial_weights: NDArray[np.floating],
     improvement_threshold: float,
+    sharing_ratio: float,
+    sharing_min_I: float,
     current_depth: int,
     max_depth: int,
     parent_id: Optional[str],
 ) -> ProfileTreeNode:
     """
-    Recursively build tree with reconstruction-guided cutting.
+    Recursively build tree with reconstruction-guided cutting and shared marker detection.
 
-    At each node, check if splitting improves reconstruction.
-    If improvement > threshold, split. Otherwise, stop.
+    At each node, check if splitting improves reconstruction. If splitting,
+    classify each marker as SHARED (stays at internal node) or SPECIFIC
+    (passes to left or right child) based on bivariate Moran's I.
 
     Args:
         scipy_node: Scipy ClusterNode from to_tree()
         X: Expression matrix (n_spots, n_markers)
         marker_names: Names for each column
+        marker_indices: Which marker columns this node is responsible for
+        spatial_weights: Precomputed row-normalized spatial weights matrix
         improvement_threshold: Min reconstruction improvement to split
+        sharing_ratio: Min ratio of bivariate Moran's I for shared classification
+        sharing_min_I: Min bivariate Moran's I with both children for shared
         current_depth: Current depth in tree
         max_depth: Maximum tree depth (safety limit)
         parent_id: ID of parent node
@@ -1220,12 +1308,11 @@ def _recursive_tree_cut(
     """
     node_id = f"node_{scipy_node.id}"
 
-    # Get markers in this subtree
-    leaf_indices = _get_leaf_indices(scipy_node)
-    node_markers = [marker_names[i] for i in leaf_indices if i < len(marker_names)]
+    # Get markers this node is responsible for
+    node_markers = [marker_names[i] for i in marker_indices]
 
     # Base case: leaf node or max depth reached
-    if scipy_node.is_leaf() or current_depth >= max_depth:
+    if scipy_node.is_leaf() or current_depth >= max_depth or len(marker_indices) == 0:
         return ProfileTreeNode(
             node_id=node_id,
             markers=node_markers,
@@ -1234,14 +1321,16 @@ def _recursive_tree_cut(
             depth=current_depth,
         )
 
-    # Get left and right children markers
-    left_indices = _get_leaf_indices(scipy_node.get_left())
-    right_indices = _get_leaf_indices(scipy_node.get_right())
-    left_markers = [marker_names[i] for i in left_indices if i < len(marker_names)]
-    right_markers = [marker_names[i] for i in right_indices if i < len(marker_names)]
+    # Get clustering's left and right marker indices (for computing representative signals)
+    cluster_left_indices = _get_leaf_indices(scipy_node.get_left())
+    cluster_right_indices = _get_leaf_indices(scipy_node.get_right())
 
-    # Skip split if either side is empty
-    if len(left_markers) == 0 or len(right_markers) == 0:
+    # Filter to only indices we're responsible for
+    left_cluster_set = set(cluster_left_indices)
+    right_cluster_set = set(cluster_right_indices)
+
+    # Skip split if clustering doesn't have valid children
+    if len(cluster_left_indices) == 0 or len(cluster_right_indices) == 0:
         return ProfileTreeNode(
             node_id=node_id,
             markers=node_markers,
@@ -1250,17 +1339,20 @@ def _recursive_tree_cut(
             depth=current_depth,
         )
 
-    # Compute reconstruction error: merged vs split
+    # Compute reconstruction error to decide whether to split
     error_merged = _compute_reconstruction_error(X, marker_names, node_markers)
-    error_left = _compute_reconstruction_error(X, marker_names, left_markers)
-    error_right = _compute_reconstruction_error(X, marker_names, right_markers)
+    left_marker_names = [marker_names[i] for i in cluster_left_indices if i < len(marker_names)]
+    right_marker_names = [marker_names[i] for i in cluster_right_indices if i < len(marker_names)]
+    error_left = _compute_reconstruction_error(X, marker_names, left_marker_names)
+    error_right = _compute_reconstruction_error(X, marker_names, right_marker_names)
 
-    # Weighted average error for split case
-    error_split = (
-        error_left * len(left_markers) + error_right * len(right_markers)
-    ) / len(node_markers)
+    n_left = len(left_marker_names)
+    n_right = len(right_marker_names)
+    if n_left + n_right > 0:
+        error_split = (error_left * n_left + error_right * n_right) / (n_left + n_right)
+    else:
+        error_split = error_merged
 
-    # Compute improvement
     if error_merged > 1e-10:
         improvement = (error_merged - error_split) / error_merged
     else:
@@ -1268,25 +1360,75 @@ def _recursive_tree_cut(
 
     # Decision: split or stop
     if improvement > improvement_threshold:
-        # Split is worthwhile - recurse on children
+        # Compute representative signals for left and right children
+        # Use mean expression of markers in each cluster
+        if len(cluster_left_indices) > 0:
+            left_signal = X[:, cluster_left_indices].mean(axis=1)
+        else:
+            left_signal = np.zeros(X.shape[0])
+
+        if len(cluster_right_indices) > 0:
+            right_signal = X[:, cluster_right_indices].mean(axis=1)
+        else:
+            right_signal = np.zeros(X.shape[0])
+
+        # Classify each marker as shared or specific
+        shared_markers = []
+        shared_indices = []
+        left_specific_markers = []
+        left_specific_indices = []
+        right_specific_markers = []
+        right_specific_indices = []
+
+        for idx in marker_indices:
+            marker_expr = X[:, idx]
+
+            # Compute bivariate Moran's I with each child's representative signal
+            I_left = _compute_bivariate_morans_i_with_weights(
+                marker_expr, left_signal, spatial_weights
+            )
+            I_right = _compute_bivariate_morans_i_with_weights(
+                marker_expr, right_signal, spatial_weights
+            )
+
+            max_I = max(I_left, I_right)
+            min_I = min(I_left, I_right)
+            ratio = min_I / max_I if max_I > 1e-10 else 0.0
+
+            if ratio > sharing_ratio and min_I > sharing_min_I:
+                # Shared: stays at this internal node
+                shared_markers.append(marker_names[idx])
+                shared_indices.append(idx)
+            elif I_left >= I_right:
+                # Specific to left child
+                left_specific_markers.append(marker_names[idx])
+                left_specific_indices.append(idx)
+            else:
+                # Specific to right child
+                right_specific_markers.append(marker_names[idx])
+                right_specific_indices.append(idx)
+
+        # Recurse on children with only their specific markers
         left_child = _recursive_tree_cut(
-            scipy_node.get_left(), X, marker_names,
-            improvement_threshold, current_depth + 1, max_depth, node_id
+            scipy_node.get_left(), X, marker_names, left_specific_indices,
+            spatial_weights, improvement_threshold, sharing_ratio, sharing_min_I,
+            current_depth + 1, max_depth, node_id
         )
         right_child = _recursive_tree_cut(
-            scipy_node.get_right(), X, marker_names,
-            improvement_threshold, current_depth + 1, max_depth, node_id
+            scipy_node.get_right(), X, marker_names, right_specific_indices,
+            spatial_weights, improvement_threshold, sharing_ratio, sharing_min_I,
+            current_depth + 1, max_depth, node_id
         )
 
         return ProfileTreeNode(
             node_id=node_id,
-            markers=[],  # Internal nodes don't own markers directly
+            markers=shared_markers,  # Internal nodes now hold shared markers!
             children=[left_child, right_child],
             parent_id=parent_id,
             depth=current_depth,
         )
     else:
-        # Stop here - this is a leaf
+        # Stop here - this is a leaf with all remaining markers
         return ProfileTreeNode(
             node_id=node_id,
             markers=node_markers,
@@ -1300,42 +1442,50 @@ def _build_hierarchical_tree(
     X: NDArray[np.floating],
     marker_names: List[str],
     linkage_matrix: NDArray[np.floating],
+    coords: NDArray[np.floating],
     improvement_threshold: float = 0.05,
+    sharing_ratio: float = 0.5,
+    sharing_min_I: float = 0.2,
     max_depth: int = 5,
+    neighbor_k: int = 6,
 ) -> ProfileTree:
     """
-    Build hierarchical profile tree with reconstruction-guided cutting.
+    Build hierarchical profile tree with reconstruction-guided cutting and shared marker detection.
 
     This function converts a scipy linkage matrix into a ProfileTree by
     recursively deciding whether to split nodes based on reconstruction
-    improvement. At each internal node, we compare:
-    - Error of reconstructing all markers together (merged)
-    - Weighted average error of reconstructing left/right children separately
-
-    If splitting improves reconstruction by more than improvement_threshold,
-    we continue splitting. Otherwise, we stop and create a leaf node.
+    improvement. At each split, markers are classified as SHARED (stay at
+    internal node) or SPECIFIC (pass to child) using bivariate Moran's I.
 
     Args:
         X: Expression matrix (n_spots, n_markers)
         marker_names: Names for each column in X
         linkage_matrix: Scipy linkage matrix from hierarchical clustering
+        coords: Spatial coordinates (n_spots, 2)
         improvement_threshold: Minimum relative reconstruction improvement
             required to split a node (default 5%). Higher values create
             shallower trees.
+        sharing_ratio: Min ratio of bivariate Moran's I values for a marker
+            to be classified as shared (default 0.5).
+        sharing_min_I: Min bivariate Moran's I with both children for a marker
+            to be classified as shared (default 0.2).
         max_depth: Maximum tree depth as safety limit (default 5)
+        neighbor_k: Number of neighbors for spatial weights (default 6)
 
     Returns:
-        ProfileTree with reconstruction-guided structure. Leaf nodes contain
-        marker sets that should be treated as single profiles.
+        ProfileTree with reconstruction-guided structure. Internal nodes contain
+        shared markers inherited by all descendants. Leaf nodes contain specific
+        markers unique to that profile.
 
     Example:
         >>> from scipy.cluster.hierarchy import linkage
         >>> from scipy.spatial.distance import squareform
         >>> X = np.random.rand(100, 4)
+        >>> coords = np.random.rand(100, 2)
         >>> D = 1 - np.corrcoef(X.T)
         >>> np.fill_diagonal(D, 0)
         >>> Z = linkage(squareform(D), method='ward')
-        >>> tree = _build_hierarchical_tree(X, ["A", "B", "C", "D"], Z)
+        >>> tree = _build_hierarchical_tree(X, ["A", "B", "C", "D"], Z, coords)
         >>> leaves = tree.get_leaves()
     """
     from scipy.cluster.hierarchy import to_tree
@@ -1343,12 +1493,22 @@ def _build_hierarchical_tree(
     # Convert scipy linkage to tree structure
     scipy_root = to_tree(linkage_matrix)
 
+    # Precompute spatial weights matrix (for fast bivariate Moran's I)
+    spatial_weights = _build_spatial_weights_matrix(coords, k=neighbor_k)
+
+    # All markers start at the root
+    all_marker_indices = list(range(len(marker_names)))
+
     # Recursively build ProfileTree with reconstruction-guided cutting
     root_node = _recursive_tree_cut(
         scipy_node=scipy_root,
         X=X,
         marker_names=marker_names,
+        marker_indices=all_marker_indices,
+        spatial_weights=spatial_weights,
         improvement_threshold=improvement_threshold,
+        sharing_ratio=sharing_ratio,
+        sharing_min_I=sharing_min_I,
         current_depth=0,
         max_depth=max_depth,
         parent_id=None,
@@ -1470,21 +1630,17 @@ def _compute_nmf_weights(
 
 def _flatten_tree_to_profiles(
     tree: ProfileTree,
-    all_weights: Dict[str, Dict[str, Dict[str, float]]],
-    min_weight: float = 0.05,
 ) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
     """
-    Flatten hierarchical tree to flat profiles with weight propagation.
+    Flatten hierarchical tree to flat profiles with inheritance.
 
-    This function traverses the hierarchical profile tree and produces flat
-    marker profiles for each leaf node (cell type). Markers from ancestor nodes
-    are propagated down to leaves, with shared markers (like CD3 for T cells)
-    appearing in multiple child profiles.
+    Each leaf profile collects markers from the entire path from root to leaf,
+    including shared markers at internal nodes. This enables proper inheritance
+    of lineage markers (e.g., CD3 for all T cells).
 
     Args:
-        tree: ProfileTree with hierarchy structure
-        all_weights: Nested dict: parent_id -> child_id -> marker -> weight
-        min_weight: Minimum weight to include marker in profile
+        tree: ProfileTree with hierarchy structure. Internal nodes contain
+            shared markers, leaf nodes contain specific markers.
 
     Returns:
         Tuple of:
@@ -1498,11 +1654,9 @@ def _flatten_tree_to_profiles(
     leaves = tree.get_leaves()
 
     for leaf in leaves:
-        # Collect all markers from leaf up to root with propagated weights
-        leaf_markers = _collect_markers_with_weights(
-            leaf, tree.root, all_weights, min_weight
-        )
-        flat_profiles[leaf.node_id] = list(leaf_markers.keys())
+        # Collect ALL markers from root to this leaf (including inherited ones)
+        leaf_markers = _collect_path_markers(leaf, tree.root)
+        flat_profiles[leaf.node_id] = list(leaf_markers)
 
         # Track which profiles contain each marker
         for marker in leaf_markers:
@@ -1516,6 +1670,258 @@ def _flatten_tree_to_profiles(
     return flat_profiles, shared_markers
 
 
+def _collect_path_markers(
+    leaf: ProfileTreeNode,
+    root: ProfileTreeNode,
+) -> Set[str]:
+    """
+    Collect all markers along the path from root to leaf.
+
+    This includes markers assigned at every node along the path, ensuring
+    that shared lineage markers (e.g., CD3 for all T cells) are included
+    in descendant profiles.
+
+    Args:
+        leaf: Target leaf node
+        root: Root of the tree
+
+    Returns:
+        Set of all markers along the path from root to leaf
+    """
+    # Find path from root to leaf
+    def find_path(node: ProfileTreeNode, target_id: str) -> Optional[List[ProfileTreeNode]]:
+        if node.node_id == target_id:
+            return [node]
+        for child in node.children:
+            result = find_path(child, target_id)
+            if result:
+                return [node] + result
+        return None
+
+    path = find_path(root, leaf.node_id)
+    if path is None:
+        # Fallback: return leaf's own markers
+        return set(leaf.markers)
+
+    # Collect markers from all nodes along the path
+    all_markers: Set[str] = set()
+    for node in path:
+        all_markers.update(node.markers)
+
+    return all_markers
+
+
+def _redistribute_markers_by_weights(
+    tree: ProfileTree,
+    all_weights: Dict[str, Dict[str, Dict[str, float]]],
+    sharing_threshold: float = 0.7,
+) -> None:
+    """
+    Redistribute markers in tree based on NMF weights.
+
+    Markers with "flat" weight distributions (shared equally across children)
+    are moved to internal nodes. Markers with "peaked" distributions
+    (specific to one child) stay at leaves.
+
+    This modifies the tree IN PLACE.
+
+    A marker is considered "shared" if max_weight / sum_weights < sharing_threshold.
+    For example, with sharing_threshold=0.7:
+    - {CD4_T: 0.5, CD8_T: 0.5} → max/sum = 0.5/1.0 = 0.5 < 0.7 → SHARED
+    - {CD4_T: 0.8, CD8_T: 0.2} → max/sum = 0.8/1.0 = 0.8 >= 0.7 → SPECIFIC
+
+    Args:
+        tree: ProfileTree to modify (in place)
+        all_weights: NMF weights from discover_hierarchical_profiles
+        sharing_threshold: Max weight ratio below which marker is shared (default 0.7)
+    """
+    def redistribute_at_node(node: ProfileTreeNode) -> None:
+        """Recursively redistribute markers at internal nodes."""
+        if node.is_leaf or len(node.children) == 0:
+            return
+
+        # Get weights for this node's children
+        if node.node_id not in all_weights:
+            # No weights - recurse to children
+            for child in node.children:
+                redistribute_at_node(child)
+            return
+
+        node_weights = all_weights[node.node_id]
+
+        # Collect all markers: this node's markers + all children's markers
+        all_markers_at_node: Set[str] = set(node.markers)
+        for child in node.children:
+            all_markers_at_node.update(child.get_all_markers())
+
+        # Identify shared vs specific markers
+        shared_markers: List[str] = []
+        child_specific: Dict[str, List[str]] = {c.node_id: [] for c in node.children}
+
+        for marker in all_markers_at_node:
+            # Get weights for this marker across children
+            marker_weights = {}
+            for child in node.children:
+                if child.node_id in node_weights:
+                    w = node_weights[child.node_id].get(marker, 0.0)
+                    marker_weights[child.node_id] = w
+
+            if not marker_weights:
+                continue
+
+            total_weight = sum(marker_weights.values())
+            if total_weight < 1e-10:
+                continue
+
+            max_weight = max(marker_weights.values())
+            weight_ratio = max_weight / total_weight
+
+            if weight_ratio < sharing_threshold:
+                # Shared marker - goes to this internal node
+                shared_markers.append(marker)
+            else:
+                # Specific marker - goes to child with max weight
+                winner = max(marker_weights, key=marker_weights.get)
+                child_specific[winner].append(marker)
+
+        # Update internal node's markers with shared ones
+        node.markers = shared_markers
+
+        # Update each child's markers to only include specific ones
+        for child in node.children:
+            if child.is_leaf:
+                child.markers = child_specific.get(child.node_id, [])
+            # Recurse for non-leaves
+            redistribute_at_node(child)
+
+    redistribute_at_node(tree.root)
+
+
+def _compute_marker_allocations(
+    node: ProfileTreeNode,
+    all_weights: Dict[str, Dict[str, Dict[str, float]]],
+    min_weight: float,
+    relative_threshold: float,
+) -> Dict[str, Dict[str, Set[str]]]:
+    """
+    Compute marker allocations at each internal node using relative thresholds.
+
+    For each marker at each internal node, determines which children receive it
+    based on NMF weights. A marker is allocated to a child if its weight is
+    at least `relative_threshold` times the maximum weight across all siblings.
+
+    Args:
+        node: Current node in traversal
+        all_weights: NMF weights from discover_hierarchical_profiles
+        min_weight: Absolute minimum weight threshold
+        relative_threshold: Fraction of max weight required
+
+    Returns:
+        Dict mapping node_id -> child_id -> set of allocated markers
+    """
+    allocations: Dict[str, Dict[str, Set[str]]] = {}
+
+    def traverse(current: ProfileTreeNode):
+        if current.is_leaf or len(current.children) == 0:
+            return
+
+        node_id = current.node_id
+        if node_id not in all_weights:
+            # No weights for this node - allocate all markers to all children
+            for child in current.children:
+                if node_id not in allocations:
+                    allocations[node_id] = {}
+                allocations[node_id][child.node_id] = set(current.get_all_markers())
+        else:
+            # Collect all markers at this level
+            all_markers_at_node: Set[str] = set()
+            for child_id, marker_weights in all_weights[node_id].items():
+                all_markers_at_node.update(marker_weights.keys())
+
+            # For each marker, find which children should receive it
+            allocations[node_id] = {child.node_id: set() for child in current.children}
+
+            for marker in all_markers_at_node:
+                # Get weights for this marker across all children
+                marker_weights = {}
+                for child in current.children:
+                    if child.node_id in all_weights[node_id]:
+                        w = all_weights[node_id][child.node_id].get(marker, 0.0)
+                        marker_weights[child.node_id] = w
+
+                if not marker_weights:
+                    continue
+
+                max_weight = max(marker_weights.values())
+                if max_weight < min_weight:
+                    continue  # Skip markers with very low weights everywhere
+
+                # Allocate to children with weight >= max_weight * relative_threshold
+                threshold = max_weight * relative_threshold
+                for child_id, weight in marker_weights.items():
+                    if weight >= threshold and weight >= min_weight:
+                        allocations[node_id][child_id].add(marker)
+
+        # Recurse to children
+        for child in current.children:
+            traverse(child)
+
+    traverse(node)
+    return allocations
+
+
+def _collect_allocated_markers(
+    leaf: ProfileTreeNode,
+    root: ProfileTreeNode,
+    marker_allocations: Dict[str, Dict[str, Set[str]]],
+) -> Set[str]:
+    """
+    Collect markers allocated to a leaf by traversing from root.
+
+    Follows the path from root to leaf, accumulating markers that were
+    allocated to each step in the path.
+
+    Args:
+        leaf: Target leaf node
+        root: Root of the tree
+        marker_allocations: Pre-computed allocations from _compute_marker_allocations
+
+    Returns:
+        Set of marker names allocated to this leaf
+    """
+    # Build path from root to leaf
+    def find_path(
+        node: ProfileTreeNode, target_id: str, path: List[str]
+    ) -> Optional[List[str]]:
+        if node.node_id == target_id:
+            return path
+        for child in node.children:
+            result = find_path(child, target_id, path + [child.node_id])
+            if result:
+                return result
+        return None
+
+    path = find_path(root, leaf.node_id, [root.node_id])
+    if path is None:
+        # Fallback: just return leaf's own markers
+        return set(leaf.markers)
+
+    # Collect markers allocated along the path
+    collected_markers: Set[str] = set()
+
+    for i, node_id in enumerate(path[:-1]):
+        child_id = path[i + 1]
+
+        if node_id in marker_allocations and child_id in marker_allocations[node_id]:
+            collected_markers.update(marker_allocations[node_id][child_id])
+
+    # If no markers collected (e.g., shallow tree), use leaf's own markers
+    if len(collected_markers) == 0:
+        collected_markers = set(leaf.markers)
+
+    return collected_markers
+
+
 def _collect_markers_with_weights(
     leaf: ProfileTreeNode,
     root: ProfileTreeNode,
@@ -1523,20 +1929,13 @@ def _collect_markers_with_weights(
     min_weight: float,
 ) -> Dict[str, float]:
     """
+    DEPRECATED: Use _collect_allocated_markers instead.
+
     Collect markers from leaf to root with propagated weights.
+    This function uses a fixed threshold which causes issues when
+    there are many siblings (all markers pass threshold).
 
-    Traverses from leaf up to root, accumulating markers and their weights.
-    Markers from ancestor nodes are included if their weight to this leaf
-    branch exceeds min_weight.
-
-    Args:
-        leaf: The leaf node to collect markers for
-        root: The root of the tree
-        all_weights: Nested dict: parent_id -> child_id -> marker -> weight
-        min_weight: Minimum weight to include a marker
-
-    Returns:
-        Dict mapping marker name to its weight for this leaf
+    Kept for backward compatibility with tests.
     """
     markers_with_weights: Dict[str, float] = {}
 
@@ -3127,30 +3526,41 @@ def discover_hierarchical_profiles(
     coloc_result: ColocalizationResult,
     antibody_expression: NDArray[np.floating],
     marker_names: List[str],
+    coords: NDArray[np.floating],
     improvement_threshold: float = 0.05,
-    min_marker_weight: float = 0.05,
+    sharing_ratio: float = 0.5,
+    sharing_min_I: float = 0.2,
     max_depth: int = 5,
+    neighbor_k: int = 6,
     verbose: bool = True,
 ) -> HierarchicalProfileResult:
     """
-    Discover cell type profiles using hierarchical NMF.
+    Discover cell type profiles using hierarchical clustering with shared marker detection.
 
-    Two-phase algorithm:
+    Algorithm:
     1. Structure learning: Hierarchical clustering on colocalization distances
        with reconstruction-guided tree cutting
-    2. Weight learning: NMF at each level to learn marker allocation
+    2. Shared marker detection: At each split, classify markers as SHARED
+       (stay at internal node) or SPECIFIC (pass to child) using bivariate Moran's I
+    3. Profile flattening: Collect markers along path from root to each leaf
 
     Args:
         coloc_result: Result from analyze_marker_colocalization()
         antibody_expression: Expression matrix (n_spots, n_markers)
         marker_names: Names for each column in expression matrix
+        coords: Spatial coordinates (n_spots, 2)
         improvement_threshold: Min reconstruction improvement to split (default 5%)
-        min_marker_weight: Min weight to include marker in profile (default 0.05)
+        sharing_ratio: Min ratio of bivariate Moran's I for shared classification (default 0.5).
+            A marker is shared if min(I_left, I_right)/max(I_left, I_right) > sharing_ratio.
+        sharing_min_I: Min bivariate Moran's I with both children for shared (default 0.2).
+            A marker is shared only if min(I_left, I_right) > sharing_min_I.
         max_depth: Maximum tree depth (default 5)
+        neighbor_k: Number of neighbors for spatial weights (default 6)
         verbose: Log progress (default True)
 
     Returns:
-        HierarchicalProfileResult with tree structure and flat profiles
+        HierarchicalProfileResult with tree structure and flat profiles.
+        Internal nodes contain shared markers inherited by all descendants.
     """
     if verbose:
         logger.info("Starting hierarchical profile discovery...")
@@ -3193,27 +3603,23 @@ def discover_hierarchical_profiles(
         X=antibody_expression,
         marker_names=marker_names,
         linkage_matrix=Z,
+        coords=coords,
         improvement_threshold=improvement_threshold,
+        sharing_ratio=sharing_ratio,
+        sharing_min_I=sharing_min_I,
         max_depth=max_depth,
+        neighbor_k=neighbor_k,
     )
 
     if verbose:
         logger.info(f"Tree depth: {tree.get_depth()}, leaves: {len(tree.get_leaves())}")
 
     # Phase 2: NMF weight learning at each level
+    # Phase 2: Flatten to profiles (shared markers already at internal nodes)
     if verbose:
-        logger.info("Phase 2: Computing NMF weights at each level...")
+        logger.info("Phase 2: Flattening tree to profiles with inheritance...")
 
-    all_weights: Dict[str, Dict[str, Dict[str, float]]] = {}
-    _compute_all_nmf_weights(tree.root, antibody_expression, marker_names, all_weights)
-
-    # Phase 3: Flatten to profiles
-    if verbose:
-        logger.info("Phase 3: Flattening tree to profiles...")
-
-    flat_profiles, shared_markers = _flatten_tree_to_profiles(
-        tree, all_weights, min_marker_weight
-    )
+    flat_profiles, shared_markers = _flatten_tree_to_profiles(tree)
 
     # Rename profiles to be more descriptive
     renamed_profiles: Dict[str, List[str]] = {}
