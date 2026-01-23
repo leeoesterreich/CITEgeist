@@ -1448,6 +1448,7 @@ def _build_hierarchical_tree(
     sharing_min_I: float = 0.2,
     max_depth: int = 5,
     neighbor_k: int = 6,
+    component_markers: Optional[List[str]] = None,
 ) -> ProfileTree:
     """
     Build hierarchical profile tree with reconstruction-guided cutting and shared marker detection.
@@ -1471,6 +1472,8 @@ def _build_hierarchical_tree(
             to be classified as shared (default 0.2).
         max_depth: Maximum tree depth as safety limit (default 5)
         neighbor_k: Number of neighbors for spatial weights (default 6)
+        component_markers: Optional list of marker names in this component.
+            If provided, only these markers are clustered (for separate lineage trees).
 
     Returns:
         ProfileTree with reconstruction-guided structure. Internal nodes contain
@@ -1496,8 +1499,17 @@ def _build_hierarchical_tree(
     # Precompute spatial weights matrix (for fast bivariate Moran's I)
     spatial_weights = _build_spatial_weights_matrix(coords, k=neighbor_k)
 
-    # All markers start at the root
-    all_marker_indices = list(range(len(marker_names)))
+    # Determine which markers to use
+    if component_markers is not None:
+        # Only use markers in this component
+        marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+        all_marker_indices = [marker_to_idx[m] for m in component_markers]
+        # Use component markers for naming
+        effective_marker_names = component_markers
+    else:
+        # Use all markers
+        all_marker_indices = list(range(len(marker_names)))
+        effective_marker_names = marker_names
 
     # Recursively build ProfileTree with reconstruction-guided cutting
     root_node = _recursive_tree_cut(
@@ -3532,16 +3544,18 @@ def discover_hierarchical_profiles(
     sharing_min_I: float = 0.2,
     max_depth: int = 5,
     neighbor_k: int = 6,
+    fdr_alpha: float = 0.05,
+    top_k: int = 3,
     verbose: bool = True,
 ) -> HierarchicalProfileResult:
     """
     Discover cell type profiles using hierarchical clustering with shared marker detection.
 
     Algorithm:
-    1. Structure learning: Hierarchical clustering on colocalization distances
-       with reconstruction-guided tree cutting
-    2. Shared marker detection: At each split, classify markers as SHARED
-       (stay at internal node) or SPECIFIC (pass to child) using bivariate Moran's I
+    1. Component separation: Find connected components using significant colocalization
+       edges (FDR + top-k filtering) - this ensures unrelated lineages get separate trees
+    2. Per-component tree building: For each component with 2+ markers, build hierarchical
+       tree with reconstruction-guided cutting and shared marker detection
     3. Profile flattening: Collect markers along path from root to each leaf
 
     Args:
@@ -3556,99 +3570,197 @@ def discover_hierarchical_profiles(
             A marker is shared only if min(I_left, I_right) > sharing_min_I.
         max_depth: Maximum tree depth (default 5)
         neighbor_k: Number of neighbors for spatial weights (default 6)
+        fdr_alpha: FDR threshold for significant colocalization edges (default 0.05)
+        top_k: Mutual top-k for edge sparsification (default 3)
         verbose: Log progress (default True)
 
     Returns:
         HierarchicalProfileResult with tree structure and flat profiles.
         Internal nodes contain shared markers inherited by all descendants.
+        Markers without significant colocalization become single-marker profiles.
     """
     if verbose:
         logger.info("Starting hierarchical profile discovery...")
 
-    # Phase 1: Build colocalization distance matrix
+    # Phase 1: Find connected components using significant edges
+    # This ensures unrelated lineages (e.g., epithelial vs immune) get separate trees
     if verbose:
-        logger.info("Phase 1: Building colocalization distance matrix...")
+        logger.info("Phase 1: Finding connected components from significant edges...")
 
-    D, markers = _build_colocalization_distance_matrix(coloc_result)
+    pairs = coloc_result.pairs
+    all_markers = coloc_result.marker_names
 
-    if len(markers) < 2:
-        # Not enough markers for hierarchy
-        if verbose:
-            logger.info("Only 1 marker - returning single profile")
-        root = ProfileTreeNode("root", markers, [], None, 0)
-        tree = ProfileTree(root=root, n_levels=1)
-        return HierarchicalProfileResult(
-            tree=tree,
-            flat_profiles={"profile_0": markers},
-            depth_per_branch={},
-            shared_markers={},
-            reconstruction_error=0.0,
-        )
-
-    # Build hierarchical clustering
-    if verbose:
-        logger.info(f"Clustering {len(markers)} markers...")
-
-    condensed = squareform(D)
-    # Handle numerical issues
-    condensed = np.maximum(condensed, 0)
-
-    Z = linkage(condensed, method='ward')
-
-    # Phase 1b: Reconstruction-guided tree cutting
-    if verbose:
-        logger.info("Building tree with reconstruction-guided cutting...")
-
-    tree = _build_hierarchical_tree(
-        X=antibody_expression,
-        marker_names=marker_names,
-        linkage_matrix=Z,
-        coords=coords,
-        improvement_threshold=improvement_threshold,
-        sharing_ratio=sharing_ratio,
-        sharing_min_I=sharing_min_I,
-        max_depth=max_depth,
-        neighbor_k=neighbor_k,
+    # Apply FDR correction
+    fdr_pairs, _, method_used = _apply_fdr_correction(
+        pairs, alpha=fdr_alpha, pvalue_source="bivariate_morans"
     )
+    if verbose:
+        logger.info(f"FDR correction (q < {fdr_alpha}): {len(fdr_pairs)}/{len(pairs)} pairs")
+
+    # Apply mutual top-k sparsification
+    if top_k > 0:
+        specificity = coloc_result.marker_specificity if coloc_result.marker_specificity else None
+        topk_pairs = _apply_mutual_topk(fdr_pairs, k=top_k, specificity=specificity)
+        if verbose:
+            logger.info(f"Mutual top-{top_k} sparsification: {len(topk_pairs)}/{len(fdr_pairs)} pairs")
+    else:
+        topk_pairs = fdr_pairs
+
+    # Build edges and find connected components
+    significant_edges = [
+        (p.marker_a, p.marker_b, p.colocalization_score)
+        for p in topk_pairs
+    ]
+    components = _find_connected_components(all_markers, significant_edges)
+
+    # Separate singletons from multi-marker components
+    singletons = []
+    multi_marker_components = []
+    for comp in components:
+        if len(comp) == 1:
+            marker = list(comp)[0]
+            # Check if this marker has ANY significant edge
+            has_edge = any(
+                (p.marker_a == marker or p.marker_b == marker)
+                for p in topk_pairs
+            )
+            if not has_edge:
+                singletons.append(marker)
+            else:
+                multi_marker_components.append(comp)
+        else:
+            multi_marker_components.append(comp)
 
     if verbose:
-        logger.info(f"Tree depth: {tree.get_depth()}, leaves: {len(tree.get_leaves())}")
+        logger.info(f"Found {len(multi_marker_components)} connected components, "
+                   f"{len(singletons)} singletons")
 
-    # Phase 2: NMF weight learning at each level
-    # Phase 2: Flatten to profiles (shared markers already at internal nodes)
+    # Phase 2: Build hierarchical tree for each component
+    all_flat_profiles: Dict[str, List[str]] = {}
+    all_shared_markers: Dict[str, List[str]] = defaultdict(list)
+    all_trees: List[ProfileTree] = []
+    profile_idx = 0
+
+    # Process each multi-marker component
+    for comp_idx, component in enumerate(multi_marker_components):
+        comp_markers = sorted(list(component))
+        n_comp = len(comp_markers)
+
+        if verbose:
+            logger.info(f"Processing component {comp_idx + 1} ({n_comp} markers): {comp_markers}")
+
+        if n_comp == 1:
+            # Single marker component (has edge but partner is in another component)
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
+            continue
+
+        if n_comp == 2:
+            # Two-marker component - simple pair profile
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
+            continue
+
+        # Build distance matrix for this component only
+        comp_coloc = _filter_coloc_result_for_markers(coloc_result, comp_markers)
+        D, ordered_markers = _build_colocalization_distance_matrix(comp_coloc)
+
+        # Build hierarchical clustering for this component
+        condensed = squareform(D)
+        condensed = np.maximum(condensed, 0)
+        Z = linkage(condensed, method='ward')
+
+        # Get marker indices for this component
+        marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+        comp_marker_indices = [marker_to_idx[m] for m in ordered_markers]
+
+        # Build tree with reconstruction-guided cutting
+        tree = _build_hierarchical_tree(
+            X=antibody_expression,
+            marker_names=marker_names,
+            linkage_matrix=Z,
+            coords=coords,
+            improvement_threshold=improvement_threshold,
+            sharing_ratio=sharing_ratio,
+            sharing_min_I=sharing_min_I,
+            max_depth=max_depth,
+            neighbor_k=neighbor_k,
+            component_markers=ordered_markers,  # Only cluster these markers
+        )
+        all_trees.append(tree)
+
+        # Flatten this tree
+        comp_flat_profiles, comp_shared = _flatten_tree_to_profiles(tree)
+
+        # Add profiles with global naming
+        for node_id, markers_list in comp_flat_profiles.items():
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = markers_list
+            # Update shared marker tracking
+            for marker in markers_list:
+                if marker in comp_shared:
+                    all_shared_markers[marker].append(profile_name)
+            profile_idx += 1
+
+    # Add singletons as individual profiles
+    for marker in singletons:
+        profile_name = f"profile_{profile_idx}"
+        all_flat_profiles[profile_name] = [marker]
+        profile_idx += 1
+
     if verbose:
-        logger.info("Phase 2: Flattening tree to profiles with inheritance...")
+        logger.info(f"Added {len(singletons)} singleton profiles")
 
-    flat_profiles, shared_markers = _flatten_tree_to_profiles(tree)
-
-    # Rename profiles to be more descriptive
-    renamed_profiles: Dict[str, List[str]] = {}
-    for i, (node_id, markers_list) in enumerate(flat_profiles.items()):
-        profile_name = f"profile_{i}"
-        renamed_profiles[profile_name] = markers_list
-
-    # Update shared_markers with new names
-    old_to_new = {old: f"profile_{i}" for i, old in enumerate(flat_profiles.keys())}
-    renamed_shared: Dict[str, List[str]] = {}
-    for marker, old_profiles in shared_markers.items():
-        renamed_shared[marker] = [old_to_new.get(p, p) for p in old_profiles]
+    # Filter shared_markers to only include markers that appear in 2+ profiles
+    final_shared = {m: profiles for m, profiles in all_shared_markers.items() if len(profiles) > 1}
 
     # Compute final reconstruction error
     final_error = _compute_final_reconstruction_error(
-        antibody_expression, marker_names, list(renamed_profiles.values())
+        antibody_expression, marker_names, list(all_flat_profiles.values())
     )
 
+    # Create a combined tree (forest of component trees)
+    # For now, use the first tree or create a dummy root
+    if all_trees:
+        combined_tree = all_trees[0]  # Use first component tree
+    else:
+        # All singletons - create minimal tree
+        root = ProfileTreeNode("root", singletons[:1] if singletons else [], [], None, 0)
+        combined_tree = ProfileTree(root=root, n_levels=1)
+
     if verbose:
-        logger.info(f"Discovered {len(renamed_profiles)} profiles, "
-                   f"{len(renamed_shared)} shared markers, "
+        logger.info(f"Discovered {len(all_flat_profiles)} profiles, "
+                   f"{len(final_shared)} shared markers, "
                    f"reconstruction error: {final_error:.4f}")
 
     return HierarchicalProfileResult(
-        tree=tree,
-        flat_profiles=renamed_profiles,
-        depth_per_branch={},  # TODO: compute per-branch depth
-        shared_markers=renamed_shared,
+        tree=combined_tree,
+        flat_profiles=all_flat_profiles,
+        depth_per_branch={},
+        shared_markers=final_shared,
         reconstruction_error=final_error,
+    )
+
+
+def _filter_coloc_result_for_markers(
+    coloc_result: ColocalizationResult,
+    markers: List[str],
+) -> ColocalizationResult:
+    """Filter colocalization result to only include specified markers."""
+    marker_set = set(markers)
+    filtered_pairs = [
+        p for p in coloc_result.pairs
+        if p.marker_a in marker_set and p.marker_b in marker_set
+    ]
+    return ColocalizationResult(
+        pairs=filtered_pairs,
+        marker_names=markers,
+        n_spots=coloc_result.n_spots,
+        neighbor_k=coloc_result.neighbor_k,
+        marker_specificity={m: coloc_result.marker_specificity.get(m, 0.5)
+                          for m in markers} if coloc_result.marker_specificity else None,
     )
 
 
