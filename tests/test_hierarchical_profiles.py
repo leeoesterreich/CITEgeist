@@ -445,6 +445,81 @@ class TestDiscoverHierarchicalProfiles:
             assert all(isinstance(m, str) for m in markers)
 
 
+class TestHierarchicalDataTcells:
+    """Test on data with known hierarchy (T cell subtypes)."""
+
+    def test_tcell_hierarchy_detected(self):
+        """
+        Data with T cell hierarchy: CD3 shared, CD4/CD8 specific.
+        Algorithm should:
+        1. Detect hierarchy
+        2. Put CD3 in both CD4+ and CD8+ profiles
+        """
+        np.random.seed(42)
+        n_spots = 500
+
+        # Create T cell spatial pattern (shared by all T cells)
+        t_cell_region = np.zeros(n_spots)
+        t_cell_region[100:300] = 1.0  # T cells in spots 100-300
+
+        # CD4+ T cells: subset of T cell region
+        cd4_region = np.zeros(n_spots)
+        cd4_region[100:200] = 1.0
+
+        # CD8+ T cells: different subset
+        cd8_region = np.zeros(n_spots)
+        cd8_region[200:300] = 1.0
+
+        # Non-T cells (epithelial)
+        epi_region = np.zeros(n_spots)
+        epi_region[350:450] = 1.0
+
+        # Create marker expression
+        noise = lambda: 0.1 * np.random.rand(n_spots)
+
+        X = np.column_stack([
+            t_cell_region + noise(),      # CD3 (shared T cell marker)
+            cd4_region + noise(),          # CD4 (specific to CD4+ T)
+            cd8_region + noise(),          # CD8 (specific to CD8+ T)
+            epi_region + noise(),          # PanCK (epithelial)
+        ])
+        marker_names = ["CD3", "CD4", "CD8", "PanCK"]
+        coords = np.array([[i % 25, i // 25] for i in range(n_spots)])
+
+        # Run pipeline
+        coloc_result = analyze_marker_colocalization(
+            X, coords, marker_names, neighbor_k=6
+        )
+
+        result = discover_hierarchical_profiles(
+            coloc_result=coloc_result,
+            antibody_expression=X,
+            marker_names=marker_names,
+            improvement_threshold=0.05,
+            verbose=True,
+        )
+
+        # Check that CD3 appears in profiles with CD4 and CD8
+        cd3_in_cd4_profile = False
+        cd3_in_cd8_profile = False
+
+        for profile_name, markers in result.flat_profiles.items():
+            if "CD4" in markers and "CD3" in markers:
+                cd3_in_cd4_profile = True
+            if "CD8" in markers and "CD3" in markers:
+                cd3_in_cd8_profile = True
+
+        # At minimum, CD3 should be shared or appear with at least one T cell marker
+        cd3_shared = "CD3" in result.shared_markers
+
+        # Success if EITHER:
+        # 1. CD3 is explicitly marked as shared, OR
+        # 2. CD3 appears in profiles with both CD4 and CD8
+        assert cd3_shared or (cd3_in_cd4_profile and cd3_in_cd8_profile), \
+            f"CD3 should be shared or appear with both CD4 and CD8. " \
+            f"Profiles: {result.flat_profiles}, Shared: {result.shared_markers}"
+
+
 class TestSimulatedDataAdversarial:
     """Test on simulated data where hierarchy should NOT be detected."""
 
