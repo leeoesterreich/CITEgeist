@@ -106,6 +106,19 @@ class SpatialProgram:
     subpopulations: Optional[List[int]] = None
     """Subpopulation IDs where this program is dominant (if detected)."""
 
+    # Region analysis fields (populated by analyze_program_regions)
+    region_enrichment: Optional[Dict[str, float]] = None
+    """Mean program activity per region (region_value -> mean_activity)."""
+
+    region_specificity: Optional[float] = None
+    """Specificity score: 0 = uniform across regions, 1 = completely region-specific."""
+
+    region_pvalue: Optional[float] = None
+    """P-value for region enrichment (Mann-Whitney U or Kruskal-Wallis)."""
+
+    enriched_region: Optional[str] = None
+    """Region with highest mean activity (if significantly enriched)."""
+
 
 @dataclass
 class AnchoredProgramResult:
