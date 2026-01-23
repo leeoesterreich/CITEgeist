@@ -271,6 +271,8 @@ def run_hierarchical_benchmark(
     min_counts: int = 25,
     improvement_threshold: float = 0.05,
     max_depth: int = 5,
+    fdr_alpha: float = 0.05,
+    top_k: int = 3,
 ) -> Dict:
     """
     Run hierarchical profile discovery benchmark.
@@ -355,6 +357,8 @@ def run_hierarchical_benchmark(
         sharing_ratio=0.5,
         sharing_min_I=0.2,
         max_depth=max_depth,
+        fdr_alpha=fdr_alpha,
+        top_k=top_k,
         verbose=True,
     )
 
@@ -490,6 +494,8 @@ def run_hierarchical_benchmark(
             "min_counts": min_counts,
             "improvement_threshold": improvement_threshold,
             "max_depth": max_depth,
+            "fdr_alpha": fdr_alpha,
+            "top_k": top_k,
         },
     }
 
@@ -547,6 +553,8 @@ def main():
     parser.add_argument("--min-counts", type=int, default=25, help="Min counts filter")
     parser.add_argument("--improvement-threshold", type=float, default=0.05, help="Reconstruction improvement threshold for tree cutting")
     parser.add_argument("--max-depth", type=int, default=5, help="Maximum tree depth")
+    parser.add_argument("--fdr-alpha", type=float, default=0.05, help="FDR threshold for significant colocalization edges")
+    parser.add_argument("--top-k", type=int, default=3, help="Mutual top-k for edge sparsification")
 
     args = parser.parse_args()
 
@@ -581,6 +589,8 @@ def main():
         min_counts=args.min_counts,
         improvement_threshold=args.improvement_threshold,
         max_depth=args.max_depth,
+        fdr_alpha=args.fdr_alpha,
+        top_k=args.top_k,
     )
 
 
