@@ -209,5 +209,65 @@ class TestAnalyzeProgramRegions:
         assert result.programs[0].enriched_region == "Region_A"
 
 
+class TestCompareProgramsByRegion:
+    """Test compare_programs_by_region function."""
+
+    def test_returns_dataframe_with_expected_columns(self):
+        """Should return DataFrame with comparison statistics."""
+        from CITEgeist.model.anchored_program_discovery import compare_programs_by_region
+
+        result = create_mock_anchored_result(n_spots=100, K=3)
+        adata = create_mock_adata_with_regions(n_spots=100)
+
+        df = compare_programs_by_region(
+            result, adata, "D538G_Mutation",
+            region_a="D538G_pos", region_b="D538G_neg"
+        )
+
+        assert isinstance(df, pd.DataFrame)
+        assert "program_id" in df.columns
+        assert "mean_activity_a" in df.columns
+        assert "mean_activity_b" in df.columns
+        assert "fold_change" in df.columns
+        assert "pvalue" in df.columns
+        assert "top_genes" in df.columns
+        assert len(df) == 3  # One row per program
+
+    def test_fold_change_calculation(self):
+        """Fold change should reflect region activity differences."""
+        from CITEgeist.model.anchored_program_discovery import compare_programs_by_region
+
+        result = create_mock_anchored_result(n_spots=100, K=3)
+        # Make program 0 strongly enriched in region A
+        result.H[0, :50] = 2.0  # High in D538G_pos
+        result.H[0, 50:] = 0.5  # Low in D538G_neg
+
+        adata = create_mock_adata_with_regions(n_spots=100)
+
+        df = compare_programs_by_region(
+            result, adata, "D538G_Mutation",
+            region_a="D538G_pos", region_b="D538G_neg"
+        )
+
+        # Program 0 should have fold_change > 1
+        prog0_row = df[df["program_id"] == 0].iloc[0]
+        assert prog0_row["fold_change"] > 3.0  # 2.0 / 0.5 = 4.0
+
+    def test_sorted_by_fold_change(self):
+        """Results should be sorted by fold change descending."""
+        from CITEgeist.model.anchored_program_discovery import compare_programs_by_region
+
+        result = create_mock_anchored_result(n_spots=100, K=3)
+        adata = create_mock_adata_with_regions(n_spots=100)
+
+        df = compare_programs_by_region(
+            result, adata, "D538G_Mutation",
+            region_a="D538G_pos", region_b="D538G_neg"
+        )
+
+        # Check sorted descending
+        assert df["fold_change"].is_monotonic_decreasing
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -2250,3 +2250,93 @@ def analyze_program_regions(
                 f"programs show significant region enrichment")
 
     return result
+
+
+def compare_programs_by_region(
+    result: AnchoredProgramResult,
+    adata: sc.AnnData,
+    region_column: str,
+    region_a: Any,
+    region_b: Any,
+    top_n_genes: int = 50,
+) -> pd.DataFrame:
+    """
+    Compare program activities and gene loadings between two regions.
+
+    For each program, computes:
+    - Mean activity in region A vs B
+    - Fold change and statistical significance
+    - Top genes driving the program
+
+    Useful for identifying which programs and genes are region-specific.
+
+    Args:
+        result: AnchoredProgramResult with discovered programs
+        adata: AnnData with region annotations
+        region_column: Column defining regions
+        region_a: First region value (e.g., True for D538G+)
+        region_b: Second region value (e.g., False for D538G-)
+        top_n_genes: Number of top genes to include per program
+
+    Returns:
+        DataFrame with columns:
+        - program_id: Program index
+        - mean_activity_a, mean_activity_b: Mean activity per region
+        - fold_change: region_a / region_b
+        - pvalue: Mann-Whitney U test
+        - top_genes: Comma-separated top genes
+        - gene_loadings: Dict of gene -> loading
+
+    Example:
+        >>> df = compare_programs_by_region(result, adata, "D538G Mutation", True, False)
+        >>> d538g_enriched = df[df['fold_change'] > 1.5]
+    """
+    from scipy.stats import mannwhitneyu
+
+    mask_a = (adata.obs[region_column] == region_a).values
+    mask_b = (adata.obs[region_column] == region_b).values
+
+    H = result.H
+    W = result.W
+
+    records = []
+    for k, program in enumerate(result.programs):
+        h_k = H[k, :]
+
+        activities_a = h_k[mask_a]
+        activities_b = h_k[mask_b]
+
+        mean_a = float(np.mean(activities_a))
+        mean_b = float(np.mean(activities_b))
+
+        # Fold change (with pseudocount to avoid division by zero)
+        fc = (mean_a + 1e-6) / (mean_b + 1e-6)
+
+        # Statistical test
+        if len(activities_a) >= 10 and len(activities_b) >= 10:
+            _, pval = mannwhitneyu(activities_a, activities_b, alternative='two-sided')
+        else:
+            pval = 1.0
+
+        # Top genes
+        loadings = W[:, k]
+        top_idx = np.argsort(loadings)[::-1][:top_n_genes]
+        top_genes = [result.gene_names[i] for i in top_idx]
+        gene_loadings = {result.gene_names[i]: float(loadings[i]) for i in top_idx}
+
+        records.append({
+            'program_id': k,
+            'mean_activity_a': mean_a,
+            'mean_activity_b': mean_b,
+            'fold_change': fc,
+            'pvalue': float(pval),
+            'n_spots_a': int(mask_a.sum()),
+            'n_spots_b': int(mask_b.sum()),
+            'top_genes': ', '.join(top_genes[:10]),
+            'gene_loadings': gene_loadings,
+        })
+
+    df = pd.DataFrame(records)
+    df = df.sort_values('fold_change', ascending=False)
+
+    return df
