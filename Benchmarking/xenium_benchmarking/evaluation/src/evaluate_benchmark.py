@@ -1,8 +1,8 @@
 """
-Evaluate CITEgeist benchmark results against ground truth.
+Unified evaluation for CITEgeist Xenium benchmark.
 
-This module calculates metrics comparing CITEgeist predictions to
-ground truth cell type proportions.
+Evaluates both manual (achievable-7) and hierarchical (autodiscovery) modes
+against the achievable-7 ground truth (10 granular types collapsed to 7).
 
 Reference for RNA-based ground truth:
     Zhao et al. (2025). "Benchmarking cell type annotation methods for 10x
@@ -22,6 +22,58 @@ from scipy import stats
 from scipy.spatial.distance import jensenshannon
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# ACHIEVABLE-7 GROUND TRUTH COLLAPSE
+# =============================================================================
+
+# Mapping from 10 granular GT types to 7 achievable types
+GT_TO_ACHIEVABLE_7_MAPPING = {
+    "B cells": "B cells",
+    "Mixed Immune": "CD4+ T cells",
+    "CD8+ T cells": "CD8+ T cells",
+    "Proliferating T": "CD8+ T cells",
+    "Macrophages": "Macrophages",
+    "Endothelial": "Endothelial",
+    "Vascular Stromal": "Endothelial",
+    "Epithelial": "Epithelial",
+    "Myofibroblasts": "Fibroblasts",
+    "Stromal": "Fibroblasts",
+}
+
+ACHIEVABLE_7_CELL_TYPES = [
+    "B cells",
+    "CD4+ T cells",
+    "CD8+ T cells",
+    "Macrophages",
+    "Endothelial",
+    "Epithelial",
+    "Fibroblasts",
+]
+
+
+def collapse_gt_to_achievable_7(gt_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Collapse 10 granular GT cell types to 7 achievable types.
+
+    Multiple GT types that map to the same achievable type have their
+    proportions summed.
+    """
+    collapsed = pd.DataFrame(index=gt_df.index)
+
+    for achievable_type in ACHIEVABLE_7_CELL_TYPES:
+        # Find all GT types that map to this achievable type
+        source_types = [
+            gt_type for gt_type, target in GT_TO_ACHIEVABLE_7_MAPPING.items()
+            if target == achievable_type and gt_type in gt_df.columns
+        ]
+
+        if source_types:
+            collapsed[achievable_type] = gt_df[source_types].sum(axis=1)
+        else:
+            collapsed[achievable_type] = 0.0
+
+    return collapsed
 
 
 def calculate_metrics(
@@ -105,6 +157,7 @@ def evaluate_region(
     gt_dir: str,
     pred_dir: str,
     prefix: str = "Xenium",
+    use_achievable_7: bool = True,
 ) -> Dict[str, any]:
     """
     Evaluate a single region.
@@ -114,6 +167,7 @@ def evaluate_region(
         gt_dir: Directory containing ground_truth/ folder
         pred_dir: Directory containing prediction CSVs
         prefix: Filename prefix
+        use_achievable_7: Collapse GT to achievable-7 types (default True)
 
     Returns:
         Dict with region metrics
@@ -127,12 +181,35 @@ def evaluate_region(
         raise FileNotFoundError(f"Ground truth not found: {gt_path}")
     gt_df = pd.read_csv(gt_path, index_col=0)
 
-    # Load predictions (try finetuned first, then global)
-    pred_path = pred_dir / f"{prefix}_region_{region_id}_cell_prop_finetuned_results.csv"
-    if not pred_path.exists():
-        pred_path = pred_dir / f"{prefix}_region_{region_id}_cell_prop_global_results.csv"
-    if not pred_path.exists():
+    # Collapse GT to achievable-7 if requested
+    if use_achievable_7:
+        gt_df = collapse_gt_to_achievable_7(gt_df)
+        logger.info(f"Collapsed GT to achievable-7: {list(gt_df.columns)}")
+
+    # Load predictions - try multiple patterns
+    pred_path = None
+    sample_name = f"{prefix}_region_{region_id}"
+
+    # Pattern 1: New unified format (in subdirectory)
+    candidate = pred_dir / sample_name / f"{sample_name}_deconv_predictions.csv"
+    if candidate.exists():
+        pred_path = candidate
+
+    # Pattern 2: Old finetuned format
+    if pred_path is None:
+        candidate = pred_dir / f"{sample_name}_cell_prop_finetuned_results.csv"
+        if candidate.exists():
+            pred_path = candidate
+
+    # Pattern 3: Old global format
+    if pred_path is None:
+        candidate = pred_dir / f"{sample_name}_cell_prop_global_results.csv"
+        if candidate.exists():
+            pred_path = candidate
+
+    if pred_path is None:
         raise FileNotFoundError(f"Predictions not found in {pred_dir}")
+
     pred_df = pd.read_csv(pred_path, index_col=0)
 
     # Align spots
@@ -144,7 +221,7 @@ def evaluate_region(
     gt_aligned = gt_df.loc[common_spots]
 
     # Get cell type columns (exclude metadata)
-    metadata_cols = ["n_cells", "spot_x", "spot_y", "x", "y"]
+    metadata_cols = ["n_cells", "spot_x", "spot_y", "x", "y", "Unknown"]
     cell_types = [c for c in gt_aligned.columns if c not in metadata_cols]
 
     logger.info(f"Region {region_id}: {len(common_spots)} spots, {len(cell_types)} cell types")
@@ -165,6 +242,7 @@ def evaluate_all_regions(
     n_regions: int = 5,
     output_path: Optional[str] = None,
     prefix: str = "Xenium",
+    use_achievable_7: bool = True,
 ) -> Dict[str, any]:
     """
     Evaluate all regions and compute summary statistics.
@@ -183,7 +261,7 @@ def evaluate_all_regions(
 
     for region_id in range(n_regions):
         try:
-            metrics = evaluate_region(region_id, gt_dir, pred_dir, prefix)
+            metrics = evaluate_region(region_id, gt_dir, pred_dir, prefix, use_achievable_7)
             all_metrics.append(metrics)
             logger.info(f"Region {region_id}: Pearson r = {metrics['overall_pearson_r']:.4f}")
         except Exception as e:
@@ -326,6 +404,11 @@ def main():
         default="Xenium",
         help="Filename prefix",
     )
+    parser.add_argument(
+        "--no-achievable-7",
+        action="store_true",
+        help="Disable achievable-7 GT collapse (use raw 10-type GT)",
+    )
 
     args = parser.parse_args()
 
@@ -342,6 +425,7 @@ def main():
         n_regions=args.n_regions,
         output_path=args.output,
         prefix=args.prefix,
+        use_achievable_7=not args.no_achievable_7,
     )
 
     # Print summary
