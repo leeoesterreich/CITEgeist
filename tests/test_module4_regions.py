@@ -231,6 +231,9 @@ class TestCompareProgramsByRegion:
         assert "fold_change" in df.columns
         assert "pvalue" in df.columns
         assert "top_genes" in df.columns
+        assert "gene_loadings" in df.columns
+        assert "n_spots_a" in df.columns
+        assert "n_spots_b" in df.columns
         assert len(df) == 3  # One row per program
 
     def test_fold_change_calculation(self):
