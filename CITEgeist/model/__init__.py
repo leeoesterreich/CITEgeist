@@ -48,6 +48,10 @@ from .anchored_program_discovery import (
     ProgramPairRelationship,
     BivariateProgramResult,
     analyze_program_relationships,
+    # Module 4c: Region-aware program analysis
+    analyze_program_regions,
+    compare_programs_by_region,
+    extract_program_context_genes,
 )
 
 # Module 5: Cross-sample integration
@@ -113,6 +117,10 @@ __all__ = [
     "ProgramPairRelationship",
     "BivariateProgramResult",
     "analyze_program_relationships",
+    # Module 4c: Region-aware program analysis
+    "analyze_program_regions",
+    "compare_programs_by_region",
+    "extract_program_context_genes",
     # Module 5: Cross-sample integration
     "AlignedProgram",
     "ConservedRelationship",

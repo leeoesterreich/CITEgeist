@@ -338,5 +338,21 @@ class TestExtractProgramContextGenes:
             extract_program_context_genes(result, program_id=10, target_gene="GENE_0")
 
 
+class TestModuleExports:
+    """Test that new functions are exported from module."""
+
+    def test_import_from_model(self):
+        """Should be able to import from CITEgeist.model."""
+        from CITEgeist.model import (
+            analyze_program_regions,
+            compare_programs_by_region,
+            extract_program_context_genes,
+        )
+
+        assert callable(analyze_program_regions)
+        assert callable(compare_programs_by_region)
+        assert callable(extract_program_context_genes)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
