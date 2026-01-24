@@ -168,6 +168,46 @@ class TestAnalyzeProgramRegions:
         with pytest.raises(ValueError, match="not found in adata.obs"):
             analyze_program_regions(result, adata, "NonexistentColumn")
 
+    def test_handles_filtered_regions_correctly(self):
+        """Should use correct test when regions are filtered by min_spots_per_region.
+
+        Bug fix test: When total unique regions = 3 but one region has too few spots
+        and gets filtered, we should use Mann-Whitney U (2 groups) not Kruskal-Wallis.
+        Previously the code used n_regions (total unique) instead of len(region_activities)
+        (regions after filtering).
+        """
+        n_spots = 100
+        result = create_mock_anchored_result(n_spots=n_spots, K=2)
+
+        # Create AnnData with 3 regions, but one region has very few spots
+        adata = create_mock_adata_with_regions(n_spots=n_spots)
+        # Override with 3 regions: 45 spots, 50 spots, and only 5 spots
+        regions = (["Region_A"] * 45 +
+                  ["Region_B"] * 50 +
+                  ["Region_C"] * 5)  # This region should get filtered
+        adata.obs["multi_region"] = regions
+
+        # Make program 0 strongly enriched in Region_A
+        result.H[0, :45] = 1.0   # High in Region_A
+        result.H[0, 45:95] = 0.1  # Low in Region_B
+        result.H[0, 95:] = 0.5    # Medium in Region_C (but too few spots)
+
+        # Use min_spots_per_region=10 to filter out Region_C
+        result = analyze_program_regions(
+            result, adata, "multi_region",
+            min_spots_per_region=10
+        )
+
+        # Should still work correctly and detect Region_A enrichment
+        assert result.programs[0].region_enrichment is not None
+        # Region_C should NOT be in enrichment (filtered out)
+        assert "Region_C" not in result.programs[0].region_enrichment
+        # Should have exactly 2 regions after filtering
+        assert len(result.programs[0].region_enrichment) == 2
+        # Should detect significant difference (Mann-Whitney U test)
+        assert result.programs[0].region_pvalue < 0.05
+        assert result.programs[0].enriched_region == "Region_A"
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -2223,7 +2223,7 @@ def analyze_program_regions(
 
         # Statistical test for region differences
         activity_lists = list(region_activities.values())
-        if n_regions == 2:
+        if len(region_activities) == 2:
             # Mann-Whitney U for two regions
             stat, pval = mannwhitneyu(activity_lists[0], activity_lists[1], alternative='two-sided')
         else:
