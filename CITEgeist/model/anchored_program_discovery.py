@@ -2340,3 +2340,60 @@ def compare_programs_by_region(
     df = df.sort_values('fold_change', ascending=False)
 
     return df
+
+
+def extract_program_context_genes(
+    result: AnchoredProgramResult,
+    program_id: int,
+    target_gene: str,
+    top_n: int = 50,
+    exclude_target: bool = True,
+) -> List[Tuple[str, float]]:
+    """
+    Extract genes co-loaded with a target gene in a specific program.
+
+    Useful for finding "contextual factors" - genes that are co-expressed
+    with a gene of interest (e.g., MDK) in a spatial program.
+
+    Args:
+        result: AnchoredProgramResult with discovered programs
+        program_id: Index of the program to analyze
+        target_gene: Gene of interest (e.g., "MDK")
+        top_n: Number of top co-loaded genes to return
+        exclude_target: Whether to exclude target gene from results
+
+    Returns:
+        List of (gene_name, loading) tuples sorted by loading
+
+    Example:
+        >>> # Find genes co-expressed with MDK in program 2
+        >>> context_genes = extract_program_context_genes(result, 2, "MDK")
+        >>> print("Contextual factors:", [g[0] for g in context_genes[:10]])
+    """
+    if program_id >= len(result.programs):
+        raise ValueError(f"Program {program_id} not found (max: {len(result.programs)-1})")
+
+    W = result.W  # (n_genes, K_programs)
+    loadings = W[:, program_id]
+
+    # Check if target gene is in this program
+    if target_gene in result.gene_names:
+        target_idx = result.gene_names.index(target_gene)
+        target_loading = loadings[target_idx]
+        logger.info(f"Target gene '{target_gene}' loading in program {program_id}: {target_loading:.4f}")
+    else:
+        logger.warning(f"Target gene '{target_gene}' not found in gene list")
+
+    # Get top genes by loading
+    top_idx = np.argsort(loadings)[::-1]
+
+    context_genes = []
+    for idx in top_idx:
+        gene = result.gene_names[idx]
+        if exclude_target and gene == target_gene:
+            continue
+        context_genes.append((gene, float(loadings[idx])))
+        if len(context_genes) >= top_n:
+            break
+
+    return context_genes
