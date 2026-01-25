@@ -1,0 +1,62 @@
+# mdk_saturation_pipeline/data/manifest.yaml
+# Documentation of all datasets used in this analysis
+
+datasets:
+  vignette4_spatial:
+    description: "CITEgeist spatial analysis of MDK programs"
+    type: "Spatial transcriptomics"
+    source: "Internal - Vignette 4"
+    used_in: ["01_summarize_spatial_finding.py"]
+
+  GSE89888:
+    description: "D538G vs WT expression in MCF7 and T47D"
+    type: "RNA-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE89888"
+    samples:
+      MCF7_WT: [GSM2392606, GSM2392607, GSM2392608, GSM2392609]
+      MCF7_D538G: [GSM2392614, GSM2392615, GSM2392616, GSM2392617]
+      T47D_WT: [GSM2392582, GSM2392583, GSM2392584, GSM2392585]
+      T47D_D538G: [GSM2392590, GSM2392591, GSM2392592, GSM2392593]
+    used_in: ["02_analyze_chaperone_expression.py"]
+
+  GSE125117:
+    description: "ER ChIP-seq in D538G vs WT (MCF7 and T47D)"
+    type: "ChIP-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE125117"
+    genome: "hg38"
+    used_in: ["03_analyze_er_binding_changes.py"]
+
+  GSE254216:
+    description: "ATAC-seq chromatin accessibility (MCF7 and T47D)"
+    type: "ATAC-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE254216"
+    genome: "hg38"
+    used_in: ["04_quantify_saturation.py"]
+
+  GSE72249:
+    description: "FOXA1 and ER ChIP-seq (MCF7 and T47D)"
+    type: "ChIP-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE72249"
+    genome: "hg19"
+    used_in: ["04_quantify_saturation.py"]
+
+  GSE254218:
+    description: "FOXA1 knockdown RNA-seq in T47D"
+    type: "RNA-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE254218"
+    samples:
+      T47D_siCtrl: [GSM8036191]
+      T47D_siFOXA1: [GSM8036192]
+    used_in: ["05_analyze_foxa1_perturbations.py"]
+
+  GSE75329:
+    description: "FOXA1/ER knockdown and overexpression in MCF7"
+    type: "RNA-seq"
+    source: "https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE75329"
+    samples:
+      MCF7_P_siCtrl: [GSM1953122]
+      MCF7_P_siFOXA1: [GSM1953124, GSM1953126]
+      MCF7_P_siER: [GSM1953127]
+      MCF7_FOXA1_noDox: [GSM1953129]
+      MCF7_FOXA1_Dox: [GSM1953131]
+    used_in: ["05_analyze_foxa1_perturbations.py"]
