@@ -32,8 +32,29 @@ def main():
     print("SCRIPT 07: GENERATE REPORT")
     print("=" * 80)
 
-    # Load all results
-    spatial = pd.read_csv(TABLES_DIR / "spatial_summary.csv")
+    # Load all results (spatial is optional - from script 01)
+    spatial_path = TABLES_DIR / "spatial_summary.csv"
+    if spatial_path.exists():
+        spatial = pd.read_csv(spatial_path)
+        spatial_section = f"""## 1. Spatial Observation (Vignette 4)
+
+CITEgeist spatial analysis revealed:
+
+{spatial.to_markdown(index=False)}
+
+![Spatial Observation](figures/fig1_spatial_observation.pdf)
+
+---
+
+"""
+    else:
+        spatial_section = """## 1. Spatial Observation (Vignette 4)
+
+*Spatial analysis (script 01) was skipped - vignette 4 outputs not available.*
+
+---
+
+"""
     expr = pd.read_csv(TABLES_DIR / "chaperone_expression.csv")
     binding = pd.read_csv(TABLES_DIR / "binding_changes.csv")
     saturation = pd.read_csv(TABLES_DIR / "saturation_metrics.csv")
@@ -62,17 +83,7 @@ explaining why ESR1-D538G causes opposite MDK secretion effects:
 
 ---
 
-## 1. Spatial Observation (Vignette 4)
-
-CITEgeist spatial analysis revealed:
-
-{spatial.to_markdown(index=False)}
-
-![Spatial Observation](figures/fig1_spatial_observation.pdf)
-
----
-
-## 2. Chaperone Expression (GSE89888)
+{spatial_section}## 2. Chaperone Expression (GSE89888)
 
 RNA-seq shows **opposite regulation** of chaperones:
 
