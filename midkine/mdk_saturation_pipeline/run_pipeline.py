@@ -26,6 +26,9 @@ SCRIPTS = [
     "05_analyze_foxa1_perturbations.py",
     "06_cross_validate.py",
     "07_generate_report.py",
+    "09_er_represses_hsp90b1.py",
+    "10_unsupervised_hsp90b1_identification.py",
+    "13_discriminate_hsp90b1_mechanism.py",
 ]
 
 
