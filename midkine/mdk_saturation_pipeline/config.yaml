@@ -47,12 +47,52 @@ gene_coordinates_hg38:
   CANX: ["chr5", 179680000, 179700000]
   PDIA4: ["chr7", 150030000, 150050000]
   TFF1: ["chr21", 42650000, 42670000]
+  LRP1: ["chr12", 57510000, 57610000]
+  LRPAP1: ["chr4", 3410000, 3440000]
 
 gene_coordinates_hg19:
   HSP90B1: ["chr12", 104323000, 104370000]
   HSPA5: ["chr9", 127995000, 128010000]
   CALR: ["chr19", 13049000, 13060000]
   TFF1: ["chr21", 43780000, 43800000]
+  LRP1: ["chr12", 57510000, 57610000]
+  LRPAP1: ["chr4", 3440000, 3470000]
 
 flags:
   rerun_spatial: false
+
+mechanism_discrimination:
+  erad_genes:
+    - EDEM1
+    - EDEM2
+    - EDEM3
+    - OS9
+    - SYVN1
+    - SEL1L
+    - HERPUD1
+    - DERL1
+  upr_genes:
+    - XBP1
+    - ATF6
+    - ATF4
+    - DDIT3
+    - ERN1
+  secretory_chaperones:
+    - CALR
+    - CANX
+    - PDIA4
+    - PDIA6
+    - ERO1A
+    - SEC61A1
+    - SRP54
+  grp94_clients:
+    - IGF1
+    - IGF2
+    - ITGA4
+    - ITGAL
+    - TLR2
+    - TLR4
+    - TLR9
+  lrp1_axis:
+    - LRP1
+    - LRPAP1
