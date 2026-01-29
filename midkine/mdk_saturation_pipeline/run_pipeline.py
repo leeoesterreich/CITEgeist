@@ -29,6 +29,9 @@ SCRIPTS = [
     "09_er_represses_hsp90b1.py",
     "10_unsupervised_hsp90b1_identification.py",
     "13_discriminate_hsp90b1_mechanism.py",
+    "14_cistrome_divergence.py",
+    "15_proteostasis_setpoint.py",
+    "16_functional_consequence.py",
 ]
 
 
