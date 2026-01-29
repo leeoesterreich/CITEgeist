@@ -125,3 +125,17 @@ class TestExclusivityInFinetuning:
             "finetune_cell_proportions_per_marker missing marker_exclusivity parameter"
         param = sig.parameters["marker_exclusivity"]
         assert param.default is None, f"Default should be None, got {param.default}"
+
+
+class TestOrchestrationIntegration:
+    """Test that CitegeistModel computes and stores exclusivity."""
+
+    def test_model_calls_compute_marker_exclusivity(self):
+        """run_cell_proportion_model should call compute_marker_exclusivity."""
+        source = inspect.getsource(
+            __import__("CITEgeist.model.citegeist_model", fromlist=["CitegeistModel"]).CitegeistModel.run_cell_proportion_model
+        )
+        assert "compute_marker_exclusivity" in source, \
+            "run_cell_proportion_model should call compute_marker_exclusivity"
+        assert "marker_exclusivity" in source, \
+            "run_cell_proportion_model should pass marker_exclusivity to finetuning"
