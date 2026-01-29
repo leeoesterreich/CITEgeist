@@ -544,16 +544,20 @@ def optimize_cell_proportions_per_marker(
     coords: Optional[np.ndarray] = None,
     laplacian_k: int = 8,
     lambda_sparse: float = 0.0,
-) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
+    alpha_max: float = 0.8,
+    lambda_alpha: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
 
-    This version learns individual scaling factors (beta) for each marker rather than
-    per cell type, preserving signal variation between markers of the same cell type.
+    This version learns individual scaling factors (beta) and baselines (alpha) for
+    each marker. Alpha captures ubiquitous signal (e.g., VIM floor), beta captures
+    cell-type-dependent variation.
 
     Mathematical formulation:
-        Minimize: sum_{i,m} (S[i,m] - beta[m] * Y[i, owner(m)])^2 + regularization
-        Beta update: beta[m] = (S[:,m] . Y[:,owner(m)]) / (Y[:,owner(m)] . Y[:,owner(m)])
+        Minimize: sum_{i,m} (S[i,m] - alpha[m] - beta[m] * Y[i, owner(m)])^2 + regularization
+        Beta update: OLS slope of S[:,m] vs Y[:,owner(m)]
+        Alpha update: OLS intercept with L2 regularization toward zero
 
     Args:
         marker_level_data: N x M matrix of normalized antibody data
@@ -623,9 +627,11 @@ def optimize_cell_proportions_per_marker(
     elif lambda_laplacian > 0 and coords is None:
         logging.warning("lambda_laplacian > 0 but coords not provided. Laplacian smoothing disabled.")
 
-    # Initialize beta (per-marker)
+    # Initialize beta (per-marker) and alpha (per-marker baseline)
     beta_values = np.ones(M, dtype=np.float64)
+    alpha_values = np.zeros(M, dtype=np.float64)
     beta_prev = np.zeros(M)
+    alpha_prev = np.zeros(M)
     Y_prev = np.zeros((N, T))
 
     iteration = 0
@@ -651,10 +657,12 @@ def optimize_cell_proportions_per_marker(
             n_owners = len(owners_m)
             beta_m = beta_values[m]
 
+            alpha_m = alpha_values[m]
+
             for j in owners_m:
                 weight = 1.0 / (n_owners * markers_per_celltype[j])
                 for i in range(N):
-                    S_im = marker_level_data[i, m]
+                    S_im = marker_level_data[i, m] - alpha_m  # baseline-subtracted
                     Y_ij = Y[i, j]
                     error_terms.append(weight * (S_im - beta_m * Y_ij) * (S_im - beta_m * Y_ij))
 
@@ -703,12 +711,14 @@ def optimize_cell_proportions_per_marker(
 
         Y_values = np.array([[Y[i, j].X for j in range(T)] for i in range(N)])
 
-        # Update beta (per-marker closed-form solution)
+        # Update beta and alpha (per-marker OLS: S = alpha + beta * Y_combined)
         # For shared markers, use sum of all owner proportions
         beta_new = np.zeros(M, dtype=np.float64)
+        alpha_new = np.zeros(M, dtype=np.float64)
         for m in range(M):
             if not marker_has_owner[m]:
                 beta_new[m] = 1.0
+                alpha_new[m] = 0.0
                 continue
 
             owners_m = marker_owners[m]
@@ -717,9 +727,23 @@ def optimize_cell_proportions_per_marker(
                 Y_combined += Y_values[:, j]
 
             S_m = marker_level_data[:, m]
-            denominator = np.dot(Y_combined, Y_combined) + 1e-9
-            beta_new[m] = np.dot(S_m, Y_combined) / denominator
+
+            # OLS: S_m = alpha_m + beta_m * Y_combined
+            Y_mean = np.mean(Y_combined)
+            S_mean = np.mean(S_m)
+            Y_centered = Y_combined - Y_mean
+            Y_var = np.dot(Y_centered, Y_centered)
+
+            if Y_var > 1e-9:
+                beta_new[m] = np.dot(S_m - S_mean, Y_centered) / Y_var
+            else:
+                beta_new[m] = beta_values[m]  # keep previous
             beta_new[m] = np.clip(beta_new[m], beta_min, beta_max)
+
+            # Alpha with L2 regularization toward zero
+            raw_alpha = S_mean - beta_new[m] * Y_mean
+            alpha_new[m] = raw_alpha / (1.0 + lambda_alpha / N)
+            alpha_new[m] = np.clip(alpha_new[m], 0.0, alpha_max)
 
         # Optionally normalize beta so max=1
         if normalize_beta:
@@ -733,15 +757,18 @@ def optimize_cell_proportions_per_marker(
 
         # Convergence check
         beta_diff = np.linalg.norm(beta_new - beta_prev)
+        alpha_diff = np.linalg.norm(alpha_new - alpha_prev)
         Y_diff = np.linalg.norm(Y_values - Y_prev)
 
-        logging.info(f"Change in beta: {beta_diff:.6f}, Change in Y: {Y_diff:.6f}")
-        if beta_diff < tolerance and Y_diff < tolerance:
+        logging.info(f"Change in beta: {beta_diff:.6f}, alpha: {alpha_diff:.6f}, Y: {Y_diff:.6f}")
+        if beta_diff < tolerance and alpha_diff < tolerance and Y_diff < tolerance:
             logging.info("Convergence achieved.")
             break
 
         beta_values = beta_new.copy()
+        alpha_values = alpha_new.copy()
         beta_prev = beta_new.copy()
+        alpha_prev = alpha_new.copy()
         Y_prev = Y_values.copy()
         iteration += 1
 
@@ -760,10 +787,14 @@ def optimize_cell_proportions_per_marker(
     # Build marker-beta dictionary for interpretability
     marker_beta_dict = {marker_names[m]: beta_new[m] for m in range(M)}
 
-    # Log beta statistics
+    # Log beta and alpha statistics
     logging.info(f"Beta range: [{beta_new.min():.3f}, {beta_new.max():.3f}], mean: {beta_new.mean():.3f}")
+    logging.info(f"Alpha (baseline) range: [{alpha_values.min():.3f}, {alpha_values.max():.3f}], mean: {alpha_values.mean():.3f}")
+    for m in range(M):
+        if marker_has_owner[m] and alpha_values[m] > 0.05:
+            logging.info(f"  Marker '{marker_names[m]}': alpha={alpha_values[m]:.3f}, beta={beta_new[m]:.3f}")
 
-    return Y_values, beta_new, marker_beta_dict
+    return Y_values, beta_new, marker_beta_dict, alpha_values
 
 
 def compute_marker_exclusivity(
@@ -1683,6 +1714,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     lambda_prior_weight: float = 0.0,
     local_enrichment_weight: float = 0.5,
     global_enrichment_weight: float = 0.5,
+    lambda_reg_gex: float = 0.0,
 ) -> Optional[np.ndarray]:
     """
     Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
@@ -1828,8 +1860,24 @@ def deconvolute_spot_with_neighbors_with_prior(
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
 
-        # Maximize the sum of all terms
-        model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
+        # Quadratic diversity penalty: penalize concentration of counts in one cell type
+        # This converts the linear objective (which always picks vertex solutions)
+        # into a concave quadratic that encourages distributing counts proportionally
+        diversity_penalty = []
+        if lambda_reg_gex > 0:
+            for k in range(M):
+                total_counts = int(center_counts[k])
+                if total_counts > 0:
+                    for j in range(T):
+                        diversity_penalty.append(lambda_reg_gex * X[j, k] * X[j, k])
+
+        # Maximize the sum of all terms minus diversity penalty
+        if diversity_penalty:
+            model.setObjective(
+                gp.quicksum(obj_terms) - gp.quicksum(diversity_penalty), GRB.MAXIMIZE
+            )
+        else:
+            model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
 
         model.write('gene_expression_model.mps')
 
@@ -1926,6 +1974,7 @@ def optimize_gene_expression(
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False,
+    lambda_reg_gex: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -1936,8 +1985,7 @@ def optimize_gene_expression(
         cell_type_numbers_array (np.ndarray): Cell type proportions (N_spots x T_celltypes)
         filtered_adata (sc.AnnData): Filtered AnnData object containing gene expression data
         radius (float): Radius for neighbor detection
-        alpha (float): Weight for spatial regularization
-        lambda_reg_gex (float): Weight for gene expression regularization
+        lambda_reg_gex (float): Quadratic diversity penalty weight for GEX deconvolution
         global_enrichment_weight (float): Weight for global expression enrichment (0-1)
         local_enrichment_weight (float): Weight for local expression enrichment (0-1)
         global_prior (np.ndarray, optional): Global prior matrix for guidance
@@ -2014,6 +2062,7 @@ def optimize_gene_expression(
                             lambda_prior_weight,
                             local_enrichment_weight,
                             global_enrichment_weight,
+                            lambda_reg_gex,
                         )
                         futures[future] = spot_idx
 
