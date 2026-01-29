@@ -46,6 +46,8 @@ class MarkerInterestResult:
     morans_threshold: float
     morans_k: int
     morans_alpha: float
+    signal_masks: Optional[NDArray[np.bool_]] = field(default=None, repr=False)  # (n_spots, n_markers) boolean, True = signal component
+    signal_mask_marker_names: Optional[List[str]] = None  # marker names corresponding to columns
 
     def to_dataframe(self) -> pd.DataFrame:
         """Convert results to ranked DataFrame sorted by interest_score descending."""
@@ -115,7 +117,7 @@ def _compute_kurtosis(X: NDArray[np.floating]) -> NDArray[np.floating]:
 def _fit_gmm_per_marker(
     X: NDArray[np.floating],
     seed: int,
-) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+) -> Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.bool_]]:
     """
     Fit 2-component GMM to each marker to separate signal from noise.
 
@@ -127,10 +129,13 @@ def _fit_gmm_per_marker(
         Tuple of:
         - snr_values: SNR = (mu_signal - mu_background) / sigma_background (n_markers,)
         - signal_fractions: Fraction of spots in signal component (n_markers,)
+        - signal_masks: Boolean array (n_spots, n_markers) where True means the spot
+          is classified in the signal (higher-mean) GMM component.
     """
     n_spots, n_markers = X.shape
     snr_values = np.zeros(n_markers)
     signal_fractions = np.zeros(n_markers)
+    signal_masks = np.zeros((n_spots, n_markers), dtype=bool)
 
     for m in range(n_markers):
         values = X[:, m].reshape(-1, 1)
@@ -168,12 +173,16 @@ def _fit_gmm_per_marker(
             snr_values[m] = (mu_signal - mu_bg) / sigma_bg
             signal_fractions[m] = weights[signal_idx]
 
+            # Per-spot signal classification
+            posteriors = gmm.predict_proba(values)
+            signal_masks[:, m] = posteriors[:, signal_idx] > 0.5
+
         except Exception as e:
             logging.debug(f"GMM fitting failed for marker {m}: {e}")
             snr_values[m] = 0.0
             signal_fractions[m] = 0.0
 
-    return snr_values, signal_fractions
+    return snr_values, signal_fractions, signal_masks
 
 
 def _spatial_smooth(
@@ -571,7 +580,7 @@ def identify_interesting_markers(
     # Step 3: Fit GMM per marker for signal/noise separation
     if verbose:
         logging.info("Fitting GMM to separate signal/noise per marker...")
-    snr_values, signal_fractions = _fit_gmm_per_marker(X, seed)
+    snr_values, signal_fractions, signal_masks = _fit_gmm_per_marker(X, seed)
 
     # Step 4: Spatial smoothing before Moran's I
     if verbose:
@@ -645,6 +654,8 @@ def identify_interesting_markers(
         morans_threshold=morans_thresh_learned,
         morans_k=morans_k,
         morans_alpha=0.0,  # Not used with adaptive GMM
+        signal_masks=signal_masks,
+        signal_mask_marker_names=list(marker_names),
     )
 
     if verbose:
