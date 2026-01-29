@@ -1307,6 +1307,7 @@ def deconvolute_local_cell_proportions_per_marker(
     beta_max: float = 2.0,
     max_iterations: int = 20,
     max_y_change: float = 0.4,
+    marker_exclusivity: Optional[np.ndarray] = None,
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization with per-marker beta.
@@ -1329,6 +1330,8 @@ def deconvolute_local_cell_proportions_per_marker(
         beta_max: Maximum allowed beta value.
         max_iterations: Maximum iterations allowed for EM-like steps.
         max_y_change: Maximum allowed change in Y values between iterations.
+        marker_exclusivity: Optional (M,) array of per-marker exclusivity weights.
+            If provided, multiplies the loss weight for each marker.
 
     Returns:
         Refined proportions (T,) for the specified spot, or None on failure.
@@ -1424,7 +1427,8 @@ def deconvolute_local_cell_proportions_per_marker(
                 n_owners = len(owners_m)
                 beta_m = local_beta[m]
                 for j in owners_m:
-                    weight = 1.0 / (n_owners * markers_per_celltype[j])
+                    excl = marker_exclusivity[m] if marker_exclusivity is not None else 1.0
+                    weight = excl / (n_owners * markers_per_celltype[j])
                     for i in range(local_N):
                         S_im = local_marker_data[i, m]
                         error_terms.append(weight * (S_im - beta_m * Y_vars[i, j]) ** 2)
@@ -1522,6 +1526,7 @@ def finetune_cell_proportions_per_marker(
     beta_vary: bool = True,
     beta_min: float = 0.1,
     beta_max: float = 2.0,
+    marker_exclusivity: Optional[np.ndarray] = None,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
@@ -1613,6 +1618,7 @@ def finetune_cell_proportions_per_marker(
                         beta_max=beta_max,
                         max_iterations=max_iterations,
                         max_y_change=max_y_change,
+                        marker_exclusivity=marker_exclusivity,
                     )
                     futures[future] = spot_idx
 

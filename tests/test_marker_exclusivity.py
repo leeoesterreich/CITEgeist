@@ -1,8 +1,14 @@
 """Tests for marker exclusivity weighting."""
+import inspect
+
 import numpy as np
 import pytest
 
-from CITEgeist.model.gurobi_impl import compute_marker_exclusivity
+from CITEgeist.model.gurobi_impl import (
+    compute_marker_exclusivity,
+    deconvolute_local_cell_proportions_per_marker,
+    finetune_cell_proportions_per_marker,
+)
 
 
 class TestComputeMarkerExclusivity:
@@ -99,3 +105,23 @@ class TestComputeMarkerExclusivity:
 
         exclusivity = compute_marker_exclusivity(S, Y, marker_owners, assignment)
         assert exclusivity[0] > 0.5, f"Shared marker should be discriminative, got {exclusivity[0]:.3f}"
+
+
+class TestExclusivityInFinetuning:
+    """Test that exclusivity weights are accepted by finetuning functions."""
+
+    def test_deconvolute_accepts_marker_exclusivity(self):
+        """deconvolute_local_cell_proportions_per_marker should accept marker_exclusivity."""
+        sig = inspect.signature(deconvolute_local_cell_proportions_per_marker)
+        assert "marker_exclusivity" in sig.parameters, \
+            "deconvolute_local_cell_proportions_per_marker missing marker_exclusivity parameter"
+        param = sig.parameters["marker_exclusivity"]
+        assert param.default is None, f"Default should be None, got {param.default}"
+
+    def test_finetune_accepts_marker_exclusivity(self):
+        """finetune_cell_proportions_per_marker should accept marker_exclusivity."""
+        sig = inspect.signature(finetune_cell_proportions_per_marker)
+        assert "marker_exclusivity" in sig.parameters, \
+            "finetune_cell_proportions_per_marker missing marker_exclusivity parameter"
+        param = sig.parameters["marker_exclusivity"]
+        assert param.default is None, f"Default should be None, got {param.default}"
