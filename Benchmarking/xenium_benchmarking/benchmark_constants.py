@@ -70,12 +70,12 @@ ACHIEVABLE_7_GT_MARKERS: Dict[str, Dict[str, List[str]]] = {
         "secondary": ["CD45RA"],
     },
     "CD4+ T cells": {
-        "primary": ["CD3E", "CD4"],
-        "secondary": ["CD45RO"],
+        "primary": ["CD4"],
+        "secondary": ["CD3E", "CD45RO"],
     },
     "CD8+ T cells": {
-        "primary": ["CD3E", "CD8A"],
-        "secondary": ["GranzymeB"],
+        "primary": ["CD8A"],
+        "secondary": ["CD3E", "GranzymeB"],
     },
     "Macrophages": {
         "primary": ["CD68", "CD163"],
