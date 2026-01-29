@@ -766,6 +766,76 @@ def optimize_cell_proportions_per_marker(
     return Y_values, beta_new, marker_beta_dict
 
 
+def compute_marker_exclusivity(
+    marker_level_data: np.ndarray,
+    Y_values: np.ndarray,
+    marker_owners: List[List[int]],
+    assignment_matrix: np.ndarray,
+    floor: float = 0.3,
+    epsilon: float = 1e-9,
+) -> np.ndarray:
+    """
+    Compute per-marker exclusivity scores measuring discriminative power.
+
+    For each marker, measures how exclusively it correlates with its assigned
+    cell type(s) versus the best non-owner cell type. Markers that track many
+    cell types equally (e.g., VIM) get low scores; markers specific to their
+    owner (e.g., CD68) get high scores.
+
+    Args:
+        marker_level_data: (N, M) normalized marker signals.
+        Y_values: (N, T) cell type proportions from global EM pass.
+        marker_owners: List of lists, marker_owners[m] = indices of owner cell types.
+        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
+        floor: Minimum exclusivity score (default: 0.3).
+        epsilon: Small constant to prevent division by zero.
+
+    Returns:
+        (M,) array of exclusivity scores in [floor, 1.0].
+    """
+    N, M = marker_level_data.shape
+    T = Y_values.shape[1]
+    exclusivity = np.ones(M, dtype=np.float64)
+
+    for m in range(M):
+        owners_m = marker_owners[m]
+        if not owners_m:
+            # Unowned markers: neutral weight (1.0)
+            continue
+
+        S_m = marker_level_data[:, m]
+
+        # Owner correlation: correlate with combined owner proportions
+        Y_owner = np.zeros(N, dtype=np.float64)
+        for j in owners_m:
+            Y_owner += Y_values[:, j]
+
+        r_owner = np.corrcoef(S_m, Y_owner)[0, 1]
+        if np.isnan(r_owner):
+            r_owner = 0.0
+        r_owner = max(r_owner, 0.0)
+
+        # Best non-owner correlation
+        owner_set = set(owners_m)
+        r_best_other = 0.0
+        for k in range(T):
+            if k in owner_set:
+                continue
+            r_k = np.corrcoef(S_m, Y_values[:, k])[0, 1]
+            if np.isnan(r_k):
+                r_k = 0.0
+            r_best_other = max(r_best_other, max(r_k, 0.0))
+
+        # Exclusivity ratio
+        denom = r_owner + r_best_other + epsilon
+        exclusivity[m] = r_owner / denom
+
+    # Apply floor
+    exclusivity = np.clip(exclusivity, floor, 1.0)
+
+    return exclusivity
+
+
 def validate_cell_proportions(
     Y_values: np.ndarray,
     cell_type_names: List[str],
@@ -1987,6 +2057,187 @@ def optimize_gene_expression(
             checkpoint_mgr.save_final_results(spotwise_gene_expression_profiles, completed_spots, N, T, M)
 
     return spotwise_gene_expression_profiles
+
+
+def estimate_true_expression_cell(
+    X_obs: np.ndarray,
+    Y_assignments: np.ndarray,
+    coords: np.ndarray,
+    enrichment_weights: np.ndarray,
+    library_slack: float = 1.5,
+    lambda_enrich: float = 1.0,
+    lambda_spatial: float = 0.01,
+    spatial_k: int = 50,
+    max_workers: Optional[int] = None,
+    checkpoint_interval: int = 500,
+) -> np.ndarray:
+    """
+    Estimate true gene expression per cell using optimization.
+
+    For each cell, solves a QP to find X_true that:
+    1. Stays close to observed counts (data fidelity)
+    2. Recovers dropout for genes expected in the cell's type (enrichment prior)
+    3. Agrees with same-type spatial neighbors (spatial coherence)
+    4. Respects bounded total library size (prevents runaway imputation)
+
+    Args:
+        X_obs: Observed expression matrix (n_cells, n_genes).
+        Y_assignments: Cell type assignment weights (n_cells, n_types) from Pass 1.
+        coords: Spatial coordinates (n_cells, 2).
+        enrichment_weights: Type-gene enrichment matrix (n_types, n_genes).
+        library_slack: Max ratio of X_true library size to X_obs (default 1.5).
+        lambda_enrich: Weight for enrichment prior term.
+        lambda_spatial: Weight for spatial coherence term.
+        spatial_k: Number of neighbors for spatial smoothing.
+        max_workers: Max parallel workers (None = cpu_count).
+        checkpoint_interval: Cells between checkpoint saves.
+
+    Returns:
+        X_true: Estimated true expression (n_cells, n_genes).
+    """
+    N, M = X_obs.shape
+    T = Y_assignments.shape[1]
+
+    # Determine dominant type per cell
+    dominant_type = np.argmax(Y_assignments, axis=1)
+
+    # Build spatial neighbor graph (k-NN)
+    from scipy.spatial import cKDTree
+    tree = cKDTree(coords)
+    k_query = min(spatial_k + 1, N)
+    _, all_neighbor_indices = tree.query(coords, k=k_query)
+    # Remove self
+    if all_neighbor_indices.ndim > 1 and all_neighbor_indices.shape[1] > 1:
+        all_neighbor_indices = all_neighbor_indices[:, 1:]
+    else:
+        all_neighbor_indices = np.empty((N, 0), dtype=int)
+
+    # For each cell, find same-type neighbors and precompute their mean expression
+    same_type_neighbor_means = np.zeros((N, M))
+    same_type_neighbor_counts = np.zeros(N, dtype=int)
+    for i in range(N):
+        ct = dominant_type[i]
+        neighbors = all_neighbor_indices[i]
+        same_type_mask = dominant_type[neighbors] == ct
+        same_type_neighbors = neighbors[same_type_mask]
+        if len(same_type_neighbors) > 0:
+            same_type_neighbor_means[i] = X_obs[same_type_neighbors].mean(axis=0)
+            same_type_neighbor_counts[i] = len(same_type_neighbors)
+
+    logging.info(
+        f"Cell-level Pass 2: {N} cells, {M} genes, {T} types, "
+        f"library_slack={library_slack}, spatial_k={spatial_k}"
+    )
+
+    X_true = np.zeros((N, M), dtype=np.float64)
+
+    # Process cells in parallel
+    workers = max_workers if max_workers is not None else os.cpu_count()
+
+    # Need to make these accessible to the worker function via module-level
+    # since ProcessPoolExecutor pickles the function
+    _worker_data = {
+        'X_obs': X_obs,
+        'dominant_type': dominant_type,
+        'enrichment_weights': enrichment_weights,
+        'same_type_neighbor_means': same_type_neighbor_means,
+        'same_type_neighbor_counts': same_type_neighbor_counts,
+        'library_slack': library_slack,
+        'lambda_enrich': lambda_enrich,
+        'lambda_spatial': lambda_spatial,
+        'M': M,
+    }
+
+    def _solve_single_cell(cell_idx):
+        """Solve QP for a single cell."""
+        import gurobipy as gp
+        from gurobipy import GRB
+
+        model = None
+        try:
+            ct = _worker_data['dominant_type'][cell_idx]
+            obs = _worker_data['X_obs'][cell_idx]
+            obs_lib = obs.sum()
+
+            if obs_lib < 1:
+                return cell_idx, obs.copy()  # Nothing to optimize
+
+            enrich = _worker_data['enrichment_weights'][ct]
+            neighbor_mean = _worker_data['same_type_neighbor_means'][cell_idx]
+            has_neighbors = _worker_data['same_type_neighbor_counts'][cell_idx] > 0
+            M_genes = _worker_data['M']
+            lib_slack = _worker_data['library_slack']
+            l_enrich = _worker_data['lambda_enrich']
+            l_spatial = _worker_data['lambda_spatial']
+
+            model = gp.Model(f"cell_expr_{cell_idx}")
+            model.setParam("OutputFlag", 0)
+            model.setParam("Threads", 1)
+            model.setParam("TimeLimit", 30)
+
+            # Variables: X_true[g] for each gene
+            max_lib = lib_slack * obs_lib
+            X_vars = model.addVars(
+                M_genes, lb=0, ub=max_lib, vtype=GRB.CONTINUOUS, name="X"
+            )
+
+            # Library size constraint
+            model.addConstr(
+                gp.quicksum(X_vars[g] for g in range(M_genes)) <= max_lib,
+                name="lib_size",
+            )
+
+            # Objective: data fidelity + enrichment + spatial
+            obj_terms = []
+
+            for g in range(M_genes):
+                # Data fidelity: (X_true[g] - X_obs[g])^2
+                obj_terms.append((X_vars[g] - obs[g]) * (X_vars[g] - obs[g]))
+
+                # Enrichment prior: -lambda_enrich * E[ct,g] * X_true[g]
+                # (negative because we minimize; higher enrichment = more expression wanted)
+                if l_enrich > 0 and enrich[g] > 0.1:
+                    obj_terms.append(-l_enrich * enrich[g] * X_vars[g])
+
+                # Spatial coherence with same-type neighbors
+                if l_spatial > 0 and has_neighbors:
+                    obj_terms.append(
+                        l_spatial * (X_vars[g] - neighbor_mean[g]) * (X_vars[g] - neighbor_mean[g])
+                    )
+
+            model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
+            model.optimize()
+
+            if model.status == GRB.OPTIMAL:
+                result = np.array([X_vars[g].X for g in range(M_genes)])
+                return cell_idx, result
+            else:
+                return cell_idx, obs.copy()
+
+        except Exception as e:
+            logging.warning(f"Cell {cell_idx} optimization failed: {e}")
+            return cell_idx, _worker_data['X_obs'][cell_idx].copy()
+        finally:
+            if model:
+                del model
+
+    # Process cells - use sequential for small N, parallel for large N
+    if N <= 100:
+        # Sequential for small datasets (avoids pickle overhead)
+        for i in range(N):
+            cell_idx, result = _solve_single_cell(i)
+            X_true[cell_idx] = result
+    else:
+        # Parallel for large datasets
+        with ProcessPoolExecutor(max_workers=workers) as executor:
+            futures = {executor.submit(_solve_single_cell, i): i for i in range(N)}
+            with tqdm(total=N, desc="Estimating true expression") as pbar:
+                for future in as_completed(futures):
+                    cell_idx, result = future.result()
+                    X_true[cell_idx] = result
+                    pbar.update(1)
+
+    return X_true
 
 
 def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, max_fraction=0.05):

@@ -162,3 +162,97 @@ class TestPass1Sparsity:
         )
 
         np.testing.assert_allclose(Y_no_sparse, Y_default, atol=1e-4)
+
+
+class TestPass2CellLevel:
+    """Test cell-level gene expression optimization."""
+
+    def test_basic_true_count_estimation(self):
+        """Verify true count estimation recovers dropout for expected genes."""
+        from CITEgeist.model.gurobi_impl import estimate_true_expression_cell
+
+        rng = np.random.default_rng(42)
+        n_cells = 30
+        n_genes = 20
+        n_types = 2
+
+        # Simulate cells: type 0 expresses genes 0-9, type 1 expresses genes 10-19
+        X_obs = np.zeros((n_cells, n_genes), dtype=np.float64)
+        cell_types = np.zeros(n_cells, dtype=int)
+        Y_assignments = np.zeros((n_cells, n_types))
+
+        for i in range(n_cells):
+            ct = i % n_types
+            cell_types[i] = ct
+            Y_assignments[i, ct] = 0.95
+            Y_assignments[i, 1 - ct] = 0.05
+
+            # Express type-specific genes with some dropout
+            type_genes = range(ct * 10, ct * 10 + 10)
+            for g in type_genes:
+                if rng.random() > 0.3:  # 30% dropout
+                    X_obs[i, g] = rng.poisson(10)
+
+        coords = rng.uniform(0, 100, (n_cells, 2))
+
+        # Build enrichment weights: gene g is enriched in its type
+        enrichment = np.ones((n_types, n_genes)) * 0.1
+        enrichment[0, :10] = 1.0
+        enrichment[1, 10:] = 1.0
+
+        X_true = estimate_true_expression_cell(
+            X_obs=X_obs,
+            Y_assignments=Y_assignments,
+            coords=coords,
+            enrichment_weights=enrichment,
+            library_slack=1.5,
+            lambda_spatial=0.01,
+            spatial_k=10,
+        )
+
+        assert X_true.shape == X_obs.shape
+
+        # X_true should be non-negative
+        assert np.all(X_true >= 0)
+
+        # Dropout genes should have some recovery (not all zeros where expected)
+        for ct in range(n_types):
+            ct_cells = np.where(cell_types == ct)[0]
+            type_genes = range(ct * 10, ct * 10 + 10)
+            obs_zeros = np.sum(X_obs[np.ix_(ct_cells, list(type_genes))] == 0)
+            true_zeros = np.sum(X_true[np.ix_(ct_cells, list(type_genes))] == 0)
+            # Should recover at least some dropouts
+            assert true_zeros < obs_zeros, (
+                f"Type {ct}: expected fewer zeros in X_true ({true_zeros}) than X_obs ({obs_zeros})"
+            )
+
+    def test_library_size_bounded(self):
+        """X_true total counts should not exceed library_slack * observed."""
+        from CITEgeist.model.gurobi_impl import estimate_true_expression_cell
+
+        rng = np.random.default_rng(42)
+        n_cells = 10
+        n_genes = 10
+        X_obs = rng.poisson(5, (n_cells, n_genes)).astype(np.float64)
+        Y_assignments = np.zeros((n_cells, 1))
+        Y_assignments[:, 0] = 1.0
+        coords = rng.uniform(0, 100, (n_cells, 2))
+        enrichment = np.ones((1, n_genes))
+
+        slack = 1.5
+        X_true = estimate_true_expression_cell(
+            X_obs=X_obs,
+            Y_assignments=Y_assignments,
+            coords=coords,
+            enrichment_weights=enrichment,
+            library_slack=slack,
+            lambda_spatial=0.0,
+            spatial_k=5,
+        )
+
+        obs_lib = X_obs.sum(axis=1)
+        true_lib = X_true.sum(axis=1)
+        for i in range(n_cells):
+            assert true_lib[i] <= slack * obs_lib[i] + 1.0, (
+                f"Cell {i}: true lib {true_lib[i]:.1f} > slack * obs lib {slack * obs_lib[i]:.1f}"
+            )
