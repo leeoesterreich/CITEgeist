@@ -46,8 +46,8 @@ ACHIEVABLE_7_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = {
         "Minor": [],
     },
     "Fibroblasts": {
-        "Major": ["alphaSMA", "Vimentin"],
-        "Minor": [],
+        "Major": ["alphaSMA"],
+        "Minor": ["Vimentin"],
     },
 }
 
@@ -90,8 +90,8 @@ ACHIEVABLE_7_GT_MARKERS: Dict[str, Dict[str, List[str]]] = {
         "secondary": [],
     },
     "Fibroblasts": {
-        "primary": ["alphaSMA", "Vimentin"],
-        "secondary": [],
+        "primary": ["alphaSMA"],
+        "secondary": ["Vimentin"],
     },
 }
 
