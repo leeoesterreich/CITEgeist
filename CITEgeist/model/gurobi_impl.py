@@ -534,8 +534,8 @@ def optimize_cell_proportions_per_marker(
     lambda_reg: float = 1.0,
     alpha: float = 0.5,
     normalize_beta: bool = True,
-    beta_min: float = 0.01,
-    beta_max: float = 100.0,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
     unknown_threshold: float = 0.05,
     min_celltype_threshold: float = 0.01,
     redundancy_threshold: float = 0.2,
@@ -564,8 +564,8 @@ def optimize_cell_proportions_per_marker(
         lambda_reg: Regularization strength for elastic net
         alpha: L1-L2 tradeoff factor (0 = L2, 1 = L1)
         normalize_beta: Whether to normalize beta values so max=1
-        beta_min: Minimum allowed beta value (default: 0.01)
-        beta_max: Maximum allowed beta value (default: 100.0)
+        beta_min: Minimum allowed beta value (default: 0.1)
+        beta_max: Maximum allowed beta value (default: 2.0)
         unknown_threshold: Maximum allowed mean proportion for Unknown (default: 0.05)
         min_celltype_threshold: Minimum required mean proportion for cell types (default: 0.01)
         redundancy_threshold: Maximum allowed fraction of redundant types (default: 0.2)
@@ -717,6 +717,10 @@ def optimize_cell_proportions_per_marker(
             max_beta = np.max(beta_new)
             if max_beta > 0:
                 beta_new = beta_new / max_beta
+                # Re-clip after normalization to prevent extreme ratios.
+                # Without this, wide pre-normalization range creates tiny
+                # post-normalization betas that silence weak markers.
+                beta_new = np.clip(beta_new, beta_min, 1.0)
 
         # Convergence check
         beta_diff = np.linalg.norm(beta_new - beta_prev)
@@ -1220,8 +1224,8 @@ def deconvolute_local_cell_proportions_per_marker(
     beta_values: Optional[np.ndarray] = None,
     beta_vary: bool = True,
     normalize_beta: bool = True,
-    beta_min: float = 0.01,
-    beta_max: float = 100.0,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
     max_iterations: int = 20,
     max_y_change: float = 0.4,
 ) -> Optional[np.ndarray]:
@@ -1384,6 +1388,8 @@ def deconvolute_local_cell_proportions_per_marker(
                     max_beta_val = np.max(new_beta)
                     if max_beta_val > 0:
                         new_beta = new_beta / max_beta_val
+                        # Re-clip after normalization to prevent extreme ratios
+                        new_beta = np.clip(new_beta, beta_min, 1.0)
             else:
                 new_beta = local_beta.copy()
 
@@ -1435,8 +1441,8 @@ def finetune_cell_proportions_per_marker(
     max_iterations: int = 20,
     max_y_change: float = 0.4,
     beta_vary: bool = True,
-    beta_min: float = 0.01,
-    beta_max: float = 100.0,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",

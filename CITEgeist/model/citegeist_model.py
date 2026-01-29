@@ -405,8 +405,8 @@ class CitegeistModel:
         laplacian_k=8,
         # Per-marker beta parameters
         per_marker_beta=True,
-        beta_min=0.01,
-        beta_max=100.0,
+        beta_min=0.1,
+        beta_max=2.0,
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -427,8 +427,8 @@ class CitegeistModel:
             laplacian_k (int): Number of neighbors for Laplacian graph (default: 8)
             per_marker_beta (bool): If True (default), use per-marker beta learning which preserves
                 marker-level signal variation. If False, use legacy per-celltype beta with marker averaging.
-            beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.01)
-            beta_max (float): Maximum allowed beta value for per-marker optimization (default: 100.0)
+            beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.1)
+            beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
         """
 
         if radius is None:
