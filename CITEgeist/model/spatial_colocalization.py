@@ -3415,8 +3415,9 @@ def rescue_singletons(
 
     Algorithm:
     1. Separate profiles into singletons (1 marker) and multi-marker (2+)
-    2. Compute "explained territory" = union of GMM-signal spots across all
-       multi-marker profile markers
+    2. Compute "explained territory" = spots where at least 2 markers from
+       the same multi-marker profile co-express (both in signal component).
+       This prevents broadly-expressed markers from inflating territory.
     3. For each singleton, compute:
        - unique_coverage: fraction of its signal spots outside explained territory
        - signal_fraction: fraction of all spots classified as signal
@@ -3456,17 +3457,28 @@ def rescue_singletons(
             logging.info("No singletons to rescue/filter")
         return profiles
 
-    # Compute explained territory: union of signal spots from all multi-marker profiles
+    # Compute explained territory: spots with co-expression in multi-marker profiles
+    # A spot is "explained" if at least 2 markers from the SAME profile have signal there.
+    # This avoids broadly-expressed markers (CD45, CD3E) inflating the territory.
     explained = np.zeros(n_spots, dtype=bool)
     for profile in multi_marker:
-        for marker in profile:
-            if marker in marker_to_col:
-                explained |= signal_masks[:, marker_to_col[marker]]
+        # Count how many markers in this profile have signal per spot
+        profile_cols = [marker_to_col[m] for m in profile if m in marker_to_col]
+        if len(profile_cols) < 2:
+            # Single-marker match in multi-marker profile: use that marker's signal
+            for col in profile_cols:
+                explained |= signal_masks[:, col]
+        else:
+            # Co-expression: spots where >= 2 markers from this profile have signal
+            coexpr_count = np.zeros(n_spots, dtype=int)
+            for col in profile_cols:
+                coexpr_count += signal_masks[:, col].astype(int)
+            explained |= (coexpr_count >= 2)
 
     n_explained = explained.sum()
     if verbose:
         logging.info(
-            f"Explained territory: {n_explained}/{n_spots} spots "
+            f"Explained territory (co-expression): {n_explained}/{n_spots} spots "
             f"({n_explained / n_spots:.1%}) covered by {len(multi_marker)} multi-marker profiles"
         )
 

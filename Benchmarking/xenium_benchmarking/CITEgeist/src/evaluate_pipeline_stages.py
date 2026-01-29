@@ -1029,13 +1029,41 @@ def run_all_stages(
     )
 
     # Build auto-discovered cell_profile_dict for Stage 4
-    from run_benchmark_autodiscovery import map_profiles_to_celltypes, build_cell_profile_dict
-
+    # Map discovered profiles to achievable-7 cell types using Jaccard-like scoring
     gt_celltypes = [c for c in ground_truth.columns if c != "n_cells"]
-    profile_to_celltype, match_scores = map_profiles_to_celltypes(
-        selection_result.selected_profiles, gt_celltypes
-    )
-    auto_profiles = build_cell_profile_dict(selection_result.selected_profiles, profile_to_celltype)
+
+    # Score each profile against achievable-7 GT markers
+    profile_to_celltype = {}
+    used_celltypes = set()
+    score_pairs = []
+
+    for i, profile in enumerate(selection_result.selected_profiles):
+        profile_set = set(profile)
+        for ct, markers in ACHIEVABLE_7_GT_MARKERS.items():
+            if ct not in gt_celltypes:
+                continue
+            primary = set(markers["primary"])
+            secondary = set(markers["secondary"])
+            primary_score = len(profile_set & primary) / len(primary) if primary else 0
+            secondary_score = len(profile_set & secondary) / len(secondary) if secondary else 0
+            score = (2 * primary_score + secondary_score) / 3
+            if score > 0:
+                score_pairs.append((score, i, ct))
+
+    # Greedy assignment: best score first, no duplicates
+    score_pairs.sort(reverse=True)
+    for score, i, ct in score_pairs:
+        if i not in profile_to_celltype and ct not in used_celltypes:
+            profile_to_celltype[i] = ct
+            used_celltypes.add(ct)
+
+    # Build cell_profile_dict in Module 3 format
+    auto_profiles = {}
+    for idx, celltype in profile_to_celltype.items():
+        markers = list(selection_result.selected_profiles[idx])
+        major = markers[:2] if len(markers) >= 2 else markers
+        minor = markers[2:] if len(markers) > 2 else []
+        auto_profiles[celltype] = {"Major": major, "Minor": minor}
 
     # Stage 4: Oracle comparison
     stage4_results = run_stage4(
