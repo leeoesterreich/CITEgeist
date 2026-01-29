@@ -1339,6 +1339,7 @@ def deconvolute_local_cell_proportions_per_marker(
     max_iterations: int = 20,
     max_y_change: float = 0.4,
     marker_exclusivity: Optional[np.ndarray] = None,
+    marker_alpha: Optional[np.ndarray] = None,
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization with per-marker beta.
@@ -1363,6 +1364,8 @@ def deconvolute_local_cell_proportions_per_marker(
         max_y_change: Maximum allowed change in Y values between iterations.
         marker_exclusivity: Optional (M,) array of per-marker exclusivity weights.
             If provided, multiplies the loss weight for each marker.
+        marker_alpha: Optional (M,) array of per-marker baselines from global EM.
+            If provided, signal is baseline-subtracted before reconstruction.
 
     Returns:
         Refined proportions (T,) for the specified spot, or None on failure.
@@ -1462,6 +1465,8 @@ def deconvolute_local_cell_proportions_per_marker(
                     weight = excl / (n_owners * markers_per_celltype[j])
                     for i in range(local_N):
                         S_im = local_marker_data[i, m]
+                        if marker_alpha is not None:
+                            S_im = S_im - marker_alpha[m]
                         error_terms.append(weight * (S_im - beta_m * Y_vars[i, j]) ** 2)
 
             total_error = gp.quicksum(error_terms)
@@ -1493,6 +1498,8 @@ def deconvolute_local_cell_proportions_per_marker(
                     for j in owners_m:
                         Y_combined += Y_values[:, j]
                     S_m = local_marker_data[:, m]
+                    if marker_alpha is not None:
+                        S_m = S_m - marker_alpha[m]
                     denominator = np.dot(Y_combined, Y_combined) + 1e-9
                     new_beta[m] = np.dot(S_m, Y_combined) / denominator
                     new_beta[m] = np.clip(new_beta[m], beta_min, beta_max)
@@ -1558,6 +1565,7 @@ def finetune_cell_proportions_per_marker(
     beta_min: float = 0.1,
     beta_max: float = 2.0,
     marker_exclusivity: Optional[np.ndarray] = None,
+    marker_alpha: Optional[np.ndarray] = None,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
@@ -1650,6 +1658,7 @@ def finetune_cell_proportions_per_marker(
                         max_iterations=max_iterations,
                         max_y_change=max_y_change,
                         marker_exclusivity=marker_exclusivity,
+                        marker_alpha=marker_alpha,
                     )
                     futures[future] = spot_idx
 
