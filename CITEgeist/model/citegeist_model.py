@@ -19,6 +19,8 @@ from scipy.ndimage import gaussian_filter
 # Local imports
 from .gurobi_impl import (
     compute_global_prior,
+    compute_marker_exclusivity,
+    estimate_true_expression_cell,
     finetune_cell_proportions,
     finetune_cell_proportions_per_marker,
     map_antibodies_to_profiles,
@@ -472,6 +474,14 @@ class CitegeistModel:
             beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
         """
 
+        # Use resolution preset for laplacian_k if caller used default
+        if laplacian_k == 8 and self.resolution == "cell":
+            laplacian_k = self.resolution_params["laplacian_k"]
+
+        # Use resolution preset for lambda_laplacian if caller used default
+        if lambda_laplacian == 0.1 and self.resolution == "cell":
+            lambda_laplacian = self.resolution_params["lambda_spatial"]
+
         if radius is None:
             raise ValueError("Radius must be provided. Run `run_cell_proportion_model` with a radius argument.")
 
@@ -526,10 +536,32 @@ class CitegeistModel:
                     lambda_laplacian=lambda_laplacian,
                     coords=coords,
                     laplacian_k=laplacian_k,
+                    lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
                 )
 
                 # Store marker betas for downstream analysis
                 self.results["marker_beta"] = marker_beta_dict
+
+                # Compute marker exclusivity scores for finetuning
+                marker_owners = []
+                for m_idx in range(assignment_matrix.shape[0]):
+                    owners = [j for j in range(assignment_matrix.shape[1]) if assignment_matrix[m_idx, j] > 0]
+                    marker_owners.append(owners)
+
+                marker_exclusivity = compute_marker_exclusivity(
+                    marker_level_data=marker_level_data,
+                    Y_values=Y_values,
+                    marker_owners=marker_owners,
+                    assignment_matrix=assignment_matrix,
+                )
+
+                # Log exclusivity scores
+                for m_idx, m_name in enumerate(marker_names):
+                    if marker_owners[m_idx]:
+                        logging.info(f"  Marker exclusivity: {m_name} = {marker_exclusivity[m_idx]:.3f}")
+                self.results["marker_exclusivity"] = {
+                    marker_names[i]: marker_exclusivity[i] for i in range(len(marker_names))
+                }
 
             except ValueError as e:
                 error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
@@ -566,6 +598,7 @@ class CitegeistModel:
                     beta_vary=True,
                     beta_min=beta_min,
                     beta_max=beta_max,
+                    marker_exclusivity=marker_exclusivity,
                     max_workers=max_workers,
                     checkpoint_interval=checkpoint_interval,
                     output_dir=finetune_output_dir,
@@ -708,6 +741,63 @@ class CitegeistModel:
                 f"Deconvolution for these spots may fail and their profiles will be imputed as zeros. "
                 f"Example spot indices: {zero_prop_spots[:5]}"
             )
+
+        if self.resolution == "cell":
+            # Cell-level: estimate true expression per cell (not deconvolution)
+            logging.info("Cell-level mode: using true count estimation instead of deconvolution")
+
+            # Get gene expression data
+            gex_data = self.gene_expression_adata.X
+            if hasattr(gex_data, 'toarray'):
+                gex_data = gex_data.toarray()
+            gex_data = np.asarray(gex_data, dtype=np.float64)
+
+            # Get spatial coordinates
+            cell_coords = self.gene_expression_adata.obsm.get('spatial', None)
+            if cell_coords is None:
+                cell_coords = self.antibody_capture_adata.obsm.get('spatial', None)
+            if cell_coords is None:
+                raise ValueError("No spatial coordinates found for cell-level expression estimation")
+
+            # Build enrichment weights from cell type assignments
+            n_types = cell_props_values.shape[1]
+            n_genes = gex_data.shape[1]
+            dominant_type = np.argmax(cell_props_values, axis=1)
+
+            enrichment = np.ones((n_types, n_genes)) * 0.1
+            for ct_idx in range(n_types):
+                ct_cells = np.where(dominant_type == ct_idx)[0]
+                if len(ct_cells) > 0:
+                    ct_mean = gex_data[ct_cells].mean(axis=0)
+                    global_mean = gex_data.mean(axis=0) + 1e-10
+                    enrichment[ct_idx] = ct_mean / global_mean
+
+            X_true = estimate_true_expression_cell(
+                X_obs=gex_data,
+                Y_assignments=cell_props_values,
+                coords=cell_coords,
+                enrichment_weights=enrichment,
+                library_slack=self.resolution_params["pass2_library_slack"],
+                lambda_spatial=self.resolution_params["lambda_spatial"],
+                spatial_k=self.resolution_params["neighbor_k"],
+                max_workers=max_workers,
+            )
+
+            # Store results in same format as spot-level for downstream compatibility
+            N = X_true.shape[0]
+            T = n_types
+            M = n_genes
+            spotwise_gene_expression_profiles = {}
+            for i in range(N):
+                # For cell-level: all expression assigned to dominant type
+                profile = np.zeros((T, M))
+                dt = dominant_type[i]
+                profile[dt, :] = X_true[i, :]
+                spotwise_gene_expression_profiles[i] = profile
+
+            self.results["gene_expression"] = spotwise_gene_expression_profiles
+            logging.info(f"Cell-level expression estimation complete for {N} cells")
+            return
 
         spotwise_profiles = optimize_gene_expression(
             sample_name=self.sample_name,

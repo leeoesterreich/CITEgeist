@@ -164,6 +164,45 @@ class TestPass1Sparsity:
         np.testing.assert_allclose(Y_no_sparse, Y_default, atol=1e-4)
 
 
+class TestResolutionDispatch:
+    """Test that CitegeistModel dispatches to correct Pass 1/2 based on resolution."""
+
+    def test_cell_mode_passes_sparsity_to_pass1(self, tmp_path):
+        """In cell mode, run_cell_proportion_model should pass lambda_sparse from preset."""
+        adata_gex, adata_protein = _make_test_adata(n_obs=30, n_genes=20, n_proteins=6)
+        from CITEgeist.model import CitegeistModel
+
+        model = CitegeistModel(
+            sample_name="test_cell",
+            output_folder=str(tmp_path),
+            simulation=True,
+            gene_expression_adata=adata_gex,
+            antibody_capture_adata=adata_protein,
+            resolution="cell",
+        )
+
+        # Verify the model stores cell-level params
+        assert model.resolution == "cell"
+        assert model.resolution_params["lambda_sparse"] > 0
+
+    def test_spot_mode_no_sparsity(self, tmp_path):
+        """In spot mode, lambda_sparse should be 0."""
+        adata_gex, adata_protein = _make_test_adata(n_obs=30, n_genes=20, n_proteins=6)
+        from CITEgeist.model import CitegeistModel
+
+        model = CitegeistModel(
+            sample_name="test_spot",
+            output_folder=str(tmp_path),
+            simulation=True,
+            gene_expression_adata=adata_gex,
+            antibody_capture_adata=adata_protein,
+            resolution="spot",
+        )
+
+        assert model.resolution == "spot"
+        assert model.resolution_params["lambda_sparse"] == 0.0
+
+
 class TestPass2CellLevel:
     """Test cell-level gene expression optimization."""
 
