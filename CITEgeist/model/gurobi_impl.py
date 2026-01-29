@@ -543,6 +543,7 @@ def optimize_cell_proportions_per_marker(
     lambda_laplacian: float = 0.1,
     coords: Optional[np.ndarray] = None,
     laplacian_k: int = 8,
+    lambda_sparse: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float]]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
@@ -676,7 +677,15 @@ def optimize_cell_proportions_per_marker(
                     laplacian_terms.append(L_val * Y[i_spot, k] * Y[j_spot, k])
             laplacian_term = lambda_laplacian * gp.quicksum(laplacian_terms)
 
-        model.setObjective(total_error + regularization_term + laplacian_term, GRB.MINIMIZE)
+        # Sparsity penalty (L1 on Y - encourages near-one-hot for cell-level)
+        sparsity_term = 0
+        if lambda_sparse > 0:
+            sparsity_term = lambda_sparse * gp.quicksum(
+                Y[i, j] for i in range(N) for j in range(T)
+            )
+            logging.info(f"Sparsity penalty enabled: lambda_sparse={lambda_sparse}")
+
+        model.setObjective(total_error + regularization_term + laplacian_term + sparsity_term, GRB.MINIMIZE)
 
         # Sum of proportions constraints
         for i in range(N):
