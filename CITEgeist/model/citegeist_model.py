@@ -38,6 +38,32 @@ from .utils import (
 )
 
 
+RESOLUTION_DEFAULTS = {
+    "spot": {
+        "neighbor_k": 8,
+        "morans_k": 8,
+        "smooth_k": 6,
+        "coloc_neighbor_k": 6,
+        "coloc_multi_scale_k": [6, 12, 24, 48, 64],
+        "laplacian_k": 8,
+        "lambda_spatial": 0.1,
+        "lambda_sparse": 0.0,
+        "pass2_library_slack": 1.0,
+    },
+    "cell": {
+        "neighbor_k": 50,
+        "morans_k": 50,
+        "smooth_k": 20,
+        "coloc_neighbor_k": 30,
+        "coloc_multi_scale_k": [20, 40, 60, 80, 100],
+        "laplacian_k": 50,
+        "lambda_spatial": 0.01,
+        "lambda_sparse": 0.1,
+        "pass2_library_slack": 1.5,
+    },
+}
+
+
 class CitegeistModel:
     def __init__(
         self,
@@ -47,6 +73,8 @@ class CitegeistModel:
         simulation=False,
         gene_expression_adata=None,
         antibody_capture_adata=None,
+        resolution="spot",
+        resolution_overrides=None,
     ):
         """
         Initialize the CitegeistModel with an AnnData object and output folder.
@@ -86,6 +114,19 @@ class CitegeistModel:
         self.cell_profile_dict = None
         self.preprocessed_gex = False
         self.preprocessed_antibody = False
+
+        # Resolution mode and parameter presets
+        if resolution not in RESOLUTION_DEFAULTS:
+            raise ValueError(
+                f"resolution must be one of {list(RESOLUTION_DEFAULTS.keys())}, got '{resolution}'"
+            )
+        self.resolution = resolution
+        self.resolution_params = dict(RESOLUTION_DEFAULTS[resolution])
+        if resolution_overrides:
+            for key, val in resolution_overrides.items():
+                if key not in self.resolution_params:
+                    raise ValueError(f"Unknown resolution parameter: '{key}'")
+                self.resolution_params[key] = val
 
         print("CitegeistModel initialized successfully.")
 
