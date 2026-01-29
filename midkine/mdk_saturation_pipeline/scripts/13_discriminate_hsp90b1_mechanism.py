@@ -168,8 +168,8 @@ def get_gene_fc_and_stats(tpm, gene):
     mcf7_fc = np.mean(mcf7_d538g) / mcf7_wt_mean
     t47d_fc = np.mean(t47d_d538g) / t47d_wt_mean
 
-    _, mcf7_pval = stats.ttest_ind(mcf7_d538g, mcf7_wt)
-    _, t47d_pval = stats.ttest_ind(t47d_d538g, t47d_wt)
+    _, mcf7_pval = stats.ttest_ind(mcf7_d538g, mcf7_wt, equal_var=False)
+    _, t47d_pval = stats.ttest_ind(t47d_d538g, t47d_wt, equal_var=False)
 
     return {
         'gene': gene,
@@ -641,6 +641,11 @@ def compile_scorecard(results):
         })
 
     scorecard = pd.DataFrame(rows)
+
+    # Apply Benjamini-Hochberg FDR correction across all tests
+    _, fdr_corrected, _, _ = multipletests(scorecard['p_value'], method='fdr_bh')
+    scorecard['p_value_BH'] = fdr_corrected
+
     scorecard.to_csv(OUTPUT_DIR / "tables" / "mechanism_discrimination_scorecard.csv", index=False)
     print(f"\nSaved scorecard to: outputs/tables/mechanism_discrimination_scorecard.csv")
     return scorecard
