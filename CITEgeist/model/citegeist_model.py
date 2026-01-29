@@ -518,7 +518,7 @@ class CitegeistModel:
                 logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
                             f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
 
-                Y_values, beta_values, marker_beta_dict = optimize_cell_proportions_per_marker(
+                Y_values, beta_values, marker_beta_dict, alpha_values = optimize_cell_proportions_per_marker(
                     marker_level_data=marker_level_data,
                     marker_names=marker_names,
                     assignment_matrix=assignment_matrix,
@@ -539,8 +539,13 @@ class CitegeistModel:
                     lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
                 )
 
-                # Store marker betas for downstream analysis
+                # Store marker betas and baselines for downstream analysis
                 self.results["marker_beta"] = marker_beta_dict
+                marker_alpha_dict = {marker_names[i]: alpha_values[i] for i in range(len(marker_names))}
+                self.results["marker_alpha"] = marker_alpha_dict
+                for m_idx, m_name in enumerate(marker_names):
+                    if alpha_values[m_idx] > 0.05:
+                        logging.info(f"  Marker baseline: {m_name} = {alpha_values[m_idx]:.3f}")
 
                 # Compute marker exclusivity scores for finetuning
                 marker_owners = []
@@ -599,6 +604,7 @@ class CitegeistModel:
                     beta_min=beta_min,
                     beta_max=beta_max,
                     marker_exclusivity=marker_exclusivity,
+                    marker_alpha=alpha_values,
                     max_workers=max_workers,
                     checkpoint_interval=checkpoint_interval,
                     output_dir=finetune_output_dir,
@@ -813,6 +819,7 @@ class CitegeistModel:
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun,
+            lambda_reg_gex=lambda_reg_gex,
         )
 
         # Get dimensions for NaN imputation and consistency checks
