@@ -750,7 +750,7 @@ def analyze_marker_colocalization(
     neighbor_k: int = 6,
     smooth_k: int = 6,
     signal_threshold_percentile: float = 75.0,
-    n_permutations: int = 199,
+    n_permutations: int = 999,
     seed: int = 1234,
     verbose: bool = True,
     # Multi-scale neighborhood parameters

@@ -29,6 +29,15 @@ from scipy.stats import pearsonr, spearmanr
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
+# Import shared benchmark constants
+BENCHMARK_ROOT = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(BENCHMARK_ROOT))
+from benchmark_constants import (
+    ACHIEVABLE_7_CELL_PROFILE_DICT,
+    ACHIEVABLE_7_MARKER_SIGNATURES,
+    GT_TO_ACHIEVABLE_7_MAPPING,
+)
+
 from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
@@ -42,76 +51,6 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-
-# =============================================================================
-# CANONICAL ACHIEVABLE-7 PROFILES (fair benchmark baseline)
-# =============================================================================
-#
-# These 7 cell types are the maximum granularity achievable with the 27-antibody
-# Xenium panel. Based on 2026-01-21 analysis of single-cell protein expression:
-#
-# Collapsed types:
-# - Myofibroblasts + Stromal → Fibroblasts (both VIM+, αSMA overlaps)
-# - Vascular Stromal → Endothelial (CD31+)
-# - Proliferating T → CD8+ T cells (both CD3E+)
-# - Mixed Immune → CD4+ T cells (HLA-DR+ T cells)
-#
-ACHIEVABLE_7_CELL_PROFILE_DICT = {
-    "B cells": {
-        "Major": ["CD20"],
-        "Minor": ["CD45RA"],
-    },
-    "CD4+ T cells": {
-        "Major": ["CD3E", "CD4"],
-        "Minor": ["CD45RO"],
-    },
-    "CD8+ T cells": {
-        "Major": ["CD3E", "CD8A"],
-        "Minor": ["GranzymeB"],
-    },
-    "Macrophages": {
-        "Major": ["CD68", "CD163"],
-        "Minor": ["CD16"],
-    },
-    "Endothelial": {
-        "Major": ["CD31"],
-        "Minor": [],
-    },
-    "Epithelial": {
-        "Major": ["PanCK"],
-        "Minor": [],
-    },
-    "Fibroblasts": {
-        "Major": ["alphaSMA", "Vimentin"],
-        "Minor": [],
-    },
-}
-
-# GT collapse mapping (10 → 7) for evaluation
-GT_TO_ACHIEVABLE_7_MAPPING = {
-    "B cells": "B cells",
-    "Mixed Immune": "CD4+ T cells",
-    "CD8+ T cells": "CD8+ T cells",
-    "Proliferating T": "CD8+ T cells",
-    "Macrophages": "Macrophages",
-    "Endothelial": "Endothelial",
-    "Vascular Stromal": "Endothelial",
-    "Epithelial": "Epithelial",
-    "Myofibroblasts": "Fibroblasts",
-    "Stromal": "Fibroblasts",
-}
-
-# Marker signatures for mapping autodiscovered profiles to achievable-7
-ACHIEVABLE_7_MARKER_SIGNATURES = {
-    "B cells": {"CD20", "CD45RA"},
-    "CD4+ T cells": {"CD3E", "CD4", "CD45RO"},
-    "CD8+ T cells": {"CD3E", "CD8A", "GranzymeB"},
-    "Macrophages": {"CD68", "CD163", "CD16"},
-    "Endothelial": {"CD31"},
-    "Epithelial": {"PanCK"},
-    "Fibroblasts": {"alphaSMA", "Vimentin"},
-}
 
 
 # =============================================================================
@@ -368,7 +307,7 @@ def run_hierarchical_benchmark(
         marker_names=marker_names,
         markers_to_analyze=interesting_markers,
         neighbor_k=6,
-        n_permutations=199,
+        n_permutations=999,
     )
 
     # =========================================================================
