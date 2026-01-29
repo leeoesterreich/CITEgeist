@@ -534,8 +534,8 @@ def optimize_cell_proportions_per_marker(
     lambda_reg: float = 1.0,
     alpha: float = 0.5,
     normalize_beta: bool = True,
-    beta_min: float = 0.1,
-    beta_max: float = 2.0,
+    beta_min: float = 0.01,
+    beta_max: float = 100.0,
     unknown_threshold: float = 0.05,
     min_celltype_threshold: float = 0.01,
     redundancy_threshold: float = 0.2,
@@ -564,8 +564,8 @@ def optimize_cell_proportions_per_marker(
         lambda_reg: Regularization strength for elastic net
         alpha: L1-L2 tradeoff factor (0 = L2, 1 = L1)
         normalize_beta: Whether to normalize beta values so max=1
-        beta_min: Minimum allowed beta value (default: 0.1)
-        beta_max: Maximum allowed beta value (default: 2.0)
+        beta_min: Minimum allowed beta value (default: 0.01)
+        beta_max: Maximum allowed beta value (default: 100.0)
         unknown_threshold: Maximum allowed mean proportion for Unknown (default: 0.05)
         min_celltype_threshold: Minimum required mean proportion for cell types (default: 0.01)
         redundancy_threshold: Maximum allowed fraction of redundant types (default: 0.2)
@@ -587,10 +587,25 @@ def optimize_cell_proportions_per_marker(
     if assignment_matrix.shape != (M, T):
         raise ValueError(f"Assignment matrix shape {assignment_matrix.shape} != expected ({M}, {T})")
 
-    # Precompute marker owners (for exclusive assignment)
-    # owner[m] = j means marker m belongs to cell type j
-    owners = np.argmax(assignment_matrix, axis=1)
-    marker_has_owner = assignment_matrix.sum(axis=1) > 0  # Boolean mask for markers with assignments
+    # Precompute marker-to-celltype assignments (supports shared markers)
+    # marker_owners[m] = list of cell type indices that own marker m
+    marker_owners = []
+    for m in range(M):
+        owners_for_m = []
+        for j in range(T):
+            if assignment_matrix[m, j] > 0:
+                owners_for_m.append(j)
+        marker_owners.append(owners_for_m)
+
+    marker_has_owner = np.array([len(o) > 0 for o in marker_owners])
+
+    # Compute markers-per-celltype for loss normalization (Bug 1 fix)
+    # Each cell type gets equal total loss weight regardless of marker count
+    markers_per_celltype = np.zeros(T, dtype=np.float64)
+    for m in range(M):
+        for j in marker_owners[m]:
+            markers_per_celltype[j] += 1
+    markers_per_celltype = np.maximum(markers_per_celltype, 1.0)
 
     logging.info(f"Per-marker beta optimization: {N} spots, {M} markers, {T} cell types")
     logging.info(f"Markers with assignments: {marker_has_owner.sum()}/{M}")
@@ -622,19 +637,25 @@ def optimize_cell_proportions_per_marker(
         # Define Y variables: Y[i, j] = proportion of cell type j at spot i
         Y = model.addVars(N, T, lb=0, ub=1, vtype=GRB.CONTINUOUS, name="Y")
 
-        # Objective: sum_m sum_i (S[i,m] - beta[m] * Y[i, owner(m)])^2
+        # Objective: for each marker m and each owner j of m,
+        # add normalized error: (1/n_owners) * (1/markers_per_celltype[j]) * (S - β*Y)²
+        # This ensures equal loss weight per cell type regardless of marker count,
+        # and shared markers contribute to all owner cell types.
         error_terms = []
         for m in range(M):
             if not marker_has_owner[m]:
-                continue  # Skip markers without cell type assignment (e.g., Unknown has no markers)
+                continue
 
-            j = owners[m]  # Owner cell type
+            owners_m = marker_owners[m]
+            n_owners = len(owners_m)
             beta_m = beta_values[m]
 
-            for i in range(N):
-                S_im = marker_level_data[i, m]
-                Y_ij = Y[i, j]
-                error_terms.append((S_im - beta_m * Y_ij) * (S_im - beta_m * Y_ij))
+            for j in owners_m:
+                weight = 1.0 / (n_owners * markers_per_celltype[j])
+                for i in range(N):
+                    S_im = marker_level_data[i, m]
+                    Y_ij = Y[i, j]
+                    error_terms.append(weight * (S_im - beta_m * Y_ij) * (S_im - beta_m * Y_ij))
 
         total_error = gp.quicksum(error_terms)
 
@@ -674,18 +695,21 @@ def optimize_cell_proportions_per_marker(
         Y_values = np.array([[Y[i, j].X for j in range(T)] for i in range(N)])
 
         # Update beta (per-marker closed-form solution)
+        # For shared markers, use sum of all owner proportions
         beta_new = np.zeros(M, dtype=np.float64)
         for m in range(M):
             if not marker_has_owner[m]:
-                beta_new[m] = 1.0  # Default for unassigned markers
+                beta_new[m] = 1.0
                 continue
 
-            j = owners[m]
-            Y_j = Y_values[:, j]  # (N,)
-            S_m = marker_level_data[:, m]  # (N,)
+            owners_m = marker_owners[m]
+            Y_combined = np.zeros(N, dtype=np.float64)
+            for j in owners_m:
+                Y_combined += Y_values[:, j]
 
-            denominator = np.dot(Y_j, Y_j) + 1e-9
-            beta_new[m] = np.dot(S_m, Y_j) / denominator
+            S_m = marker_level_data[:, m]
+            denominator = np.dot(Y_combined, Y_combined) + 1e-9
+            beta_new[m] = np.dot(S_m, Y_combined) / denominator
             beta_new[m] = np.clip(beta_new[m], beta_min, beta_max)
 
         # Optionally normalize beta so max=1
@@ -1196,8 +1220,8 @@ def deconvolute_local_cell_proportions_per_marker(
     beta_values: Optional[np.ndarray] = None,
     beta_vary: bool = True,
     normalize_beta: bool = True,
-    beta_min: float = 0.1,
-    beta_max: float = 2.0,
+    beta_min: float = 0.01,
+    beta_max: float = 100.0,
     max_iterations: int = 20,
     max_y_change: float = 0.4,
 ) -> Optional[np.ndarray]:
@@ -1232,9 +1256,23 @@ def deconvolute_local_cell_proportions_per_marker(
     N_global, M = marker_level_data.shape
     T = len(cell_type_names)
 
-    # Precompute marker owners
-    owners = np.argmax(assignment_matrix, axis=1)
-    marker_has_owner = assignment_matrix.sum(axis=1) > 0
+    # Precompute marker-to-celltype assignments (supports shared markers)
+    marker_owners = []
+    for m in range(M):
+        owners_for_m = []
+        for j in range(T):
+            if assignment_matrix[m, j] > 0:
+                owners_for_m.append(j)
+        marker_owners.append(owners_for_m)
+
+    marker_has_owner = np.array([len(o) > 0 for o in marker_owners])
+
+    # Compute markers-per-celltype for loss normalization
+    markers_per_celltype = np.zeros(T, dtype=np.float64)
+    for m in range(M):
+        for j in marker_owners[m]:
+            markers_per_celltype[j] += 1
+    markers_per_celltype = np.maximum(markers_per_celltype, 1.0)
 
     # Identify indices of spot's local neighborhood
     neighbor_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
@@ -1299,11 +1337,14 @@ def deconvolute_local_cell_proportions_per_marker(
             for m in range(M):
                 if not marker_has_owner[m]:
                     continue
-                j = owners[m]
+                owners_m = marker_owners[m]
+                n_owners = len(owners_m)
                 beta_m = local_beta[m]
-                for i in range(local_N):
-                    S_im = local_marker_data[i, m]
-                    error_terms.append((S_im - beta_m * Y_vars[i, j]) ** 2)
+                for j in owners_m:
+                    weight = 1.0 / (n_owners * markers_per_celltype[j])
+                    for i in range(local_N):
+                        S_im = local_marker_data[i, m]
+                        error_terms.append(weight * (S_im - beta_m * Y_vars[i, j]) ** 2)
 
             total_error = gp.quicksum(error_terms)
             l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
@@ -1329,11 +1370,13 @@ def deconvolute_local_cell_proportions_per_marker(
                     if not marker_has_owner[m]:
                         new_beta[m] = 1.0
                         continue
-                    j = owners[m]
-                    Y_j = Y_values[:, j]
+                    owners_m = marker_owners[m]
+                    Y_combined = np.zeros(local_N, dtype=float)
+                    for j in owners_m:
+                        Y_combined += Y_values[:, j]
                     S_m = local_marker_data[:, m]
-                    denominator = np.dot(Y_j, Y_j) + 1e-9
-                    new_beta[m] = np.dot(S_m, Y_j) / denominator
+                    denominator = np.dot(Y_combined, Y_combined) + 1e-9
+                    new_beta[m] = np.dot(S_m, Y_combined) / denominator
                     new_beta[m] = np.clip(new_beta[m], beta_min, beta_max)
 
                 # Optionally normalize beta values
@@ -1392,8 +1435,8 @@ def finetune_cell_proportions_per_marker(
     max_iterations: int = 20,
     max_y_change: float = 0.4,
     beta_vary: bool = True,
-    beta_min: float = 0.1,
-    beta_max: float = 2.0,
+    beta_min: float = 0.01,
+    beta_max: float = 100.0,
     max_workers: Optional[int] = None,
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
