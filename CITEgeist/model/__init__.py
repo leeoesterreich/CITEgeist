@@ -3,11 +3,12 @@ CITEgeist model package - spatial transcriptomics deconvolution using CITE-seq.
 """
 # Expose key classes and functions for easy access
 
-from .citegeist_model import CitegeistModel
+from .citegeist_model import CitegeistModel, RESOLUTION_DEFAULTS
 from .gurobi_impl import (
     map_antibodies_to_profiles,
     optimize_cell_proportions,
     optimize_gene_expression,
+    estimate_true_expression_cell,
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
@@ -72,10 +73,12 @@ from .cross_sample_integration import (
 __all__ = [
     # Core model
     "CitegeistModel",
+    "RESOLUTION_DEFAULTS",
     # Gurobi optimization
     "map_antibodies_to_profiles",
     "optimize_cell_proportions",
     "optimize_gene_expression",
+    "estimate_true_expression_cell",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
