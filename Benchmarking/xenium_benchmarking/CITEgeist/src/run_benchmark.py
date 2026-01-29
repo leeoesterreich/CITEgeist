@@ -43,6 +43,7 @@ from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
     discover_hierarchical_profiles,
+    rescue_singletons,
     select_profiles,
 )
 
@@ -339,6 +340,46 @@ def run_hierarchical_benchmark(
     logger.info(f"Discovered {len(discovered_profiles)} profiles:")
     for name, markers in discovered_profiles.items():
         logger.info(f"  {name}: {markers}")
+
+    # =========================================================================
+    # Singleton Rescue: Filter noise singletons by unique spatial coverage
+    # =========================================================================
+    if interest_result.signal_masks is not None and interest_result.signal_mask_marker_names is not None:
+        logger.info("-" * 60)
+        logger.info("SINGLETON RESCUE: Filtering by unique spatial coverage")
+        logger.info("-" * 60)
+
+        # Convert dict to list-of-lists for rescue function
+        profile_names = list(discovered_profiles.keys())
+        profile_marker_lists = [discovered_profiles[name] for name in profile_names]
+
+        rescued_marker_lists = rescue_singletons(
+            profiles=profile_marker_lists,
+            signal_masks=interest_result.signal_masks,
+            signal_mask_marker_names=interest_result.signal_mask_marker_names,
+            min_unique_coverage=0.3,
+            min_signal_fraction=0.05,
+            verbose=True,
+        )
+
+        # Rebuild dict preserving names for kept profiles
+        rescued_profiles = {}
+        for markers in rescued_marker_lists:
+            # Find original name
+            matched = False
+            for name, orig_markers in discovered_profiles.items():
+                if orig_markers == markers and name not in rescued_profiles:
+                    rescued_profiles[name] = markers
+                    matched = True
+                    break
+            if not matched:
+                # Fallback: generate name
+                rescued_profiles[f"Profile_{len(rescued_profiles)}"] = markers
+
+        logger.info(f"After rescue: {len(rescued_profiles)} profiles (was {len(discovered_profiles)})")
+        discovered_profiles = rescued_profiles
+    else:
+        logger.warning("No GMM signal masks available, skipping singleton rescue")
 
     # =========================================================================
     # Map to Achievable-7 for Fair Comparison

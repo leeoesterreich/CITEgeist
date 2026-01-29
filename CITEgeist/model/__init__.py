@@ -21,6 +21,8 @@ from .spatial_colocalization import (
     LineageDendrogram,
     ProfileDiscoveryResult,
     discover_profiles,
+    # Singleton rescue
+    rescue_singletons,
     # Module 2c: Profile selection
     ProfileSelectionResult,
     select_profiles,
@@ -96,6 +98,8 @@ __all__ = [
     "LineageDendrogram",
     "ProfileDiscoveryResult",
     "discover_profiles",
+    # Singleton rescue
+    "rescue_singletons",
     # Module 2c: Profile selection
     "ProfileSelectionResult",
     "select_profiles",

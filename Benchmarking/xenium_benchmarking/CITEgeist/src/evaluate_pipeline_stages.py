@@ -48,6 +48,7 @@ from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
     discover_profiles,
+    rescue_singletons,
     select_profiles,
 )
 
@@ -87,7 +88,7 @@ def run_stage1(
     marker_names: List[str],
     output_dir: Path,
     region_id: int,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], Any]:
     """
     Evaluate Module 1 (Marker Interest Detection).
 
@@ -206,7 +207,7 @@ def run_stage1(
         json.dump(stage1_results, f, indent=2)
     logger.info(f"Saved Stage 1 results to {output_file}")
 
-    return stage1_results
+    return stage1_results, result
 
 
 # ============================================================================
@@ -980,7 +981,7 @@ def run_all_stages(
     logger.info(f"Spots: {X_protein.shape[0]}, Markers: {len(marker_names)}")
 
     # Stage 1: Module 1
-    stage1_results = run_stage1(X_protein, coords, marker_names, output_dir, region_id)
+    stage1_results, module1_result = run_stage1(X_protein, coords, marker_names, output_dir, region_id)
     interesting_markers = stage1_results["interesting_markers"]
 
     if len(interesting_markers) < 3:
@@ -999,10 +1000,26 @@ def run_all_stages(
         logger.error("No profiles discovered - stopping evaluation")
         return {"error": "Stage 2b failed", "stage1": stage1_results, "stage2a": stage2a_results, "stage2b": stage2b_results}
 
+    # Singleton rescue: filter noise singletons using Module 1 GMM signal masks
+    profiles_for_selection = profile_result.profiles
+    if module1_result.signal_masks is not None and module1_result.signal_mask_marker_names is not None:
+        logger.info("Running singleton rescue with GMM signal masks...")
+        profiles_for_selection = rescue_singletons(
+            profiles=profile_result.profiles,
+            signal_masks=module1_result.signal_masks,
+            signal_mask_marker_names=module1_result.signal_mask_marker_names,
+            min_unique_coverage=0.3,
+            min_signal_fraction=0.05,
+            verbose=True,
+        )
+        logger.info(f"Profiles after rescue: {len(profiles_for_selection)} (was {len(profile_result.profiles)})")
+    else:
+        logger.warning("No GMM signal masks available, skipping singleton rescue")
+
     # Stage 2c: Module 2c
     stage2c_results, selection_result = run_stage2c(
         X_protein, coords, marker_names,
-        profile_result.profiles, interesting_markers, coloc_result,
+        profiles_for_selection, interesting_markers, coloc_result,
         output_dir, region_id
     )
 
