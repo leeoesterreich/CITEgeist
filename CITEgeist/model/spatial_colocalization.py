@@ -3398,6 +3398,129 @@ def _score_profile_spatial_contribution(
     return new_ve - current_ve
 
 
+def rescue_singletons(
+    profiles: List[List[str]],
+    signal_masks: NDArray[np.bool_],
+    signal_mask_marker_names: List[str],
+    min_unique_coverage: float = 0.3,
+    min_signal_fraction: float = 0.05,
+    verbose: bool = False,
+) -> List[List[str]]:
+    """
+    Filter singletons by unique spatial coverage.
+
+    Keeps singletons that cover spatial territory not explained by multi-marker
+    profiles. Drops noise singletons that overlap heavily with multi-marker
+    profile territory.
+
+    Algorithm:
+    1. Separate profiles into singletons (1 marker) and multi-marker (2+)
+    2. Compute "explained territory" = union of GMM-signal spots across all
+       multi-marker profile markers
+    3. For each singleton, compute:
+       - unique_coverage: fraction of its signal spots outside explained territory
+       - signal_fraction: fraction of all spots classified as signal
+    4. Keep singleton if unique_coverage >= min_unique_coverage AND
+       signal_fraction >= min_signal_fraction
+
+    Args:
+        profiles: List of profiles (each a list of marker names).
+        signal_masks: Boolean array (n_spots, n_markers) from Module 1 GMM.
+            True = spot is in signal component for that marker.
+        signal_mask_marker_names: Marker names corresponding to columns of signal_masks.
+        min_unique_coverage: Minimum fraction of signal spots that must be
+            outside explained territory (default: 0.3).
+        min_signal_fraction: Minimum fraction of all spots that must be
+            classified as signal (default: 0.05).
+        verbose: Log rescue decisions (default: False).
+
+    Returns:
+        Filtered list of profiles with noise singletons removed.
+    """
+    n_spots = signal_masks.shape[0]
+
+    # Build marker name -> column index mapping
+    marker_to_col = {name: i for i, name in enumerate(signal_mask_marker_names)}
+
+    # Separate singletons from multi-marker profiles
+    singletons = []
+    multi_marker = []
+    for profile in profiles:
+        if len(profile) == 1:
+            singletons.append(profile)
+        else:
+            multi_marker.append(profile)
+
+    if not singletons:
+        if verbose:
+            logging.info("No singletons to rescue/filter")
+        return profiles
+
+    # Compute explained territory: union of signal spots from all multi-marker profiles
+    explained = np.zeros(n_spots, dtype=bool)
+    for profile in multi_marker:
+        for marker in profile:
+            if marker in marker_to_col:
+                explained |= signal_masks[:, marker_to_col[marker]]
+
+    n_explained = explained.sum()
+    if verbose:
+        logging.info(
+            f"Explained territory: {n_explained}/{n_spots} spots "
+            f"({n_explained / n_spots:.1%}) covered by {len(multi_marker)} multi-marker profiles"
+        )
+
+    # Evaluate each singleton
+    rescued = []
+    dropped = []
+    for profile in singletons:
+        marker = profile[0]
+        if marker not in marker_to_col:
+            if verbose:
+                logging.info(f"  Singleton [{marker}]: not in signal masks, dropping")
+            dropped.append(marker)
+            continue
+
+        col = marker_to_col[marker]
+        signal_spots = signal_masks[:, col]
+        n_signal = signal_spots.sum()
+        signal_fraction = n_signal / n_spots
+
+        if n_signal == 0:
+            if verbose:
+                logging.info(f"  Singleton [{marker}]: no signal spots, dropping")
+            dropped.append(marker)
+            continue
+
+        # Unique coverage: signal spots NOT in explained territory
+        unique_spots = signal_spots & ~explained
+        unique_coverage = unique_spots.sum() / n_signal
+
+        keep = unique_coverage >= min_unique_coverage and signal_fraction >= min_signal_fraction
+
+        if verbose:
+            status = "KEEP" if keep else "DROP"
+            logging.info(
+                f"  Singleton [{marker}]: signal_fraction={signal_fraction:.3f}, "
+                f"unique_coverage={unique_coverage:.3f} -> {status}"
+            )
+
+        if keep:
+            rescued.append(profile)
+        else:
+            dropped.append(marker)
+
+    result = multi_marker + rescued
+
+    if verbose:
+        logging.info(
+            f"Singleton rescue: {len(rescued)} kept, {len(dropped)} dropped "
+            f"(total profiles: {len(result)})"
+        )
+
+    return result
+
+
 def select_profiles(
     X: NDArray[np.floating],
     coords: NDArray[np.floating],
