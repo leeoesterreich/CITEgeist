@@ -41,7 +41,7 @@ REPO_ROOT="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist"
 PSEUDOVISIUM_DIR="${REPO_ROOT}/Benchmarking/xenium_pseudovisium"
 BENCH_DIR="${REPO_ROOT}/Benchmarking/xenium_benchmarking"
 CITEGEIST_DIR="${BENCH_DIR}/CITEgeist"
-INPUT_DIR="${PSEUDOVISIUM_DIR}/data_granular_gt"
+INPUT_DIR="${PSEUDOVISIUM_DIR}/data_protein_gt"
 OUTPUT_DIR="${CITEGEIST_DIR}/output/${MODE}"
 SLURM_LOG_DIR="${CITEGEIST_DIR}/slurm/slurm_log"
 

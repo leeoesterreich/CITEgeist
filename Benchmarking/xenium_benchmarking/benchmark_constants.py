@@ -12,13 +12,12 @@ from typing import Dict, List, Set
 # =============================================================================
 #
 # 7 cell types achievable with the 27-antibody Xenium panel.
-# Collapsed from 10 granular RNA-based ground truth types.
+# Ground truth: protein-gated single-cell classification (hierarchical gating).
 #
-# Collapse rationale:
-# - Myofibroblasts + Stromal → Fibroblasts (αSMA only; VIM excluded due to ubiquity)
-# - Vascular Stromal → Endothelial (CD31+)
-# - Proliferating T → CD8+ T cells (both CD3E+)
-# - Mixed Immune → CD4+ T cells (HLA-DR+ T cells)
+# Profile rationale:
+# - Fibroblasts: αSMA only (VIM excluded due to ubiquity)
+# - CD4+ T cells: CD3E+ CD4+ CD8A-
+# - CD8+ T cells: CD3E+ CD8A+
 
 ACHIEVABLE_7_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = {
     "B cells": {
@@ -95,18 +94,15 @@ ACHIEVABLE_7_GT_MARKERS: Dict[str, Dict[str, List[str]]] = {
     },
 }
 
-# 10 → 7 collapse mapping for ground truth evaluation
+# Protein GT → Achievable-7 mapping (identity — protein GT already has correct types)
 GT_TO_ACHIEVABLE_7_MAPPING: Dict[str, str] = {
     "B cells": "B cells",
-    "Mixed Immune": "CD4+ T cells",
+    "CD4+ T cells": "CD4+ T cells",
     "CD8+ T cells": "CD8+ T cells",
-    "Proliferating T": "CD8+ T cells",
     "Macrophages": "Macrophages",
     "Endothelial": "Endothelial",
-    "Vascular Stromal": "Endothelial",
     "Epithelial": "Epithelial",
-    "Myofibroblasts": "Fibroblasts",
-    "Stromal": "Fibroblasts",
+    "Fibroblasts": "Fibroblasts",
 }
 
 # Critical markers that MUST be flagged as interesting in Module 1

@@ -24,9 +24,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 TG_DIR="${BASE_DIR}/Tangram"
 SRC_DIR="${TG_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
-REF_PATH="${BASE_DIR}/reference_data/GSE156632/processed_granular/tangram/reference.h5ad"
-OUTPUT_DIR="${TG_DIR}/output_granular"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt"
+REF_PATH="${BASE_DIR}/reference_data/GSE156632/processed_protein7/tangram/reference.h5ad"
+OUTPUT_DIR="${TG_DIR}/output_protein_gt"
 
 echo "=============================================="
 echo "Tangram Xenium Benchmark - Region ${REGION_ID}"

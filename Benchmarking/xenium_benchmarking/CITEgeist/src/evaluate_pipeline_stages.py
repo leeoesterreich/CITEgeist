@@ -47,7 +47,7 @@ from benchmark_constants import (
 from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
-    discover_profiles,
+    discover_profiles_continuous,
     rescue_singletons,
     select_profiles,
 )
@@ -379,12 +379,10 @@ def run_stage2b(
     logger.info("=" * 70)
 
     # Run Module 2b
-    profile_result = discover_profiles(
+    profile_result = discover_profiles_continuous(
         colocalization_result=coloc_result,
-        fdr_alpha=0.05,
         top_k=6,
-        use_triangle_assembly=False,  # Use hierarchical clustering (default)
-        pvalue_source="bivariate_morans",
+        distance_metric="colocalization_score",
         verbose=True,
     )
 
@@ -1103,7 +1101,7 @@ def main():
     parser.add_argument(
         "--input-dir",
         type=str,
-        default=str(REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_granular_gt"),
+        default=str(REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_protein_gt"),
         help="Input directory with h5ad_objects/ and ground_truth/",
     )
     parser.add_argument(

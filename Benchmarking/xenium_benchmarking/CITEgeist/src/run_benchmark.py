@@ -42,7 +42,7 @@ from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
-    discover_hierarchical_profiles,
+    discover_hierarchical_profiles_continuous,
     rescue_singletons,
     select_profiles,
 )
@@ -142,6 +142,7 @@ def run_manual_benchmark(
     max_y_change: float = 0.4,
     min_counts: int = 25,
     run_gex: bool = False,
+    no_unknown: bool = False,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist with manual achievable-7 profiles.
@@ -162,7 +163,9 @@ def run_manual_benchmark(
         antibody_capture_adata=protein_adata,
     )
 
-    model.load_cell_profile_dict(ACHIEVABLE_7_CELL_PROFILE_DICT)
+    model.load_cell_profile_dict(
+        ACHIEVABLE_7_CELL_PROFILE_DICT, inject_unknown=not no_unknown
+    )
 
     logger.info("Preprocessing...")
     model.filter_gex(min_counts=min_counts)
@@ -187,11 +190,12 @@ def run_manual_benchmark(
     result_dir = output_dir / sample_name
     result_dir.mkdir(parents=True, exist_ok=True)
 
+    cell_type_names = list(model.cell_profile_dict.keys())
     if finetuned_props is not None:
         props_df = pd.DataFrame(
             finetuned_props,
             index=model.antibody_capture_adata.obs_names,
-            columns=list(ACHIEVABLE_7_CELL_PROFILE_DICT.keys()),
+            columns=cell_type_names,
         )
         props_df.to_csv(result_dir / f"{sample_name}_deconv_predictions.csv")
 
@@ -217,9 +221,10 @@ def run_manual_benchmark(
     results = {
         "region_id": region_id,
         "mode": "manual",
+        "no_unknown": no_unknown,
         "n_spots": gex_adata.shape[0],
-        "n_cell_types": len(ACHIEVABLE_7_CELL_PROFILE_DICT),
-        "cell_types": list(ACHIEVABLE_7_CELL_PROFILE_DICT.keys()),
+        "n_cell_types": len(cell_type_names),
+        "cell_types": cell_type_names,
         "runtime_proportions_sec": prop_time,
         "runtime_gex_sec": gex_time,
         "output_dir": str(result_dir),
@@ -243,8 +248,8 @@ def run_hierarchical_benchmark(
     max_y_change: float = 0.4,
     min_counts: int = 25,
     run_gex: bool = False,
+    no_unknown: bool = False,
     # Hierarchical-specific parameters
-    fdr_alpha: float = 0.05,
     top_k: int = 3,
     improvement_threshold: float = 0.05,
     max_depth: int = 5,
@@ -317,7 +322,7 @@ def run_hierarchical_benchmark(
     logger.info("MODULE 2b: HIERARCHICAL Profile Discovery")
     logger.info("-" * 60)
 
-    hierarchical_result = discover_hierarchical_profiles(
+    hierarchical_result = discover_hierarchical_profiles_continuous(
         coloc_result=coloc_result,
         antibody_expression=X_protein,
         marker_names=marker_names,
@@ -326,8 +331,8 @@ def run_hierarchical_benchmark(
         sharing_ratio=0.5,
         sharing_min_I=0.2,
         max_depth=max_depth,
-        fdr_alpha=fdr_alpha,
         top_k=top_k,
+        distance_metric="colocalization_score",
         verbose=True,
     )
 
@@ -412,7 +417,7 @@ def run_hierarchical_benchmark(
         antibody_capture_adata=protein_adata,
     )
 
-    model.load_cell_profile_dict(cell_profile_dict)
+    model.load_cell_profile_dict(cell_profile_dict, inject_unknown=not no_unknown)
     model.filter_gex(min_counts=min_counts)
     model.preprocess_gex(target_sum=10000)
     model.preprocess_antibody()
@@ -540,7 +545,7 @@ def main():
     parser.add_argument(
         "--input-dir",
         type=str,
-        default=str(REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_granular_gt"),
+        default=str(REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_protein_gt"),
         help="Input directory with h5ad_objects/",
     )
     parser.add_argument(

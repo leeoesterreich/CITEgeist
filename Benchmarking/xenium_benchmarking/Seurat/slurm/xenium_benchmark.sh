@@ -24,9 +24,9 @@ REGION_ID=${SLURM_ARRAY_TASK_ID}
 BASE_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking"
 SEURAT_DIR="${BASE_DIR}/Seurat"
 SRC_DIR="${SEURAT_DIR}/src"
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_granular_gt"
-REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed_granular/seurat"
-OUTPUT_DIR="${SEURAT_DIR}/output_granular"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt"
+REF_DIR="${BASE_DIR}/reference_data/GSE156632/processed_protein7/seurat"
+OUTPUT_DIR="${SEURAT_DIR}/output_protein_gt"
 TEMP_DIR="${OUTPUT_DIR}/temp_csvs"
 
 # Environment paths (use source activate with full path)

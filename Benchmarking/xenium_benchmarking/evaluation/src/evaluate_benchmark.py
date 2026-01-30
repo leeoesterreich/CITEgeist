@@ -2,12 +2,11 @@
 Unified evaluation for CITEgeist Xenium benchmark.
 
 Evaluates both manual (achievable-7) and hierarchical (autodiscovery) modes
-against the achievable-7 ground truth (10 granular types collapsed to 7).
+against the protein-gated achievable-7 ground truth (7 cell types from
+single-cell protein classification).
 
-Reference for RNA-based ground truth:
-    Zhao et al. (2025). "Benchmarking cell type annotation methods for 10x
-    Xenium spatial transcriptomics data." BMC Bioinformatics, 26(1), 25.
-    https://doi.org/10.1186/s12859-025-06044-0
+Ground truth is protein-gated (hierarchical gating at single-cell level
+before pseudo-Visium aggregation), so no collapse mapping is needed.
 """
 
 import argparse
@@ -24,22 +23,10 @@ from scipy.spatial.distance import jensenshannon
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# ACHIEVABLE-7 GROUND TRUTH COLLAPSE
+# ACHIEVABLE-7 GROUND TRUTH (Protein-Gated)
 # =============================================================================
-
-# Mapping from 10 granular GT types to 7 achievable types
-GT_TO_ACHIEVABLE_7_MAPPING = {
-    "B cells": "B cells",
-    "Mixed Immune": "CD4+ T cells",
-    "CD8+ T cells": "CD8+ T cells",
-    "Proliferating T": "CD8+ T cells",
-    "Macrophages": "Macrophages",
-    "Endothelial": "Endothelial",
-    "Vascular Stromal": "Endothelial",
-    "Epithelial": "Epithelial",
-    "Myofibroblasts": "Fibroblasts",
-    "Stromal": "Fibroblasts",
-}
+# Protein GT already outputs 7 cell types directly.
+# No collapse mapping needed — types match achievable-7 exactly.
 
 ACHIEVABLE_7_CELL_TYPES = [
     "B cells",
@@ -52,28 +39,15 @@ ACHIEVABLE_7_CELL_TYPES = [
 ]
 
 
-def collapse_gt_to_achievable_7(gt_df: pd.DataFrame) -> pd.DataFrame:
+def filter_gt_to_achievable_7(gt_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Collapse 10 granular GT cell types to 7 achievable types.
+    Filter protein GT to achievable-7 cell type columns.
 
-    Multiple GT types that map to the same achievable type have their
-    proportions summed.
+    Protein GT already has the correct 7 types. This function simply
+    selects those columns and drops metadata columns (n_cells, spot_x, etc.).
     """
-    collapsed = pd.DataFrame(index=gt_df.index)
-
-    for achievable_type in ACHIEVABLE_7_CELL_TYPES:
-        # Find all GT types that map to this achievable type
-        source_types = [
-            gt_type for gt_type, target in GT_TO_ACHIEVABLE_7_MAPPING.items()
-            if target == achievable_type and gt_type in gt_df.columns
-        ]
-
-        if source_types:
-            collapsed[achievable_type] = gt_df[source_types].sum(axis=1)
-        else:
-            collapsed[achievable_type] = 0.0
-
-    return collapsed
+    present_types = [ct for ct in ACHIEVABLE_7_CELL_TYPES if ct in gt_df.columns]
+    return gt_df[present_types].copy()
 
 
 def calculate_metrics(
@@ -183,8 +157,8 @@ def evaluate_region(
 
     # Collapse GT to achievable-7 if requested
     if use_achievable_7:
-        gt_df = collapse_gt_to_achievable_7(gt_df)
-        logger.info(f"Collapsed GT to achievable-7: {list(gt_df.columns)}")
+        gt_df = filter_gt_to_achievable_7(gt_df)
+        logger.info(f"Filtered GT to achievable-7: {list(gt_df.columns)}")
 
     # Load predictions - try multiple patterns
     pred_path = None
