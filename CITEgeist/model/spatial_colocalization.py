@@ -1517,17 +1517,28 @@ def _build_hierarchical_tree(
     # Precompute spatial weights matrix (for fast bivariate Moran's I)
     spatial_weights = _build_spatial_weights_matrix(coords, k=neighbor_k)
 
-    # Determine which markers to use
+    # Determine which markers to use.
+    #
+    # CRITICAL: The scipy dendrogram leaf IDs are 0..n-1, corresponding to
+    # positions in component_markers (the order used to build the distance
+    # matrix).  _recursive_tree_cut uses scipy's get_left()/get_right()
+    # leaf IDs directly as column indices into X and marker_names.  If
+    # marker_names has a different order than component_markers, the wrong
+    # columns are selected, producing nonsensical reconstruction errors
+    # and Moran's I values.
+    #
+    # Fix: reorder X so columns match component_markers order.  Then
+    # marker_names[k] == component_markers[k] and X[:, k] is the
+    # expression for that marker.  Dendrogram leaf ID k maps correctly.
     if component_markers is not None:
-        # Only use markers in this component
         marker_to_idx = {m: i for i, m in enumerate(marker_names)}
-        all_marker_indices = [marker_to_idx[m] for m in component_markers]
-        # Use component markers for naming
-        effective_marker_names = component_markers
+        col_indices = [marker_to_idx[m] for m in component_markers]
+        # Reorder X and marker_names to match dendrogram order
+        X = X[:, col_indices]
+        marker_names = list(component_markers)
+        all_marker_indices = list(range(len(component_markers)))
     else:
-        # Use all markers
         all_marker_indices = list(range(len(marker_names)))
-        effective_marker_names = marker_names
 
     # Recursively build ProfileTree with reconstruction-guided cutting
     root_node = _recursive_tree_cut(
