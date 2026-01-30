@@ -246,8 +246,6 @@ def run_hierarchical_benchmark(
     run_gex: bool = False,
     # Hierarchical-specific parameters
     top_k: int = 3,
-    improvement_threshold: float = 0.05,
-    max_depth: int = 5,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist with hierarchical profile autodiscovery.
@@ -322,10 +320,6 @@ def run_hierarchical_benchmark(
         antibody_expression=X_protein,
         marker_names=marker_names,
         coords=coords,
-        improvement_threshold=improvement_threshold,
-        sharing_ratio=0.5,
-        sharing_min_I=0.2,
-        max_depth=max_depth,
         top_k=top_k,
         distance_metric="colocalization_score",
         verbose=True,
@@ -486,8 +480,6 @@ def run_hierarchical_benchmark(
         # Parameters
         "parameters": {
             "top_k": top_k,
-            "improvement_threshold": improvement_threshold,
-            "max_depth": max_depth,
         },
     }
 
@@ -564,18 +556,6 @@ def main():
         default=3,
         help="Mutual top-k for edge sparsification (hierarchical mode)",
     )
-    parser.add_argument(
-        "--improvement-threshold",
-        type=float,
-        default=0.05,
-        help="Reconstruction improvement threshold for tree cutting (hierarchical mode)",
-    )
-    parser.add_argument(
-        "--max-depth",
-        type=int,
-        default=5,
-        help="Maximum tree depth (hierarchical mode)",
-    )
 
     args = parser.parse_args()
 
@@ -628,8 +608,6 @@ def main():
             min_counts=args.min_counts,
             run_gex=args.run_gex,
             top_k=args.top_k,
-            improvement_threshold=args.improvement_threshold,
-            max_depth=args.max_depth,
         )
 
     print(f"\nCompleted region {args.region_id} ({args.mode} mode)")
