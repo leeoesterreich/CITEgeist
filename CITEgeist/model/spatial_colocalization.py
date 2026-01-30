@@ -1366,8 +1366,14 @@ def _recursive_tree_cut(
     else:
         improvement = 0.0
 
-    # Decision: split or stop
-    if improvement > improvement_threshold:
+    # Decision: split or stop.
+    # Size-adaptive threshold: large groups need less improvement to split
+    # because even small relative gains reflect real biological heterogeneity.
+    # For 4 markers: threshold = improvement_threshold (default 5%)
+    # For 27 markers: threshold ≈ 0.7% (much easier to split)
+    n_markers_here = len(marker_indices)
+    effective_threshold = improvement_threshold * (4.0 / max(n_markers_here, 4))
+    if improvement > effective_threshold:
         # Compute representative signals for left and right children
         # Use mean expression of markers in each cluster
         if len(cluster_left_indices) > 0:
