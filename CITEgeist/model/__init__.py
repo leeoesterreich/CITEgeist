@@ -32,6 +32,7 @@ from .spatial_colocalization import (
     ProfileTree,
     HierarchicalProfileResult,
     discover_hierarchical_profiles,
+    discover_hierarchical_profiles_continuous,
 )
 
 # Module 4: Protein-anchored program discovery
@@ -110,6 +111,7 @@ __all__ = [
     "ProfileTree",
     "HierarchicalProfileResult",
     "discover_hierarchical_profiles",
+    "discover_hierarchical_profiles_continuous",
     # Module 4: Protein-anchored program discovery
     "SpatialSubpopulation",
     "SpatialProgram",

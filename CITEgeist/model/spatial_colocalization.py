@@ -4248,6 +4248,307 @@ def discover_hierarchical_profiles(
     )
 
 
+def discover_hierarchical_profiles_continuous(
+    coloc_result: ColocalizationResult,
+    antibody_expression: NDArray[np.floating],
+    marker_names: List[str],
+    coords: NDArray[np.floating],
+    improvement_threshold: float = 0.05,
+    sharing_ratio: float = 0.5,
+    sharing_min_I: float = 0.2,
+    max_depth: int = 5,
+    neighbor_k: int = 6,
+    top_k: int = 3,
+    distance_metric: str = "colocalization_score",
+    verbose: bool = True,
+) -> HierarchicalProfileResult:
+    """
+    Discover hierarchical profiles using continuous distance matrix (no FDR gate).
+
+    Replaces the FDR -> top-k -> adaptive-ratio -> connected-components Phase 1 of
+    discover_hierarchical_profiles() with the continuous distance matrix approach from
+    discover_profiles_continuous(). Phase 2 (per-lineage tree building) is identical.
+
+    Algorithm:
+    1. Build complete distance matrix from colocalization scores (all pairs)
+    2. Optional: mutual top-k distance masking with specificity weighting
+    3. Hierarchical clustering (average linkage) over all markers
+    4. Gap-based lineage splitting via _split_dendrogram_by_gaps()
+    5. Separate singletons (1-marker lineages far from all others) from multi-marker lineages
+    6. Per-lineage tree building with reconstruction-guided cutting and shared marker detection
+
+    Args:
+        coloc_result: Result from analyze_marker_colocalization()
+        antibody_expression: Expression matrix (n_spots, n_markers)
+        marker_names: Names for each column in expression matrix
+        coords: Spatial coordinates (n_spots, 2)
+        improvement_threshold: Min reconstruction improvement to split (default 5%)
+        sharing_ratio: Min ratio of bivariate Moran's I for shared classification (default 0.5)
+        sharing_min_I: Min bivariate Moran's I with both children for shared (default 0.2)
+        max_depth: Maximum tree depth (default 5)
+        neighbor_k: Number of neighbors for spatial weights (default 6)
+        top_k: Number of top partners for mutual top-k masking (default 3).
+            Set to 0 to disable.
+        distance_metric: Which metric for distance:
+            - 'colocalization_score' (default): Combined score, distance = 1 - score.
+            - 'bivariate_morans': Uses bivariate Moran's I only.
+        verbose: Log progress (default True)
+
+    Returns:
+        HierarchicalProfileResult with tree structure and flat profiles.
+    """
+    if verbose:
+        logger.info("Starting hierarchical profile discovery (continuous)...")
+
+    pairs = coloc_result.pairs
+    all_markers = coloc_result.marker_names
+    marker_specificity = coloc_result.marker_specificity
+    n_markers = len(all_markers)
+
+    # ── Phase 1: Continuous distance matrix → lineage splitting ──────────
+
+    if verbose:
+        logger.info("Phase 1: Building continuous distance matrix...")
+
+    if n_markers < 2:
+        root = ProfileTreeNode("root", all_markers[:1] if all_markers else [], [], None, 0)
+        combined_tree = ProfileTree(root=root, n_levels=1)
+        return HierarchicalProfileResult(
+            tree=combined_tree,
+            flat_profiles={f"profile_{i}": [m] for i, m in enumerate(all_markers)},
+            depth_per_branch={},
+            shared_markers={},
+            reconstruction_error=0.0,
+        )
+
+    # Step 1: Build complete distance matrix from ALL pairs
+    marker_to_idx_all = {m: i for i, m in enumerate(all_markers)}
+
+    if distance_metric == "bivariate_morans":
+        morans_values = [p.bivariate_morans_i for p in pairs]
+        if len(morans_values) > 0:
+            min_i = min(morans_values)
+            max_i = max(morans_values)
+            range_i = max_i - min_i if max_i > min_i else 1.0
+        else:
+            min_i, range_i = 0.0, 1.0
+
+        dist_matrix = np.ones((n_markers, n_markers))
+        np.fill_diagonal(dist_matrix, 0.0)
+
+        for pair in pairs:
+            i = marker_to_idx_all[pair.marker_a]
+            j = marker_to_idx_all[pair.marker_b]
+            normalized = (pair.bivariate_morans_i - min_i) / range_i
+            d = 1.0 - normalized
+            dist_matrix[i, j] = d
+            dist_matrix[j, i] = d
+    else:
+        # Use colocalization_score (already in [0, 1])
+        dist_matrix = np.ones((n_markers, n_markers))
+        np.fill_diagonal(dist_matrix, 0.0)
+
+        for pair in pairs:
+            i = marker_to_idx_all[pair.marker_a]
+            j = marker_to_idx_all[pair.marker_b]
+            d = 1.0 - pair.colocalization_score
+            dist_matrix[i, j] = d
+            dist_matrix[j, i] = d
+
+    if verbose:
+        upper_tri = dist_matrix[np.triu_indices(n_markers, k=1)]
+        logger.info(
+            f"Distance matrix: min={upper_tri.min():.3f}, "
+            f"median={np.median(upper_tri):.3f}, max={upper_tri.max():.3f}"
+        )
+
+    # Step 2: Optional mutual top-k distance masking
+    if top_k > 0 and len(pairs) > 0:
+        top_k_mask = np.zeros((n_markers, n_markers), dtype=bool)
+
+        for i in range(n_markers):
+            dists = dist_matrix[i, :].copy()
+            dists[i] = np.inf  # Exclude self
+
+            # Apply specificity weighting if available
+            if marker_specificity:
+                marker_name = all_markers[i]
+                s_i = marker_specificity.get(marker_name, 1.0)
+                for j in range(n_markers):
+                    if j != i:
+                        s_j = marker_specificity.get(all_markers[j], 1.0)
+                        dists[j] = dists[j] / (np.sqrt(s_i * s_j) + 1e-10)
+
+            k_actual = min(top_k, n_markers - 1)
+            top_k_indices = np.argsort(dists)[:k_actual]
+            for j in top_k_indices:
+                top_k_mask[i, j] = True
+
+        mutual_mask = top_k_mask & top_k_mask.T
+
+        n_masked = 0
+        for i in range(n_markers):
+            for j in range(i + 1, n_markers):
+                if not mutual_mask[i, j]:
+                    dist_matrix[i, j] = 1.0
+                    dist_matrix[j, i] = 1.0
+                    n_masked += 1
+
+        n_total_pairs = n_markers * (n_markers - 1) // 2
+        n_kept = n_total_pairs - n_masked
+        if verbose:
+            logger.info(
+                f"Mutual top-{top_k} masking: {n_kept}/{n_total_pairs} pairs kept "
+                f"(specificity-weighted: {marker_specificity is not None})"
+            )
+
+    # Step 3: Hierarchical clustering over all markers
+    condensed_dist = squareform(dist_matrix)
+    Z_all = linkage(condensed_dist, method='average')
+
+    if verbose:
+        merge_distances = Z_all[:, 2]
+        logger.info(
+            f"Linkage: {len(Z_all)} merges, "
+            f"distances [{merge_distances.min():.3f} ... {merge_distances.max():.3f}]"
+        )
+
+    # Step 4: Gap-based lineage splitting
+    lineages = _split_dendrogram_by_gaps(Z_all, all_markers, seed=1234)
+
+    if verbose:
+        logger.info(f"Gap analysis: {len(lineages)} lineages")
+        for i, lin in enumerate(lineages):
+            logger.info(f"  Lineage {i + 1} ({len(lin)} markers): {lin}")
+
+    # Step 5: Separate singletons from multi-marker lineages
+    singletons = []
+    multi_marker_lineages = []
+
+    for lineage_markers in lineages:
+        if len(lineage_markers) == 1:
+            # Check if this singleton is truly isolated (min distance to all others > 0.7)
+            idx = marker_to_idx_all[lineage_markers[0]]
+            other_dists = [dist_matrix[idx, j] for j in range(n_markers) if j != idx]
+            if min(other_dists) > 0.7:
+                singletons.append(lineage_markers[0])
+            else:
+                multi_marker_lineages.append(set(lineage_markers))
+        else:
+            multi_marker_lineages.append(set(lineage_markers))
+
+    if verbose:
+        logger.info(f"Found {len(multi_marker_lineages)} multi-marker lineages, "
+                     f"{len(singletons)} singletons")
+
+    # ── Phase 2: Build hierarchical tree for each lineage ────────────────
+    # (Identical to discover_hierarchical_profiles Phase 2)
+
+    all_flat_profiles: Dict[str, List[str]] = {}
+    all_shared_markers: Dict[str, List[str]] = defaultdict(list)
+    all_trees: List[ProfileTree] = []
+    profile_idx = 0
+
+    for comp_idx, component in enumerate(multi_marker_lineages):
+        comp_markers = sorted(list(component))
+        n_comp = len(comp_markers)
+
+        if verbose:
+            logger.info(f"Processing lineage {comp_idx + 1} ({n_comp} markers): {comp_markers}")
+
+        if n_comp == 1:
+            # Single marker lineage (close to some other but gap-separated)
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
+            continue
+
+        if n_comp == 2:
+            # Two-marker lineage - simple pair profile
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
+            continue
+
+        # Build distance matrix for this lineage only
+        comp_coloc = _filter_coloc_result_for_markers(coloc_result, comp_markers)
+        D, ordered_markers = _build_colocalization_distance_matrix(comp_coloc)
+
+        # Build hierarchical clustering for this lineage
+        condensed = squareform(D)
+        condensed = np.maximum(condensed, 0)
+        Z = linkage(condensed, method='ward')
+
+        # Get marker indices for this lineage
+        marker_to_idx = {m: i for i, m in enumerate(marker_names)}
+        comp_marker_indices = [marker_to_idx[m] for m in ordered_markers]
+
+        # Build tree with reconstruction-guided cutting
+        tree = _build_hierarchical_tree(
+            X=antibody_expression,
+            marker_names=marker_names,
+            linkage_matrix=Z,
+            coords=coords,
+            improvement_threshold=improvement_threshold,
+            sharing_ratio=sharing_ratio,
+            sharing_min_I=sharing_min_I,
+            max_depth=max_depth,
+            neighbor_k=neighbor_k,
+            component_markers=ordered_markers,
+        )
+        all_trees.append(tree)
+
+        # Flatten this tree
+        comp_flat_profiles, comp_shared = _flatten_tree_to_profiles(tree)
+
+        # Add profiles with global naming
+        for node_id, markers_list in comp_flat_profiles.items():
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = markers_list
+            # Update shared marker tracking
+            for marker in markers_list:
+                if marker in comp_shared:
+                    all_shared_markers[marker].append(profile_name)
+            profile_idx += 1
+
+    # Add singletons as individual profiles
+    for marker in singletons:
+        profile_name = f"profile_{profile_idx}"
+        all_flat_profiles[profile_name] = [marker]
+        profile_idx += 1
+
+    if verbose:
+        logger.info(f"Added {len(singletons)} singleton profiles")
+
+    # Filter shared_markers to only include markers that appear in 2+ profiles
+    final_shared = {m: profiles for m, profiles in all_shared_markers.items() if len(profiles) > 1}
+
+    # Compute final reconstruction error
+    final_error = _compute_final_reconstruction_error(
+        antibody_expression, marker_names, list(all_flat_profiles.values())
+    )
+
+    # Create a combined tree (forest of lineage trees)
+    if all_trees:
+        combined_tree = all_trees[0]
+    else:
+        root = ProfileTreeNode("root", singletons[:1] if singletons else [], [], None, 0)
+        combined_tree = ProfileTree(root=root, n_levels=1)
+
+    if verbose:
+        logger.info(f"Discovered {len(all_flat_profiles)} profiles, "
+                     f"{len(final_shared)} shared markers, "
+                     f"reconstruction error: {final_error:.4f}")
+
+    return HierarchicalProfileResult(
+        tree=combined_tree,
+        flat_profiles=all_flat_profiles,
+        depth_per_branch={},
+        shared_markers=final_shared,
+        reconstruction_error=final_error,
+    )
+
+
 def _filter_coloc_result_for_markers(
     coloc_result: ColocalizationResult,
     markers: List[str],
