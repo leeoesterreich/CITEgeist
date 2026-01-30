@@ -3128,6 +3128,239 @@ def discover_profiles(
     return result
 
 
+def discover_profiles_continuous(
+    colocalization_result: ColocalizationResult,
+    *,
+    top_k: int = 5,
+    distance_metric: str = "colocalization_score",
+    seed: int = 1234,
+    verbose: bool = True,
+) -> ProfileDiscoveryResult:
+    """
+    Discover cell type profiles using continuous edge weighting (no FDR gate).
+
+    Instead of binary FDR filtering, builds a complete distance matrix from all
+    marker pairs and uses hierarchical clustering with gap-based cutting to
+    separate lineages and profiles. This eliminates sensitivity to permutation
+    count since no p-value thresholds are used.
+
+    Algorithm:
+    1. Build complete distance matrix from colocalization scores (all pairs)
+    2. Optional: mutual top-k masking (set non-top-k distances to max)
+    3. Hierarchical clustering (average linkage) over all markers
+    4. Gap-based lineage splitting (large gaps = separate lineages)
+    5. Dynamic tree cutting within each lineage to extract profiles
+    6. Markers with uniformly high distance become singletons naturally
+
+    Args:
+        colocalization_result: Result from analyze_marker_colocalization().
+        top_k: Number of top partners to keep per marker in mutual top-k
+            distance masking (default: 5). Set to 0 to disable.
+            Unlike FDR-based filtering, this only sets non-top-k distances
+            to maximum (1.0) rather than removing edges entirely.
+        distance_metric: Which metric to use for distance:
+            - 'colocalization_score' (default): Combined score (0.3*spearman +
+              0.3*cosine + 0.4*bivariate_morans), normalized to [0,1].
+              Distance = 1 - score.
+            - 'bivariate_morans': Uses bivariate Moran's I only.
+              Distance = 1 - normalized_I.
+        seed: Random seed for reproducibility (default: 1234).
+        verbose: Log progress information (default: True).
+
+    Returns:
+        ProfileDiscoveryResult with discovered profiles, dendrograms, and metrics.
+    """
+    pairs = colocalization_result.pairs
+    all_markers = colocalization_result.marker_names
+    marker_specificity = colocalization_result.marker_specificity
+    n_markers = len(all_markers)
+
+    if verbose:
+        logging.info(f"Discovering profiles (continuous weighting) from {len(pairs)} marker pairs...")
+        logging.info(f"Distance metric: {distance_metric}, top_k: {top_k}")
+
+    if n_markers < 2:
+        return ProfileDiscoveryResult(
+            profiles=[[m] for m in all_markers],
+            lineage_dendrograms={},
+            singletons=list(all_markers),
+            modularity=0.0,
+            n_significant_edges=0,
+            alpha=0.0,
+        )
+
+    # Step 1: Build complete distance matrix from ALL pairs
+    marker_to_idx = {m: i for i, m in enumerate(all_markers)}
+
+    if distance_metric == "bivariate_morans":
+        # Use bivariate Moran's I with min-max normalization
+        morans_values = [p.bivariate_morans_i for p in pairs]
+        if len(morans_values) > 0:
+            min_i = min(morans_values)
+            max_i = max(morans_values)
+            range_i = max_i - min_i if max_i > min_i else 1.0
+        else:
+            min_i, range_i = 0.0, 1.0
+
+        dist_matrix = np.ones((n_markers, n_markers))
+        np.fill_diagonal(dist_matrix, 0.0)
+
+        for pair in pairs:
+            i = marker_to_idx[pair.marker_a]
+            j = marker_to_idx[pair.marker_b]
+            normalized = (pair.bivariate_morans_i - min_i) / range_i
+            d = 1.0 - normalized
+            dist_matrix[i, j] = d
+            dist_matrix[j, i] = d
+    else:
+        # Use colocalization_score (already in [0, 1])
+        dist_matrix = np.ones((n_markers, n_markers))
+        np.fill_diagonal(dist_matrix, 0.0)
+
+        for pair in pairs:
+            i = marker_to_idx[pair.marker_a]
+            j = marker_to_idx[pair.marker_b]
+            d = 1.0 - pair.colocalization_score
+            dist_matrix[i, j] = d
+            dist_matrix[j, i] = d
+
+    if verbose:
+        upper_tri = dist_matrix[np.triu_indices(n_markers, k=1)]
+        logging.info(
+            f"Distance matrix: min={upper_tri.min():.3f}, "
+            f"median={np.median(upper_tri):.3f}, max={upper_tri.max():.3f}"
+        )
+
+    # Step 2: Optional mutual top-k distance masking
+    if top_k > 0 and len(pairs) > 0:
+        top_k_mask = np.zeros((n_markers, n_markers), dtype=bool)
+
+        for i in range(n_markers):
+            dists = dist_matrix[i, :].copy()
+            dists[i] = np.inf  # Exclude self
+
+            # Apply specificity weighting if available
+            if marker_specificity:
+                marker_name = all_markers[i]
+                s_i = marker_specificity.get(marker_name, 1.0)
+                for j in range(n_markers):
+                    if j != i:
+                        s_j = marker_specificity.get(all_markers[j], 1.0)
+                        dists[j] = dists[j] / (np.sqrt(s_i * s_j) + 1e-10)
+
+            k_actual = min(top_k, n_markers - 1)
+            top_k_indices = np.argsort(dists)[:k_actual]
+            for j in top_k_indices:
+                top_k_mask[i, j] = True
+
+        mutual_mask = top_k_mask & top_k_mask.T
+
+        n_masked = 0
+        for i in range(n_markers):
+            for j in range(i + 1, n_markers):
+                if not mutual_mask[i, j]:
+                    dist_matrix[i, j] = 1.0
+                    dist_matrix[j, i] = 1.0
+                    n_masked += 1
+
+        n_total_pairs = n_markers * (n_markers - 1) // 2
+        n_kept = n_total_pairs - n_masked
+        if verbose:
+            logging.info(
+                f"Mutual top-{top_k} masking: {n_kept}/{n_total_pairs} pairs kept "
+                f"(specificity-weighted: {marker_specificity is not None})"
+            )
+
+    # Step 3: Hierarchical clustering over all markers
+    condensed_dist = squareform(dist_matrix)
+    Z = linkage(condensed_dist, method='average')
+
+    if verbose:
+        merge_distances = Z[:, 2]
+        logging.info(
+            f"Linkage: {len(Z)} merges, "
+            f"distances [{merge_distances.min():.3f} ... {merge_distances.max():.3f}]"
+        )
+
+    # Step 4: Gap-based lineage splitting
+    lineages = _split_dendrogram_by_gaps(Z, all_markers, seed=seed)
+
+    if verbose:
+        logging.info(f"Gap analysis: {len(lineages)} lineages")
+        for i, lin in enumerate(lineages):
+            logging.info(f"  Lineage {i + 1} ({len(lin)} markers): {lin}")
+
+    # Step 5: Dynamic tree cutting within each lineage
+    profiles = []
+    lineage_dendrograms = {}
+    lineage_idx = 0
+
+    for lineage_markers in lineages:
+        n_lineage = len(lineage_markers)
+
+        if n_lineage == 1:
+            profiles.append(lineage_markers)
+            continue
+
+        if n_lineage == 2:
+            i = marker_to_idx[lineage_markers[0]]
+            j = marker_to_idx[lineage_markers[1]]
+            if dist_matrix[i, j] < 0.7:
+                profiles.append(lineage_markers)
+            else:
+                profiles.append([lineage_markers[0]])
+                profiles.append([lineage_markers[1]])
+            continue
+
+        # Build lineage-specific dendrogram
+        lin_marker_indices = [marker_to_idx[m] for m in lineage_markers]
+        lin_dist = dist_matrix[np.ix_(lin_marker_indices, lin_marker_indices)]
+        lin_condensed = squareform(lin_dist)
+        lin_Z = linkage(lin_condensed, method='average')
+
+        lineage_dendrograms[lineage_idx] = LineageDendrogram(
+            markers=lineage_markers,
+            linkage_matrix=lin_Z,
+            distance_matrix=lin_dist,
+        )
+        lineage_idx += 1
+
+        cluster_labels = _dynamic_tree_cut(lin_Z, n_lineage)
+
+        cluster_to_markers = defaultdict(list)
+        for i, label in enumerate(cluster_labels):
+            cluster_to_markers[label].append(lineage_markers[i])
+
+        for cluster_markers in cluster_to_markers.values():
+            profiles.append(cluster_markers)
+
+    # Identify singletons
+    singletons = [p[0] for p in profiles if len(p) == 1]
+
+    # Compute modularity
+    significant_pairs = [p for p in pairs if p.colocalization_score > 0.5]
+    modularity = _compute_modularity(profiles, pairs, significant_pairs)
+
+    n_meaningful_edges = sum(1 for p in pairs if p.colocalization_score > 0.5)
+
+    if verbose:
+        logging.info(f"Discovered {len(profiles)} profiles, modularity = {modularity:.3f}")
+
+    result = ProfileDiscoveryResult(
+        profiles=profiles,
+        lineage_dendrograms=lineage_dendrograms,
+        singletons=singletons,
+        modularity=modularity,
+        n_significant_edges=n_meaningful_edges,
+        alpha=0.0,
+    )
+
+    if verbose:
+        logging.info(result.summary())
+
+    return result
+
+
 def _compute_profile_confidence(
     profile: List[str],
     pairs: List[MarkerPairColocalization],
