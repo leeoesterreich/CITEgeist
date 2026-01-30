@@ -1386,7 +1386,25 @@ def _recursive_tree_cut(
         else:
             right_signal = np.zeros(X.shape[0])
 
-        # Classify each marker as shared or specific
+        # Classify each marker as shared or specific.
+        #
+        # For large subtrees (> sharing_max_subtree), sharing is disabled
+        # AND markers are assigned strictly by dendrogram structure.  Using
+        # the dendrogram ensures the reconstruction error check (which was
+        # computed on dendrogram-based left/right) matches the actual
+        # marker assignment.  Bivariate Moran's I can disagree with the
+        # dendrogram, causing markers to migrate between branches and
+        # producing large undifferentiated blobs.
+        #
+        # For small subtrees (≤ sharing_max_subtree), the original
+        # Moran's I classification is used so biologically meaningful
+        # sharing (e.g., CD3 between CD4+ and CD8+ T cells) is preserved.
+
+        sharing_enabled = (
+            sharing_max_subtree <= 0
+            or len(marker_indices) <= sharing_max_subtree
+        )
+
         shared_markers = []
         shared_indices = []
         left_specific_markers = []
@@ -1394,40 +1412,52 @@ def _recursive_tree_cut(
         right_specific_markers = []
         right_specific_indices = []
 
-        # Guard: only allow sharing when the subtree is small enough
-        # for it to be biologically meaningful (e.g., T-cell lineage).
-        sharing_enabled = (
-            sharing_max_subtree <= 0
-            or len(marker_indices) <= sharing_max_subtree
-        )
+        if not sharing_enabled:
+            # Large subtree: use dendrogram structure directly.
+            left_cluster_set = set(cluster_left_indices)
+            for idx in marker_indices:
+                if idx in left_cluster_set:
+                    left_specific_markers.append(marker_names[idx])
+                    left_specific_indices.append(idx)
+                else:
+                    right_specific_markers.append(marker_names[idx])
+                    right_specific_indices.append(idx)
+        else:
+            # Small subtree: use Moran's I for sharing detection.
+            for idx in marker_indices:
+                marker_expr = X[:, idx]
 
-        for idx in marker_indices:
-            marker_expr = X[:, idx]
+                I_left = _compute_bivariate_morans_i_with_weights(
+                    marker_expr, left_signal, spatial_weights
+                )
+                I_right = _compute_bivariate_morans_i_with_weights(
+                    marker_expr, right_signal, spatial_weights
+                )
 
-            # Compute bivariate Moran's I with each child's representative signal
-            I_left = _compute_bivariate_morans_i_with_weights(
-                marker_expr, left_signal, spatial_weights
+                max_I = max(I_left, I_right)
+                min_I = min(I_left, I_right)
+                ratio = min_I / max_I if max_I > 1e-10 else 0.0
+
+                if ratio > sharing_ratio and min_I > sharing_min_I:
+                    shared_markers.append(marker_names[idx])
+                    shared_indices.append(idx)
+                elif I_left >= I_right:
+                    left_specific_markers.append(marker_names[idx])
+                    left_specific_indices.append(idx)
+                else:
+                    right_specific_markers.append(marker_names[idx])
+                    right_specific_indices.append(idx)
+
+        # Guard: if sharing consumed all markers (both children empty),
+        # don't split — treat as leaf with all markers.
+        if len(left_specific_indices) == 0 and len(right_specific_indices) == 0:
+            return ProfileTreeNode(
+                node_id=node_id,
+                markers=node_markers,
+                children=[],
+                parent_id=parent_id,
+                depth=current_depth,
             )
-            I_right = _compute_bivariate_morans_i_with_weights(
-                marker_expr, right_signal, spatial_weights
-            )
-
-            max_I = max(I_left, I_right)
-            min_I = min(I_left, I_right)
-            ratio = min_I / max_I if max_I > 1e-10 else 0.0
-
-            if sharing_enabled and ratio > sharing_ratio and min_I > sharing_min_I:
-                # Shared: stays at this internal node
-                shared_markers.append(marker_names[idx])
-                shared_indices.append(idx)
-            elif I_left >= I_right:
-                # Specific to left child
-                left_specific_markers.append(marker_names[idx])
-                left_specific_indices.append(idx)
-            else:
-                # Specific to right child
-                right_specific_markers.append(marker_names[idx])
-                right_specific_indices.append(idx)
 
         # Recurse on children with only their specific markers
         left_child = _recursive_tree_cut(
