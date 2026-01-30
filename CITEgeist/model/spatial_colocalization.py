@@ -4466,61 +4466,30 @@ def discover_hierarchical_profiles_continuous(
             sub_groups.append(comp_markers)
             continue
 
-        # Large lineage — split into sub-groups using distance-based cutting
-        # We scan distance thresholds to find one that produces well-sized groups
-        # (no singletons, reasonable number of clusters)
+        # Large lineage — split into sub-groups using ward linkage on the
+        # bivariate Moran's I distance matrix (NOT the top-k masked one).
+        # The top-k masked average-linkage dendrogram has too many 1.0
+        # distances which produces all-singleton splits. Ward linkage on
+        # the full colocalization distance matrix groups markers that
+        # spatially co-localize into biologically meaningful sub-groups.
         if verbose:
             logger.info(f"Lineage {comp_idx + 1} has {n_comp} markers — "
-                         f"splitting into sub-groups via distance threshold")
+                         f"splitting into sub-groups via ward linkage")
 
-        # Build lineage-specific dendrogram from the Phase 1 dist_matrix
-        lin_marker_indices = [marker_to_idx_all[m] for m in comp_markers]
-        lin_dist = dist_matrix[np.ix_(lin_marker_indices, lin_marker_indices)]
-        lin_condensed = squareform(lin_dist)
-        lin_Z = linkage(lin_condensed, method='average')
+        # Build ward dendrogram from bivariate Moran's I distances
+        comp_coloc = _filter_coloc_result_for_markers(coloc_result, comp_markers)
+        D_ward, ordered_ward = _build_colocalization_distance_matrix(comp_coloc)
 
-        # Scan distance thresholds to find the best cut
-        merge_dists = lin_Z[:, 2]
-        best_labels = None
-        best_score = -np.inf
+        condensed_ward = squareform(D_ward)
+        condensed_ward = np.maximum(condensed_ward, 0)
+        Z_ward = linkage(condensed_ward, method='ward')
 
-        # Try cutting at each merge distance (+ small offset above)
-        candidate_thresholds = np.unique(merge_dists)
-        for t in candidate_thresholds:
-            labels = fcluster(lin_Z, t=t + 1e-10, criterion='distance')
-            n_clusters = len(set(labels))
-            sizes = np.bincount(labels)
-            min_size = sizes.min()
-
-            # Score: prefer cuts with no singletons and 3-10 clusters
-            if n_clusters < 2:
-                score = -1.0  # Must split
-            elif n_clusters > 10:
-                score = -0.5  # Too many clusters
-            elif min_size < 2:
-                # Penalize singletons — how many?
-                n_singletons = np.sum(sizes < 2)
-                score = 0.1 - 0.05 * n_singletons
-            else:
-                # No singletons — reward based on cluster balance
-                # Prefer fewer, larger clusters (min_size / n_comp)
-                # with a bonus for having 3-8 clusters
-                balance = min_size / (n_comp / n_clusters)
-                target_bonus = 1.0 - abs(n_clusters - 6) * 0.1  # Peak at 6
-                score = balance + max(0, target_bonus)
-
-            if score > best_score:
-                best_score = score
-                best_labels = labels
-
-        if best_labels is None:
-            # Fallback: keep as single group
-            sub_groups.append(comp_markers)
-            continue
+        # Dynamic tree cut on the ward dendrogram
+        cluster_labels = _dynamic_tree_cut(Z_ward, n_comp)
 
         cluster_to_markers: Dict[int, List[str]] = defaultdict(list)
-        for i, label in enumerate(best_labels):
-            cluster_to_markers[label].append(comp_markers[i])
+        for i, label in enumerate(cluster_labels):
+            cluster_to_markers[label].append(ordered_ward[i])
 
         if verbose:
             logger.info(f"  Split into {len(cluster_to_markers)} sub-groups:")
