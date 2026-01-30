@@ -204,7 +204,6 @@ def run_manual_benchmark(
             model.run_cell_expression_pass1(
                 radius=radius,
                 alpha=0.5,
-                lambda_reg_gex=0.001,
                 checkpoint_interval=100,
                 output_dir=str(output_dir / "checkpoints"),
                 rerun=True,
@@ -450,7 +449,6 @@ def run_hierarchical_benchmark(
             model.run_cell_expression_pass1(
                 radius=radius,
                 alpha=0.5,
-                lambda_reg_gex=0.001,
                 checkpoint_interval=100,
                 output_dir=str(output_dir / "checkpoints"),
                 rerun=True,
@@ -559,6 +557,11 @@ def main():
     parser.add_argument("--max-y-change", type=float, default=0.4, help="Max Y change")
     parser.add_argument("--min-counts", type=int, default=25, help="Min counts filter")
     parser.add_argument("--run-gex", action="store_true", help="Run GEX deconvolution")
+    parser.add_argument(
+        "--no-unknown",
+        action="store_true",
+        help="Exclude unknown/unassigned profile from cell type dictionary",
+    )
 
     # Hierarchical-specific parameters
     parser.add_argument(

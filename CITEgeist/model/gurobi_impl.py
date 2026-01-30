@@ -1723,7 +1723,6 @@ def deconvolute_spot_with_neighbors_with_prior(
     lambda_prior_weight: float = 0.0,
     local_enrichment_weight: float = 0.5,
     global_enrichment_weight: float = 0.5,
-    lambda_reg_gex: float = 0.0,
 ) -> Optional[np.ndarray]:
     """
     Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
@@ -1869,24 +1868,8 @@ def deconvolute_spot_with_neighbors_with_prior(
                             logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
                             continue
 
-        # Quadratic diversity penalty: penalize concentration of counts in one cell type
-        # This converts the linear objective (which always picks vertex solutions)
-        # into a concave quadratic that encourages distributing counts proportionally
-        diversity_penalty = []
-        if lambda_reg_gex > 0:
-            for k in range(M):
-                total_counts = int(center_counts[k])
-                if total_counts > 0:
-                    for j in range(T):
-                        diversity_penalty.append(lambda_reg_gex * X[j, k] * X[j, k])
-
-        # Maximize the sum of all terms minus diversity penalty
-        if diversity_penalty:
-            model.setObjective(
-                gp.quicksum(obj_terms) - gp.quicksum(diversity_penalty), GRB.MAXIMIZE
-            )
-        else:
-            model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
+        # Maximize the sum of all terms
+        model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
 
         model.write('gene_expression_model.mps')
 
@@ -1983,7 +1966,6 @@ def optimize_gene_expression(
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False,
-    lambda_reg_gex: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -1994,7 +1976,6 @@ def optimize_gene_expression(
         cell_type_numbers_array (np.ndarray): Cell type proportions (N_spots x T_celltypes)
         filtered_adata (sc.AnnData): Filtered AnnData object containing gene expression data
         radius (float): Radius for neighbor detection
-        lambda_reg_gex (float): Quadratic diversity penalty weight for GEX deconvolution
         global_enrichment_weight (float): Weight for global expression enrichment (0-1)
         local_enrichment_weight (float): Weight for local expression enrichment (0-1)
         global_prior (np.ndarray, optional): Global prior matrix for guidance
@@ -2071,7 +2052,6 @@ def optimize_gene_expression(
                             lambda_prior_weight,
                             local_enrichment_weight,
                             global_enrichment_weight,
-                            lambda_reg_gex,
                         )
                         futures[future] = spot_idx
 

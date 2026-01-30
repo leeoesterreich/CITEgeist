@@ -696,7 +696,6 @@ class CitegeistModel:
         self,
         radius,
         alpha=0.5,
-        lambda_reg_gex=0.001,
         global_enrichment_weight=0.5,
         local_enrichment_weight=0.5,
         max_workers=None,
@@ -710,7 +709,6 @@ class CitegeistModel:
         Args:
             radius (float): Radius for neighbor detection
             alpha (float): Weight for spatial regularization
-            lambda_reg_gex (float): Weight for gene expression regularization
             global_enrichment_weight (float): Weight for global expression enrichment (0-1)
             local_enrichment_weight (float): Weight for local expression enrichment (0-1)
             max_workers (int, optional): Maximum number of parallel workers
@@ -819,7 +817,6 @@ class CitegeistModel:
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun,
-            lambda_reg_gex=lambda_reg_gex,
         )
 
         # Get dimensions for NaN imputation and consistency checks

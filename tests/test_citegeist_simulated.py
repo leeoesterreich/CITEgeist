@@ -452,6 +452,7 @@ def main():
     parser.add_argument('--beta-max', type=float, default=2.0,
                         help='Maximum beta value for per-marker optimization (default: 2.0)')
 
+
     args = parser.parse_args()
 
     radius = args.radius
@@ -880,9 +881,9 @@ def main():
         # Run first pass with weight parameters
         pass1_results = model.run_cell_expression_pass1(
             radius=radius,
-            max_workers=None, 
-            checkpoint_interval=100, 
-            output_dir="checkpoints", 
+            max_workers=None,
+            checkpoint_interval=100,
+            output_dir="checkpoints",
             rerun=True
         )
 

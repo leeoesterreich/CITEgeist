@@ -15,7 +15,7 @@ from typing import Dict, List, Set
 # Collapsed from 10 granular RNA-based ground truth types.
 #
 # Collapse rationale:
-# - Myofibroblasts + Stromal → Fibroblasts (both VIM+, αSMA overlaps)
+# - Myofibroblasts + Stromal → Fibroblasts (αSMA only; VIM excluded due to ubiquity)
 # - Vascular Stromal → Endothelial (CD31+)
 # - Proliferating T → CD8+ T cells (both CD3E+)
 # - Mixed Immune → CD4+ T cells (HLA-DR+ T cells)
@@ -47,7 +47,7 @@ ACHIEVABLE_7_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = {
     },
     "Fibroblasts": {
         "Major": ["alphaSMA"],
-        "Minor": ["Vimentin"],
+        "Minor": [],
     },
 }
 
@@ -59,7 +59,7 @@ ACHIEVABLE_7_MARKER_SIGNATURES: Dict[str, Set[str]] = {
     "Macrophages": {"CD68", "CD163", "CD16"},
     "Endothelial": {"CD31"},
     "Epithelial": {"PanCK"},
-    "Fibroblasts": {"alphaSMA", "Vimentin"},
+    "Fibroblasts": {"alphaSMA"},
 }
 
 # Primary/secondary format for profile scoring in staged evaluation
@@ -91,7 +91,7 @@ ACHIEVABLE_7_GT_MARKERS: Dict[str, Dict[str, List[str]]] = {
     },
     "Fibroblasts": {
         "primary": ["alphaSMA"],
-        "secondary": ["Vimentin"],
+        "secondary": [],
     },
 }
 
@@ -116,7 +116,7 @@ CRITICAL_MARKERS: List[str] = [
     "CD20",  # B cells
     "PanCK",  # Epithelial
     "CD31",  # Endothelial
-    "alphaSMA", "Vimentin",  # Fibroblasts
+    "alphaSMA",  # Fibroblasts
 ]
 
 # Expected colocalization pairs for Module 2a validation

@@ -97,12 +97,13 @@ python "${CITEGEIST_DIR}/src/run_benchmark.py" \
     --mode ${MODE} \
     --input-dir "${INPUT_DIR}" \
     --output-dir "${OUTPUT_DIR}" \
-    --radius 4.0 \
+    --radius 250.0 \
     --lambda-reg 1.0 \
     --alpha-elastic 0.7 \
     --max-y-change 0.4 \
     --min-counts 25 \
-    --run-gex
+    --run-gex \
+    --no-unknown
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: CITEgeist failed on region ${REGION_ID}!${RESET}" >&2
