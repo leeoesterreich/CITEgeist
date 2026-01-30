@@ -4441,47 +4441,90 @@ def discover_hierarchical_profiles_continuous(
         logger.info(f"Found {len(multi_marker_lineages)} multi-marker lineages, "
                      f"{len(singletons)} singletons")
 
-    # ── Phase 2: Build hierarchical tree for each lineage ────────────────
-    # (Identical to discover_hierarchical_profiles Phase 2)
+    # ── Phase 2: Sub-lineage splitting + hierarchical tree building ─────
+    #
+    # When Phase 1 produces large lineages (8+ markers), we first apply
+    # _dynamic_tree_cut to break them into biologically meaningful sub-groups.
+    # Only then do we run _build_hierarchical_tree on each sub-group.
+    # Without this step, large lineages cause the sharing logic to assign
+    # ubiquitous markers (CD45, PTEN, etc.) to every profile.
 
     all_flat_profiles: Dict[str, List[str]] = {}
     all_shared_markers: Dict[str, List[str]] = defaultdict(list)
     all_trees: List[ProfileTree] = []
     profile_idx = 0
 
+    # Flatten large lineages into sub-groups using dynamic tree cut
+    sub_groups: List[List[str]] = []
+
     for comp_idx, component in enumerate(multi_marker_lineages):
         comp_markers = sorted(list(component))
         n_comp = len(comp_markers)
 
+        if n_comp <= 7:
+            # Small lineage — pass directly to tree building
+            sub_groups.append(comp_markers)
+            continue
+
+        # Large lineage — apply dynamic tree cut to split into sub-groups
         if verbose:
-            logger.info(f"Processing lineage {comp_idx + 1} ({n_comp} markers): {comp_markers}")
+            logger.info(f"Lineage {comp_idx + 1} has {n_comp} markers — "
+                         f"applying dynamic tree cut to split into sub-groups")
 
-        if n_comp == 1:
-            # Single marker lineage (close to some other but gap-separated)
+        # Build lineage-specific distance matrix from the Phase 1 dist_matrix
+        lin_marker_indices = [marker_to_idx_all[m] for m in comp_markers]
+        lin_dist = dist_matrix[np.ix_(lin_marker_indices, lin_marker_indices)]
+        lin_condensed = squareform(lin_dist)
+        lin_Z = linkage(lin_condensed, method='average')
+
+        # Dynamic tree cut to find natural sub-groups
+        cluster_labels = _dynamic_tree_cut(lin_Z, n_comp)
+
+        cluster_to_markers: Dict[int, List[str]] = defaultdict(list)
+        for i, label in enumerate(cluster_labels):
+            cluster_to_markers[label].append(comp_markers[i])
+
+        if verbose:
+            logger.info(f"  Split into {len(cluster_to_markers)} sub-groups:")
+            for label, markers_list in sorted(cluster_to_markers.items()):
+                logger.info(f"    Sub-group {label}: {markers_list}")
+
+        for markers_list in cluster_to_markers.values():
+            sub_groups.append(markers_list)
+
+    if verbose:
+        logger.info(f"Total sub-groups for tree building: {len(sub_groups)}")
+
+    # Now build hierarchical trees for each sub-group
+    for sg_idx, sg_markers in enumerate(sub_groups):
+        n_sg = len(sg_markers)
+
+        if verbose:
+            logger.info(f"Processing sub-group {sg_idx + 1} ({n_sg} markers): {sg_markers}")
+
+        if n_sg == 1:
             profile_name = f"profile_{profile_idx}"
-            all_flat_profiles[profile_name] = comp_markers
+            all_flat_profiles[profile_name] = sg_markers
             profile_idx += 1
             continue
 
-        if n_comp == 2:
-            # Two-marker lineage - simple pair profile
+        if n_sg == 2:
             profile_name = f"profile_{profile_idx}"
-            all_flat_profiles[profile_name] = comp_markers
+            all_flat_profiles[profile_name] = sg_markers
             profile_idx += 1
             continue
 
-        # Build distance matrix for this lineage only
-        comp_coloc = _filter_coloc_result_for_markers(coloc_result, comp_markers)
+        # Build distance matrix for this sub-group only
+        comp_coloc = _filter_coloc_result_for_markers(coloc_result, sg_markers)
         D, ordered_markers = _build_colocalization_distance_matrix(comp_coloc)
 
-        # Build hierarchical clustering for this lineage
+        # Build hierarchical clustering for this sub-group
         condensed = squareform(D)
         condensed = np.maximum(condensed, 0)
         Z = linkage(condensed, method='ward')
 
-        # Get marker indices for this lineage
-        marker_to_idx = {m: i for i, m in enumerate(marker_names)}
-        comp_marker_indices = [marker_to_idx[m] for m in ordered_markers]
+        # Get marker indices for this sub-group
+        marker_to_idx_local = {m: i for i, m in enumerate(marker_names)}
 
         # Build tree with reconstruction-guided cutting
         tree = _build_hierarchical_tree(
