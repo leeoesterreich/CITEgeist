@@ -142,7 +142,6 @@ def run_manual_benchmark(
     max_y_change: float = 0.4,
     min_counts: int = 25,
     run_gex: bool = False,
-    no_unknown: bool = False,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist with manual achievable-7 profiles.
@@ -163,9 +162,7 @@ def run_manual_benchmark(
         antibody_capture_adata=protein_adata,
     )
 
-    model.load_cell_profile_dict(
-        ACHIEVABLE_7_CELL_PROFILE_DICT, inject_unknown=not no_unknown
-    )
+    model.load_cell_profile_dict(ACHIEVABLE_7_CELL_PROFILE_DICT)
 
     logger.info("Preprocessing...")
     model.filter_gex(min_counts=min_counts)
@@ -221,7 +218,6 @@ def run_manual_benchmark(
     results = {
         "region_id": region_id,
         "mode": "manual",
-        "no_unknown": no_unknown,
         "n_spots": gex_adata.shape[0],
         "n_cell_types": len(cell_type_names),
         "cell_types": cell_type_names,
@@ -248,7 +244,6 @@ def run_hierarchical_benchmark(
     max_y_change: float = 0.4,
     min_counts: int = 25,
     run_gex: bool = False,
-    no_unknown: bool = False,
     # Hierarchical-specific parameters
     top_k: int = 3,
     improvement_threshold: float = 0.05,
@@ -417,7 +412,7 @@ def run_hierarchical_benchmark(
         antibody_capture_adata=protein_adata,
     )
 
-    model.load_cell_profile_dict(cell_profile_dict, inject_unknown=not no_unknown)
+    model.load_cell_profile_dict(cell_profile_dict)
     model.filter_gex(min_counts=min_counts)
     model.preprocess_gex(target_sum=10000)
     model.preprocess_antibody()
@@ -561,11 +556,6 @@ def main():
     parser.add_argument("--max-y-change", type=float, default=0.4, help="Max Y change")
     parser.add_argument("--min-counts", type=int, default=25, help="Min counts filter")
     parser.add_argument("--run-gex", action="store_true", help="Run GEX deconvolution")
-    parser.add_argument(
-        "--no-unknown",
-        action="store_true",
-        help="Exclude unknown/unassigned profile from cell type dictionary",
-    )
 
     # Hierarchical-specific parameters
     parser.add_argument(
@@ -624,7 +614,6 @@ def main():
             max_y_change=args.max_y_change,
             min_counts=args.min_counts,
             run_gex=args.run_gex,
-            no_unknown=args.no_unknown,
         )
     else:  # hierarchical
         results = run_hierarchical_benchmark(
@@ -638,7 +627,6 @@ def main():
             max_y_change=args.max_y_change,
             min_counts=args.min_counts,
             run_gex=args.run_gex,
-            no_unknown=args.no_unknown,
             top_k=args.top_k,
             improvement_threshold=args.improvement_threshold,
             max_depth=args.max_depth,

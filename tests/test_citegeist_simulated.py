@@ -452,7 +452,6 @@ def main():
     parser.add_argument('--beta-max', type=float, default=2.0,
                         help='Maximum beta value for per-marker optimization (default: 2.0)')
 
-
     args = parser.parse_args()
 
     radius = args.radius

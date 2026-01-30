@@ -102,8 +102,7 @@ python "${CITEGEIST_DIR}/src/run_benchmark.py" \
     --alpha-elastic 0.7 \
     --max-y-change 0.4 \
     --min-counts 25 \
-    --run-gex \
-    --no-unknown
+    --run-gex
 
 if [ $? -ne 0 ]; then
     echo -e "${RED}Error: CITEgeist failed on region ${REGION_ID}!${RESET}" >&2

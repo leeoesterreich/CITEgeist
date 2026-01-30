@@ -254,22 +254,11 @@ class CitegeistModel:
     def load_cell_profile_dict(self, cell_profile_dict):
         """
         Load and validate the cell profile dictionary.
-        
-        Automatically adds an "Unknown" cell type if not present to capture
-        uncharacterized cell populations.
 
         Args:
             cell_profile_dict (dict): Dictionary of cell type profiles.
         """
         if validate_cell_profile_dict(cell_profile_dict):
-            # Automatically add Unknown cell type if not present
-            if "Unknown" not in cell_profile_dict:
-                # Add Unknown as the last entry with empty markers
-                cell_profile_dict["Unknown"] = {"Major": []}
-                logging.info("✓ Automatically added 'Unknown' cell type to capture uncharacterized populations")
-            else:
-                logging.info("'Unknown' cell type already present in cell profile dictionary")
-            
             self.cell_profile_dict = cell_profile_dict
         else:
             raise ValueError("Invalid cell_profile_dict format.")
