@@ -490,7 +490,6 @@ def run_hierarchical_benchmark(
         "output_dir": str(result_dir),
         # Parameters
         "parameters": {
-            "fdr_alpha": fdr_alpha,
             "top_k": top_k,
             "improvement_threshold": improvement_threshold,
             "max_depth": max_depth,
@@ -570,12 +569,6 @@ def main():
 
     # Hierarchical-specific parameters
     parser.add_argument(
-        "--fdr-alpha",
-        type=float,
-        default=0.05,
-        help="FDR threshold for colocalization (hierarchical mode)",
-    )
-    parser.add_argument(
         "--top-k",
         type=int,
         default=3,
@@ -631,6 +624,7 @@ def main():
             max_y_change=args.max_y_change,
             min_counts=args.min_counts,
             run_gex=args.run_gex,
+            no_unknown=args.no_unknown,
         )
     else:  # hierarchical
         results = run_hierarchical_benchmark(
@@ -644,7 +638,7 @@ def main():
             max_y_change=args.max_y_change,
             min_counts=args.min_counts,
             run_gex=args.run_gex,
-            fdr_alpha=args.fdr_alpha,
+            no_unknown=args.no_unknown,
             top_k=args.top_k,
             improvement_threshold=args.improvement_threshold,
             max_depth=args.max_depth,
