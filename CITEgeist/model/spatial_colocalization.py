@@ -1367,13 +1367,18 @@ def _recursive_tree_cut(
         improvement = 0.0
 
     # Decision: split or stop.
-    # Size-adaptive threshold: large groups need less improvement to split
-    # because even small relative gains reflect real biological heterogeneity.
-    # For 4 markers: threshold = improvement_threshold (default 5%)
-    # For 27 markers: threshold ≈ 0.7% (much easier to split)
+    # Split decision: reconstruction improvement OR oversized leaf.
+    #
+    # 1. Size-adaptive threshold: large groups need less improvement to
+    #    split because even small gains reflect biological heterogeneity.
+    # 2. Oversized leaf guard: no leaf profile should have more than
+    #    max_leaf_markers markers.  Force splitting regardless of
+    #    reconstruction improvement to avoid undifferentiated blobs.
     n_markers_here = len(marker_indices)
     effective_threshold = improvement_threshold * (4.0 / max(n_markers_here, 4))
-    if improvement > effective_threshold:
+    MAX_LEAF_MARKERS = 6
+    oversized = n_markers_here > MAX_LEAF_MARKERS
+    if improvement > effective_threshold or oversized:
         # Compute representative signals for left and right children
         # Use mean expression of markers in each cluster
         if len(cluster_left_indices) > 0:
