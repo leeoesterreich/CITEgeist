@@ -1282,6 +1282,7 @@ def _recursive_tree_cut(
     current_depth: int,
     max_depth: int,
     parent_id: Optional[str],
+    sharing_max_subtree: int = 0,
 ) -> ProfileTreeNode:
     """
     Recursively build tree with reconstruction-guided cutting and shared marker detection.
@@ -1302,6 +1303,13 @@ def _recursive_tree_cut(
         current_depth: Current depth in tree
         max_depth: Maximum tree depth (safety limit)
         parent_id: ID of parent node
+        sharing_max_subtree: Maximum subtree size for sharing to be enabled.
+            When > 0, sharing is only applied when len(marker_indices) <=
+            this value.  Prevents ubiquitous markers from being shared at the
+            root of large trees (e.g., all 27 markers), while still allowing
+            biologically meaningful sharing within small lineage sub-trees
+            (e.g., CD3 shared between CD4+ and CD8+ T cells).
+            0 (default) means sharing is always enabled (legacy behaviour).
 
     Returns:
         ProfileTreeNode representing this subtree
@@ -1380,6 +1388,13 @@ def _recursive_tree_cut(
         right_specific_markers = []
         right_specific_indices = []
 
+        # Guard: only allow sharing when the subtree is small enough
+        # for it to be biologically meaningful (e.g., T-cell lineage).
+        sharing_enabled = (
+            sharing_max_subtree <= 0
+            or len(marker_indices) <= sharing_max_subtree
+        )
+
         for idx in marker_indices:
             marker_expr = X[:, idx]
 
@@ -1395,7 +1410,7 @@ def _recursive_tree_cut(
             min_I = min(I_left, I_right)
             ratio = min_I / max_I if max_I > 1e-10 else 0.0
 
-            if ratio > sharing_ratio and min_I > sharing_min_I:
+            if sharing_enabled and ratio > sharing_ratio and min_I > sharing_min_I:
                 # Shared: stays at this internal node
                 shared_markers.append(marker_names[idx])
                 shared_indices.append(idx)
@@ -1412,12 +1427,14 @@ def _recursive_tree_cut(
         left_child = _recursive_tree_cut(
             scipy_node.get_left(), X, marker_names, left_specific_indices,
             spatial_weights, improvement_threshold, sharing_ratio, sharing_min_I,
-            current_depth + 1, max_depth, node_id
+            current_depth + 1, max_depth, node_id,
+            sharing_max_subtree=sharing_max_subtree,
         )
         right_child = _recursive_tree_cut(
             scipy_node.get_right(), X, marker_names, right_specific_indices,
             spatial_weights, improvement_threshold, sharing_ratio, sharing_min_I,
-            current_depth + 1, max_depth, node_id
+            current_depth + 1, max_depth, node_id,
+            sharing_max_subtree=sharing_max_subtree,
         )
 
         return ProfileTreeNode(
@@ -1449,6 +1466,7 @@ def _build_hierarchical_tree(
     max_depth: int = 5,
     neighbor_k: int = 6,
     component_markers: Optional[List[str]] = None,
+    sharing_max_subtree: int = 0,
 ) -> ProfileTree:
     """
     Build hierarchical profile tree with reconstruction-guided cutting and shared marker detection.
@@ -1524,6 +1542,7 @@ def _build_hierarchical_tree(
         current_depth=0,
         max_depth=max_depth,
         parent_id=None,
+        sharing_max_subtree=sharing_max_subtree,
     )
 
     # Compute actual depth
@@ -4441,96 +4460,55 @@ def discover_hierarchical_profiles_continuous(
         logger.info(f"Found {len(multi_marker_lineages)} multi-marker lineages, "
                      f"{len(singletons)} singletons")
 
-    # ── Phase 2: Sub-lineage splitting + hierarchical tree building ─────
+    # ── Phase 2: Per-lineage hierarchical tree building ──────────────────
     #
-    # When Phase 1 produces large lineages (8+ markers), we first apply
-    # _dynamic_tree_cut to break them into biologically meaningful sub-groups.
-    # Only then do we run _build_hierarchical_tree on each sub-group.
-    # Without this step, large lineages cause the sharing logic to assign
-    # ubiquitous markers (CD45, PTEN, etc.) to every profile.
+    # Each multi-marker lineage is passed directly to _build_hierarchical_tree.
+    # The reconstruction-guided stopping criterion (improvement_threshold) is
+    # the sole "auto-sensed" control for how many profiles emerge.
+    #
+    # To prevent ubiquitous markers (CD45, PTEN, Vimentin) from being shared
+    # at the root of large trees, sharing is only enabled when the current
+    # subtree has <= sharing_max_subtree markers.  This preserves biologically
+    # meaningful sharing (e.g., CD3 between CD4+ and CD8+ T cells in a small
+    # sub-tree) while preventing root-level pollution.
+
+    SHARING_MAX_SUBTREE = 8  # sharing enabled only for sub-trees of this size
 
     all_flat_profiles: Dict[str, List[str]] = {}
     all_shared_markers: Dict[str, List[str]] = defaultdict(list)
     all_trees: List[ProfileTree] = []
     profile_idx = 0
 
-    # Flatten large lineages into sub-groups using dynamic tree cut
-    sub_groups: List[List[str]] = []
-
     for comp_idx, component in enumerate(multi_marker_lineages):
         comp_markers = sorted(list(component))
         n_comp = len(comp_markers)
 
-        if n_comp <= 7:
-            # Small lineage — pass directly to tree building
-            sub_groups.append(comp_markers)
+        if verbose:
+            logger.info(f"Lineage {comp_idx + 1} ({n_comp} markers): {comp_markers}")
+
+        if n_comp == 1:
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
             continue
 
-        # Large lineage — split into sub-groups using ward linkage on the
-        # bivariate Moran's I distance matrix (NOT the top-k masked one).
-        # The top-k masked average-linkage dendrogram has too many 1.0
-        # distances which produces all-singleton splits. Ward linkage on
-        # the full colocalization distance matrix groups markers that
-        # spatially co-localize into biologically meaningful sub-groups.
-        if verbose:
-            logger.info(f"Lineage {comp_idx + 1} has {n_comp} markers — "
-                         f"splitting into sub-groups via ward linkage")
+        if n_comp == 2:
+            profile_name = f"profile_{profile_idx}"
+            all_flat_profiles[profile_name] = comp_markers
+            profile_idx += 1
+            continue
 
-        # Build ward dendrogram from bivariate Moran's I distances
+        # Build distance matrix for this lineage
         comp_coloc = _filter_coloc_result_for_markers(coloc_result, comp_markers)
-        D_ward, ordered_ward = _build_colocalization_distance_matrix(comp_coloc)
-
-        condensed_ward = squareform(D_ward)
-        condensed_ward = np.maximum(condensed_ward, 0)
-        Z_ward = linkage(condensed_ward, method='ward')
-
-        # Dynamic tree cut on the ward dendrogram
-        cluster_labels = _dynamic_tree_cut(Z_ward, n_comp)
-
-        cluster_to_markers: Dict[int, List[str]] = defaultdict(list)
-        for i, label in enumerate(cluster_labels):
-            cluster_to_markers[label].append(ordered_ward[i])
-
-        if verbose:
-            logger.info(f"  Split into {len(cluster_to_markers)} sub-groups:")
-            for label, markers_list in sorted(cluster_to_markers.items()):
-                logger.info(f"    Sub-group {label}: {markers_list}")
-
-        for markers_list in cluster_to_markers.values():
-            sub_groups.append(markers_list)
-
-    if verbose:
-        logger.info(f"Total sub-groups for tree building: {len(sub_groups)}")
-
-    # Now build hierarchical trees for each sub-group
-    for sg_idx, sg_markers in enumerate(sub_groups):
-        n_sg = len(sg_markers)
-
-        if verbose:
-            logger.info(f"Processing sub-group {sg_idx + 1} ({n_sg} markers): {sg_markers}")
-
-        if n_sg == 1:
-            profile_name = f"profile_{profile_idx}"
-            all_flat_profiles[profile_name] = sg_markers
-            profile_idx += 1
-            continue
-
-        if n_sg == 2:
-            profile_name = f"profile_{profile_idx}"
-            all_flat_profiles[profile_name] = sg_markers
-            profile_idx += 1
-            continue
-
-        # Build distance matrix for this sub-group only
-        comp_coloc = _filter_coloc_result_for_markers(coloc_result, sg_markers)
         D, ordered_markers = _build_colocalization_distance_matrix(comp_coloc)
 
-        # Build hierarchical clustering for this sub-group
+        # Build hierarchical clustering
         condensed = squareform(D)
         condensed = np.maximum(condensed, 0)
         Z = linkage(condensed, method='ward')
 
-        # Build tree with reconstruction-guided cutting
+        # Build tree with reconstruction-guided cutting.
+        # sharing_max_subtree prevents root-level sharing for large lineages.
         tree = _build_hierarchical_tree(
             X=antibody_expression,
             marker_names=marker_names,
@@ -4542,6 +4520,7 @@ def discover_hierarchical_profiles_continuous(
             max_depth=max_depth,
             neighbor_k=neighbor_k,
             component_markers=ordered_markers,
+            sharing_max_subtree=SHARING_MAX_SUBTREE,
         )
         all_trees.append(tree)
 
