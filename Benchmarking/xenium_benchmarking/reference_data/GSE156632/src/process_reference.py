@@ -7,12 +7,13 @@ This script:
 3. Performs QC filtering (min_genes, max_genes, mt%)
 4. Normalizes (log1p, target_sum=1e4)
 5. Integrates batches using Harmony
-6. Clusters and annotates 6 cell types matching Xenium ground truth
+6. Clusters and annotates 7 cell types matching protein-gated Xenium ground truth
 7. Exports in formats for Cell2Location, Tangram, RCTD, Seurat
 
-Target cell types (must match Xenium RNA-based ground truth):
+Target cell types (must match protein-gated ground truth):
 - B cells
-- T cells
+- CD4+ T cells
+- CD8+ T cells
 - Macrophages
 - Fibroblasts
 - Epithelial
@@ -51,10 +52,11 @@ logger = logging.getLogger(__name__)
 
 
 # Marker genes for cell type annotation
-# These markers are used to identify the 6 cell types matching Xenium ground truth
+# These markers are used to identify the 7 cell types matching protein-gated GT
 MARKER_GENES = {
-    "T cells": ["CD3D", "CD3E", "CD3G", "CD4", "CD8A", "CD8B", "TRAC", "TRBC1", "TRBC2"],
     "B cells": ["CD79A", "CD79B", "MS4A1", "CD19", "PAX5", "BANK1"],
+    "CD4+ T cells": ["CD3D", "CD3E", "CD3G", "CD4", "TRAC", "IL7R", "TCF7"],
+    "CD8+ T cells": ["CD3D", "CD3E", "CD3G", "CD8A", "CD8B", "GZMA", "GZMB", "PRF1", "NKG7"],
     "Macrophages": ["CD68", "CD163", "CSF1R", "MARCO", "MSR1", "CD14", "FCGR3A"],
     "Fibroblasts": ["COL1A1", "COL1A2", "DCN", "VIM", "ACTA2", "FAP", "PDGFRA"],
     "Epithelial": ["EPCAM", "KRT18", "KRT8", "CA9", "PAX8", "CDH1", "KRT19"],

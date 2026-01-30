@@ -31,14 +31,15 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Target cell types (must match Xenium RNA-based ground truth)
+# Target cell types (must match protein-gated ground truth)
 TARGET_CELL_TYPES = [
     "B cells",
-    "T cells",
+    "CD4+ T cells",
+    "CD8+ T cells",
     "Macrophages",
-    "Fibroblasts",
-    "Epithelial",
     "Endothelial",
+    "Epithelial",
+    "Fibroblasts",
 ]
 
 
