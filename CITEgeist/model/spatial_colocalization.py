@@ -4466,22 +4466,60 @@ def discover_hierarchical_profiles_continuous(
             sub_groups.append(comp_markers)
             continue
 
-        # Large lineage — apply dynamic tree cut to split into sub-groups
+        # Large lineage — split into sub-groups using distance-based cutting
+        # We scan distance thresholds to find one that produces well-sized groups
+        # (no singletons, reasonable number of clusters)
         if verbose:
             logger.info(f"Lineage {comp_idx + 1} has {n_comp} markers — "
-                         f"applying dynamic tree cut to split into sub-groups")
+                         f"splitting into sub-groups via distance threshold")
 
-        # Build lineage-specific distance matrix from the Phase 1 dist_matrix
+        # Build lineage-specific dendrogram from the Phase 1 dist_matrix
         lin_marker_indices = [marker_to_idx_all[m] for m in comp_markers]
         lin_dist = dist_matrix[np.ix_(lin_marker_indices, lin_marker_indices)]
         lin_condensed = squareform(lin_dist)
         lin_Z = linkage(lin_condensed, method='average')
 
-        # Dynamic tree cut to find natural sub-groups
-        cluster_labels = _dynamic_tree_cut(lin_Z, n_comp)
+        # Scan distance thresholds to find the best cut
+        merge_dists = lin_Z[:, 2]
+        best_labels = None
+        best_score = -np.inf
+
+        # Try cutting at each merge distance (+ small offset above)
+        candidate_thresholds = np.unique(merge_dists)
+        for t in candidate_thresholds:
+            labels = fcluster(lin_Z, t=t + 1e-10, criterion='distance')
+            n_clusters = len(set(labels))
+            sizes = np.bincount(labels)
+            min_size = sizes.min()
+
+            # Score: prefer cuts with no singletons and 3-10 clusters
+            if n_clusters < 2:
+                score = -1.0  # Must split
+            elif n_clusters > 10:
+                score = -0.5  # Too many clusters
+            elif min_size < 2:
+                # Penalize singletons — how many?
+                n_singletons = np.sum(sizes < 2)
+                score = 0.1 - 0.05 * n_singletons
+            else:
+                # No singletons — reward based on cluster balance
+                # Prefer fewer, larger clusters (min_size / n_comp)
+                # with a bonus for having 3-8 clusters
+                balance = min_size / (n_comp / n_clusters)
+                target_bonus = 1.0 - abs(n_clusters - 6) * 0.1  # Peak at 6
+                score = balance + max(0, target_bonus)
+
+            if score > best_score:
+                best_score = score
+                best_labels = labels
+
+        if best_labels is None:
+            # Fallback: keep as single group
+            sub_groups.append(comp_markers)
+            continue
 
         cluster_to_markers: Dict[int, List[str]] = defaultdict(list)
-        for i, label in enumerate(cluster_labels):
+        for i, label in enumerate(best_labels):
             cluster_to_markers[label].append(comp_markers[i])
 
         if verbose:
@@ -4523,9 +4561,6 @@ def discover_hierarchical_profiles_continuous(
         condensed = np.maximum(condensed, 0)
         Z = linkage(condensed, method='ward')
 
-        # Get marker indices for this sub-group
-        marker_to_idx_local = {m: i for i, m in enumerate(marker_names)}
-
         # Build tree with reconstruction-guided cutting
         tree = _build_hierarchical_tree(
             X=antibody_expression,
@@ -4544,8 +4579,10 @@ def discover_hierarchical_profiles_continuous(
         # Flatten this tree
         comp_flat_profiles, comp_shared = _flatten_tree_to_profiles(tree)
 
-        # Add profiles with global naming
+        # Add profiles with global naming (skip empty profiles from over-sharing)
         for node_id, markers_list in comp_flat_profiles.items():
+            if not markers_list:
+                continue  # Skip empty profiles created by marker sharing
             profile_name = f"profile_{profile_idx}"
             all_flat_profiles[profile_name] = markers_list
             # Update shared marker tracking
