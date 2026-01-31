@@ -128,3 +128,56 @@ EXPECTED_NEGATIVE_PAIRS = [
     ("CD20", "CD68"),  # B cells vs Macrophages
     ("PanCK", "CD20"),  # Epithelial vs B cells
 ]
+
+# =============================================================================
+# MARKER LINEAGE MAPPING (for discovery comparison evaluation)
+# =============================================================================
+#
+# Maps each of the 27 Xenium protein markers to its canonical cell lineage.
+# Used to evaluate whether discovered co-expression modules are biologically
+# coherent (single-lineage) or mixed (cross-lineage).
+#
+# "Functional" markers (checkpoints, proliferation, broadly expressed) are
+# excluded from coherence scoring since they can legitimately appear in
+# any lineage.
+
+MARKER_LINEAGE_MAP: Dict[str, str] = {
+    # T cell lineage
+    "CD3E": "T cell",
+    "CD4": "T cell",
+    "CD8A": "T cell",
+    "CD45RO": "T cell",
+    "GranzymeB": "T cell",
+    # B cell lineage
+    "CD20": "B cell",
+    "CD45RA": "B cell",
+    # Myeloid lineage
+    "CD68": "Myeloid",
+    "CD163": "Myeloid",
+    "CD16": "Myeloid",
+    "CD11c": "Myeloid",
+    "HLA-DR": "Myeloid",
+    # Stromal / Mesenchymal
+    "alphaSMA": "Stromal",
+    "Vimentin": "Stromal",
+    # Epithelial
+    "PanCK": "Epithelial",
+    "E-Cadherin": "Epithelial",
+    "Beta-catenin": "Epithelial",
+    # Endothelial
+    "CD31": "Endothelial",
+    # Plasma cell
+    "CD138": "Plasma cell",
+}
+
+# Markers excluded from coherence scoring (legitimately cross-lineage)
+FUNCTIONAL_MARKERS: Set[str] = {
+    "CD45",       # Pan-immune
+    "PD-1",       # Checkpoint
+    "PD-L1",      # Checkpoint
+    "LAG-3",      # Checkpoint
+    "VISTA",      # Checkpoint
+    "Ki-67",      # Proliferation
+    "PCNA",       # Proliferation
+    "PTEN",       # Broadly expressed
+}
