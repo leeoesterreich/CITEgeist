@@ -65,6 +65,10 @@ def compress_to_achievable_7(
     """
     Map N discovered profiles → 7 achievable types via Jaccard similarity.
 
+    Discriminative markers (CD8A → CD8+ T cells, CD4 → CD4+ T cells) take
+    priority over Jaccard to avoid ties caused by shared T-cell markers
+    (CD3E, CD45RO).
+
     Multiple discovered profiles may map to same achievable type.
     This enables fair benchmarking while preserving discovery granularity.
 
@@ -74,10 +78,30 @@ def compress_to_achievable_7(
     Returns:
         Dict mapping profile names to achievable-7 cell type names
     """
+    # Discriminative markers that uniquely identify a cell type.
+    # Checked before Jaccard to resolve ambiguity (e.g. CD8A + CD3E + CD45RO).
+    DISCRIMINATIVE_MARKERS = {
+        "CD8A": "CD8+ T cells",
+        "CD4": "CD4+ T cells",
+    }
+
     profile_mapping = {}
 
     for profile_name, markers in discovered_profiles.items():
         marker_set = set(markers)
+
+        # Check discriminative markers first
+        disc_match = None
+        for disc_marker, celltype in DISCRIMINATIVE_MARKERS.items():
+            if disc_marker in marker_set:
+                disc_match = celltype
+                break
+
+        if disc_match is not None:
+            profile_mapping[profile_name] = disc_match
+            continue
+
+        # Fall through to Jaccard for all other profiles
         best_match = None
         best_jaccard = -1
 
