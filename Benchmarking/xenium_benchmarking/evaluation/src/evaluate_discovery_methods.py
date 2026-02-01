@@ -26,8 +26,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from esda.moran import Moran
-from libpysal.weights import KNN
+from scipy.spatial import cKDTree
 import scanpy as sc
 import sys
 
@@ -142,6 +141,36 @@ def detect_subtypes(
 # -- Metric 3: Spatial Coherence -------------------------------------------
 
 
+def _compute_morans_i(y: np.ndarray, coords: np.ndarray, k: int = 8, max_n: int = 10000, seed: int = 42) -> float:
+    """Compute Moran's I using cKDTree. Subsamples if n > max_n."""
+    n = len(y)
+    if n < 10 or np.std(y) < 1e-10:
+        return 0.0
+
+    if n > max_n:
+        rng = np.random.RandomState(seed)
+        idx = rng.choice(n, max_n, replace=False)
+        y = y[idx]
+        coords = coords[idx]
+        n = max_n
+
+    tree = cKDTree(coords)
+    _, indices = tree.query(coords, k=k + 1)
+    indices = indices[:, 1:]  # remove self
+
+    z = y - y.mean()
+    denom = np.sum(z ** 2)
+    if denom == 0:
+        return 0.0
+
+    # Vectorized Moran's I
+    neighbor_z = z[indices]  # (n, k)
+    num = np.sum(z[:, None] * neighbor_z)
+    S0 = n * k
+
+    return float((n / S0) * (num / denom))
+
+
 def compute_spatial_coherence(
     modules: List[List[str]],
     X: np.ndarray,
@@ -152,10 +181,12 @@ def compute_spatial_coherence(
     """
     Compute mean Moran's I across markers in each module.
 
+    Uses cKDTree for efficiency. Subsamples to 10K observations for
+    cell-resolution data to avoid O(n^2) weight matrix construction.
+
     Returns list of mean Moran's I values (one per module).
     """
     marker_to_idx = {m: i for i, m in enumerate(marker_names)}
-    w = KNN.from_array(coords, k=k)
 
     morans_per_module = []
     for module in modules:
@@ -166,11 +197,8 @@ def compute_spatial_coherence(
         morans_values = []
         for m in valid_markers:
             y = X[:, marker_to_idx[m]]
-            if np.std(y) < 1e-10:
-                morans_values.append(0.0)
-                continue
-            mi = Moran(y, w)
-            morans_values.append(mi.I)
+            mi = _compute_morans_i(y, coords, k=k)
+            morans_values.append(mi)
         morans_per_module.append(float(np.mean(morans_values)))
 
     return morans_per_module
