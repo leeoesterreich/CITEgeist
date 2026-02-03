@@ -121,6 +121,121 @@ class SpatialProgram:
 
 
 @dataclass
+class JointProgram:
+    """A spatial program discovered from joint analysis of all cell types."""
+
+    program_id: int
+    """Unique identifier for this program."""
+
+    top_genes: List[str]
+    """Top N genes by loading magnitude."""
+
+    gene_loadings: Dict[str, float]
+    """Gene name -> loading value for top genes."""
+
+    variance_explained: float
+    """Fraction of variance explained by this program."""
+
+    spatial_moran_i: float
+    """Moran's I spatial autocorrelation of program activity."""
+
+    spatial_moran_pvalue: float
+    """P-value for Moran's I test."""
+
+    mean_activity: float
+    """Mean program activity across all spots."""
+
+    active_spots_fraction: float
+    """Fraction of spots with above-median activity."""
+
+    cell_type_enrichments: Dict[str, float]
+    """Cell type -> enrichment score (correlation with proportions)."""
+
+    primary_cell_type: str
+    """Cell type with highest enrichment."""
+
+    secondary_cell_type: Optional[str]
+    """Second highest cell type if interaction program."""
+
+    interaction_score: float
+    """Score 0-1 indicating how multi-cell-type the program is (0=single, 1=balanced)."""
+
+    program_type: str
+    """'single_celltype', 'interaction', or 'microenvironment'."""
+
+
+@dataclass
+class JointDiscoveryResult:
+    """Results from joint program discovery across all cell types."""
+
+    programs: List[JointProgram]
+    """List of discovered programs with cell type assignments."""
+
+    W: NDArray[np.floating]
+    """Gene loadings matrix (n_genes, K_programs)."""
+
+    H: NDArray[np.floating]
+    """Program activities matrix (K_programs, n_spots)."""
+
+    gene_names: List[str]
+    """Gene names corresponding to W rows."""
+
+    cell_type_names: List[str]
+    """Cell types included in analysis."""
+
+    n_spots: int
+    """Number of spots analyzed."""
+
+    reconstruction_error: float
+    """NMF reconstruction error."""
+
+    H_by_celltype: Optional[Dict[str, NDArray]] = None
+    """Program activities split by cell type (from unstacking)."""
+
+    parameters: Dict[str, Any] = field(default_factory=dict)
+    """Parameters used for discovery."""
+
+    def summary(self) -> str:
+        """Return summary string."""
+        n_single = sum(1 for p in self.programs if p.program_type == "single_celltype")
+        n_interaction = sum(1 for p in self.programs if p.program_type == "interaction")
+        n_micro = sum(1 for p in self.programs if p.program_type == "microenvironment")
+
+        lines = [
+            "Joint Program Discovery Results",
+            "=" * 40,
+            f"Total programs: {len(self.programs)}",
+            f"  Single cell-type: {n_single}",
+            f"  Interaction: {n_interaction}",
+            f"  Microenvironment: {n_micro}",
+            f"Spots: {self.n_spots}",
+            f"Genes: {len(self.gene_names)}",
+            f"Cell types: {', '.join(self.cell_type_names)}",
+            f"Reconstruction error: {self.reconstruction_error:.4f}",
+        ]
+        return "\n".join(lines)
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Convert programs to DataFrame."""
+        records = []
+        for prog in self.programs:
+            records.append({
+                "program_id": prog.program_id,
+                "top_genes": ", ".join(prog.top_genes[:10]),
+                "variance_explained": prog.variance_explained,
+                "spatial_moran_i": prog.spatial_moran_i,
+                "spatial_moran_pvalue": prog.spatial_moran_pvalue,
+                "mean_activity": prog.mean_activity,
+                "active_spots_fraction": prog.active_spots_fraction,
+                "primary_cell_type": prog.primary_cell_type,
+                "secondary_cell_type": prog.secondary_cell_type,
+                "interaction_score": prog.interaction_score,
+                "program_type": prog.program_type,
+            })
+        return pd.DataFrame(records)
+
+
+@dataclass
 class AnchoredProgramResult:
     """Results from discovering programs anchored to a specific cell type."""
 
@@ -959,6 +1074,89 @@ def _get_celltype_weights(
     )
 
     return weights, mask
+
+
+def _assign_program_cell_types(
+    H: NDArray[np.floating],
+    cell_type_proportions: pd.DataFrame,
+    single_threshold: float = 0.7,
+    interaction_threshold: float = 0.25,
+) -> List[Dict[str, Any]]:
+    """
+    Assign cell type labels to joint programs based on correlation with proportions.
+
+    Args:
+        H: Program activities (K_programs, n_spots).
+        cell_type_proportions: Cell type proportions per spot (n_spots, n_celltypes).
+        single_threshold: Min enrichment for single cell-type classification.
+        interaction_threshold: Min enrichment for secondary cell type in interaction.
+
+    Returns:
+        List of dicts with cell type assignment info per program.
+    """
+    K_programs = H.shape[0]
+    cell_types = list(cell_type_proportions.columns)
+
+    results = []
+
+    for k in range(K_programs):
+        h_k = H[k, :]
+
+        # Compute correlation with each cell type's proportions
+        enrichments = {}
+        for ct in cell_types:
+            if ct == "Unknown":
+                continue
+            props = cell_type_proportions[ct].values
+            # Use Spearman correlation (rank-based, more robust)
+            if np.std(h_k) > 1e-10 and np.std(props) > 1e-10:
+                corr, _ = spearmanr(h_k, props)
+                enrichments[ct] = max(0, corr)  # Only positive correlations
+            else:
+                enrichments[ct] = 0.0
+
+        # Normalize to sum to 1
+        total = sum(enrichments.values())
+        if total > 0:
+            enrichments = {ct: v / total for ct, v in enrichments.items()}
+
+        # Sort by enrichment
+        sorted_cts = sorted(enrichments.items(), key=lambda x: x[1], reverse=True)
+
+        primary_ct = sorted_cts[0][0] if sorted_cts else "Unknown"
+        primary_score = sorted_cts[0][1] if sorted_cts else 0.0
+
+        secondary_ct = sorted_cts[1][0] if len(sorted_cts) > 1 else None
+        secondary_score = sorted_cts[1][1] if len(sorted_cts) > 1 else 0.0
+
+        # Compute interaction score: how balanced is the distribution?
+        # 0 = all in one cell type, 1 = perfectly balanced
+        if len(enrichments) > 1:
+            max_enrich = max(enrichments.values())
+            # Gini-like: 1 - (max / ideal_balanced)
+            ideal_balanced = 1.0 / len(enrichments)
+            interaction_score = 1.0 - (max_enrich - ideal_balanced) / (1.0 - ideal_balanced)
+            interaction_score = max(0, min(1, interaction_score))
+        else:
+            interaction_score = 0.0
+
+        # Classify program type
+        if primary_score >= single_threshold:
+            program_type = "single_celltype"
+        elif secondary_score >= interaction_threshold:
+            program_type = "interaction"
+        else:
+            program_type = "microenvironment"
+
+        results.append({
+            "cell_type_enrichments": enrichments,
+            "primary_cell_type": primary_ct,
+            "secondary_cell_type": secondary_ct if secondary_score >= interaction_threshold else None,
+            "interaction_score": interaction_score,
+            "program_type": program_type,
+        })
+
+    return results
 
 
 def _compute_spatial_moran_i(
