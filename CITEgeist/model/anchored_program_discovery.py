@@ -1079,6 +1079,7 @@ def _get_celltype_weights(
 def _assign_program_cell_types(
     H: NDArray[np.floating],
     cell_type_proportions: pd.DataFrame,
+    spot_names: Optional[List[str]] = None,
     single_threshold: float = 0.7,
     interaction_threshold: float = 0.25,
 ) -> List[Dict[str, Any]]:
@@ -1088,6 +1089,8 @@ def _assign_program_cell_types(
     Args:
         H: Program activities (K_programs, n_spots).
         cell_type_proportions: Cell type proportions per spot (n_spots, n_celltypes).
+        spot_names: Names of spots in H (used for alignment with proportions).
+            If None, assumes H and proportions have same order.
         single_threshold: Min enrichment for single cell-type classification.
         interaction_threshold: Min enrichment for secondary cell type in interaction.
 
@@ -1097,17 +1100,40 @@ def _assign_program_cell_types(
     K_programs = H.shape[0]
     cell_types = list(cell_type_proportions.columns)
 
+    # Handle spot alignment between H and proportions
+    if spot_names is not None:
+        # Find common spots between H and proportions
+        h_spots = pd.Index(spot_names)
+        prop_spots = cell_type_proportions.index
+        common_spots = h_spots.intersection(prop_spots)
+
+        if len(common_spots) == 0:
+            logger.warning("No common spots between H and proportions. Using all spots.")
+            h_indices = np.arange(H.shape[1])
+            prop_aligned = cell_type_proportions
+        else:
+            logger.info(f"Aligned {len(common_spots)} spots (H has {len(h_spots)}, proportions has {len(prop_spots)})")
+            # Get indices in H for common spots
+            h_indices = np.array([h_spots.get_loc(s) for s in common_spots])
+            # Align proportions to same order
+            prop_aligned = cell_type_proportions.loc[common_spots]
+    else:
+        # Assume same order
+        h_indices = np.arange(H.shape[1])
+        prop_aligned = cell_type_proportions
+
     results = []
 
     for k in range(K_programs):
-        h_k = H[k, :]
+        # Use only aligned spots
+        h_k = H[k, h_indices]
 
         # Compute correlation with each cell type's proportions
         enrichments = {}
         for ct in cell_types:
             if ct == "Unknown":
                 continue
-            props = cell_type_proportions[ct].values
+            props = prop_aligned[ct].values
             # Use Spearman correlation (rank-based, more robust)
             if np.std(h_k) > 1e-10 and np.std(props) > 1e-10:
                 corr, _ = spearmanr(h_k, props)
@@ -1844,7 +1870,9 @@ def discover_joint_programs(
     recon_error = np.mean((X_stacked - X_reconstructed) ** 2)
 
     # Assign cell types to programs
-    cell_type_assignments = _assign_program_cell_types(H, cell_type_proportions)
+    # Pass spot names to handle alignment between H (from adata) and proportions
+    spot_names = list(adata.obs_names)
+    cell_type_assignments = _assign_program_cell_types(H, cell_type_proportions, spot_names=spot_names)
 
     # Get spatial coordinates
     coords = adata.obsm.get("spatial", np.zeros((n_spots, 2)))
