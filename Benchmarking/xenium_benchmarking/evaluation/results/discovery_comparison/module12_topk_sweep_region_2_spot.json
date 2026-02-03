@@ -1,0 +1,121 @@
+{
+  "region_id": 2,
+  "resolution_level": "spot",
+  "n_observations": 1352,
+  "n_markers": 27,
+  "marker_names": [
+    "PD-1",
+    "VISTA",
+    "PD-L1",
+    "LAG-3",
+    "CD16",
+    "GranzymeB",
+    "CD163",
+    "CD4",
+    "CD20",
+    "CD8A",
+    "CD3E",
+    "CD138",
+    "HLA-DR",
+    "CD11c",
+    "CD68",
+    "CD45RA",
+    "PCNA",
+    "CD45RO",
+    "Ki-67",
+    "Beta-catenin",
+    "CD31",
+    "PTEN",
+    "PanCK",
+    "Vimentin",
+    "alphaSMA",
+    "CD45",
+    "E-Cadherin"
+  ],
+  "sweep_results": {
+    "2": {
+      "interesting_markers": [
+        "CD20",
+        "CD138",
+        "Ki-67",
+        "alphaSMA",
+        "Vimentin"
+      ],
+      "profiles": [
+        [
+          "CD20",
+          "CD138",
+          "Ki-67"
+        ],
+        [
+          "Vimentin",
+          "alphaSMA"
+        ]
+      ],
+      "singletons": [],
+      "top_k": 2
+    },
+    "3": {
+      "interesting_markers": [
+        "CD20",
+        "CD138",
+        "Ki-67",
+        "alphaSMA",
+        "Vimentin"
+      ],
+      "profiles": [
+        [
+          "CD20",
+          "CD138",
+          "Ki-67"
+        ],
+        [
+          "Vimentin",
+          "alphaSMA"
+        ]
+      ],
+      "singletons": [],
+      "top_k": 3
+    },
+    "4": {
+      "interesting_markers": [
+        "CD20",
+        "CD138",
+        "Ki-67",
+        "alphaSMA",
+        "Vimentin"
+      ],
+      "profiles": [
+        [
+          "CD20",
+          "CD138",
+          "Ki-67",
+          "Vimentin",
+          "alphaSMA"
+        ]
+      ],
+      "singletons": [],
+      "top_k": 4
+    },
+    "5": {
+      "interesting_markers": [
+        "CD20",
+        "CD138",
+        "Ki-67",
+        "alphaSMA",
+        "Vimentin"
+      ],
+      "profiles": [
+        [
+          "CD20",
+          "CD138",
+          "Ki-67",
+          "Vimentin",
+          "alphaSMA"
+        ]
+      ],
+      "singletons": [],
+      "top_k": 5
+    }
+  }
+}
