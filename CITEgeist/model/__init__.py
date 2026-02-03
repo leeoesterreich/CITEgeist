@@ -57,6 +57,10 @@ from .anchored_program_discovery import (
     analyze_program_regions,
     compare_programs_by_region,
     extract_program_context_genes,
+    # Module 4 Joint: Cross-cell-type program discovery
+    JointProgram,
+    JointDiscoveryResult,
+    discover_joint_programs,
 )
 
 # Module 5: Cross-sample integration
@@ -132,6 +136,10 @@ __all__ = [
     "analyze_program_regions",
     "compare_programs_by_region",
     "extract_program_context_genes",
+    # Module 4 Joint: Cross-cell-type program discovery
+    "JointProgram",
+    "JointDiscoveryResult",
+    "discover_joint_programs",
     # Module 5: Cross-sample integration
     "AlignedProgram",
     "ConservedRelationship",

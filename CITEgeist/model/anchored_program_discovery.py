@@ -1747,6 +1747,174 @@ def discover_anchored_programs(
     return result
 
 
+def discover_joint_programs(
+    adata: sc.AnnData,
+    cell_type_proportions: pd.DataFrame,
+    K_programs: int = 10,
+    layer_pattern: str = "_genes_pass1",
+    lambda_spatial: float = 0.1,
+    lambda_sparsity: float = 0.01,
+    top_n_genes: int = 50,
+    random_state: int = 42,
+) -> JointDiscoveryResult:
+    """
+    Discover spatial programs jointly across all cell types.
+
+    Unlike discover_anchored_programs which runs NMF per cell type, this function
+    stacks all deconvolved layers and runs a single NMF to find programs that
+    may span multiple cell types (e.g., tumor-immune interface programs).
+
+    Args:
+        adata: AnnData with deconvolved layers from Module 3.
+        cell_type_proportions: Module 3 output - cell type proportions per spot.
+        K_programs: Number of programs to discover.
+        layer_pattern: Pattern to identify deconvolved layers.
+        lambda_spatial: Spatial smoothness regularization (not yet implemented).
+        lambda_sparsity: Sparsity regularization via NMF alpha.
+        top_n_genes: Number of top genes to report per program.
+        random_state: Random seed.
+
+    Returns:
+        JointDiscoveryResult with programs and cell type assignments.
+    """
+    logger.info("Starting JOINT program discovery across all cell types")
+
+    # Stack deconvolved layers
+    stacked_adata = stack_deconvolved_layers(
+        adata,
+        layer_pattern=layer_pattern,
+    )
+
+    # Get stacked expression matrix
+    if scipy.sparse.issparse(stacked_adata.X):
+        X_stacked = stacked_adata.X.toarray()
+    else:
+        X_stacked = np.array(stacked_adata.X)
+
+    # Ensure non-negative
+    X_stacked = np.maximum(X_stacked, 0)
+
+    gene_names = list(stacked_adata.var_names)
+    cell_type_names = list(stacked_adata.obs["cell_type"].unique())
+    n_spots = adata.shape[0]
+    n_genes = len(gene_names)
+
+    logger.info(f"Stacked data: {X_stacked.shape[0]} rows ({n_spots} spots x {len(cell_type_names)} cell types)")
+    logger.info(f"Discovering {K_programs} joint programs")
+
+    # Run NMF on stacked data
+    # X_stacked is (n_spots * n_celltypes, n_genes)
+    # NMF: X ≈ W @ H where W is (n_samples, K), H is (K, n_features)
+    nmf = NMF(
+        n_components=K_programs,
+        init="nndsvda",
+        random_state=random_state,
+        max_iter=500,
+        alpha_W=lambda_sparsity,
+        alpha_H=0.0,
+        l1_ratio=0.5,
+    )
+
+    # W_stacked: (n_spots * n_celltypes, K) - activities per stacked row
+    # H_nmf: (K, n_genes) - gene loadings
+    W_stacked = nmf.fit_transform(X_stacked)
+    H_nmf = nmf.components_
+
+    # We want:
+    # W = gene loadings (n_genes, K)
+    # H = spot activities (K, n_spots)
+    W = H_nmf.T  # (n_genes, K)
+
+    # Unstack W_stacked to get per-cell-type activities
+    # W_stacked is (n_spots * n_celltypes, K)
+    H_by_celltype = {}
+    for ct_idx, cell_type in enumerate(cell_type_names):
+        start_idx = ct_idx * n_spots
+        end_idx = (ct_idx + 1) * n_spots
+        H_by_celltype[cell_type] = W_stacked[start_idx:end_idx, :].T  # (K, n_spots)
+
+    # Average across cell types for overall spot activity
+    H = np.zeros((K_programs, n_spots))
+    for ct_H in H_by_celltype.values():
+        H += ct_H
+    H /= len(H_by_celltype)
+
+    # Compute reconstruction error
+    X_reconstructed = W_stacked @ H_nmf
+    recon_error = np.mean((X_stacked - X_reconstructed) ** 2)
+
+    # Assign cell types to programs
+    cell_type_assignments = _assign_program_cell_types(H, cell_type_proportions)
+
+    # Get spatial coordinates
+    coords = adata.obsm.get("spatial", np.zeros((n_spots, 2)))
+
+    # Build JointProgram objects
+    programs = []
+    total_var = np.var(X_stacked)
+
+    for k in range(K_programs):
+        # Top genes
+        loadings = W[:, k]
+        top_indices = np.argsort(loadings)[::-1][:top_n_genes]
+        top_genes = [gene_names[i] for i in top_indices]
+        gene_loadings = {gene_names[i]: float(loadings[i]) for i in top_indices}
+
+        # Variance explained
+        program_var = np.var(H[k, :]) * np.sum(loadings ** 2)
+        var_explained = program_var / total_var if total_var > 0 else 0
+
+        # Spatial Moran's I
+        moran_i, moran_p = _compute_spatial_moran_i(H[k, :], coords, k=8, n_permutations=99)
+
+        # Activity stats
+        mean_activity = float(np.mean(H[k, :]))
+        median_activity = float(np.median(H[k, :]))
+        active_fraction = float(np.mean(H[k, :] > median_activity))
+
+        # Cell type assignment
+        ct_info = cell_type_assignments[k]
+
+        programs.append(JointProgram(
+            program_id=k,
+            top_genes=top_genes,
+            gene_loadings=gene_loadings,
+            variance_explained=var_explained,
+            spatial_moran_i=moran_i,
+            spatial_moran_pvalue=moran_p,
+            mean_activity=mean_activity,
+            active_spots_fraction=active_fraction,
+            cell_type_enrichments=ct_info["cell_type_enrichments"],
+            primary_cell_type=ct_info["primary_cell_type"],
+            secondary_cell_type=ct_info["secondary_cell_type"],
+            interaction_score=ct_info["interaction_score"],
+            program_type=ct_info["program_type"],
+        ))
+
+    logger.info(f"Discovered {len(programs)} joint programs")
+    logger.info(f"  Single cell-type: {sum(1 for p in programs if p.program_type == 'single_celltype')}")
+    logger.info(f"  Interaction: {sum(1 for p in programs if p.program_type == 'interaction')}")
+    logger.info(f"  Microenvironment: {sum(1 for p in programs if p.program_type == 'microenvironment')}")
+
+    return JointDiscoveryResult(
+        programs=programs,
+        W=W,
+        H=H,
+        gene_names=gene_names,
+        cell_type_names=cell_type_names,
+        n_spots=n_spots,
+        reconstruction_error=recon_error,
+        H_by_celltype=H_by_celltype,
+        parameters={
+            "K_programs": K_programs,
+            "layer_pattern": layer_pattern,
+            "lambda_spatial": lambda_spatial,
+            "lambda_sparsity": lambda_sparsity,
+            "random_state": random_state,
+        },
+    )
+
+
 def store_results_in_adata(
     adata,
     result: AnchoredProgramDiscoveryResult,
