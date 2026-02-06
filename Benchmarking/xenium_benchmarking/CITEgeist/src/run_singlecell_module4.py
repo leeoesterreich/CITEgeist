@@ -22,7 +22,6 @@ import pandas as pd
 import scanpy as sc
 from scipy.spatial import cKDTree
 from sklearn.decomposition import NMF
-from sklearn.preprocessing import normalize
 
 # Add paths
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent

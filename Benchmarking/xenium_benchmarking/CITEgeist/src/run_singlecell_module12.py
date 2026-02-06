@@ -14,9 +14,8 @@ import argparse
 import json
 import logging
 import sys
-from dataclasses import asdict
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -102,7 +101,7 @@ def run_module1(
     coords: np.ndarray,
     marker_names: List[str],
     output_dir: Path,
-) -> Dict:
+) -> Tuple[Dict, Any]:
     """Run Module 1: Marker Interest Detection."""
     logger.info("=" * 70)
     logger.info("MODULE 1: Marker Interest Detection")
