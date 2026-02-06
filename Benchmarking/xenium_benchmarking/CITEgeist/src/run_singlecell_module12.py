@@ -193,18 +193,18 @@ def run_module2(
         colocalization_result=coloc_result,
     )
 
-    # Save raw profiles
+    # Save raw profiles (profiles is a List[List[str]])
     raw_profiles = {
-        name: {"markers": list(markers)}
-        for name, markers in profile_result.profiles.items()
+        f"Profile_{i}": {"markers": list(markers)}
+        for i, markers in enumerate(profile_result.profiles)
     }
     with open(output_dir / "module2b_profiles_raw.json", "w") as f:
         json.dump(raw_profiles, f, indent=2)
 
     # Module 2c: Profile selection
     logger.info("Module 2c: Profile Selection")
-    # Convert profiles dict to list format for select_profiles
-    profiles_list = [list(markers) for markers in profile_result.profiles.values()]
+    # profiles is already a list of lists
+    profiles_list = [list(markers) for markers in profile_result.profiles]
     selection_result = select_profiles(
         X=X_filtered,
         coords=coords,

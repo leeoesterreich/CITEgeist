@@ -1,0 +1,79 @@
+2026-02-06 11:40:43,825 - __main__ - INFO - Loading QUADRANT 2
+2026-02-06 11:40:43,838 - load_xenium_singlecell - INFO - Loading Xenium single-cell data from /ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma
+2026-02-06 11:40:43,838 - load_xenium - INFO - Loading Xenium data from /ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma
+2026-02-06 11:40:45,306 - load_xenium - INFO - Loaded matrix: 465534 cells x 543 features
+2026-02-06 11:40:45,681 - load_xenium - INFO - Loaded cell metadata: 465534 cells
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2026-02-06 11:40:45,927 - load_xenium - INFO - Final shape after filtering: (465534, 543)
+2026-02-06 11:40:45,931 - load_xenium_singlecell - INFO - Loaded 465534 cells × 543 features
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2026-02-06 11:40:45,935 - load_xenium_singlecell - INFO - After subsampling: 1000 cells
+2026-02-06 11:40:45,935 - load_xenium - INFO - Splitting: 405 genes, 27 proteins
+2026-02-06 11:40:45,938 - load_xenium_singlecell - INFO - GEX: 1000 cells × 405 genes
+2026-02-06 11:40:45,938 - load_xenium_singlecell - INFO - Protein: 1000 cells × 27 proteins
+2026-02-06 11:40:45,940 - load_xenium_singlecell - INFO - Loading Xenium single-cell data from /ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma
+2026-02-06 11:40:45,940 - load_xenium - INFO - Loading Xenium data from /ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma
+2026-02-06 11:40:47,089 - load_xenium - INFO - Loaded matrix: 465534 cells x 543 features
+2026-02-06 11:40:47,250 - load_xenium - INFO - Loaded cell metadata: 465534 cells
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2026-02-06 11:40:47,483 - load_xenium - INFO - Final shape after filtering: (465534, 543)
+2026-02-06 11:40:47,488 - load_xenium_singlecell - INFO - Loaded 465534 cells × 543 features
+2026-02-06 11:40:47,488 - load_xenium_singlecell - INFO - Using custom region bounds: x=[43.4, 5757.1], y=[2897.1, 5784.7]
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/lib/python3.10/site-packages/anndata/_core/anndata.py:1758: UserWarning: Variable names are not unique. To make them unique, call `.var_names_make_unique`.
+  utils.warn_names_duplicates("var")
+2026-02-06 11:40:47,504 - load_xenium_singlecell - INFO - After region subsetting: 103093 cells
+2026-02-06 11:40:47,505 - load_xenium - INFO - Splitting: 405 genes, 27 proteins
+2026-02-06 11:40:47,541 - load_xenium_singlecell - INFO - GEX: 103093 cells × 405 genes
+2026-02-06 11:40:47,541 - load_xenium_singlecell - INFO - Protein: 103093 cells × 27 proteins
+2026-02-06 11:40:47,541 - __main__ - INFO - Loaded 103,093 cells × 405 genes
+2026-02-06 11:40:47,541 - __main__ - INFO - Proteins: ['PD-1', 'VISTA', 'PD-L1', 'LAG-3', 'CD16', 'GranzymeB', 'CD163', 'CD4', 'CD20', 'CD8A', 'CD3E', 'CD138', 'HLA-DR', 'CD11c', 'CD68', 'CD45RA', 'PCNA', 'CD45RO', 'Ki-67', 'Beta-catenin', 'CD31', 'PTEN', 'PanCK', 'Vimentin', 'alphaSMA', 'CD45', 'E-Cadherin']
+2026-02-06 11:40:47,567 - __main__ - INFO - ======================================================================
+2026-02-06 11:40:47,567 - __main__ - INFO - MODULE 1: Marker Interest Detection
+2026-02-06 11:40:47,567 - __main__ - INFO - ======================================================================
+2026-02-06 11:40:47,568 - root - INFO - Analyzing 27 markers across 103093 spots
+2026-02-06 11:40:47,568 - root - INFO - Computing kurtosis for each marker...
+2026-02-06 11:40:47,596 - root - INFO - Fitting GMM to separate signal/noise per marker...
+2026-02-06 11:41:25,885 - root - INFO - Applying spatial smoothing (k=6 neighbors)...
+2026-02-06 11:41:26,476 - root - INFO - Computing Moran's I on smoothed data (k=15, 199 permutations)...
+2026-02-06 11:41:58,162 - root - INFO - Found 27/27 interesting markers (kurtosis_only=0, morans_only=1, both=26)
+2026-02-06 11:41:58,221 - __main__ - INFO - Interesting markers: 27/27
+2026-02-06 11:41:58,221 - __main__ - INFO - Markers: ['GranzymeB', 'CD163', 'CD138', 'PanCK', 'CD16', 'CD20', 'Ki-67', 'LAG-3', 'CD45RA', 'PD-L1', 'CD3E', 'CD11c', 'CD4', 'Beta-catenin', 'CD68', 'HLA-DR', 'PD-1', 'CD31', 'CD8A', 'VISTA', 'CD45RO', 'PCNA', 'alphaSMA', 'E-Cadherin', 'PTEN', 'Vimentin', 'CD45']
+2026-02-06 11:41:58,221 - __main__ - INFO - ======================================================================
+2026-02-06 11:41:58,221 - __main__ - INFO - MODULE 2: Profile Discovery
+2026-02-06 11:41:58,221 - __main__ - INFO - ======================================================================
+2026-02-06 11:41:58,227 - __main__ - INFO - Module 2a: Colocalization Analysis
+2026-02-06 11:41:58,232 - root - INFO - Analyzing colocalization for 27 markers (351 pairs) across 103093 spots
+2026-02-06 11:41:58,232 - root - INFO - Building 15-NN neighbor graph...
+2026-02-06 11:41:58,628 - root - INFO - Applying spatial smoothing (k=6 neighbors) for bivariate Moran's I...
+2026-02-06 11:41:59,466 - root - INFO - Binarizing markers at 75.0th percentile...
+2026-02-06 11:41:59,506 - root - INFO - Computing pairwise colocalization (continuous metrics)...
+2026-02-06 11:41:59,506 - root - INFO - Running parallel colocalization analysis with 64 workers...
+2026-02-06 11:41:59,506 - root - INFO - Building multi-scale neighbor graphs (k=[6, 12, 24, 48, 64])...
+2026-02-06 11:42:02,432 - root - INFO - Multi-scale aggregation method: max
+2026-02-06 14:21:54,988 - root - INFO - Processed 351/351 pairs
+2026-02-06 14:21:55,070 - root - INFO - Highly specific markers (Gini > 0.6): ['GranzymeB', 'CD138', 'PanCK', 'Ki-67', 'LAG-3']...
+2026-02-06 14:21:55,071 - root - INFO - Top colocalization: CD45RO <-> CD45 (score=0.858)
+2026-02-06 14:21:55,266 - __main__ - INFO - Module 2b: Profile Discovery
+2026-02-06 14:21:55,266 - root - INFO - Discovering profiles (continuous weighting) from 351 marker pairs...
+2026-02-06 14:21:55,266 - root - INFO - Distance metric: colocalization_score, top_k: 5
+2026-02-06 14:21:55,267 - root - INFO - Distance matrix: min=0.142, median=0.474, max=0.570
+2026-02-06 14:21:55,267 - root - INFO - Mutual top-5 masking: 44/351 pairs kept (specificity-weighted: True)
+2026-02-06 14:21:55,268 - root - INFO - Linkage: 26 merges, distances [0.142 ... 1.000]
+2026-02-06 14:21:55,268 - root - INFO - Gap analysis: 1 lineages
+2026-02-06 14:21:55,268 - root - INFO -   Lineage 1 (27 markers): ['GranzymeB', 'CD163', 'CD138', 'PanCK', 'CD16', 'CD20', 'Ki-67', 'LAG-3', 'CD45RA', 'PD-L1', 'CD3E', 'CD11c', 'CD4', 'Beta-catenin', 'CD68', 'HLA-DR', 'PD-1', 'CD31', 'CD8A', 'VISTA', 'CD45RO', 'PCNA', 'alphaSMA', 'E-Cadherin', 'PTEN', 'Vimentin', 'CD45']
+2026-02-06 14:21:55,279 - root - INFO - Discovered 7 profiles, modularity = 0.066
+2026-02-06 14:21:55,279 - root - INFO - Discovered 7 profiles: 5 multi-marker, 2 singletons
+Profile sizes: [6, 6, 6, 4, 3, 1, 1]
+Modularity: 0.066
+Significant edges: 258
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/singlecell-demonstration/Benchmarking/xenium_benchmarking/CITEgeist/src/run_singlecell_module12.py", line 320, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/singlecell-demonstration/Benchmarking/xenium_benchmarking/CITEgeist/src/run_singlecell_module12.py", line 296, in main
+    module2_output = run_module2(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/singlecell-demonstration/Benchmarking/xenium_benchmarking/CITEgeist/src/run_singlecell_module12.py", line 199, in run_module2
+    for name, markers in profile_result.profiles.items()
+AttributeError: 'list' object has no attribute 'items'
