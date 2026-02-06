@@ -162,8 +162,6 @@ def run_module2(
     coords: np.ndarray,
     marker_names: List[str],
     interesting_markers: List[str],
-    signal_masks: np.ndarray,
-    signal_mask_names: List[str],
     output_dir: Path,
 ) -> Dict:
     """Run Module 2: Profile Discovery."""
@@ -181,11 +179,8 @@ def run_module2(
         X=X_filtered,
         coords=coords,
         marker_names=interesting_markers,
-        signal_masks=signal_masks,
-        signal_mask_marker_names=signal_mask_names,
         neighbor_k=15,  # More neighbors at single-cell resolution
-        n_perm=199,
-        n_jobs=8,
+        n_permutations=199,
     )
 
     # Save colocalization results
@@ -196,13 +191,6 @@ def run_module2(
     logger.info("Module 2b: Profile Discovery")
     profile_result = discover_profiles_continuous(
         colocalization_result=coloc_result,
-        X=X_filtered,
-        coords=coords,
-        marker_names=interesting_markers,
-        signal_masks=signal_masks,
-        signal_mask_marker_names=signal_mask_names,
-        min_cluster_size=2,
-        bivariate_pvalue_threshold=0.05,
     )
 
     # Save raw profiles
@@ -215,25 +203,30 @@ def run_module2(
 
     # Module 2c: Profile selection
     logger.info("Module 2c: Profile Selection")
-    selected_profiles = select_profiles(
-        profile_result=profile_result,
+    # Convert profiles dict to list format for select_profiles
+    profiles_list = [list(markers) for markers in profile_result.profiles.values()]
+    selection_result = select_profiles(
         X=X_filtered,
+        coords=coords,
         marker_names=interesting_markers,
+        profiles=profiles_list,
+        interesting_markers=interesting_markers,
+        colocalization_result=coloc_result,
         max_profiles=10,
-        min_reconstruction_improvement=0.01,
     )
 
-    # Save selected profiles
+    # Save selected profiles (convert list of lists to named dict)
+    selected_profiles = selection_result.selected_profiles
     selected_output = {
-        name: {"markers": list(markers)}
-        for name, markers in selected_profiles.items()
+        f"Profile_{i}": {"markers": list(markers)}
+        for i, markers in enumerate(selected_profiles)
     }
     with open(output_dir / "module2c_profiles_selected.json", "w") as f:
         json.dump(selected_output, f, indent=2)
 
     logger.info(f"Discovered {len(selected_profiles)} profiles:")
-    for name, markers in selected_profiles.items():
-        logger.info(f"  {name}: {list(markers)}")
+    for i, markers in enumerate(selected_profiles):
+        logger.info(f"  Profile_{i}: {list(markers)}")
 
     return {
         "n_profiles_raw": len(profile_result.profiles),
@@ -305,8 +298,6 @@ def main():
         coords=coords,
         marker_names=marker_names,
         interesting_markers=module1_result.interesting_markers,
-        signal_masks=module1_result.signal_masks,
-        signal_mask_names=module1_result.signal_mask_marker_names,
         output_dir=output_dir,
     )
 
