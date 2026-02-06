@@ -20,7 +20,8 @@ echo "Started: $(date)"
 echo "=========================================="
 
 # Load environment
-module load python/ondemand-jupyter-python3.11
+source /ihome/crc/install/miniconda3-24.1.2/etc/profile.d/conda.sh
+conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
 
 # Change to script directory
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/singlecell-demonstration/Benchmarking/xenium_benchmarking/CITEgeist/src

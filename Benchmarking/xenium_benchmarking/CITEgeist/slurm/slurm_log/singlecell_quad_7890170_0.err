@@ -1,0 +1,8 @@
+
+The following have been reloaded with a version change:
+  1) python/ondemand-jupyter-python3.8 => python/ondemand-jupyter-python3.11
+
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/.worktrees/singlecell-demonstration/Benchmarking/xenium_benchmarking/CITEgeist/src/run_singlecell_module12.py", line 22, in <module>
+    import scanpy as sc
+ModuleNotFoundError: No module named 'scanpy'
