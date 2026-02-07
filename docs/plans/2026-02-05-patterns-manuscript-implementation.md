@@ -275,8 +275,12 @@ manuscript/
       - Figure 4: Spatial Programs (Module 4)
       - Figure 5: Cross-Sample Integration (Module 5 + PyDESeq2 volcano)
       - Figure 6: Interoperability
-- [ ] Task 3.1: Introduction draft
-- [ ] Task 3.2: Results draft
-- [ ] Task 3.3: Discussion draft
+- [x] Task 3.1: Introduction draft ✅ (2026-02-06)
+- [x] Task 3.2: Results draft ✅ (2026-02-06)
+- [x] Task 3.3: Discussion draft ✅ (2026-02-06)
+- [x] Methods section ✅ (2026-02-06)
+- [x] Figure legends ✅ (2026-02-06)
 - [ ] Internal review
 - [ ] Final submission draft
+
+**Manuscript file**: `manuscript/CITEgeist_Patterns_v4.md` (~4,900 words)
