@@ -9,56 +9,62 @@
 
 ### Task 1.1: Xenium Module 4 Full Demonstration
 **Priority**: HIGH (blocks Figure 4)
-**Estimated compute**: ~2-4 hours on GPU node
+**Status**: ✅ COMPLETE
 
-**Steps**:
-1. Load Xenium single-cell data with Module 1-2 outputs
-2. Run Module 4 `discover_programs_from_layers()` for each cell type anchor
-3. Compute Moran's I for spatial coherence validation
-4. Run Module 4b bivariate relationships
-5. Save outputs to `Benchmarking/xenium_benchmarking/CITEgeist/output_module4_singlecell/`
+**Existing outputs** in `Benchmarking/xenium_benchmarking/CITEgeist/output_module4_validation/singlecell/`:
+- 5 regions processed
+- 7 cell types: CD8+ T, CD4+ T, Fibroblasts, Macrophages, Endothelial, B cells, Epithelial
+- 5 programs per cell type (175 total)
+- Moran's I validation complete (range: 0.04-0.37, programs with I>0.2 indicate spatial coherence)
+- Module 5 integration: 27 aligned programs, 207 conserved relationships
 
-**Input**:
-- Xenium data: `Benchmarking/xenium_pseudovisium/data/`
-- Module 1-2 outputs: Already run on Xenium
+**Key results**:
+| Cell Type | Best Moran's I | Example Genes |
+|-----------|----------------|---------------|
+| Fibroblasts | 0.367 | HLA-DRA, FCGR3A, HLA-DRB1 |
+| Endothelial | 0.277 | HLA-DRA, HLA-DRB1, PTPRC |
+| CD4+ T | 0.263 | VIM, CD3E, PTEN, ACTA2 |
+| CD8+ T | 0.260 | VIM, CXCL6, PTEN, VCAN |
 
-**Output**:
-- Program W matrices (gene loadings)
-- Program H matrices (spot/cell loadings)
-- Moran's I statistics per program
-- Top genes per program
-- Bivariate relationship matrix
-
-**Script location**: `Benchmarking/xenium_benchmarking/CITEgeist/src/run_module4_xenium.py`
-**SLURM script**: `Benchmarking/xenium_benchmarking/CITEgeist/slurm/run_module4_xenium.sh`
+**No further computation needed** - ready for Figure 4 generation.
 
 ---
 
 ### Task 1.2: Module 5 PyDESeq2 Analysis
 **Priority**: HIGH (blocks Figure 5)
-**Estimated compute**: ~1-2 hours
+**Status**: ✅ COMPLETE
+**Executed**: 2026-02-06
 
-**Steps**:
-1. Load Module 5 outputs (`output/module5_integration/`)
-2. Identify responder-enriched vs progressor-enriched programs
-3. For each patient sample:
-   - Stratify spots by program enrichment (top 25% vs bottom 25%)
-   - Extract raw counts from deconvolved layers
-4. Run PyDESeq2 comparing responder-high vs progressor-high spots
-5. Run pathway analysis (GSEApy) on DE genes
-6. Save results
+**Approach** (pseudo-bulk aggregation):
+1. Aggregate deconvolved gene expression within each of 14 samples (pseudo-bulk)
+2. Compare responder samples (P1, P5: 5 samples) vs progressor samples (P2-P4, P6: 9 samples)
+3. Run PyDESeq2 differential expression with 8 CPUs
+4. Pathway enrichment with GSEApy (KEGG, GO, MSigDB Hallmark)
 
-**Input**:
-- Module 5: `output/module5_integration/module5_response_analysis.json`
-- Patient data: Deconvolved layers from Module 3
+**Key Results**:
+| Metric | Value |
+|--------|-------|
+| Genes tested | 13,371 |
+| Significant (padj<0.05) | 127 |
+| Responder-enriched | 5 |
+| Progressor-enriched | 122 |
 
-**Output**:
-- DE gene lists (responder vs progressor program spots)
-- Pathway enrichment results
-- Summary statistics
+**Top Progressor-Enriched Genes** (negative log2FC = higher in progressors):
+- SLC37A2, MMP13, BNC2, ARRDC4, ACAA2, ADAMTS4, MLKL
 
-**Script location**: `examples/run_module5_pydeseq.py`
-**SLURM script**: `examples/sbatch_module5_pydeseq.sh`
+**Pathway Enrichment**:
+- 6 GO BP pathways for responder-up genes
+- 7 GO BP pathways for progressor-up genes
+- 1 MSigDB Hallmark pathway for progressor-up genes
+
+**Output** (`examples/output_module5_pydeseq/`):
+- `pseudobulk_de_results.csv` - All DE genes
+- `pseudobulk_*_enrichment.csv` - Pathway enrichment files
+- `module5_pydeseq_summary.json` - Summary statistics
+
+**Scripts**:
+- `examples/run_module5_pydeseq_pseudobulk.py` ✅
+- `examples/sbatch_module5_pydeseq_pseudobulk.sh` ✅
 
 ---
 
@@ -66,19 +72,22 @@
 
 ### Task 2.1: Figure 1 - Pipeline Overview
 **Priority**: MEDIUM
+**Status**: ✅ COMPLETE
 **Dependencies**: None
 
 **Panels**:
-- A: Module flow schematic (draw in Python/matplotlib or external tool)
+- A: Module flow schematic
 - B: Spatial operations highlight
 - C: Resolution flexibility diagram
 
-**Script**: `manuscript/figures/generate_figure1.py`
+**Script**: `manuscript/figures/generate_figure1.py` ✅
+**Output**: `manuscript/figures/output/figure1_pipeline_overview.pdf`
 
 ---
 
 ### Task 2.2: Figure 2 - Modules 1-2 Profile Discovery
 **Priority**: MEDIUM
+**Status**: ✅ COMPLETE
 **Dependencies**: Xenium Module 1-2 outputs (already exist)
 
 **Panels**:
@@ -87,12 +96,14 @@
 - C: Xenium single-cell workflow
 - D: Discovered vs known markers comparison
 
-**Script**: `manuscript/figures/generate_figure2.py`
+**Script**: `manuscript/figures/generate_figure2.py` ✅
+**Output**: `manuscript/figures/output/figure2_profile_discovery.pdf`
 
 ---
 
 ### Task 2.3: Figure 3 - Benchmarking
 **Priority**: MEDIUM
+**Status**: ✅ COMPLETE
 **Dependencies**: Existing benchmark results
 
 **Panels**:
@@ -101,12 +112,14 @@
 - C: Spatial proportion visualization
 
 **Data source**: `Benchmarking/xenium_benchmarking/evaluation/results/`
-**Script**: `manuscript/figures/generate_figure3.py`
+**Script**: `manuscript/figures/generate_figure3.py` ✅
+**Output**: `manuscript/figures/output/figure3_benchmarking.pdf`
 
 ---
 
 ### Task 2.4: Figure 4 - Module 4 Programs
 **Priority**: HIGH
+**Status**: ✅ COMPLETE
 **Dependencies**: Task 1.1 (Xenium Module 4)
 
 **Panels**:
@@ -116,27 +129,31 @@
 - D: Xenium single-cell programs (spatial plots)
 - E: Bivariate relationships (heatmap)
 
-**Script**: `manuscript/figures/generate_figure4.py`
+**Script**: `manuscript/figures/generate_figure4.py` ✅
+**Output**: `manuscript/figures/output/figure4_module4_programs.pdf`
 
 ---
 
 ### Task 2.5: Figure 5 - Module 5 Integration
 **Priority**: HIGH
+**Status**: ✅ COMPLETE
 **Dependencies**: Task 1.2 (PyDESeq2)
 
 **Panels**:
 - A: Integration schematic
-- B: UMAP of aligned programs
-- C: Responder vs progressor bar plot
-- D: PyDESeq2 volcano plot / pathway results
-- E: Conserved relationship network
+- B: UMAP of aligned programs (590 programs colored by cell type)
+- C: Responder vs progressor bar plot (3 resp-enriched, 4 prog-enriched)
+- D: PyDESeq2 volcano plot (127 sig genes, 5 resp-up, 122 prog-up)
+- E: Conserved relationship network (191 relationships)
 
-**Script**: `manuscript/figures/generate_figure5.py`
+**Script**: `manuscript/figures/generate_figure5.py` ✅
+**Output**: `manuscript/figures/output/figure5_integration.pdf`
 
 ---
 
 ### Task 2.6: Figure 6 - Interoperability
 **Priority**: MEDIUM
+**Status**: ✅ COMPLETE
 **Dependencies**: Existing vignette outputs
 
 **Panels**:
@@ -144,7 +161,8 @@
 - B: Midkine discovery summary
 - C: Wet lab validation (condensed)
 
-**Script**: `manuscript/figures/generate_figure6.py`
+**Script**: `manuscript/figures/generate_figure6.py` ✅
+**Output**: `manuscript/figures/output/figure6_interoperability.pdf`
 
 ---
 
@@ -248,9 +266,15 @@ manuscript/
 
 ## Checkpoints
 
-- [ ] Task 1.1: Xenium Module 4 complete
-- [ ] Task 1.2: PyDESeq2 analysis complete
-- [ ] Task 2.1-2.6: All figures generated
+- [x] Task 1.1: Xenium Module 4 complete ✅ (outputs exist in output_module4_validation/singlecell/)
+- [x] Task 1.2: PyDESeq2 analysis complete ✅ (127 DE genes, pseudo-bulk approach)
+- [x] Task 2.1-2.6: All figures generated ✅ (2026-02-06)
+      - Figure 1: Pipeline Overview
+      - Figure 2: Profile Discovery (Modules 1-2)
+      - Figure 3: Benchmarking
+      - Figure 4: Spatial Programs (Module 4)
+      - Figure 5: Cross-Sample Integration (Module 5 + PyDESeq2 volcano)
+      - Figure 6: Interoperability
 - [ ] Task 3.1: Introduction draft
 - [ ] Task 3.2: Results draft
 - [ ] Task 3.3: Discussion draft
