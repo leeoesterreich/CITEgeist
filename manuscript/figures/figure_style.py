@@ -81,8 +81,8 @@ def apply_style():
     Font sizes are set to minimum 10pt for readability in print.
     """
     plt.rcParams.update({
-        # Font settings
-        'font.family': 'Arial',
+        # Font settings (DejaVu Sans is universally available, similar to Arial)
+        'font.family': 'sans-serif',
         'font.size': 10,
         'axes.labelsize': 10,
         'axes.titlesize': 11,
