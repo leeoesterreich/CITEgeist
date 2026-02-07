@@ -164,18 +164,24 @@ def evaluate_region(
     pred_path = None
     sample_name = f"{prefix}_region_{region_id}"
 
-    # Pattern 1: New unified format (in subdirectory)
-    candidate = pred_dir / sample_name / f"{sample_name}_deconv_predictions.csv"
+    # Pattern 1: Finetuned format at top level (preferred for proportions)
+    candidate = pred_dir / f"{sample_name}_cell_prop_finetuned_results.csv"
     if candidate.exists():
         pred_path = candidate
 
-    # Pattern 2: Old finetuned format
+    # Pattern 2: Finetuned format in subdirectory
     if pred_path is None:
-        candidate = pred_dir / f"{sample_name}_cell_prop_finetuned_results.csv"
+        candidate = pred_dir / sample_name / f"{sample_name}_cell_prop_finetuned_results.csv"
         if candidate.exists():
             pred_path = candidate
 
-    # Pattern 3: Old global format
+    # Pattern 3: Deconv predictions format (in subdirectory)
+    if pred_path is None:
+        candidate = pred_dir / sample_name / f"{sample_name}_deconv_predictions.csv"
+        if candidate.exists():
+            pred_path = candidate
+
+    # Pattern 4: Global format at top level
     if pred_path is None:
         candidate = pred_dir / f"{sample_name}_cell_prop_global_results.csv"
         if candidate.exists():
@@ -185,6 +191,21 @@ def evaluate_region(
         raise FileNotFoundError(f"Predictions not found in {pred_dir}")
 
     pred_df = pd.read_csv(pred_path, index_col=0)
+
+    # Normalize column names (R's make.names replaces +/spaces with dots)
+    col_rename = {
+        "CD4..T.cells": "CD4+ T cells",
+        "CD8..T.cells": "CD8+ T cells",
+        "B.cells": "B cells",
+    }
+    pred_df = pred_df.rename(columns=col_rename)
+
+    # Normalize to proportions if predictions are cell counts (e.g. Tangram)
+    row_sums = pred_df.select_dtypes(include=[np.number]).sum(axis=1)
+    if row_sums.max() > 1.5:  # Not already proportions
+        logger.info("Normalizing predictions to proportions (detected cell counts)")
+        numeric_cols = pred_df.select_dtypes(include=[np.number]).columns
+        pred_df[numeric_cols] = pred_df[numeric_cols].div(row_sums, axis=0)
 
     # Align spots
     common_spots = pred_df.index.intersection(gt_df.index)

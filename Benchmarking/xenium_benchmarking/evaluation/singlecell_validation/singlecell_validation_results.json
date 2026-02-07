@@ -1,0 +1,260 @@
+{
+  "n_cells": 465534,
+  "n_proteins": 27,
+  "proteins": [
+    "PD-1",
+    "VISTA",
+    "PD-L1",
+    "LAG-3",
+    "CD16",
+    "GranzymeB",
+    "CD163",
+    "CD4",
+    "CD20",
+    "CD8A",
+    "CD3E",
+    "CD138",
+    "HLA-DR",
+    "CD11c",
+    "CD68",
+    "CD45RA",
+    "PCNA",
+    "CD45RO",
+    "Ki-67",
+    "Beta-catenin",
+    "CD31",
+    "PTEN",
+    "PanCK",
+    "Vimentin",
+    "alphaSMA",
+    "CD45",
+    "E-Cadherin"
+  ],
+  "thresholds": {
+    "PD-1": 53.39980244496254,
+    "VISTA": 66.73083155736907,
+    "PD-L1": 21.491522438602814,
+    "LAG-3": 160.07298907005688,
+    "CD16": 86.7153288130274,
+    "GranzymeB": 93.26959230911177,
+    "CD163": 91.55770186787142,
+    "CD4": 124.28752766299357,
+    "CD20": 152.43105928874596,
+    "CD8A": 148.80037380187235,
+    "CD3E": 181.1293631372951,
+    "CD138": 74.88666897621738,
+    "HLA-DR": 206.80486373992682,
+    "CD11c": 39.95464683666692,
+    "CD68": 287.91159585826546,
+    "CD45RA": 170.4240461246558,
+    "PCNA": 82.4795916010434,
+    "CD45RO": 41.036989894585815,
+    "Ki-67": 121.06907882502271,
+    "Beta-catenin": 29.27147341311941,
+    "CD31": 85.16609047684578,
+    "PTEN": 184.18876137574324,
+    "PanCK": 131.00061361841645,
+    "Vimentin": 339.6789658399945,
+    "alphaSMA": 61.860124343044944,
+    "CD45": 165.2882100160741,
+    "E-Cadherin": 52.47450583069744
+  },
+  "coexpression_analysis": [
+    {
+      "marker1": "Vimentin",
+      "marker2": "E-Cadherin",
+      "n_cells": 465534,
+      "n_double_positive": 39675,
+      "n_single_positive_1": 57981,
+      "n_single_positive_2": 57847,
+      "n_double_negative": 310031,
+      "frac_double_positive": 0.085224709688229,
+      "pearson_r": 0.36973108809123506,
+      "pearson_p": 0.0,
+      "odds_ratio": 3.667376638112529,
+      "contingency": [
+        [
+          39675,
+          57847
+        ],
+        [
+          57981,
+          310031
+        ]
+      ],
+      "expected": "co-express",
+      "description": "EMT cells"
+    },
+    {
+      "marker1": "PanCK",
+      "marker2": "E-Cadherin",
+      "n_cells": 465534,
+      "n_double_positive": 1621,
+      "n_single_positive_1": 5199,
+      "n_single_positive_2": 95901,
+      "n_double_negative": 362813,
+      "frac_double_positive": 0.0034820227953275165,
+      "pearson_r": 0.06531738459363072,
+      "pearson_p": 0.0,
+      "odds_ratio": 1.1795677805360043,
+      "contingency": [
+        [
+          1621,
+          95901
+        ],
+        [
+          5199,
+          362813
+        ]
+      ],
+      "expected": "independent",
+      "description": "Epithelial definition"
+    },
+    {
+      "marker1": "alphaSMA",
+      "marker2": "Vimentin",
+      "n_cells": 465534,
+      "n_double_positive": 28022,
+      "n_single_positive_1": 20625,
+      "n_single_positive_2": 69634,
+      "n_double_negative": 347253,
+      "frac_double_positive": 0.06019324045075118,
+      "pearson_r": 0.4058255451789822,
+      "pearson_p": 0.0,
+      "odds_ratio": 6.775320353066591,
+      "contingency": [
+        [
+          28022,
+          69634
+        ],
+        [
+          20625,
+          347253
+        ]
+      ],
+      "expected": "co-express",
+      "description": "Fibroblasts"
+    },
+    {
+      "marker1": "CD68",
+      "marker2": "CD16",
+      "n_cells": 465534,
+      "n_double_positive": 31406,
+      "n_single_positive_1": 27874,
+      "n_single_positive_2": 19786,
+      "n_double_negative": 386468,
+      "frac_double_positive": 0.06746231209750524,
+      "pearson_r": 0.7440802928344725,
+      "pearson_p": 0.0,
+      "odds_ratio": 22.00740646992235,
+      "contingency": [
+        [
+          31406,
+          19786
+        ],
+        [
+          27874,
+          386468
+        ]
+      ],
+      "expected": "co-express",
+      "description": "Macrophages"
+    },
+    {
+      "marker1": "CD20",
+      "marker2": "CD45RA",
+      "n_cells": 465534,
+      "n_double_positive": 22391,
+      "n_single_positive_1": 1225,
+      "n_single_positive_2": 15929,
+      "n_double_negative": 425989,
+      "frac_double_positive": 0.048097453676852815,
+      "pearson_r": 0.7448785671886884,
+      "pearson_p": 0.0,
+      "odds_ratio": 488.81806952955424,
+      "contingency": [
+        [
+          22391,
+          15929
+        ],
+        [
+          1225,
+          425989
+        ]
+      ],
+      "expected": "co-express",
+      "description": "B cells"
+    },
+    {
+      "marker1": "CD3E",
+      "marker2": "CD45RO",
+      "n_cells": 465534,
+      "n_double_positive": 49315,
+      "n_single_positive_1": 76680,
+      "n_single_positive_2": 5572,
+      "n_double_negative": 333967,
+      "frac_double_positive": 0.10593211236988061,
+      "pearson_r": 0.6360161264101496,
+      "pearson_p": 0.0,
+      "odds_ratio": 38.54689313868767,
+      "contingency": [
+        [
+          49315,
+          5572
+        ],
+        [
+          76680,
+          333967
+        ]
+      ],
+      "expected": "co-express",
+      "description": "T cells"
+    },
+    {
+      "marker1": "CD8A",
+      "marker2": "PD-1",
+      "n_cells": 465534,
+      "n_double_positive": 22514,
+      "n_single_positive_1": 58427,
+      "n_single_positive_2": 1576,
+      "n_double_negative": 383017,
+      "frac_double_positive": 0.048361666387417464,
+      "pearson_r": 0.6309500573844818,
+      "pearson_p": 0.0,
+      "odds_ratio": 93.64851750611226,
+      "contingency": [
+        [
+          22514,
+          1576
+        ],
+        [
+          58427,
+          383017
+        ]
+      ],
+      "expected": "co-express",
+      "description": "Exhausted T"
+    }
+  ],
+  "emt_validation": {
+    "n_emt_cells": 39675,
+    "frac_emt_cells": 0.085224709688229,
+    "n_vimentin_only": 57981,
+    "n_ecadherin_only": 57847,
+    "spatial_coherence_emt": 2.715883875739645,
+    "spatial_coherence_vim_only": 1.4110613006612847,
+    "spatial_coherence_ecad_only": 1.4347343284755458
+  },
+  "misclassification_analysis": {
+    "emt_classified_as_fibroblast": 18043,
+    "emt_classified_as_epithelial": 1094,
+    "total_emt": 39675,
+    "pct_emt_as_fibroblast": 45.477000630119726,
+    "pct_emt_as_epithelial": 2.757403906742281
+  },
+  "soft_assignment_analysis": {
+    "autodiscovery_total_score_variance": 4.286294105511054,
+    "artificial_total_score_variance": 3.3987279254299354,
+    "variance_ratio": 1.2611465817667187
+  }
+}

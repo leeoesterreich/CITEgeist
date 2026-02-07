@@ -271,10 +271,15 @@ manuscript/
 - [x] Task 2.1-2.6: All figures generated ✅ (2026-02-06)
       - Figure 1: Pipeline Overview
       - Figure 2: Profile Discovery (Modules 1-2)
-      - Figure 3: Benchmarking
-      - Figure 4: Spatial Programs (Module 4)
-      - Figure 5: Cross-Sample Integration (Module 5 + PyDESeq2 volcano)
-      - Figure 6: Interoperability
+      - Figure 3: Benchmarking (with deconvolution schematic)
+      - Figure 4: Spatial Programs (Module 4, with NMF schematic)
+      - Figure 5: Cross-Sample Integration (Module 5 + PyDESeq2 volcano, with integration schematic)
+      - Figure 6: Interoperability (simplified, ER model removed)
+- [x] Task 2.7: Placeholder panels fixed ✅ (2026-02-06)
+      - Figure 3A: Deconvolution schematic (two-pass process)
+      - Figure 4A: NMF program discovery schematic
+      - Figure 5A: Cross-sample integration workflow
+      - Figure 6: Removed ER saturation model panels
 - [x] Task 3.1: Introduction draft ✅ (2026-02-06)
 - [x] Task 3.2: Results draft ✅ (2026-02-06)
 - [x] Task 3.3: Discussion draft ✅ (2026-02-06)
@@ -284,3 +289,4 @@ manuscript/
 - [ ] Final submission draft
 
 **Manuscript file**: `manuscript/CITEgeist_Patterns_v4.md` (~4,900 words)
+**Figures file**: `manuscript/CITEgeist_Patterns_v4_Figures.md`

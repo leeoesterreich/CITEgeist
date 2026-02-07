@@ -37,7 +37,7 @@ from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
     discover_hierarchical_profiles,
-    discover_profiles,  # For comparison
+    discover_profiles_continuous,  # Default - more robust than FDR-based
 )
 
 logging.basicConfig(
@@ -273,15 +273,13 @@ def run_simulated_hierarchical_benchmark(
     flat_result = None
     if run_comparison:
         logger.info("-" * 60)
-        logger.info("COMPARISON: Flat Profile Discovery")
+        logger.info("COMPARISON: Flat Profile Discovery (continuous weighting)")
         logger.info("-" * 60)
 
-        flat_result = discover_profiles(
+        flat_result = discover_profiles_continuous(
             colocalization_result=coloc_result,
-            fdr_alpha=0.05,
             top_k=3,
-            use_triangle_assembly=False,
-            pvalue_source="bivariate_morans",
+            distance_metric="colocalization_score",
         )
         logger.info(flat_result.summary())
 

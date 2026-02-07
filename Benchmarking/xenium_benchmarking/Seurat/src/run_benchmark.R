@@ -57,6 +57,10 @@ ref_cell_types <- read.csv(opt$`ref-cell-types`, row.names=1, check.names=FALSE)
 cat(sprintf("  Reference counts: %d genes x %d cells\n", nrow(ref_counts), ncol(ref_counts)))
 cat(sprintf("  Cell types: %s\n", paste(unique(ref_cell_types$cell_type), collapse=", ")))
 
+# Seurat replaces _ with - internally, which can create duplicates.
+# Apply the same conversion first, then deduplicate.
+rownames(ref_counts) <- make.unique(gsub("_", "-", rownames(ref_counts)))
+
 # Create Reference Seurat object
 cat("Creating Reference Seurat object...\n")
 ref_seurat <- CreateSeuratObject(

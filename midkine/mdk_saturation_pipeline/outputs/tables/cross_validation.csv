@@ -1,0 +1,6 @@
+check,description,metric,threshold,passed
+opposite_expression,Chaperones show opposite regulation in MCF7 vs T47D,3/7 genes,>=3 genes,True
+binding_expression_correlation,Binding changes correlate with expression changes,3/5 genes,>=50%,True
+mcf7_saturated,MCF7 has higher ER occupancy than T47D,"MCF7=3.0%, T47D=0.9%",MCF7 > T47D and MCF7 > 2%,True
+foxa1_kd_derepression,FOXA1-KD increases chaperone expression (derepression),4/7 genes UP,>=3 genes UP,True
+er_kd_derepression,ER-KD increases chaperone expression (confirms ER represses),6/7 genes UP,>=3 genes UP,True

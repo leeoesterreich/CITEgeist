@@ -192,3 +192,102 @@ _archive_duplicates/
 
 # Git worktrees
 .worktrees/
+
+# ============================================
+# Large files exclusions (GitHub LFS threshold: 100MB)
+# ============================================
+
+# Checkpoint files
+checkpoints/
+*.npz
+
+# Raw data downloads (GEO, etc.)
+*.tar
+*.tar.gz
+
+# Large CSV outputs (deconvolved layers)
+*_layer_pass1.csv
+*_layer_pass2.csv
+
+# Gurobi model files
+*.mps
+*.lp
+*.sol
+
+# Reference data (downloaded from GEO, too large for git)
+Benchmarking/xenium_benchmarking/reference_data/GSE*/processed*/
+Benchmarking/xenium_benchmarking/reference_data/GSE*/raw/
+
+# Simulation replicates (generated data)
+replicates/
+
+# Large output directories
+output/
+CITEgeist/examples/output*/
+examples/output*/
+
+# Midkine raw data (GEO downloads)
+midkine/*.tar
+midkine/*.gz
+midkine/*.bedgraph.gz
+midkine/GSE*_RAW*
+
+# ============================================
+# Tool and cache directories
+# ============================================
+
+# Claude Code
+.claude/
+.claude-home/
+
+# npm cache
+.npm-cache/
+
+# SLURM logs (transient)
+slurm_log/
+*/slurm_log/
+**/slurm_log/
+
+# scResolve outputs (large intermediate files)
+Benchmarking/*/scResolve/
+scResolve/
+
+# Test results (generated outputs)
+test_results/
+test_results_*/
+test_validation_output/
+
+# Model archives
+model_archive/
+
+# HDF5 data files
+*.h5
+
+# Session and log files
+*.session
+*.session.*
+merged_config.toml*
+
+# Benchmark output directories (regenerable)
+Benchmarking/xenium_benchmarking/*/output*/
+Benchmarking/xenium_benchmarking/*/reference_model*/
+Benchmarking/simulation_benchmarking/*/output*/
+
+# Numpy checkpoint files
+*.npy
+
+# Parquet files (large outputs)
+*.parquet
+
+# Prism files (GraphPad)
+*.prism
+
+# Word documents (use markdown source)
+*.docx
+
+# Keep figures but exclude certain patterns
+# (figures/*.png are kept for manuscript)
+
+# Large annotation files
+Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_annotations.csv
+Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_scores.csv

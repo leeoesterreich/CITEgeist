@@ -19,6 +19,7 @@ import matplotlib.patches as mpatches
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
+from adjustText import adjust_text
 
 # Import shared style
 from figure_style import apply_style, PALETTE, CELL_TYPE_COLORS, get_cell_type_color
@@ -213,12 +214,17 @@ def panel_d_volcano(ax):
 
     ax.axhline(-np.log10(0.05), color=PALETTE['neutral'], linestyle='--', lw=0.8, alpha=0.7)
 
-    # Label top genes
+    # Label top genes with adjustText to avoid overlaps
+    texts = []
     for subset, n in [('prog', 5), ('resp', 3)]:
         top = de[de['cat'] == subset].nsmallest(n, 'padj')
         for _, row in top.iterrows():
-            ax.annotate(row.name, (row['log2FoldChange'], row['neg_log10_padj']),
+            t = ax.text(row['log2FoldChange'], row['neg_log10_padj'], row.name,
                        fontsize=9, ha='center', va='bottom')
+            texts.append(t)
+
+    adjust_text(texts, ax=ax, arrowprops=dict(arrowstyle='-', color='gray', lw=0.5),
+                expand_points=(1.5, 1.5), force_text=(0.8, 0.8))
 
     ax.set_xlabel("log2 Fold Change", fontsize=10)
     ax.set_ylabel("-log10(p-adj)", fontsize=10)

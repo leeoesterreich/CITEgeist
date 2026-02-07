@@ -1,0 +1,284 @@
+{
+  "n_regions": 5,
+  "total_spots": 7054,
+  "proportion_metrics": {
+    "JSD_median": {
+      "mean": 0.629922432964894,
+      "std": 0.01744606785596854,
+      "values": [
+        0.6430270365373751,
+        0.6229153323857257,
+        0.6257647695630384,
+        0.6542687991435475,
+        0.603636227194783
+      ]
+    },
+    "RMSE_global": {
+      "mean": 0.19283839587322973,
+      "std": 0.008905106651148893,
+      "values": [
+        0.19071866795314021,
+        0.18249704783291287,
+        0.19128855728894276,
+        0.20944887875118554,
+        0.1902388275399672
+      ]
+    },
+    "MAE_global": {
+      "mean": 0.11889589618171167,
+      "std": 0.004304720868536464,
+      "values": [
+        0.12019708446409991,
+        0.11428738347153547,
+        0.11893984137987443,
+        0.12620186439628348,
+        0.11485330719676508
+      ]
+    },
+    "Pearson_r": {
+      "mean": 0.24658358862996285,
+      "std": 0.04024515534927422,
+      "values": [
+        0.2214881173111482,
+        0.2843559266717586,
+        0.21825448522559193,
+        0.20382909760640497,
+        0.3049903163349106
+      ]
+    }
+  },
+  "gex_metrics": {
+    "RMSE_mean": {
+      "mean": 0.6701457072870968,
+      "std": 0.014083501979677967,
+      "values": [
+        0.6490588616745633,
+        0.6638679863776537,
+        0.67805089752733,
+        0.6685653422233463,
+        0.6911854486325906
+      ]
+    },
+    "NRMSE_mean": {
+      "mean": 0.11678858093987055,
+      "std": 0.004644622523579775,
+      "values": [
+        0.10881321669641082,
+        0.11667749504677609,
+        0.12275748399775219,
+        0.11606213593353287,
+        0.11963257302488073
+      ]
+    },
+    "MAE_mean": {
+      "mean": 0.20112150318393168,
+      "std": 0.005353767685229,
+      "values": [
+        0.1953689680752428,
+        0.19857032387810358,
+        0.19761583689826706,
+        0.2037327505223346,
+        0.21031963654571034
+      ]
+    },
+    "Pearson_r_mean": {
+      "mean": 0.0668671404726387,
+      "std": 0.011890893604836906,
+      "values": [
+        0.06253018620848036,
+        0.05662170606589614,
+        0.05546726017605512,
+        0.07225261147415588,
+        0.08746393843860598
+      ]
+    }
+  },
+  "timing": {
+    "total_seconds": 1029.8379769325256,
+    "total_minutes": 17.16396628220876,
+    "per_region": {
+      "0": 138.8575415611267,
+      "1": 128.21841883659363,
+      "2": 274.5913453102112,
+      "3": 300.57505464553833,
+      "4": 187.5956165790558
+    }
+  },
+  "regions": [
+    {
+      "region_id": 0,
+      "sample_name": "Xenium_region_0",
+      "timings": {
+        "preprocessing": 0.01723790168762207,
+        "proportions": 103.2639832496643,
+        "expression": 35.376319885253906,
+        "module4": 0.20000052452087402
+      },
+      "metrics": {
+        "proportions": {
+          "JSD_median": 0.6430270365373751,
+          "RMSE_global": 0.19071866795314021,
+          "MAE_global": 0.12019708446409991,
+          "Pearson_r": 0.2214881173111482
+        },
+        "gex": {
+          "RMSE_mean": 0.6490588616745633,
+          "RMSE_median": 0.682970315778046,
+          "NRMSE_mean": 0.10881321669641082,
+          "MAE_mean": 0.1953689680752428,
+          "Pearson_r_mean": 0.06253018620848036,
+          "n_cell_types": 10
+        }
+      },
+      "n_spots": 1407,
+      "n_genes_raw": 405,
+      "n_proteins": 27,
+      "n_genes_filtered": 395,
+      "module4": {
+        "error": "too many values to unpack (expected 2)"
+      },
+      "output_dir": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_0",
+      "total_time": 138.8575415611267
+    },
+    {
+      "region_id": 1,
+      "sample_name": "Xenium_region_1",
+      "timings": {
+        "preprocessing": 0.018720388412475586,
+        "proportions": 93.32179999351501,
+        "expression": 34.695727586746216,
+        "module4": 0.18217086791992188
+      },
+      "metrics": {
+        "proportions": {
+          "JSD_median": 0.6229153323857257,
+          "RMSE_global": 0.18249704783291287,
+          "MAE_global": 0.11428738347153547,
+          "Pearson_r": 0.2843559266717586
+        },
+        "gex": {
+          "RMSE_mean": 0.6638679863776537,
+          "RMSE_median": 0.7667793109758907,
+          "NRMSE_mean": 0.11667749504677609,
+          "MAE_mean": 0.19857032387810358,
+          "Pearson_r_mean": 0.05662170606589614,
+          "n_cell_types": 10
+        }
+      },
+      "n_spots": 1417,
+      "n_genes_raw": 405,
+      "n_proteins": 27,
+      "n_genes_filtered": 392,
+      "module4": {
+        "error": "too many values to unpack (expected 2)"
+      },
+      "output_dir": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_1",
+      "total_time": 128.21841883659363
+    },
+    {
+      "region_id": 2,
+      "sample_name": "Xenium_region_2",
+      "timings": {
+        "preprocessing": 0.038884878158569336,
+        "proportions": 207.4650273323059,
+        "expression": 66.27203583717346,
+        "module4": 0.8153972625732422
+      },
+      "metrics": {
+        "proportions": {
+          "JSD_median": 0.6257647695630384,
+          "RMSE_global": 0.19128855728894276,
+          "MAE_global": 0.11893984137987443,
+          "Pearson_r": 0.21825448522559193
+        },
+        "gex": {
+          "RMSE_mean": 0.67805089752733,
+          "RMSE_median": 0.7329453186375279,
+          "NRMSE_mean": 0.12275748399775219,
+          "MAE_mean": 0.19761583689826706,
+          "Pearson_r_mean": 0.05546726017605512,
+          "n_cell_types": 10
+        }
+      },
+      "n_spots": 1352,
+      "n_genes_raw": 405,
+      "n_proteins": 27,
+      "n_genes_filtered": 396,
+      "module4": {
+        "error": "too many values to unpack (expected 2)"
+      },
+      "output_dir": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_2",
+      "total_time": 274.5913453102112
+    },
+    {
+      "region_id": 3,
+      "sample_name": "Xenium_region_3",
+      "timings": {
+        "preprocessing": 0.04731416702270508,
+        "proportions": 224.57748556137085,
+        "expression": 75.10181045532227,
+        "module4": 0.8484444618225098
+      },
+      "metrics": {
+        "proportions": {
+          "JSD_median": 0.6542687991435475,
+          "RMSE_global": 0.20944887875118554,
+          "MAE_global": 0.12620186439628348,
+          "Pearson_r": 0.20382909760640497
+        },
+        "gex": {
+          "RMSE_mean": 0.6685653422233463,
+          "RMSE_median": 0.7143284179049243,
+          "NRMSE_mean": 0.11606213593353287,
+          "MAE_mean": 0.2037327505223346,
+          "Pearson_r_mean": 0.07225261147415588,
+          "n_cell_types": 10
+        }
+      },
+      "n_spots": 1464,
+      "n_genes_raw": 405,
+      "n_proteins": 27,
+      "n_genes_filtered": 400,
+      "module4": {
+        "error": "too many values to unpack (expected 2)"
+      },
+      "output_dir": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_3",
+      "total_time": 300.57505464553833
+    },
+    {
+      "region_id": 4,
+      "sample_name": "Xenium_region_4",
+      "timings": {
+        "preprocessing": 0.0468447208404541,
+        "proportions": 113.89253211021423,
+        "expression": 72.82196474075317,
+        "module4": 0.8342750072479248
+      },
+      "metrics": {
+        "proportions": {
+          "JSD_median": 0.603636227194783,
+          "RMSE_global": 0.1902388275399672,
+          "MAE_global": 0.11485330719676508,
+          "Pearson_r": 0.3049903163349106
+        },
+        "gex": {
+          "RMSE_mean": 0.6911854486325906,
+          "RMSE_median": 0.7099706187622636,
+          "NRMSE_mean": 0.11963257302488073,
+          "MAE_mean": 0.21031963654571034,
+          "Pearson_r_mean": 0.08746393843860598,
+          "n_cell_types": 10
+        }
+      },
+      "n_spots": 1414,
+      "n_genes_raw": 405,
+      "n_proteins": 27,
+      "n_genes_filtered": 399,
+      "module4": {
+        "error": "too many values to unpack (expected 2)"
+      },
+      "output_dir": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/output/Xenium_region_4",
+      "total_time": 187.5956165790558
+    }
+  ]
+}

@@ -83,9 +83,9 @@
 ![Figure 6](figures/output/figure6_interoperability.png)
 
 **Legend:**
-(A) Workflow diagram showing CITEgeist outputs feeding into standard bioinformatics tools. Cell type-specific expression layers enable PyDESeq2 differential expression within populations. Program gene loadings enable GSEApy/Enrichr pathway enrichment. Spatial neighbor graphs and proportions enable COMMOT and CellPhoneDB cell-cell communication analysis. All outputs in standard AnnData/CSV formats compatible with scanpy workflows.
-(B) Midkine (MDK) discovery summary. Previous analysis of this cohort using COMMOT on CITEgeist outputs identified midkine as a potential mediator of estrogen receptor signaling in the tumor microenvironment. Spatial ligand-receptor analysis revealed MDK-SDC2 interactions enriched in macrophage-cancer interfaces.
-(C) Wet lab validation summary. Computational predictions from CITEgeist analysis were validated through: (1) bulk RNA-seq confirming expression patterns, (2) ChIP-seq confirming ER binding at predicted loci, (3) published gene signatures confirming pathway associations. This demonstrates that CITEgeist's interpretable outputs enable hypothesis generation suitable for experimental follow-up. Extended validation details in Supplementary Note 1.
+(A) Workflow diagram showing CITEgeist outputs feeding into standard bioinformatics tools. Cell type proportions and deconvolved GEX layers (Module 3) enable PyDESeq2 differential expression within cell populations. Spatial programs (Module 4) enable GSEApy/Enrichr pathway enrichment. Program relationships (Module 5) enable network analysis with COMMOT and CellPhoneDB. All outputs in standard AnnData/CSV/Parquet formats compatible with scanpy workflows.
+(B) Example application demonstrating the discovery-to-validation workflow. CITEgeist analysis (Modules 1-5) produces spatial programs that feed into downstream bioinformatics tools (PyDESeq2, GSEA, COMMOT), generating biological hypotheses for experimental validation. Demonstrated capabilities include: 3 responder-enriched and 4 progressor-enriched aligned programs (Module 5), 127 significant differentially expressed genes between responders and progressors, ECM organization and EMT pathway enrichment in progressors, and spatially-resolved ligand-receptor interactions via COMMOT.
+(C) Output format compatibility table. CITEgeist exports all results in standard formats: cell type proportions (CSV, AnnData), deconvolved GEX layers (h5ad, parquet), spatial programs (CSV, AnnData with gene loadings and H matrices), bivariate relationships (CSV, JSON), and spatial coordinates (AnnData.obsm). Compatible with scanpy, seaborn, PyDESeq2, GSEA tools, networkx, Cytoscape, squidpy, and COMMOT.
 
 ---
 
@@ -97,6 +97,5 @@
 - **Figure S2**: Per-cell-type benchmarking breakdown
 - **Figure S3**: Parameter sensitivity analysis (lambda regularization)
 - **Figure S4**: Per-sample Module 4 programs
-- **Figure S5**: Extended midkine mechanism (ER saturation model)
-- **Figure S6**: Complete wet lab validation data
+- **Figure S5**: Extended differential expression and pathway analysis
 

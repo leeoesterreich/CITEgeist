@@ -1,0 +1,953 @@
+{
+  "CITEgeist": [
+    {
+      "pearson_r": 0.1840973450302663,
+      "rmse": 4.791200039938669,
+      "mae": 2.912512330607128,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "B cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.2036315439833902,
+      "rmse": 4.891774641716558,
+      "mae": 3.041258861327997,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "CD4+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.41682147827843935,
+      "rmse": 4.484598201185383,
+      "mae": 2.6206807179244813,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "CD8+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.5219441420539295,
+      "rmse": 4.064577238155584,
+      "mae": 2.2203090782408634,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "Macrophages",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.4787223336984786,
+      "rmse": 4.132793331687481,
+      "mae": 2.2977314151374713,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "Endothelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.38569977612973017,
+      "rmse": 4.384912117039732,
+      "mae": 2.515836469296964,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "Epithelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.586158995487467,
+      "rmse": 3.705172138087312,
+      "mae": 1.9101151849532265,
+      "n_genes": 395,
+      "n_spots": 1407,
+      "cell_type": "Fibroblasts",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.052896026759417604,
+      "rmse": 4.893384962830976,
+      "mae": 3.0440044838870643,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "B cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.18227183461557825,
+      "rmse": 4.934568373834271,
+      "mae": 3.1181815679294917,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "CD4+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.4623114917937017,
+      "rmse": 4.388496729096035,
+      "mae": 2.5546278515133585,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "CD8+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.570180321684384,
+      "rmse": 3.9062944224739793,
+      "mae": 2.102270799909032,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "Macrophages",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.4889744507144828,
+      "rmse": 4.131311755973542,
+      "mae": 2.32425711224921,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "Endothelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.4432111053970425,
+      "rmse": 4.187680855114311,
+      "mae": 2.357282600728315,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "Epithelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.6185485767641588,
+      "rmse": 3.6231939915719664,
+      "mae": 1.8621054062923743,
+      "n_genes": 392,
+      "n_spots": 1417,
+      "cell_type": "Fibroblasts",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.19810433384551027,
+      "rmse": 4.840866658893377,
+      "mae": 2.990018926065295,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "B cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.30951824414281265,
+      "rmse": 4.852481861585057,
+      "mae": 3.0454426533385845,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "CD4+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.4769042910558443,
+      "rmse": 4.394585029953866,
+      "mae": 2.569740066734181,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "CD8+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.5767523744621272,
+      "rmse": 3.910800168191748,
+      "mae": 2.096551857846933,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "Macrophages",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.4272233394929227,
+      "rmse": 4.390118697376406,
+      "mae": 2.5686517761007903,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "Endothelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.4448398161477658,
+      "rmse": 4.219156358833229,
+      "mae": 2.378728941787099,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "Epithelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.5299558275678043,
+      "rmse": 3.9704319186559687,
+      "mae": 2.178156487682798,
+      "n_genes": 396,
+      "n_spots": 1352,
+      "cell_type": "Fibroblasts",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.228976034146827,
+      "rmse": 4.815513852645635,
+      "mae": 3.010990373343675,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "B cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.28671302203910204,
+      "rmse": 4.870910709745025,
+      "mae": 3.128663170054362,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "CD4+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.47147614216740297,
+      "rmse": 4.4074975650128145,
+      "mae": 2.6803747000387883,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "CD8+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.6178374569132846,
+      "rmse": 3.7975710859574967,
+      "mae": 2.038802707786326,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "Macrophages",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.36086413774841375,
+      "rmse": 4.5801847683621935,
+      "mae": 2.8177550842751478,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "Endothelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.39881682038584326,
+      "rmse": 4.378422844194948,
+      "mae": 2.585569170649935,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "Epithelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.5203203691304886,
+      "rmse": 3.9258073758196623,
+      "mae": 2.1851642311693857,
+      "n_genes": 400,
+      "n_spots": 1464,
+      "cell_type": "Fibroblasts",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.2665008116104815,
+      "rmse": 4.793011795201959,
+      "mae": 2.988385695210083,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "B cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.28018416732197804,
+      "rmse": 4.950370032347729,
+      "mae": 3.218318150221163,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "CD4+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.4549290859961538,
+      "rmse": 4.517174042189664,
+      "mae": 2.790036493860798,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "CD8+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.6055665624880947,
+      "rmse": 3.865152636481053,
+      "mae": 2.099211524342133,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "Macrophages",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.364167762555749,
+      "rmse": 4.6167029663406005,
+      "mae": 2.8598526669738735,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "Endothelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.33449618502374134,
+      "rmse": 4.584009834668879,
+      "mae": 2.7908180906474236,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "Epithelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.5462792129993872,
+      "rmse": 3.9096457912405564,
+      "mae": 2.1762558000642005,
+      "n_genes": 399,
+      "n_spots": 1414,
+      "cell_type": "Fibroblasts",
+      "region_id": 4
+    }
+  ],
+  "Cell2Location": [
+    {
+      "pearson_r": 0.14352470716130072,
+      "rmse": 5.938354918144123,
+      "mae": 4.390747746178676,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "B cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.21010241510754396,
+      "rmse": 5.629993586469776,
+      "mae": 4.1368580870043,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "CD4+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.45975918029040935,
+      "rmse": 4.829458868431706,
+      "mae": 3.2893251697357058,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "CD8+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.5658525911032377,
+      "rmse": 4.141630033907056,
+      "mae": 2.6250088066382453,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "Macrophages",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.5285851215864441,
+      "rmse": 4.368474286527078,
+      "mae": 2.844251568552301,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "Endothelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.3654931546834817,
+      "rmse": 5.105157745283785,
+      "mae": 3.5577532310536992,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "Epithelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.5691777239819981,
+      "rmse": 3.988568049860444,
+      "mae": 2.581730575388388,
+      "n_genes": 180,
+      "n_spots": 1407,
+      "cell_type": "Fibroblasts",
+      "region_id": 0
+    },
+    {
+      "pearson_r": 0.04013540592681925,
+      "rmse": 6.075589936946856,
+      "mae": 4.609121142887436,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "B cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.18693419584390022,
+      "rmse": 5.666723747263632,
+      "mae": 4.20822309925873,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "CD4+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.5095161984526283,
+      "rmse": 4.5592058783963285,
+      "mae": 3.0731979754615746,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "CD8+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.6057134112778505,
+      "rmse": 3.839416129082752,
+      "mae": 2.4083921820604397,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "Macrophages",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.519456487324456,
+      "rmse": 4.377121884032436,
+      "mae": 2.870962598625223,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "Endothelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.41233805748496033,
+      "rmse": 4.828497149853345,
+      "mae": 3.3402300330632477,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "Epithelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.5900830621961296,
+      "rmse": 3.896649767518967,
+      "mae": 2.4857624696948646,
+      "n_genes": 180,
+      "n_spots": 1417,
+      "cell_type": "Fibroblasts",
+      "region_id": 1
+    },
+    {
+      "pearson_r": 0.1525578286611917,
+      "rmse": 5.988922460339541,
+      "mae": 4.4588948988759105,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "B cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.3096918152834274,
+      "rmse": 5.341340289159959,
+      "mae": 3.8140515480276616,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "CD4+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.5101577077624638,
+      "rmse": 4.483611903304355,
+      "mae": 2.9594903710017193,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "CD8+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.6232877033844553,
+      "rmse": 3.686722231477448,
+      "mae": 2.2528538557480906,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "Macrophages",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.42248851452783964,
+      "rmse": 4.737770827892412,
+      "mae": 3.207056035683519,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "Endothelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.4380837622030958,
+      "rmse": 4.734270221530906,
+      "mae": 3.1535640984868483,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "Epithelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.44911625796906185,
+      "rmse": 4.46171058427616,
+      "mae": 3.054877007004925,
+      "n_genes": 180,
+      "n_spots": 1352,
+      "cell_type": "Fibroblasts",
+      "region_id": 2
+    },
+    {
+      "pearson_r": 0.1594143271896239,
+      "rmse": 6.0092656565730245,
+      "mae": 4.5810165898518065,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "B cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.2747638772064147,
+      "rmse": 5.5450476708056184,
+      "mae": 4.105685939358065,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "CD4+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.49969048440577196,
+      "rmse": 4.584384640331993,
+      "mae": 3.1172987684406035,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "CD8+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.6320867381357388,
+      "rmse": 3.526144316275072,
+      "mae": 2.216047351486847,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "Macrophages",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.3474686611656606,
+      "rmse": 4.992058012101031,
+      "mae": 3.5601588383476663,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "Endothelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.39272757267825464,
+      "rmse": 5.054680257186028,
+      "mae": 3.5565988831612336,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "Epithelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.4526699446609556,
+      "rmse": 4.421985620318788,
+      "mae": 3.0865167580009873,
+      "n_genes": 180,
+      "n_spots": 1464,
+      "cell_type": "Fibroblasts",
+      "region_id": 3
+    },
+    {
+      "pearson_r": 0.192914998882505,
+      "rmse": 5.90314454443566,
+      "mae": 4.458581793507434,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "B cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.2734233625527815,
+      "rmse": 5.591461225378317,
+      "mae": 4.163962921428814,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "CD4+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.48901098434283685,
+      "rmse": 4.6822339727987545,
+      "mae": 3.218563724855488,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "CD8+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.6244317637382826,
+      "rmse": 3.6300747427461593,
+      "mae": 2.292679520995781,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "Macrophages",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.3588998684924432,
+      "rmse": 5.019794204671891,
+      "mae": 3.592954954539568,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "Endothelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.3231175472923763,
+      "rmse": 5.304455286683353,
+      "mae": 3.8707270147683044,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "Epithelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": 0.48321383485133246,
+      "rmse": 4.39337005954255,
+      "mae": 3.0168792730293377,
+      "n_genes": 180,
+      "n_spots": 1414,
+      "cell_type": "Fibroblasts",
+      "region_id": 4
+    }
+  ],
+  "Tangram": [
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "B cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "CD4+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "CD8+ T cells",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "Macrophages",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "Endothelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "Epithelial",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1407,
+      "cell_type": "Fibroblasts",
+      "region_id": 0
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "B cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "CD4+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "CD8+ T cells",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "Macrophages",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "Endothelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "Epithelial",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1417,
+      "cell_type": "Fibroblasts",
+      "region_id": 1
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "B cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "CD4+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "CD8+ T cells",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "Macrophages",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "Endothelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "Epithelial",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1352,
+      "cell_type": "Fibroblasts",
+      "region_id": 2
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "B cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "CD4+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "CD8+ T cells",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "Macrophages",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "Endothelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "Epithelial",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1464,
+      "cell_type": "Fibroblasts",
+      "region_id": 3
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "B cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "CD4+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "CD8+ T cells",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "Macrophages",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "Endothelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "Epithelial",
+      "region_id": 4
+    },
+    {
+      "pearson_r": NaN,
+      "rmse": NaN,
+      "mae": NaN,
+      "n_genes": 374,
+      "n_spots": 1414,
+      "cell_type": "Fibroblasts",
+      "region_id": 4
+    }
+  ]
+}

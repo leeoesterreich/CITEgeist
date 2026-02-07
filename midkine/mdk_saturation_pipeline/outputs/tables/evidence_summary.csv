@@ -1,0 +1,5 @@
+evidence_type,supports_model,key_finding
+Expression (GSE89888),True,3/7 chaperones opposite-regulated
+Binding (GSE125117),True,3/5 binding-expression concordant
+Saturation (GSE254216),True,MCF7 3.0% vs T47D 0.9% occupancy
+"Perturbation (GSE254218, GSE75329)",True,FOXA1-KD and ER-KD both derepress chaperones

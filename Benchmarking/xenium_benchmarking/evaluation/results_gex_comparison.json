@@ -1,0 +1,78 @@
+{
+  "CITEgeist": {
+    "B cells": {
+      "pearson_r": 0.012928957403646014,
+      "rmse": 0.538450136755625,
+      "n_genes": 395,
+      "n_spots": 1407
+    },
+    "CD8+ T cells": {
+      "pearson_r": 0.09433434338208811,
+      "rmse": 0.9810073280902488,
+      "n_genes": 395,
+      "n_spots": 1407
+    },
+    "Macrophages": {
+      "pearson_r": 0.12353290350468885,
+      "rmse": 0.9166730266374158,
+      "n_genes": 395,
+      "n_spots": 1407
+    },
+    "Endothelial": {
+      "pearson_r": 0.045941151705054965,
+      "rmse": 0.7579545856082336,
+      "n_genes": 395,
+      "n_spots": 1407
+    },
+    "Epithelial": {
+      "pearson_r": 0.08924182986597912,
+      "rmse": 0.8974028505430833,
+      "n_genes": 395,
+      "n_spots": 1407
+    },
+    "Fibroblasts": {
+      "pearson_r": 0.11667280919333438,
+      "rmse": 0.897387020656442,
+      "n_genes": 395,
+      "n_spots": 1407
+    }
+  },
+  "scResolve": {
+    "B cells": {
+      "pearson_r": 0.018415113700923302,
+      "rmse": 1.1104372734469532,
+      "n_genes": 369,
+      "n_spots": 28
+    },
+    "CD8+ T cells": {
+      "pearson_r": 0.26657240394729464,
+      "rmse": 0.9460272851972372,
+      "n_genes": 369,
+      "n_spots": 200
+    },
+    "Macrophages": {
+      "pearson_r": 0.38107950971052573,
+      "rmse": 0.9273750087553656,
+      "n_genes": 369,
+      "n_spots": 537
+    },
+    "Endothelial": {
+      "pearson_r": 0.22426955731777182,
+      "rmse": 0.963292819803035,
+      "n_genes": 369,
+      "n_spots": 340
+    },
+    "Epithelial": {
+      "pearson_r": 0.2781594147882883,
+      "rmse": 1.1149868767986175,
+      "n_genes": 369,
+      "n_spots": 704
+    },
+    "Fibroblasts": {
+      "pearson_r": 0.310404858754695,
+      "rmse": 0.9849430758069495,
+      "n_genes": 369,
+      "n_spots": 518
+    }
+  }
+}

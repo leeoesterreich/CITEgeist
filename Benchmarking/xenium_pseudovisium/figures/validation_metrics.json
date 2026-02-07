@@ -1,0 +1,318 @@
+{
+  "silhouette_score": 0.1057557538151741,
+  "calinski_harabasz": 5807.6728515625,
+  "davies_bouldin": 2.248141192493004,
+  "ari_vs_leiden": 0.43360570117964914,
+  "silhouette_per_celltype": {
+    "Macrophages": 0.10660281032323837,
+    "Endothelial": 0.15862077474594116,
+    "Epithelial": 0.09563655406236649,
+    "Mixed Immune": 0.04239865764975548,
+    "Myofibroblasts": 0.15147629380226135,
+    "CD8+ T cells": 0.0824345201253891,
+    "Stromal": 0.08024338632822037,
+    "Proliferating T": 0.18281985819339752,
+    "B cells": 0.1051359623670578,
+    "Vascular Stromal": 0.13371306657791138
+  },
+  "inter_cluster_distances": {
+    "B cells_vs_CD8+ T cells": 12.25671383255026,
+    "B cells_vs_Endothelial": 15.653664001422143,
+    "B cells_vs_Epithelial": 14.087942689421288,
+    "B cells_vs_Macrophages": 12.46182795833997,
+    "B cells_vs_Mixed Immune": 12.1402018592476,
+    "B cells_vs_Myofibroblasts": 14.699168712978176,
+    "B cells_vs_Proliferating T": 11.656405727666737,
+    "B cells_vs_Stromal": 14.328062871603477,
+    "B cells_vs_Vascular Stromal": 14.545341294545754,
+    "CD8+ T cells_vs_Endothelial": 13.632590709190522,
+    "CD8+ T cells_vs_Epithelial": 10.67647573755928,
+    "CD8+ T cells_vs_Macrophages": 9.261150112519372,
+    "CD8+ T cells_vs_Mixed Immune": 6.694103212300526,
+    "CD8+ T cells_vs_Myofibroblasts": 12.05999787316325,
+    "CD8+ T cells_vs_Proliferating T": 10.353195318726605,
+    "CD8+ T cells_vs_Stromal": 11.757040922188624,
+    "CD8+ T cells_vs_Vascular Stromal": 12.36924447042923,
+    "Endothelial_vs_Epithelial": 11.973528943769567,
+    "Endothelial_vs_Macrophages": 12.721169136393838,
+    "Endothelial_vs_Mixed Immune": 10.821289184635393,
+    "Endothelial_vs_Myofibroblasts": 7.888960083541874,
+    "Endothelial_vs_Proliferating T": 13.814266335342825,
+    "Endothelial_vs_Stromal": 11.57300345688124,
+    "Endothelial_vs_Vascular Stromal": 9.620799410920048,
+    "Epithelial_vs_Macrophages": 8.957587691720715,
+    "Epithelial_vs_Mixed Immune": 6.638750653942872,
+    "Epithelial_vs_Myofibroblasts": 9.807333265883145,
+    "Epithelial_vs_Proliferating T": 12.00596173849667,
+    "Epithelial_vs_Stromal": 10.285272617572362,
+    "Epithelial_vs_Vascular Stromal": 10.71434560160088,
+    "Macrophages_vs_Mixed Immune": 4.826048542997167,
+    "Macrophages_vs_Myofibroblasts": 10.899886844546856,
+    "Macrophages_vs_Proliferating T": 10.623388353630551,
+    "Macrophages_vs_Stromal": 10.509111472866358,
+    "Macrophages_vs_Vascular Stromal": 10.544698030326096,
+    "Mixed Immune_vs_Myofibroblasts": 8.371362799451296,
+    "Mixed Immune_vs_Proliferating T": 9.677158492163555,
+    "Mixed Immune_vs_Stromal": 7.975525578633324,
+    "Mixed Immune_vs_Vascular Stromal": 9.083187716831064,
+    "Myofibroblasts_vs_Proliferating T": 12.368145647517126,
+    "Myofibroblasts_vs_Stromal": 8.100049671828796,
+    "Myofibroblasts_vs_Vascular Stromal": 9.815001688982951,
+    "Proliferating T_vs_Stromal": 12.011718671342235,
+    "Proliferating T_vs_Vascular Stromal": 12.802221488183946,
+    "Stromal_vs_Vascular Stromal": 10.175302721582979
+  },
+  "neighbor_purity": 0.9075764045013557,
+  "neighbor_purity_per_celltype": {
+    "Macrophages": 0.9407402889538743,
+    "Endothelial": 0.9460738689663976,
+    "Epithelial": 0.9675297243650487,
+    "Mixed Immune": 0.37945261863968316,
+    "Myofibroblasts": 0.8505406470516312,
+    "CD8+ T cells": 0.883638405343128,
+    "Stromal": 0.8400679302421639,
+    "Proliferating T": 0.9152787926544409,
+    "B cells": 0.8103380554545384,
+    "Vascular Stromal": 0.8323962742331202
+  },
+  "cell_counts": {
+    "Epithelial": 35942,
+    "Macrophages": 24187,
+    "Endothelial": 7337,
+    "CD8+ T cells": 6628,
+    "Stromal": 4742,
+    "Myofibroblasts": 4013,
+    "Mixed Immune": 3425,
+    "Proliferating T": 2565,
+    "Vascular Stromal": 2400,
+    "B cells": 559
+  },
+  "total_cells": 91798,
+  "marker_statistics": {
+    "CD3D": {
+      "f_statistic": 3020.254579713945,
+      "p_value": 0.0,
+      "eta_squared": 0.2284796560496838
+    },
+    "CD3E": {
+      "f_statistic": 3649.619990710832,
+      "p_value": 0.0,
+      "eta_squared": 0.2635430707784374
+    },
+    "CD3G": {
+      "f_statistic": 2288.3615938298635,
+      "p_value": 0.0,
+      "eta_squared": 0.18325910265331866
+    },
+    "CD4": {
+      "f_statistic": 3192.7853998807636,
+      "p_value": 0.0,
+      "eta_squared": 0.23841965636082915
+    },
+    "CD8A": {
+      "f_statistic": 2655.4003017425307,
+      "p_value": 0.0,
+      "eta_squared": 0.20658055604224265
+    },
+    "TRAC": {
+      "f_statistic": 2767.7943355584325,
+      "p_value": 0.0,
+      "eta_squared": 0.21345796166595074
+    },
+    "MS4A1": {
+      "f_statistic": 1505.8846875965764,
+      "p_value": 0.0,
+      "eta_squared": 0.1286580443807724
+    },
+    "CD79A": {
+      "f_statistic": 3002.4114206486693,
+      "p_value": 0.0,
+      "eta_squared": 0.2274368351421418
+    },
+    "CD19": {
+      "f_statistic": 1369.7194326542815,
+      "p_value": 0.0,
+      "eta_squared": 0.11840194655479284
+    },
+    "BANK1": {
+      "f_statistic": 1117.510831625573,
+      "p_value": 0.0,
+      "eta_squared": 0.09875338485923174
+    },
+    "CD68": {
+      "f_statistic": 4230.62017589281,
+      "p_value": 0.0,
+      "eta_squared": 0.2931967617010917
+    },
+    "CD163": {
+      "f_statistic": 5140.2600823157245,
+      "p_value": 0.0,
+      "eta_squared": 0.33511210832655625
+    },
+    "MARCO": {
+      "f_statistic": 141.83673179033795,
+      "p_value": 2.8058981641191005e-267,
+      "eta_squared": 0.01371661768534367
+    },
+    "FCGR3A": {
+      "f_statistic": 4006.699461137633,
+      "p_value": 0.0,
+      "eta_squared": 0.28205534620432104
+    },
+    "ITGAX": {
+      "f_statistic": 1857.0688085691024,
+      "p_value": 0.0,
+      "eta_squared": 0.15404027505267193
+    },
+    "HLA-DRA": {
+      "f_statistic": 5202.440397693022,
+      "p_value": 0.0,
+      "eta_squared": 0.33779652176640784
+    },
+    "HLA-DRB1": {
+      "f_statistic": 2620.9804684483724,
+      "p_value": 0.0,
+      "eta_squared": 0.20445028172958335
+    },
+    "CD1C": {
+      "f_statistic": 323.81347737752736,
+      "p_value": 0.0,
+      "eta_squared": 0.030773493790948674
+    },
+    "FCER1A": {
+      "f_statistic": 7.071289849577477,
+      "p_value": 2.672400364279437e-10,
+      "eta_squared": 0.000692873938142575
+    },
+    "NCAM1": {
+      "f_statistic": 37.285790388413616,
+      "p_value": 9.748719598101582e-67,
+      "eta_squared": 0.003642630282323544
+    },
+    "KLRD1": {
+      "f_statistic": 234.24161382913917,
+      "p_value": 0.0,
+      "eta_squared": 0.022452187590628725
+    },
+    "GNLY": {
+      "f_statistic": 89.23953586564986,
+      "p_value": 2.4757390049466966e-166,
+      "eta_squared": 0.00867421748494562
+    },
+    "NKG7": {
+      "f_statistic": 2306.1907290721892,
+      "p_value": 0.0,
+      "eta_squared": 0.18442359285586563
+    },
+    "KLRB1": {
+      "f_statistic": 184.29237037703135,
+      "p_value": 0.0,
+      "eta_squared": 0.017749503751251776
+    },
+    "KLRC1": {
+      "f_statistic": 237.43270103682113,
+      "p_value": 0.0,
+      "eta_squared": 0.02275109623545021
+    },
+    "EPCAM": {
+      "f_statistic": 257.14698657326943,
+      "p_value": 0.0,
+      "eta_squared": 0.024593684920340902
+    },
+    "KRT8": {
+      "f_statistic": 5383.423226251477,
+      "p_value": 0.0,
+      "eta_squared": 0.34548788148736725
+    },
+    "KRT18": {
+      "f_statistic": 4513.121219655235,
+      "p_value": 0.0,
+      "eta_squared": 0.30676905176494557
+    },
+    "CDH1": {
+      "f_statistic": 410.156340134698,
+      "p_value": 0.0,
+      "eta_squared": 0.03866181383854259
+    },
+    "MUC1": {
+      "f_statistic": 1438.3660389734237,
+      "p_value": 0.0,
+      "eta_squared": 0.1236024745616609
+    },
+    "PECAM1": {
+      "f_statistic": 5550.96585044502,
+      "p_value": 0.0,
+      "eta_squared": 0.3524504996806204
+    },
+    "VWF": {
+      "f_statistic": 9920.060458682347,
+      "p_value": 0.0,
+      "eta_squared": 0.49307594843749636
+    },
+    "CD34": {
+      "f_statistic": 6338.241452995339,
+      "p_value": 0.0,
+      "eta_squared": 0.38327850690863646
+    },
+    "ERG": {
+      "f_statistic": 1583.244232536765,
+      "p_value": 0.0,
+      "eta_squared": 0.13437924001326285
+    },
+    "VIM": {
+      "f_statistic": 11500.549065140327,
+      "p_value": 0.0,
+      "eta_squared": 0.5299983744703958
+    },
+    "THY1": {
+      "f_statistic": 2938.9565949988355,
+      "p_value": 0.0,
+      "eta_squared": 0.2237053488642102
+    },
+    "PDGFRA": {
+      "f_statistic": 3906.880317167569,
+      "p_value": 0.0,
+      "eta_squared": 0.2769747477104024
+    },
+    "ACTA2": {
+      "f_statistic": 2039.7283332440402,
+      "p_value": 0.0,
+      "eta_squared": 0.166666326202028
+    },
+    "MYH11": {
+      "f_statistic": 998.5178984948989,
+      "p_value": 0.0,
+      "eta_squared": 0.0891758006384102
+    },
+    "CNN1": {
+      "f_statistic": 509.6304720747075,
+      "p_value": 0.0,
+      "eta_squared": 0.047592111562911946
+    },
+    "DES": {
+      "f_statistic": 58.85301144614147,
+      "p_value": 5.303290369481963e-108,
+      "eta_squared": 0.005737547993373623
+    },
+    "MKI67": {
+      "f_statistic": 1084.3889517276173,
+      "p_value": 0.0,
+      "eta_squared": 0.0961077378685723
+    },
+    "TOP2A": {
+      "f_statistic": 741.6714516003409,
+      "p_value": 0.0,
+      "eta_squared": 0.06779237017925532
+    },
+    "PCNA": {
+      "f_statistic": 665.5731598301844,
+      "p_value": 0.0,
+      "eta_squared": 0.06126274552649424
+    },
+    "CDK1": {
+      "f_statistic": 798.9103975739605,
+      "p_value": 0.0,
+      "eta_squared": 0.07264421907729093
+    }
+  }
+}

@@ -1,0 +1,342 @@
+{
+  "summary": {
+    "n_regions": 5,
+    "total_matched": 35,
+    "total_spurious": 0,
+    "total_missed": 0,
+    "overall_mean_holistic_rmse": 0.8933145891851803,
+    "overall_std_holistic_rmse": 0.028645727965440574,
+    "overall_mean_holistic_nrmse": 0.23120180751159167,
+    "overall_mean_holistic_mae": 0.32305375053209423,
+    "overall_mean_matched_rmse": 0.8933145891851803,
+    "overall_mean_matched_nrmse": 0.23120180751159167,
+    "overall_mean_matched_mae": 0.32305375053209423
+  },
+  "regions": [
+    {
+      "region_id": 0,
+      "n_matched": 7,
+      "n_spurious": 0,
+      "n_missed": 0,
+      "spurious_celltypes": [],
+      "missed_celltypes": [],
+      "per_celltype": {
+        "Endothelial": {
+          "rmse": 0.7770876328372386,
+          "nrmse": 0.13365500285617243,
+          "mae": 0.24998840291016108,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "T_cells": {
+          "rmse": 0.9383828839805685,
+          "nrmse": 0.1783085931904034,
+          "mae": 0.31097080764891993,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "Macrophages": {
+          "rmse": 0.9281549513347226,
+          "nrmse": 0.15753750870966038,
+          "mae": 0.38020431833396306,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "Unknown": {
+          "rmse": 1.2475558152254451,
+          "nrmse": 0.7751500108125652,
+          "mae": 0.42955873386864535,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "B_cells": {
+          "rmse": 0.5119975183146727,
+          "nrmse": 0.08646301408695511,
+          "mae": 0.08602817857609797,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "Fibroblasts": {
+          "rmse": 0.8239009641576628,
+          "nrmse": 0.12899898729257356,
+          "mae": 0.28740931463032476,
+          "n_genes": 395,
+          "n_spots": 1407
+        },
+        "Epithelial": {
+          "rmse": 0.8537492304820887,
+          "nrmse": 0.12301467773991777,
+          "mae": 0.31757601053695,
+          "n_genes": 395,
+          "n_spots": 1407
+        }
+      },
+      "holistic_rmse": 0.8686898566189143,
+      "holistic_nrmse": 0.22616111352689255,
+      "holistic_mae": 0.2945336809292946,
+      "matched_mean_rmse": 0.8686898566189143,
+      "matched_mean_nrmse": 0.22616111352689255,
+      "matched_mean_mae": 0.2945336809292946
+    },
+    {
+      "region_id": 1,
+      "n_matched": 7,
+      "n_spurious": 0,
+      "n_missed": 0,
+      "spurious_celltypes": [],
+      "missed_celltypes": [],
+      "per_celltype": {
+        "Endothelial": {
+          "rmse": 0.8705102766022131,
+          "nrmse": 0.14768421858476238,
+          "mae": 0.29951527454203947,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "T_cells": {
+          "rmse": 1.0093583754772522,
+          "nrmse": 0.18810340796373126,
+          "mae": 0.34949167624751515,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "Macrophages": {
+          "rmse": 0.9810207344787157,
+          "nrmse": 0.1620332913374055,
+          "mae": 0.433670116279988,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "Unknown": {
+          "rmse": 1.1911740021580552,
+          "nrmse": 0.6121423451829664,
+          "mae": 0.39501422220820664,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "B_cells": {
+          "rmse": 0.2208756251119329,
+          "nrmse": 0.05705609822108725,
+          "mae": 0.015488910988741887,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "Fibroblasts": {
+          "rmse": 0.8732598094959797,
+          "nrmse": 0.14130379551321393,
+          "mae": 0.323740433565338,
+          "n_genes": 392,
+          "n_spots": 1417
+        },
+        "Epithelial": {
+          "rmse": 0.8603922469100906,
+          "nrmse": 0.1224663802796953,
+          "mae": 0.3411985035717879,
+          "n_genes": 392,
+          "n_spots": 1417
+        }
+      },
+      "holistic_rmse": 0.8580844386048915,
+      "holistic_nrmse": 0.20439850529755169,
+      "holistic_mae": 0.30830273391480245,
+      "matched_mean_rmse": 0.8580844386048915,
+      "matched_mean_nrmse": 0.20439850529755169,
+      "matched_mean_mae": 0.30830273391480245
+    },
+    {
+      "region_id": 2,
+      "n_matched": 7,
+      "n_spurious": 0,
+      "n_missed": 0,
+      "spurious_celltypes": [],
+      "missed_celltypes": [],
+      "per_celltype": {
+        "Endothelial": {
+          "rmse": 0.8576939097310875,
+          "nrmse": 0.1465591651511245,
+          "mae": 0.29662067814686754,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "T_cells": {
+          "rmse": 0.991128265416785,
+          "nrmse": 0.17668834100699934,
+          "mae": 0.379429869405075,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "Macrophages": {
+          "rmse": 1.0616034911948529,
+          "nrmse": 0.16883386943861825,
+          "mae": 0.48607126706317083,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "Unknown": {
+          "rmse": 1.256096061419462,
+          "nrmse": 0.7804563641226476,
+          "mae": 0.43950225534453974,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "B_cells": {
+          "rmse": 0.3393203440723577,
+          "nrmse": 0.06291134142212611,
+          "mae": 0.04263640763914304,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "Fibroblasts": {
+          "rmse": 0.7751116911596958,
+          "nrmse": 0.13042871586812912,
+          "mae": 0.2526126802771862,
+          "n_genes": 396,
+          "n_spots": 1352
+        },
+        "Epithelial": {
+          "rmse": 0.9279877960882605,
+          "nrmse": 0.12418704631669494,
+          "mae": 0.3406186737259465,
+          "n_genes": 396,
+          "n_spots": 1352
+        }
+      },
+      "holistic_rmse": 0.8869916512975001,
+      "holistic_nrmse": 0.2271521204751914,
+      "holistic_mae": 0.319641690228847,
+      "matched_mean_rmse": 0.8869916512975001,
+      "matched_mean_nrmse": 0.2271521204751914,
+      "matched_mean_mae": 0.319641690228847
+    },
+    {
+      "region_id": 3,
+      "n_matched": 7,
+      "n_spurious": 0,
+      "n_missed": 0,
+      "spurious_celltypes": [],
+      "missed_celltypes": [],
+      "per_celltype": {
+        "Endothelial": {
+          "rmse": 0.8308378363983404,
+          "nrmse": 0.1442701870983579,
+          "mae": 0.2892615472320045,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "T_cells": {
+          "rmse": 0.9353408049169171,
+          "nrmse": 0.16820614215709004,
+          "mae": 0.36361486785226677,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "Macrophages": {
+          "rmse": 1.0780584616728068,
+          "nrmse": 0.1679220114250063,
+          "mae": 0.5175998696050748,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "Unknown": {
+          "rmse": 1.2141776946356038,
+          "nrmse": 0.8758440694043899,
+          "mae": 0.42818985128229736,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "B_cells": {
+          "rmse": 0.5705134790212105,
+          "nrmse": 0.09275732810254783,
+          "mae": 0.11386479355426961,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "Fibroblasts": {
+          "rmse": 0.8014096031947993,
+          "nrmse": 0.13856048167624418,
+          "mae": 0.25843027549817077,
+          "n_genes": 400,
+          "n_spots": 1464
+        },
+        "Epithelial": {
+          "rmse": 1.029434759573253,
+          "nrmse": 0.1393910048713548,
+          "mae": 0.4402091909536788,
+          "n_genes": 400,
+          "n_spots": 1464
+        }
+      },
+      "holistic_rmse": 0.9228246627732758,
+      "holistic_nrmse": 0.2467073178192844,
+      "holistic_mae": 0.344452913711109,
+      "matched_mean_rmse": 0.9228246627732758,
+      "matched_mean_nrmse": 0.2467073178192844,
+      "matched_mean_mae": 0.344452913711109
+    },
+    {
+      "region_id": 4,
+      "n_matched": 7,
+      "n_spurious": 0,
+      "n_missed": 0,
+      "spurious_celltypes": [],
+      "missed_celltypes": [],
+      "per_celltype": {
+        "Endothelial": {
+          "rmse": 0.8295075638517861,
+          "nrmse": 0.13862239250925415,
+          "mae": 0.2965881512261524,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "T_cells": {
+          "rmse": 0.9407682646647069,
+          "nrmse": 0.1639028235092761,
+          "mae": 0.3788012639832974,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "Macrophages": {
+          "rmse": 1.0456167729717076,
+          "nrmse": 0.1651451421417912,
+          "mae": 0.5025559418226685,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "Unknown": {
+          "rmse": 1.2634959349300512,
+          "nrmse": 0.9114196597534746,
+          "mae": 0.4587229490257572,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "B_cells": {
+          "rmse": 0.6592339579562868,
+          "nrmse": 0.10621540213786604,
+          "mae": 0.1507274698760107,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "Fibroblasts": {
+          "rmse": 0.8640557812330945,
+          "nrmse": 0.150369862077897,
+          "mae": 0.28479262175044173,
+          "n_genes": 399,
+          "n_spots": 1414
+        },
+        "Epithelial": {
+          "rmse": 0.9071980808116085,
+          "nrmse": 0.12545458094370882,
+          "mae": 0.3661757394505998,
+          "n_genes": 399,
+          "n_spots": 1414
+        }
+      },
+      "holistic_rmse": 0.9299823366313202,
+      "holistic_nrmse": 0.2515899804390383,
+      "holistic_mae": 0.3483377338764182,
+      "matched_mean_rmse": 0.9299823366313202,
+      "matched_mean_nrmse": 0.2515899804390383,
+      "matched_mean_mae": 0.3483377338764182
+    }
+  ]
+}

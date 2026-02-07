@@ -1,0 +1,95 @@
+{
+  "region_id": 0,
+  "validated_gt_path": "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/validated_benchmark/validated_gt_region_0.csv",
+  "methods": {
+    "CITEgeist_validated": {
+      "method": "CITEgeist_validated",
+      "n_spots": 1407,
+      "n_types": 8,
+      "cell_types": [
+        "B cells",
+        "T cells",
+        "Macrophages",
+        "Endothelial",
+        "Epithelial",
+        "EMT cells",
+        "Fibroblasts",
+        "Stromal"
+      ],
+      "overall_pearson_r": 0.32153533130408507,
+      "overall_pearson_p": 4.816825475029005e-269,
+      "overall_rmse": 0.17997768001580589,
+      "overall_mae": 0.1042108973071784,
+      "per_type": {
+        "B cells": {
+          "pearson_r": 0.7905393633150977,
+          "rmse": 0.08334238634624663,
+          "mae": 0.03390718881341399,
+          "mean_gt": 0.019168991508462862,
+          "mean_pred": 0.04763988406151814
+        },
+        "T cells": {
+          "pearson_r": 0.8069143911176166,
+          "rmse": 0.09664469924074548,
+          "mae": 0.07009160431838024,
+          "mean_gt": 0.1717501488353051,
+          "mean_pred": 0.155013317746219
+        },
+        "Macrophages": {
+          "pearson_r": 0.7604253774542142,
+          "rmse": 0.09831495395432865,
+          "mae": 0.07343364754175226,
+          "mean_gt": 0.11582042186164243,
+          "mean_pred": 0.15460107518900115
+        },
+        "Endothelial": {
+          "pearson_r": 0.6188765705475222,
+          "rmse": 0.09463900953523775,
+          "mae": 0.0662848465673834,
+          "mean_gt": 0.08342426603603134,
+          "mean_pred": 0.04413051417058014
+        },
+        "Epithelial": {
+          "pearson_r": 0.7205137470722875,
+          "rmse": 0.052055688452948175,
+          "mae": 0.02769274344262761,
+          "mean_gt": 0.013735080851037995,
+          "mean_pred": 0.03787370182117683
+        },
+        "EMT cells": {
+          "pearson_r": 0.30011833818392514,
+          "rmse": 0.4442422845382297,
+          "mae": 0.42415258351673796,
+          "mean_gt": 0.026602767055263824,
+          "mean_pred": 0.4505463603088236
+        },
+        "Fibroblasts": {
+          "pearson_r": 0.6709323610367526,
+          "rmse": 0.07357361494565008,
+          "mae": 0.04770148960942409,
+          "mean_gt": 0.055119614468153395,
+          "mean_pred": 0.04218631411108131
+        },
+        "Stromal": {
+          "pearson_r": -0.07423082627740375,
+          "rmse": 0.13694203150484555,
+          "mae": 0.09042307464770778,
+          "mean_gt": 0.08669933700199049,
+          "mean_pred": 0.014689284620296632
+        }
+      }
+    },
+    "Cell2Location": {
+      "error": "Could not find results for Cell2Location region 0"
+    },
+    "Tangram": {
+      "error": "Could not find results for Tangram region 0"
+    },
+    "RCTD": {
+      "error": "Could not find results for RCTD region 0"
+    },
+    "Seurat": {
+      "error": "Could not find results for Seurat region 0"
+    }
+  }
+}

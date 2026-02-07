@@ -685,13 +685,15 @@ def optimize_cell_proportions_per_marker(
                     laplacian_terms.append(L_val * Y[i_spot, k] * Y[j_spot, k])
             laplacian_term = lambda_laplacian * gp.quicksum(laplacian_terms)
 
-        # Sparsity penalty (L1 on Y - encourages near-one-hot for cell-level)
+        # Sparsity penalty (negative L2 on Y - encourages near-one-hot for cell-level)
+        # Maximizing sum(Y^2) on a simplex peaks at one-hot assignment.
+        # We add -lambda * sum(Y^2) to the minimization objective.
         sparsity_term = 0
         if lambda_sparse > 0:
-            sparsity_term = lambda_sparse * gp.quicksum(
-                Y[i, j] for i in range(N) for j in range(T)
+            sparsity_term = -lambda_sparse * gp.quicksum(
+                Y[i, j] * Y[i, j] for i in range(N) for j in range(T)
             )
-            logging.info(f"Sparsity penalty enabled: lambda_sparse={lambda_sparse}")
+            logging.info(f"Sparsity penalty enabled (neg-L2): lambda_sparse={lambda_sparse}")
 
         model.setObjective(total_error + regularization_term + laplacian_term + sparsity_term, GRB.MINIMIZE)
 
@@ -795,6 +797,359 @@ def optimize_cell_proportions_per_marker(
             logging.info(f"  Marker '{marker_names[m]}': alpha={alpha_values[m]:.3f}, beta={beta_new[m]:.3f}")
 
     return Y_values, beta_new, marker_beta_dict, alpha_values
+
+
+def classify_cells_from_betas(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    beta_values: np.ndarray,
+    alpha_values: np.ndarray,
+    temperature: float = 1.0,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Stage 2 of cell-level assignment: classify cells using learned betas.
+
+    After the QP learns per-marker scaling (beta) and baseline (alpha),
+    this function scores each cell against each type profile and assigns
+    via softmax over negative reconstruction error.
+
+    For each cell i and type j, the score is:
+        score[i,j] = -sum_m w[m,j] * (S[i,m] - alpha[m] - beta[m])^2
+                     + sum_m w[m,j'] * (S[i,m] - alpha[m])^2  (for non-owner types j')
+
+    In words: type j gets a good score when the cell's marker expression
+    is close to (alpha + beta) for j's markers, and close to alpha for
+    markers belonging to other types.
+
+    Args:
+        marker_level_data: (N, M) normalized marker expression per cell.
+        marker_names: Ordered list of marker names (length M).
+        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
+        cell_type_names: Ordered list of cell type names (length T).
+        beta_values: (M,) per-marker scaling factors from QP.
+        alpha_values: (M,) per-marker baselines from QP.
+        temperature: Softmax temperature (lower = sharper). Default 1.0.
+
+    Returns:
+        Y_cell: (N, T) soft assignment matrix (softmax probabilities).
+        scores: (N, T) raw scores before softmax.
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # For each type j, compute per-cell reconstruction error
+    # Type j "explains" its own markers with alpha + beta, and doesn't
+    # explain other types' markers (expects them at alpha level)
+    scores = np.zeros((N, T), dtype=np.float64)
+
+    for j in range(T):
+        for m in range(M):
+            S_m = marker_level_data[:, m]  # (N,)
+            alpha_m = alpha_values[m]
+            beta_m = beta_values[m]
+
+            if assignment_matrix[m, j] > 0:
+                # This marker belongs to type j: expect S ≈ alpha + beta
+                expected = alpha_m + beta_m
+                residual = (S_m - expected) ** 2
+            else:
+                # This marker does NOT belong to type j: expect S ≈ alpha (baseline)
+                expected = alpha_m
+                residual = (S_m - expected) ** 2
+
+            # Weight by beta (stronger markers matter more)
+            scores[:, j] -= beta_m * residual
+
+    # Softmax with temperature
+    scores_scaled = scores / (temperature + 1e-10)
+    scores_scaled -= scores_scaled.max(axis=1, keepdims=True)  # numerical stability
+    exp_scores = np.exp(scores_scaled)
+    Y_cell = exp_scores / exp_scores.sum(axis=1, keepdims=True)
+
+    # Log statistics
+    max_Y = Y_cell.max(axis=1)
+    dominant = np.argmax(Y_cell, axis=1)
+    entropy = -np.sum(Y_cell * np.log(Y_cell + 1e-10), axis=1)
+    max_entropy = np.log(T)
+
+    logging.info(f"Cell classification (temperature={temperature}):")
+    logging.info(f"  Max Y: mean={max_Y.mean():.3f} median={np.median(max_Y):.3f} "
+                 f"p90={np.percentile(max_Y, 90):.3f}")
+    logging.info(f"  Entropy ratio: {entropy.mean() / max_entropy:.3f}")
+    logging.info(f"  One-hot fraction (>0.9): {np.mean(max_Y > 0.9):.3f}")
+
+    for j_idx, ct in enumerate(cell_type_names):
+        n_dom = np.sum(dominant == j_idx)
+        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
+
+    return Y_cell, scores
+
+
+def beta_weighted_classification(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    beta_values: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Classify cells using QP-learned betas as quality weights in a gating classifier.
+
+    For each cell i and type j, computes:
+        positive = beta-weighted mean expression of type j's markers
+        negative = beta-weighted mean expression of markers belonging to other types
+        score[i,j] = positive - negative
+
+    This leverages both positive evidence (high expression of own markers)
+    and negative evidence (low expression of other types' markers), weighted
+    by the QP's learned marker quality estimates.
+
+    Args:
+        marker_level_data: (N, M) normalized marker expression per cell.
+        marker_names: Ordered list of marker names (length M).
+        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
+        cell_type_names: Ordered list of cell type names (length T).
+        beta_values: (M,) per-marker quality weights from QP.
+
+    Returns:
+        Y_cell: (N, T) softmax probabilities.
+        scores: (N, T) raw scores before softmax.
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    scores = np.zeros((N, T), dtype=np.float64)
+
+    for j in range(T):
+        own_mask = assignment_matrix[:, j] > 0  # markers assigned to type j
+        other_mask = ~own_mask  # markers assigned to other types
+
+        # Beta-weighted mean of own markers
+        own_betas = beta_values[own_mask]
+        own_data = marker_level_data[:, own_mask]  # (N, n_own)
+        if own_betas.sum() > 0:
+            positive = (own_data * own_betas).sum(axis=1) / own_betas.sum()
+        else:
+            positive = np.zeros(N)
+
+        # Beta-weighted mean of other markers
+        other_betas = beta_values[other_mask]
+        other_data = marker_level_data[:, other_mask]  # (N, n_other)
+        if other_betas.sum() > 0:
+            negative = (other_data * other_betas).sum(axis=1) / other_betas.sum()
+        else:
+            negative = np.zeros(N)
+
+        scores[:, j] = positive - negative
+
+    # Softmax for probabilities
+    scores_shifted = scores - scores.max(axis=1, keepdims=True)
+    exp_scores = np.exp(scores_shifted)
+    Y_cell = exp_scores / exp_scores.sum(axis=1, keepdims=True)
+
+    # Log statistics
+    max_prob = Y_cell.max(axis=1)
+    dominant = np.argmax(Y_cell, axis=1)
+
+    logging.info("Beta-weighted cell classification:")
+    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f} "
+                 f"p90={np.percentile(max_prob, 90):.3f}")
+    logging.info(f"  One-hot (>0.9): {np.mean(max_prob > 0.9)*100:.1f}%")
+
+    for j_idx, ct in enumerate(cell_type_names):
+        n_dom = np.sum(dominant == j_idx)
+        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
+
+    return Y_cell, scores
+
+
+def bayesian_cell_classification(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    beta_values: np.ndarray,
+    alpha_values: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Bayesian cell classification using learned betas from the QP.
+
+    Unlike classify_cells_from_betas() which uses beta-weighted scoring
+    (biased toward types with high-beta markers), this function uses
+    precision-weighted Gaussian log-likelihood over ALL markers.
+
+    For each cell i and type j:
+        expected[m,j] = alpha[m] + beta[m] * A[m,j]
+        log P(S_i | type=j) = -0.5 * sum_m (S[i,m] - expected[m,j])^2 / var[m]
+
+    Every marker contributes evidence for AND against each type:
+    - Marker m owned by type j: high S[i,m] matches high expected → good score
+    - Marker m NOT owned by type j: high S[i,m] mismatches low expected → penalty
+
+    This naturally handles negative evidence (CD68 high → penalizes Epithelial)
+    without profile-size bias since all M markers are used for every type.
+
+    Args:
+        marker_level_data: (N, M) normalized marker expression per cell.
+        marker_names: Ordered list of marker names (length M).
+        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
+        cell_type_names: Ordered list of cell type names (length T).
+        beta_values: (M,) per-marker scaling factors from QP.
+        alpha_values: (M,) per-marker baselines from QP.
+
+    Returns:
+        Y_cell: (N, T) posterior probabilities per cell.
+        log_lik: (N, T) log-likelihood scores before normalization.
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # Expected marker expression for each type
+    # For type j: expected[m,j] = alpha[m] + beta[m] if A[m,j]=1, else alpha[m]
+    expected = np.tile(alpha_values[:, None], (1, T))  # (M, T)
+    expected += beta_values[:, None] * assignment_matrix  # (M, T)
+
+    # Per-marker precision (inverse variance)
+    marker_var = np.var(marker_level_data, axis=0) + 1e-6  # (M,)
+    precision = 1.0 / marker_var  # (M,)
+
+    # Log-likelihood: Gaussian with per-marker precision
+    # log P(S_i | type_j) = -0.5 * sum_m precision[m] * (S[i,m] - expected[m,j])^2
+    log_lik = np.zeros((N, T), dtype=np.float64)
+    for j in range(T):
+        diff = marker_level_data - expected[:, j]  # (N, M)
+        weighted_sq = diff ** 2 * precision  # (N, M)
+        log_lik[:, j] = -0.5 * weighted_sq.sum(axis=1)
+
+    # Posterior via softmax (flat prior)
+    log_lik_shifted = log_lik - log_lik.max(axis=1, keepdims=True)
+    probs = np.exp(log_lik_shifted)
+    probs /= probs.sum(axis=1, keepdims=True)
+
+    # Log statistics
+    max_prob = probs.max(axis=1)
+    dominant = np.argmax(probs, axis=1)
+    entropy = -np.sum(probs * np.log(probs + 1e-10), axis=1)
+    max_entropy = np.log(T)
+
+    logging.info("Bayesian cell classification:")
+    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f} "
+                 f"p90={np.percentile(max_prob, 90):.3f}")
+    logging.info(f"  Entropy ratio: {entropy.mean() / max_entropy:.3f}")
+    logging.info(f"  One-hot fraction (>0.9): {np.mean(max_prob > 0.9):.3f}")
+
+    for j_idx, ct in enumerate(cell_type_names):
+        n_dom = np.sum(dominant == j_idx)
+        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
+
+    return probs, log_lik
+
+
+def supervised_cell_classification(
+    marker_level_data: np.ndarray,
+    Y_qp: np.ndarray,
+    cell_type_names: List[str],
+    confidence_percentile: float = 75.0,
+    classifier_type: str = "logistic",
+) -> Tuple[np.ndarray, dict]:
+    """
+    Two-stage supervised cell classification bootstrapped from QP.
+
+    Stage 1: QP gives soft Y assignments (already done externally).
+    Stage 2: Identify confident cells from QP, train a discriminative
+    classifier on them, then classify all cells.
+
+    The QP is good at learning the relative ordering (argmax is 75.6%
+    accurate) but produces diffuse probabilities. A discriminative
+    classifier trained on the QP's most confident cells can generalize
+    to sharper, more accurate predictions.
+
+    Args:
+        marker_level_data: (N, M) normalized marker expression per cell.
+        Y_qp: (N, T) soft assignment from QP.
+        cell_type_names: Ordered list of cell type names (length T).
+        confidence_percentile: Percentile threshold for confident cells.
+            Higher = stricter = fewer training cells but cleaner labels.
+        classifier_type: "logistic" for logistic regression,
+            "rf" for random forest.
+
+    Returns:
+        Y_supervised: (N, T) class probabilities from supervised model.
+        info: Dict with training stats.
+    """
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.preprocessing import StandardScaler
+
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # Confidence = max probability per cell
+    max_probs = Y_qp.max(axis=1)
+    threshold = np.percentile(max_probs, confidence_percentile)
+    confident_mask = max_probs >= threshold
+
+    # Get pseudo-labels from QP argmax
+    qp_labels = np.argmax(Y_qp, axis=1)
+    confident_labels = qp_labels[confident_mask]
+    confident_features = marker_level_data[confident_mask]
+
+    logging.info(f"Supervised classification:")
+    logging.info(f"  Confidence threshold: {threshold:.4f} (p{confidence_percentile:.0f})")
+    logging.info(f"  Confident cells: {confident_mask.sum()}/{N} ({confident_mask.sum()/N*100:.1f}%)")
+
+    # Check that all types are represented in training set
+    unique_train = set(confident_labels.tolist())
+    for j in range(T):
+        n_train_j = np.sum(confident_labels == j)
+        logging.info(f"  Training {cell_type_names[j]}: {n_train_j}")
+    if len(unique_train) < T:
+        missing = [cell_type_names[j] for j in range(T) if j not in unique_train]
+        logging.warning(f"  Missing types in training: {missing}")
+
+    # Standardize features
+    scaler = StandardScaler()
+    X_train = scaler.fit_transform(confident_features)
+    X_all = scaler.transform(marker_level_data)
+
+    # Train classifier
+    if classifier_type == "rf":
+        clf = RandomForestClassifier(
+            n_estimators=100, max_depth=10, random_state=42, n_jobs=-1,
+            class_weight="balanced",
+        )
+    else:
+        clf = LogisticRegression(
+            max_iter=1000, C=1.0, random_state=42, multi_class="multinomial",
+            class_weight="balanced",
+        )
+
+    clf.fit(X_train, confident_labels)
+
+    # Predict all cells
+    Y_supervised = clf.predict_proba(X_all)
+
+    # Log statistics
+    pred_labels = np.argmax(Y_supervised, axis=1)
+    max_prob = Y_supervised.max(axis=1)
+
+    logging.info(f"  Classifier: {classifier_type}")
+    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f}")
+    logging.info(f"  One-hot (>0.9): {np.mean(max_prob > 0.9)*100:.1f}%")
+
+    for j_idx, ct in enumerate(cell_type_names):
+        n_dom = np.sum(pred_labels == j_idx)
+        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
+
+    info = {
+        "n_confident": int(confident_mask.sum()),
+        "confidence_threshold": float(threshold),
+        "classifier_type": classifier_type,
+    }
+
+    return Y_supervised, info
 
 
 def compute_marker_exclusivity(
@@ -1723,22 +2078,44 @@ def deconvolute_spot_with_neighbors_with_prior(
     lambda_prior_weight: float = 0.0,
     local_enrichment_weight: float = 0.5,
     global_enrichment_weight: float = 0.5,
+    continuous_relaxation: bool = True,
+    lambda_gex_reg: float = 0.01,
 ) -> Optional[np.ndarray]:
     """
-    Deconvolute a spot with its neighbors, using both enrichment weights and optional prior.
+    Deconvolute a spot with its neighbors, using enrichment weights and optional prior.
+
+    Uses continuous relaxation (LP) by default for fractional gene assignment,
+    with L2 regularization to stabilize the solution.
+
+    Args:
+        spot_idx: Index of the center spot to deconvolve.
+        adata: AnnData with gene expression in .X and spatial coords in .obsm.
+        cell_type_numbers_array: Cell type proportions (N_spots x T), from Pass 1.
+        radius: Spatial radius for neighbor detection.
+        global_prior: Optional prior matrix (T x M) for guidance.
+        lambda_prior_weight: Weight for prior guidance term.
+        local_enrichment_weight: Weight for local expression enrichment (0-1).
+        global_enrichment_weight: Weight for global expression enrichment (0-1).
+        continuous_relaxation: If True, use continuous variables (LP); else integer (MIP).
+        lambda_gex_reg: L2 regularization weight on X variables.
+
+    Returns:
+        np.ndarray of shape (T, M) with deconvolved expression, or None on failure.
     """
     model = None
-    # Local import to avoid hard dependency at module import time
     import gurobipy as gp  # type: ignore
     from gurobipy import GRB  # type: ignore
     try:
-        neighborhood_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
+        neighborhood_indices = get_neighbors_with_fixed_radius(
+            spot_idx, adata, radius=int(radius), include_center=True
+        )
         if not neighborhood_indices:
             logging.error(f"No valid neighbors found for spot {spot_idx}.")
             return None
 
         neighborhood_indices = np.array(
-            [int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))], dtype=int
+            [int(idx) for idx in neighborhood_indices
+             if isinstance(idx, (int, np.integer))], dtype=int
         )
 
         # Extract expression data
@@ -1758,22 +2135,9 @@ def deconvolute_spot_with_neighbors_with_prior(
         # Compute normalized cell type weights to avoid abundance bias
         total_celltype_counts = np.sum(cell_type_numbers_array, axis=0) + 1e-10
         celltype_frequencies = total_celltype_counts / np.sum(total_celltype_counts)
-        inverse_frequency_weights = 1.0 / (celltype_frequencies + 1e-10)
-        normalized_weights = inverse_frequency_weights / np.max(inverse_frequency_weights)
 
         # Modified enrichment calculation
         def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
-            """
-            Compute expression-aware enrichment scores.
-
-            Args:
-                expression_data (np.ndarray): Expression matrix
-                cell_type_props (np.ndarray): Cell type proportions
-                gene_idx (int): Gene index
-
-            Returns:
-                np.ndarray: Enrichment scores for each cell type
-            """
             gene_expr = expression_data[:, gene_idx]
             expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
             high_expr_spots = gene_expr >= expr_threshold
@@ -1809,15 +2173,20 @@ def deconvolute_spot_with_neighbors_with_prior(
             )
 
         # Build Gurobi model
-        model = gp.Model(f"discrete_gene_expression_spot_{spot_idx}")
+        model = gp.Model(f"gene_expression_spot_{spot_idx}")
         model.setParam("OutputFlag", 0)
         model.setParam("Threads", 1)
-        model.setParam("NodefileStart", 0.5)
-        model.setParam("MIPGap", 0.01)
-        model.setParam("TimeLimit", 600)
-        model.setParam("NodeLimit", 1000000)
+
+        if continuous_relaxation:
+            model.setParam("TimeLimit", 30)
+        else:
+            model.setParam("NodefileStart", 0.5)
+            model.setParam("MIPGap", 0.01)
+            model.setParam("TimeLimit", 600)
+            model.setParam("NodeLimit", 1000000)
 
         # Variables for count assignment
+        var_type = GRB.CONTINUOUS if continuous_relaxation else GRB.INTEGER
         X = {}
         center_counts = deconvolution_expression_data[spot_idx, :]
 
@@ -1825,58 +2194,61 @@ def deconvolute_spot_with_neighbors_with_prior(
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    X[j, k] = model.addVar(vtype=GRB.INTEGER, lb=0, ub=total_counts, name=f"X_{j}_{k}")
+                    X[j, k] = model.addVar(
+                        vtype=var_type, lb=0, ub=total_counts,
+                        name=f"X_{j}_{k}"
+                    )
                 # Count conservation constraint
-                model.addConstr(gp.quicksum(X[j, k] for j in range(T)) == total_counts, name=f"count_conservation_{k}")
+                model.addConstr(
+                    gp.quicksum(X[j, k] for j in range(T)) == total_counts,
+                    name=f"count_conservation_{k}"
+                )
 
-        # Validate prior if asked
-        if global_prior is not None:
-            if lambda_prior_weight > 0:
-                if global_prior is None:
-                    raise ValueError("lambda_prior_weight > 0 but no global_prior provided")
+        # Validate prior if provided
+        if global_prior is not None and lambda_prior_weight > 0:
             if not isinstance(global_prior, np.ndarray):
                 raise ValueError("global_prior must be a numpy array")
             if global_prior.shape != (T, M):
-                raise ValueError(f"Prior matrix shape {global_prior.shape} does not match expected shape ({T}, {M})")
+                raise ValueError(
+                    f"Prior matrix shape {global_prior.shape} does not match "
+                    f"expected shape ({T}, {M})"
+                )
 
-        # Modify objective terms to include frequency normalization
+        # Center spot proportions (index 0 = center in neighborhood)
+        center_props = neighborhood_cell_type_numbers[0, :]
+
+        # Objective: maximize enrichment-weighted allocation + L2 regularization
         obj_terms = []
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
                 for j in range(T):
-                    # Get normalized weights
                     enrichment_weight = gene_specific_enrichment[k, j]
-                    cell_type_weight = neighborhood_cell_type_numbers[len(neighborhood_indices) // 2, j]
+                    cell_type_weight = center_props[j]
 
-                    # Apply frequency normalization
-                    normalized_weight = cell_type_weight * normalized_weights[j]
-
-                    # Add slight randomness to break ties using seeded RNG for reproducibility
-                    rng = np.random.default_rng(42)  # Fixed seed for reproducibility
-                    randomness = 0.9 + 0.2 * rng.random()
-                    base_term = enrichment_weight * normalized_weight * randomness * X[j, k]
+                    # Enrichment * proportion target
+                    base_term = enrichment_weight * cell_type_weight * X[j, k]
                     obj_terms.append(base_term)
 
-                    # Prior terms remain unchanged
+                    # L2 regularization (subtracted since we maximize)
+                    if lambda_gex_reg > 0:
+                        obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
+
+                    # Prior terms
                     if global_prior is not None and lambda_prior_weight > 0:
                         try:
                             prior_value = float(global_prior[j, k])
                             prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j, k]
                             obj_terms.append(-prior_penalty)
                         except Exception as e:
-                            logging.warning(f"Error accessing prior at [{j}, {k}]: {str(e)}")
+                            logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
                             continue
 
-        # Maximize the sum of all terms
         model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
-
-        model.write('gene_expression_model.mps')
 
         model.optimize()
 
         if model.status == GRB.OPTIMAL:
-            logging.info(f"Solution found for spot {spot_idx}")
             result = np.zeros((T, M))
             for k in range(M):
                 total_counts = int(center_counts[k])
@@ -1966,6 +2338,8 @@ def optimize_gene_expression(
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False,
+    continuous_relaxation: bool = True,
+    lambda_gex_reg: float = 0.01,
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -1984,6 +2358,8 @@ def optimize_gene_expression(
         checkpoint_interval (int): Number of spots between checkpoints
         output_dir (str): Directory for checkpoints
         rerun (bool): Whether to rerun if results exist
+        continuous_relaxation (bool): Use continuous (LP) vs integer (MIP) variables
+        lambda_gex_reg (float): L2 regularization weight on X variables
 
     Returns:
         Dict[str, Any]: {
@@ -2052,6 +2428,8 @@ def optimize_gene_expression(
                             lambda_prior_weight,
                             local_enrichment_weight,
                             global_enrichment_weight,
+                            continuous_relaxation,
+                            lambda_gex_reg,
                         )
                         futures[future] = spot_idx
 
@@ -2103,6 +2481,75 @@ def optimize_gene_expression(
     return spotwise_gene_expression_profiles
 
 
+# Module-level worker data for cell Pass 2 parallelization
+_cell_pass2_worker_data = None
+
+
+def _solve_single_cell_pass2(cell_idx):
+    """Solve QP for a single cell's true expression. Module-level for pickling."""
+    import gurobipy as gp
+    from gurobipy import GRB
+
+    wd = _cell_pass2_worker_data
+    model = None
+    try:
+        ct = wd['dominant_type'][cell_idx]
+        obs = wd['X_obs'][cell_idx]
+        obs_lib = obs.sum()
+
+        if obs_lib < 1:
+            return cell_idx, obs.copy()
+
+        enrich = wd['enrichment_weights'][ct]
+        neighbor_mean = wd['same_type_neighbor_means'][cell_idx]
+        has_neighbors = wd['same_type_neighbor_counts'][cell_idx] > 0
+        M_genes = wd['M']
+        lib_slack = wd['library_slack']
+        l_enrich = wd['lambda_enrich']
+        l_spatial = wd['lambda_spatial']
+
+        model = gp.Model(f"cell_expr_{cell_idx}")
+        model.setParam("OutputFlag", 0)
+        model.setParam("Threads", 1)
+        model.setParam("TimeLimit", 30)
+
+        max_lib = lib_slack * obs_lib
+        X_vars = model.addVars(
+            M_genes, lb=0, ub=max_lib, vtype=GRB.CONTINUOUS, name="X"
+        )
+
+        model.addConstr(
+            gp.quicksum(X_vars[g] for g in range(M_genes)) <= max_lib,
+            name="lib_size",
+        )
+
+        obj_terms = []
+        for g in range(M_genes):
+            obj_terms.append((X_vars[g] - obs[g]) * (X_vars[g] - obs[g]))
+            if l_enrich > 0 and enrich[g] > 0.1:
+                obj_terms.append(-l_enrich * enrich[g] * X_vars[g])
+            if l_spatial > 0 and has_neighbors:
+                obj_terms.append(
+                    l_spatial * (X_vars[g] - neighbor_mean[g]) * (X_vars[g] - neighbor_mean[g])
+                )
+
+        model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
+        model.optimize()
+
+        if model.status == GRB.OPTIMAL:
+            result = np.array([X_vars[g].X for g in range(M_genes)])
+            return cell_idx, result
+        else:
+            return cell_idx, obs.copy()
+
+    except Exception as e:
+        logging.warning(f"Cell {cell_idx} optimization failed: {e}")
+        return cell_idx, wd['X_obs'][cell_idx].copy()
+    finally:
+        if model:
+            del model
+
+
 def estimate_true_expression_cell(
     X_obs: np.ndarray,
     Y_assignments: np.ndarray,
@@ -2142,8 +2589,18 @@ def estimate_true_expression_cell(
     N, M = X_obs.shape
     T = Y_assignments.shape[1]
 
-    # Determine dominant type per cell
+    # Determine dominant type per cell, guarding against unassigned (zero-row) cells
+    total_weight = Y_assignments.sum(axis=1)
+    unassigned_mask = total_weight < 1e-9
     dominant_type = np.argmax(Y_assignments, axis=1)
+    dominant_type[unassigned_mask] = -1  # Mark unassigned cells
+
+    if unassigned_mask.any():
+        n_unassigned = int(unassigned_mask.sum())
+        logging.info(
+            f"Cell-level Pass 2: {n_unassigned} unassigned cells will retain "
+            f"observed expression (no deconvolution)"
+        )
 
     # Build spatial neighbor graph (k-NN)
     from scipy.spatial import cKDTree
@@ -2175,12 +2632,19 @@ def estimate_true_expression_cell(
 
     X_true = np.zeros((N, M), dtype=np.float64)
 
+    # Pre-fill unassigned cells with observed expression (no deconvolution)
+    if unassigned_mask.any():
+        X_true[unassigned_mask] = X_obs[unassigned_mask]
+
+    # Build list of cells to optimize (skip unassigned)
+    cells_to_optimize = np.where(~unassigned_mask)[0]
+
     # Process cells in parallel
     workers = max_workers if max_workers is not None else os.cpu_count()
 
-    # Need to make these accessible to the worker function via module-level
-    # since ProcessPoolExecutor pickles the function
-    _worker_data = {
+    # Store worker data in module-level variable for pickling
+    global _cell_pass2_worker_data
+    _cell_pass2_worker_data = {
         'X_obs': X_obs,
         'dominant_type': dominant_type,
         'enrichment_weights': enrichment_weights,
@@ -2192,94 +2656,25 @@ def estimate_true_expression_cell(
         'M': M,
     }
 
-    def _solve_single_cell(cell_idx):
-        """Solve QP for a single cell."""
-        import gurobipy as gp
-        from gurobipy import GRB
-
-        model = None
-        try:
-            ct = _worker_data['dominant_type'][cell_idx]
-            obs = _worker_data['X_obs'][cell_idx]
-            obs_lib = obs.sum()
-
-            if obs_lib < 1:
-                return cell_idx, obs.copy()  # Nothing to optimize
-
-            enrich = _worker_data['enrichment_weights'][ct]
-            neighbor_mean = _worker_data['same_type_neighbor_means'][cell_idx]
-            has_neighbors = _worker_data['same_type_neighbor_counts'][cell_idx] > 0
-            M_genes = _worker_data['M']
-            lib_slack = _worker_data['library_slack']
-            l_enrich = _worker_data['lambda_enrich']
-            l_spatial = _worker_data['lambda_spatial']
-
-            model = gp.Model(f"cell_expr_{cell_idx}")
-            model.setParam("OutputFlag", 0)
-            model.setParam("Threads", 1)
-            model.setParam("TimeLimit", 30)
-
-            # Variables: X_true[g] for each gene
-            max_lib = lib_slack * obs_lib
-            X_vars = model.addVars(
-                M_genes, lb=0, ub=max_lib, vtype=GRB.CONTINUOUS, name="X"
-            )
-
-            # Library size constraint
-            model.addConstr(
-                gp.quicksum(X_vars[g] for g in range(M_genes)) <= max_lib,
-                name="lib_size",
-            )
-
-            # Objective: data fidelity + enrichment + spatial
-            obj_terms = []
-
-            for g in range(M_genes):
-                # Data fidelity: (X_true[g] - X_obs[g])^2
-                obj_terms.append((X_vars[g] - obs[g]) * (X_vars[g] - obs[g]))
-
-                # Enrichment prior: -lambda_enrich * E[ct,g] * X_true[g]
-                # (negative because we minimize; higher enrichment = more expression wanted)
-                if l_enrich > 0 and enrich[g] > 0.1:
-                    obj_terms.append(-l_enrich * enrich[g] * X_vars[g])
-
-                # Spatial coherence with same-type neighbors
-                if l_spatial > 0 and has_neighbors:
-                    obj_terms.append(
-                        l_spatial * (X_vars[g] - neighbor_mean[g]) * (X_vars[g] - neighbor_mean[g])
-                    )
-
-            model.setObjective(gp.quicksum(obj_terms), GRB.MINIMIZE)
-            model.optimize()
-
-            if model.status == GRB.OPTIMAL:
-                result = np.array([X_vars[g].X for g in range(M_genes)])
-                return cell_idx, result
-            else:
-                return cell_idx, obs.copy()
-
-        except Exception as e:
-            logging.warning(f"Cell {cell_idx} optimization failed: {e}")
-            return cell_idx, _worker_data['X_obs'][cell_idx].copy()
-        finally:
-            if model:
-                del model
-
-    # Process cells - use sequential for small N, parallel for large N
-    if N <= 100:
+    # Process assigned cells - use sequential for small N, parallel for large N
+    n_to_optimize = len(cells_to_optimize)
+    if n_to_optimize <= 100:
         # Sequential for small datasets (avoids pickle overhead)
-        for i in range(N):
-            cell_idx, result = _solve_single_cell(i)
+        for i in cells_to_optimize:
+            cell_idx, result = _solve_single_cell_pass2(i)
             X_true[cell_idx] = result
     else:
         # Parallel for large datasets
         with ProcessPoolExecutor(max_workers=workers) as executor:
-            futures = {executor.submit(_solve_single_cell, i): i for i in range(N)}
-            with tqdm(total=N, desc="Estimating true expression") as pbar:
+            futures = {executor.submit(_solve_single_cell_pass2, i): i for i in cells_to_optimize}
+            with tqdm(total=n_to_optimize, desc="Estimating true expression") as pbar:
                 for future in as_completed(futures):
                     cell_idx, result = future.result()
                     X_true[cell_idx] = result
                     pbar.update(1)
+
+    # Clean up module-level data
+    _cell_pass2_worker_data = None
 
     return X_true
 

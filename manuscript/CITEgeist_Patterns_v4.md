@@ -18,9 +18,9 @@ Spatial transcriptomics technologies have transformed our ability to study tissu
 
 ## 1. Introduction
 
-Spatial transcriptomics has emerged as a transformative technology for understanding tissue organization and cellular heterogeneity in situ. Technologies ranging from spot-based platforms like 10x Genomics Visium to single-cell resolution methods such as Xenium and CosMx now enable measurement of thousands of transcripts while preserving spatial context. Yet despite rapid technological advancement, computational methods have largely adapted existing single-cell analysis frameworks rather than developing approaches that treat spatial information as a first-class citizen.
+Spatial transcriptomics has emerged as a transformative technology for understanding tissue organization and cellular heterogeneity in situ [17]. Technologies ranging from spot-based platforms like 10x Genomics Visium to single-cell resolution methods such as Xenium and CosMx now enable measurement of thousands of transcripts while preserving spatial context. Yet despite rapid technological advancement, computational methods have largely adapted existing single-cell analysis frameworks rather than developing approaches that treat spatial information as a first-class citizen [18].
 
-The dominant paradigm for analyzing spatial transcriptomics data relies on transferring cell type annotations from external single-cell RNA sequencing (scRNA-seq) atlases. Methods such as Cell2Location, RCTD, and Tangram learn cell type signatures from reference datasets and project these onto spatial measurements. While powerful, this approach has fundamental limitations. Reference atlases are derived from dissociated tissues, losing the spatial context that may influence gene expression programs. Atlas composition may not match the tissue being studied—a reference built from healthy tissue may poorly represent tumor heterogeneity, and batch effects between technologies introduce systematic biases. Most critically, these methods cannot discover spatial patterns that don't exist in the reference, effectively "hallucinating" spatial organization from non-spatial data.
+The dominant paradigm for analyzing spatial transcriptomics data relies on transferring cell type annotations from external single-cell RNA sequencing (scRNA-seq) atlases. Methods such as Cell2Location [8], RCTD, and Tangram [16] learn cell type signatures from reference datasets and project these onto spatial measurements. While powerful, this approach has fundamental limitations [7]. Reference atlases are derived from dissociated tissues, losing the spatial context that may influence gene expression programs [5,6]. Atlas composition may not match the tissue being studied—a reference built from healthy tissue may poorly represent tumor heterogeneity [26], and batch effects between technologies introduce systematic biases. Most critically, these methods cannot discover spatial patterns that don't exist in the reference, effectively "hallucinating" spatial organization from non-spatial data [7].
 
 An alternative approach leverages the protein layer available from same-slide measurements. CITE-seq technology, originally developed for single-cell analysis, has been adapted for spatial transcriptomics platforms, enabling simultaneous measurement of transcripts and surface proteins from identical tissue sections. Unlike external references, same-slide proteomics captures the actual cellular composition of the tissue being studied. Protein markers with well-characterized cell type associations (CD3 for T cells, CD68 for macrophages, EPCAM for epithelial cells) provide direct anchors for downstream analysis without requiring reference transfer.
 
@@ -78,7 +78,7 @@ Following global optimization, neighborhood-aware finetuning adjusts proportions
 
 Pass 2 uses the estimated proportions to deconvolve gene expression. At each spot, bulk expression is modeled as a weighted sum of cell type-specific expression, where weights are the proportions from Pass 1. We solve for per-cell-type expression values using non-negative least squares with global and local enrichment priors derived from proportion-weighted spatial patterns. The result is a set of cell type-specific expression layers: for each gene at each spot, we obtain estimated expression within each cell type population.
 
-We benchmarked CITEgeist against established deconvolution methods using Xenium data aggregated into pseudo-Visium spots where single-cell ground truth was available (Figure 3B). Across 5 tissue regions totaling 7,054 spots, CITEgeist achieved Pearson correlation r = 0.60 with ground truth proportions, comparable to reference-based methods Cell2Location (r = 0.61) and RCTD (r = 0.62). Jensen-Shannon divergence (lower is better) was 0.355 for CITEgeist versus 0.335 for Cell2Location and 0.347 for RCTD. Methods requiring label transfer performed substantially worse: Tangram achieved r = 0.14 and Seurat r = 0.17.
+We benchmarked CITEgeist against established deconvolution methods using Xenium data aggregated into pseudo-Visium spots where single-cell ground truth was available (Figure 3B). Across 5 tissue regions totaling 7,054 spots, CITEgeist achieved Pearson correlation r = 0.60 with ground truth proportions, comparable to reference-based methods Cell2Location [8] (r = 0.61) and RCTD (r = 0.62). Jensen-Shannon divergence (lower is better) was 0.355 for CITEgeist versus 0.335 for Cell2Location and 0.347 for RCTD. Methods requiring label transfer performed substantially worse: Tangram [16] achieved r = 0.14 and Seurat [10] r = 0.17.
 
 Importantly, CITEgeist achieved this accuracy without requiring any external reference data—the protein measurements from the same tissue section provided sufficient information for competitive deconvolution. This demonstrates that same-slide proteomics can replace reference atlases for proportion estimation while avoiding potential artifacts from reference-sample mismatches.
 
@@ -118,7 +118,7 @@ A key design principle of CITEgeist is generating outputs compatible with establ
 
 **Pathway analysis.** Gene lists from DE analysis or program loadings from Module 4 integrate directly with GSEApy/Enrichr for pathway enrichment. In our cohort, progressor-enriched genes showed enrichment for extracellular matrix organization (GO:0030198), collagen catabolic process (GO:0030574), and the MSigDB Hallmark epithelial-mesenchymal transition signature.
 
-**Cell-cell communication.** CITEgeist's spatial neighbor graphs and cell type proportions are compatible with tools like COMMOT and CellPhoneDB for inferring ligand-receptor interactions. Previous analysis of this cohort identified midkine (MDK) as a potential mediator of estrogen receptor (ER) signaling, with subsequent wet lab validation confirming the mechanism (Supplementary Note 1) (Figure 6B-C).
+**Cell-cell communication.** CITEgeist's spatial neighbor graphs and cell type proportions are compatible with tools like COMMOT and CellPhoneDB for inferring ligand-receptor interactions. Spatial coordinates and cell type stratification enable analysis of distance-dependent signaling, such as identifying ligand-receptor pairs enriched at specific cellular interfaces (Figure 6B).
 
 **Clustering and visualization.** Standard scanpy workflows (Leiden clustering, UMAP, rank_genes_groups) operate directly on CITEgeist outputs. The integration with Harmony enables joint visualization of programs across samples, as demonstrated in Module 5.
 
@@ -128,11 +128,11 @@ This interoperability is essential for practical adoption. Rather than requiring
 
 ## 3. Discussion
 
-CITEgeist addresses a fundamental gap in spatial transcriptomics analysis: the mismatch between data that is inherently spatial and methods designed for non-spatial contexts. While established tools like Cell2Location, RCTD, and Tangram have advanced the field significantly, they share a common architecture—learning cell type signatures from external scRNA-seq references and projecting them onto spatial data. This reference-dependent paradigm has three limitations that CITEgeist's spatial-native, integration-first design overcomes.
+CITEgeist addresses a fundamental gap in spatial transcriptomics analysis: the mismatch between data that is inherently spatial and methods designed for non-spatial contexts. While established tools like Cell2Location [8], RCTD, and Tangram [16] have advanced the field significantly, they share a common architecture—learning cell type signatures from external scRNA-seq references and projecting them onto spatial data [18]. This reference-dependent paradigm has three limitations that CITEgeist's spatial-native, integration-first design overcomes.
 
 **From spatial-aware to spatially-native.** Many existing methods incorporate spatial information as regularization or post-processing—coordinates constrain an otherwise non-spatial algorithm. CITEgeist inverts this relationship: spatial statistics drive discovery at every stage. Moran's I filters markers in Module 1, spatial colocalization defines profiles in Module 2, Laplacian smoothing regularizes proportions in Module 3, and spatial coherence validates programs in Module 4. This difference is more than philosophical. Reference-based methods can only discover patterns present in the reference; if a spatial cell state doesn't exist in dissociated single-cell data, it cannot be transferred. CITEgeist discovers patterns from the spatial data itself, using the protein layer as ground truth rather than an external atlas.
 
-**Same-slide anchoring eliminates reference artifacts.** A practical advantage of same-slide proteomics is the elimination of batch effects between reference and query data. scRNA-seq atlases are collected from different individuals, processed with different protocols, and sequenced on different platforms than the spatial data being analyzed. These technical differences propagate through reference-based pipelines, potentially introducing systematic biases. By using protein measurements from the identical tissue section, CITEgeist avoids this source of error. Our benchmarking on Xenium data demonstrates that same-slide proteomics provides sufficient information for competitive deconvolution accuracy (Pearson r = 0.60 vs 0.61 for Cell2Location) without any reference data.
+**Same-slide anchoring eliminates reference artifacts.** A practical advantage of same-slide proteomics is the elimination of batch effects between reference and query data [3,4]. scRNA-seq atlases are collected from different individuals, processed with different protocols, and sequenced on different platforms than the spatial data being analyzed. These technical differences propagate through reference-based pipelines, potentially introducing systematic biases [7]. By using protein measurements from the identical tissue section, CITEgeist avoids this source of error. Our benchmarking on Xenium data demonstrates that same-slide proteomics provides sufficient information for competitive deconvolution accuracy (Pearson r = 0.60 vs 0.61 for Cell2Location [8]) without any reference data.
 
 **Architectural readiness for emerging technologies.** The spatial multi-omics field is evolving rapidly. Visium HD achieves 2 μm resolution approaching single-cell, while expanded antibody panels (100+ targets) and spatial proteomics modalities (CODEX, IMC) provide increasingly rich protein information. CITEgeist's resolution-agnostic design—demonstrated on both spot-level Visium and single-cell Xenium—positions it for these developments. As protein panels expand, Module 2's colocalization-based profile discovery will leverage additional markers automatically. As resolution increases, the same modules apply with adjusted spatial neighborhood definitions. This contrasts with methods requiring substantial rearchitecting for new data types.
 
@@ -210,7 +210,7 @@ Response analysis computes mean program activity in responder vs progressor samp
 
 ### 4.7 Differential Expression Analysis
 
-Pseudo-bulk aggregation sums gene expression within each sample. PyDESeq2 (v0.4) performs differential expression with design formula ~condition (responder vs progressor). Genes with adjusted p < 0.05 are considered significant.
+Pseudo-bulk aggregation sums gene expression within each sample. PyDESeq2 (v0.4) [9,19] performs differential expression with design formula ~condition (responder vs progressor). Genes with adjusted p < 0.05 are considered significant.
 
 ### 4.8 Benchmarking
 
@@ -233,4 +233,60 @@ The authors declare no competing interests.
 ---
 
 *Figure legends provided in separate document: CITEgeist_Patterns_v4_Figures.md*
+
+---
+
+## References
+
+1. Huang H, Wei T, Zhang A, et al. Trends in the incidence and survival of women with hormone receptor-positive breast cancer from 1990 to 2019: a large population-based analysis. Sci Rep. 2024;14:23690.
+
+2. Patel R, Klein P, Tiersten A, Sparano JA. An emerging generation of endocrine therapies in breast cancer: a clinical perspective. Npj Breast Cancer. 2023;9:1–12.
+
+3. Regan C, Preall J. Practical Considerations for Single-Cell Genomics. Curr Protoc. 2022;2:e498.
+
+4. Chang AC-C, Balic M, Bartholow T, et al. Hope for OTHERS (Our Tissue Helping Enhance Research & Science): research results from the University of Pittsburgh rapid autopsy program for breast cancer. Breast Cancer Res. 2025;27.
+
+5. Wess M, Andersen MK, Midtbust E, et al. Spatial integration of multi-omics data from serial sections using the novel Multi-Omics Imaging Integration Toolset. GigaScience. 2025;14:giaf035.
+
+6. Zaidi M, Fu F, Cojocari D, McKee TD, Wouters BG. Quantitative Visualization of Hypoxia and Proliferation Gradients Within Histological Tissue Sections. Front Bioeng Biotechnol. 2019;7:397.
+
+7. Chen J, Liu W, Luo T, et al. A comprehensive comparison on cell-type composition inference for spatial transcriptomics data. Brief Bioinform. 2022;23:bbac245.
+
+8. Kleshchevnikov V, Shmatko A, Dann E, et al. Cell2location maps fine-grained cell types in spatial transcriptomics. Nat Biotechnol. 2022;40:661–71.
+
+9. Love MI, Huber W, Anders S. Moderated estimation of fold change and dispersion for RNA-seq data with DESeq2. Genome Biol. 2014;15:550.
+
+10. Butler A, Hoffman P, Smibert P, Papalexi E, Satija R. Integrating single-cell transcriptomic data across different conditions, technologies, and species. Nat Biotechnol. 2018;36:411–20.
+
+11. Wu SZ, Al-Eryani G, Roden DL, et al. A single-cell and spatially resolved atlas of human breast cancers. Nat Genet. 2021;53:1334–47.
+
+12. Qian J, Bao H, Shao X, et al. Simulating multiple variability in spatially resolved transcriptomics with scCube. Nat Commun. 2024;15:5021.
+
+13. Li Z, McGinn O, Wu Y, et al. ESR1 mutant breast cancers show elevated basal cytokeratins and immune activation. Nat Commun. 2022;13:2011.
+
+14. McAuliffe P. Longitudinal ctDNA Monitoring in Older Women With ER+ Breast Cancer Who Forego Upfront Surgery in Favor of Primary Endocrine Therapy. clinicaltrials.gov; 2025. NCT05914792.
+
+15. Carleton N, Chang AC, Chen F, et al. Longitudinal ctDNA Surveillance in Older Women with ER+ Breast Cancer to Facilitate Surgical De-Escalation: A Prospective, Hybrid-Decentralized Trial with Correlative Studies. medRxiv. 2025;2025.08.23.25332468.
+
+16. Biancalani T, Scalia G, Buffoni L, et al. Deep learning and alignment of spatially resolved single-cell transcriptomes with Tangram. Nat Methods. 2021;18:1352–62.
+
+17. Li X, Wang C-Y. From bulk, single-cell to spatial RNA sequencing. Int J Oral Sci. 2021;13:36.
+
+18. Li H, Zhou J, Li Z, et al. A comprehensive benchmarking with practical guidelines for cellular deconvolution of spatial transcriptomics. Nat Commun. 2023;14:1548.
+
+19. Anders S, Huber W. Differential expression analysis for sequence count data. Genome Biol. 2010;11:R106.
+
+20. Li Z, Chen F, Chen L, et al. EstroGene2.0: A multi-omic database of response to estrogens, ER-modulators, and resistance to endocrine therapies in breast cancer. bioRxiv. 2024;2024.06.28.601163.
+
+21. Visvader JE. Midkine links aging with breast cancer—A new predictor of cancer risk. Cancer Cell. 2024;42:1815–7.
+
+22. Yan P, Jimenez ER, Li Z, et al. Midkine as a driver of age-related changes and increase in mammary tumorigenesis. Cancer Cell. 2024;42:1936-1954.e9.
+
+23. Muramatsu T. Midkine, a heparin-binding cytokine with multiple roles in development, repair and diseases. Proc Jpn Acad Ser B Phys Biol Sci. 2010;86:410–25.
+
+24. Arnesen S, Blanchard Z, Williams MM, et al. Estrogen receptor alpha mutations in breast cancer cells cause gene expression changes through constant activity and secondary effects. Cancer Res. 2021;81:539–51.
+
+25. Li Z, Wu Y, Yates ME, et al. Hotspot ESR1 Mutations Are Multimodal and Contextual Modulators of Breast Cancer Metastasis. Cancer Res. 2022;82:1321–39.
+
+26. Guo L, Kong D, Liu J, et al. Breast cancer heterogeneity and its implication in personalized precision therapy. Exp Hematol Oncol. 2023;12:3.
 
