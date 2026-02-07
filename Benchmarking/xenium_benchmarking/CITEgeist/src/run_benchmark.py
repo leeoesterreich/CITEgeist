@@ -160,17 +160,21 @@ def run_manual_benchmark(
     gex_adata: sc.AnnData,
     protein_adata: sc.AnnData,
     output_dir: Path,
-    radius: float = 4.0,
+    radius: float = 205.0,
     lambda_reg: float = 1.0,
     alpha_elastic: float = 0.7,
     max_y_change: float = 0.4,
     min_counts: int = 25,
     run_gex: bool = False,
+    gex_radius: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Run CITEgeist with manual achievable-7 profiles.
 
     This is the fair benchmark baseline for method comparison.
+
+    Note: radius=205 corresponds to 2 rings (~18 neighbors) for Xenium
+    pseudo-Visium data with 100µm spot spacing.
     """
     logger.info("=" * 70)
     logger.info(f"MANUAL MODE: Region {region_id} with ACHIEVABLE-7 profiles")
@@ -222,12 +226,13 @@ def run_manual_benchmark(
 
     # Run GEX if requested
     gex_time = None
+    gex_r = gex_radius if gex_radius is not None else radius
     if run_gex:
-        logger.info("Running gene expression deconvolution...")
+        logger.info(f"Running gene expression deconvolution (radius={gex_r})...")
         gex_start = time.time()
         try:
             model.run_cell_expression_pass1(
-                radius=radius,
+                radius=gex_r,
                 alpha=0.5,
                 checkpoint_interval=100,
                 output_dir=str(output_dir / "checkpoints"),
@@ -262,7 +267,7 @@ def run_hierarchical_benchmark(
     gex_adata: sc.AnnData,
     protein_adata: sc.AnnData,
     output_dir: Path,
-    radius: float = 4.0,
+    radius: float = 205.0,
     lambda_reg: float = 1.0,
     alpha_elastic: float = 0.7,
     max_y_change: float = 0.4,
@@ -566,12 +571,16 @@ def main():
     )
 
     # Optimization parameters
-    parser.add_argument("--radius", type=float, default=4.0, help="Spatial neighbor radius")
+    parser.add_argument("--radius", type=float, default=205.0, help="Spatial neighbor radius (205=2 rings for 100µm spacing)")
     parser.add_argument("--lambda-reg", type=float, default=1.0, help="Regularization lambda")
     parser.add_argument("--alpha-elastic", type=float, default=0.7, help="Elastic net alpha")
     parser.add_argument("--max-y-change", type=float, default=0.4, help="Max Y change")
     parser.add_argument("--min-counts", type=int, default=25, help="Min counts filter")
     parser.add_argument("--run-gex", action="store_true", help="Run GEX deconvolution")
+    parser.add_argument("--gex-radius", type=float, default=None,
+                        help="Spatial radius for GEX deconvolution (default: same as --radius)")
+    parser.add_argument("--smooth-radius", type=float, default=None,
+                        help="Radius for spatial smoothing of expression before GEX deconvolution")
 
     # Hierarchical-specific parameters
     parser.add_argument(
@@ -582,6 +591,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Default gex-radius to main radius if not specified
+    if args.gex_radius is None:
+        args.gex_radius = args.radius
 
     # Set output directory based on mode if not specified
     if args.output_dir is None:
@@ -618,6 +631,7 @@ def main():
             max_y_change=args.max_y_change,
             min_counts=args.min_counts,
             run_gex=args.run_gex,
+            gex_radius=args.gex_radius,
         )
     else:  # hierarchical
         results = run_hierarchical_benchmark(
