@@ -1,0 +1,48 @@
+{
+  "mode": "quadrant",
+  "quadrant_id": 2,
+  "n_cells_total": 103093,
+  "n_profiles": 7,
+  "profile_names": [
+    "Profile_0",
+    "Profile_1",
+    "Profile_2",
+    "Profile_3",
+    "Profile_4",
+    "Profile_5",
+    "Profile_6"
+  ],
+  "n_programs_per_type": 5,
+  "results": {
+    "Profile_0": {
+      "n_cells": 59143,
+      "n_programs": 5,
+      "mean_morans_i": 0.2544917767425233
+    },
+    "Profile_1": {
+      "n_cells": 29418,
+      "n_programs": 5,
+      "mean_morans_i": 0.15532003113659265
+    },
+    "Profile_2": {
+      "n_cells": 11401,
+      "n_programs": 5,
+      "mean_morans_i": 0.13263646902545806
+    },
+    "Profile_3": {
+      "n_cells": 565,
+      "n_programs": 5,
+      "mean_morans_i": 0.29270734142212074
+    },
+    "Profile_4": {
+      "n_cells": 900,
+      "n_programs": 5,
+      "mean_morans_i": 0.20469961654116925
+    },
+    "Profile_5": {
+      "n_cells": 1250,
+      "n_programs": 5,
+      "mean_morans_i": 0.13414531004160954
+    }
+  }
+}

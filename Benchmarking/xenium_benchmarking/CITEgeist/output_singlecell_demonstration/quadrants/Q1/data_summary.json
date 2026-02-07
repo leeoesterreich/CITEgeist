@@ -1,0 +1,42 @@
+{
+  "mode": "quadrant",
+  "quadrant_id": 1,
+  "n_cells": 140592,
+  "n_genes": 405,
+  "n_proteins": 27,
+  "protein_names": [
+    "PD-1",
+    "VISTA",
+    "PD-L1",
+    "LAG-3",
+    "CD16",
+    "GranzymeB",
+    "CD163",
+    "CD4",
+    "CD20",
+    "CD8A",
+    "CD3E",
+    "CD138",
+    "HLA-DR",
+    "CD11c",
+    "CD68",
+    "CD45RA",
+    "PCNA",
+    "CD45RO",
+    "Ki-67",
+    "Beta-catenin",
+    "CD31",
+    "PTEN",
+    "PanCK",
+    "Vimentin",
+    "alphaSMA",
+    "CD45",
+    "E-Cadherin"
+  ],
+  "spatial_extent": {
+    "x_min": 5757.15380859375,
+    "x_max": 11470.6240234375,
+    "y_min": 9.558087348937988,
+    "y_max": 2897.082275390625
+  }
+}

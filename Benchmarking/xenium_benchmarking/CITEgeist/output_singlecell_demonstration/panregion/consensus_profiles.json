@@ -1,0 +1,49 @@
+{
+  "Exhausted_CD8_T": [
+    "LAG-3",
+    "CD3E",
+    "CD8A",
+    "PD-1",
+    "CD45RO",
+    "CD45"
+  ],
+  "Macrophages": [
+    "CD68",
+    "CD163",
+    "CD16",
+    "HLA-DR"
+  ],
+  "B_cells": [
+    "CD20",
+    "CD45RA"
+  ],
+  "Proliferating_Tumor": [
+    "Ki-67",
+    "PanCK",
+    "PCNA"
+  ],
+  "Stromal": [
+    "CD31",
+    "alphaSMA",
+    "Vimentin",
+    "PTEN"
+  ],
+  "Epithelial": [
+    "E-Cadherin",
+    "Beta-catenin"
+  ],
+  "Plasma_Thelper": [
+    "CD138",
+    "CD4"
+  ],
+  "Dendritic": [
+    "CD11c"
+  ],
+  "Checkpoint_pos": [
+    "PD-L1",
+    "VISTA"
+  ],
+  "Cytotoxic": [
+    "GranzymeB"
+  ]
+}

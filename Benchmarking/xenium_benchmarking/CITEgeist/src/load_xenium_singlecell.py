@@ -171,6 +171,43 @@ def get_region_bounds(
     return region_bounds
 
 
+def get_quadrant_bounds(
+    data_dir: str = XENIUM_DATA_DIR,
+) -> List[Tuple[float, float, float, float]]:
+    """
+    Get quadrant boundaries for the Xenium dataset.
+
+    Quadrants are defined by X/Y midpoint:
+        Q0: bottom-left, Q1: bottom-right, Q2: top-left, Q3: top-right
+
+    Args:
+        data_dir: Path to Xenium output directory.
+
+    Returns:
+        List of (x_min, x_max, y_min, y_max) tuples for each quadrant (Q0-Q3).
+    """
+    try:
+        from load_xenium import load_xenium_data
+    except ImportError:
+        from Benchmarking.xenium_pseudovisium.src.load_xenium import load_xenium_data
+
+    adata = load_xenium_data(data_dir, min_counts=0)
+    coords = adata.obsm["spatial"]
+
+    x_min, x_max = coords[:, 0].min(), coords[:, 0].max()
+    y_min, y_max = coords[:, 1].min(), coords[:, 1].max()
+    x_mid = (x_min + x_max) / 2
+    y_mid = (y_min + y_max) / 2
+
+    return [
+        (x_min, x_mid, y_min, y_mid),  # Q0: bottom-left
+        (x_mid, x_max, y_min, y_mid),  # Q1: bottom-right
+        (x_min, x_mid, y_mid, y_max),  # Q2: top-left
+        (x_mid, x_max, y_mid, y_max),  # Q3: top-right
+    ]
+
+
+
 def load_all_regions(
     data_dir: str = XENIUM_DATA_DIR,
     max_cells_per_region: Optional[int] = None,

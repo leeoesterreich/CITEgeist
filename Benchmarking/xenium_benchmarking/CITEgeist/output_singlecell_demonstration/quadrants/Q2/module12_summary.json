@@ -1,0 +1,441 @@
+{
+  "data": {
+    "mode": "quadrant",
+    "quadrant_id": 2,
+    "n_cells": 103093,
+    "n_genes": 405,
+    "n_proteins": 27,
+    "protein_names": [
+      "PD-1",
+      "VISTA",
+      "PD-L1",
+      "LAG-3",
+      "CD16",
+      "GranzymeB",
+      "CD163",
+      "CD4",
+      "CD20",
+      "CD8A",
+      "CD3E",
+      "CD138",
+      "HLA-DR",
+      "CD11c",
+      "CD68",
+      "CD45RA",
+      "PCNA",
+      "CD45RO",
+      "Ki-67",
+      "Beta-catenin",
+      "CD31",
+      "PTEN",
+      "PanCK",
+      "Vimentin",
+      "alphaSMA",
+      "CD45",
+      "E-Cadherin"
+    ],
+    "spatial_extent": {
+      "x_min": 43.40133285522461,
+      "x_max": 5757.04248046875,
+      "y_min": 2897.112060546875,
+      "y_max": 5712.2158203125
+    }
+  },
+  "module1": {
+    "n_markers_total": 27,
+    "n_interesting": 27,
+    "n_boring": 0,
+    "interesting_markers": [
+      "GranzymeB",
+      "CD163",
+      "CD138",
+      "PanCK",
+      "CD16",
+      "CD20",
+      "Ki-67",
+      "LAG-3",
+      "CD45RA",
+      "PD-L1",
+      "CD3E",
+      "CD11c",
+      "CD4",
+      "Beta-catenin",
+      "CD68",
+      "HLA-DR",
+      "PD-1",
+      "CD31",
+      "CD8A",
+      "VISTA",
+      "CD45RO",
+      "PCNA",
+      "alphaSMA",
+      "E-Cadherin",
+      "PTEN",
+      "Vimentin",
+      "CD45"
+    ],
+    "boring_markers": [],
+    "kurtosis_threshold": 2.0,
+    "morans_threshold": 0.1,
+    "marker_details": [
+      {
+        "marker": "GranzymeB",
+        "interest_score": 987647716.1842976,
+        "kurtosis": 43769.2860050297,
+        "gmm_snr": 48079.16647968474,
+        "morans_i": 0.46932714283211335,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD163",
+        "interest_score": 204111746.3072181,
+        "kurtosis": 6012.230024181242,
+        "gmm_snr": 59809.35423871285,
+        "morans_i": 0.5676273291568426,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD138",
+        "interest_score": 111509624.29058242,
+        "kurtosis": 5071.100931739289,
+        "gmm_snr": 37545.36122590611,
+        "morans_i": 0.5856711225321378,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "PanCK",
+        "interest_score": 91881576.76502134,
+        "kurtosis": 3103.656502935922,
+        "gmm_snr": 60783.143150192336,
+        "morans_i": 0.48704785570761533,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD16",
+        "interest_score": 78622106.86239664,
+        "kurtosis": 2068.1330708729333,
+        "gmm_snr": 61277.248037679536,
+        "morans_i": 0.6203930805589357,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD20",
+        "interest_score": 39641518.592655234,
+        "kurtosis": 1071.310919678638,
+        "gmm_snr": 64799.1718762928,
+        "morans_i": 0.5710383764349233,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "Ki-67",
+        "interest_score": 39135506.6061258,
+        "kurtosis": 3932.0991539024435,
+        "gmm_snr": 20076.142861107328,
+        "morans_i": 0.49575399423897365,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "LAG-3",
+        "interest_score": 31993704.099660743,
+        "kurtosis": 987.1171586997696,
+        "gmm_snr": 68548.20127702005,
+        "morans_i": 0.4728242685624283,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD45RA",
+        "interest_score": 9356620.252280511,
+        "kurtosis": 166.3631984940638,
+        "gmm_snr": 73301.39481002624,
+        "morans_i": 0.7672722713356444,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "PD-L1",
+        "interest_score": 6190956.582105534,
+        "kurtosis": 967.3730394197786,
+        "gmm_snr": 11806.152432318999,
+        "morans_i": 0.5420700249179294,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD3E",
+        "interest_score": 4635941.795484271,
+        "kurtosis": 35.162655096395675,
+        "gmm_snr": 181423.02959996412,
+        "morans_i": 0.7267146226365191,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD11c",
+        "interest_score": 4545234.857791753,
+        "kurtosis": 454.59580591943654,
+        "gmm_snr": 18172.90557342749,
+        "morans_i": 0.5501821980387718,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD4",
+        "interest_score": 3398261.0333630755,
+        "kurtosis": 147.84787301424498,
+        "gmm_snr": 33698.06741252532,
+        "morans_i": 0.6820821116953505,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "Beta-catenin",
+        "interest_score": 2816747.5667650336,
+        "kurtosis": 283.21538059983453,
+        "gmm_snr": 18447.553366592758,
+        "morans_i": 0.539128533439121,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD68",
+        "interest_score": 2213393.302749712,
+        "kurtosis": 23.924070623718197,
+        "gmm_snr": 165892.65654398332,
+        "morans_i": 0.557694490281547,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "HLA-DR",
+        "interest_score": 2042493.7159968733,
+        "kurtosis": 20.439840565492343,
+        "gmm_snr": 160276.1894483178,
+        "morans_i": 0.623468069913236,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "PD-1",
+        "interest_score": 1449039.5057578508,
+        "kurtosis": 49.83620276436973,
+        "gmm_snr": 50550.28917723265,
+        "morans_i": 0.5751904112362823,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD31",
+        "interest_score": 1275908.1613213555,
+        "kurtosis": 29.84612982997522,
+        "gmm_snr": 77783.07775350346,
+        "morans_i": 0.5495994229621478,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD8A",
+        "interest_score": 1116134.0667562496,
+        "kurtosis": 8.42741533244736,
+        "gmm_snr": 208969.46553149595,
+        "morans_i": 0.6337808811420197,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "VISTA",
+        "interest_score": 924806.3442672332,
+        "kurtosis": 47.8924427654452,
+        "gmm_snr": 39057.782509444565,
+        "morans_i": 0.4943974575767858,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD45RO",
+        "interest_score": 297735.4109064762,
+        "kurtosis": 12.372988416811047,
+        "gmm_snr": 34849.141373782695,
+        "morans_i": 0.6905001886258305,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "PCNA",
+        "interest_score": 767.1675595349659,
+        "kurtosis": 217.33641821955575,
+        "gmm_snr": 6.829571105204146,
+        "morans_i": 0.5168497297400071,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "alphaSMA",
+        "interest_score": 73.18019972129093,
+        "kurtosis": 13.572182883143345,
+        "gmm_snr": 7.423207509284032,
+        "morans_i": 0.7263606127137457,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "E-Cadherin",
+        "interest_score": 43.27557846898486,
+        "kurtosis": 26.929832384494656,
+        "gmm_snr": 2.1920463259010505,
+        "morans_i": 0.7330937271664851,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "PTEN",
+        "interest_score": 21.997241711219168,
+        "kurtosis": 11.974100367714218,
+        "gmm_snr": 2.633867398754122,
+        "morans_i": 0.697479465568239,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "Vimentin",
+        "interest_score": 17.491907142404333,
+        "kurtosis": 7.618550644312544,
+        "gmm_snr": 3.201929759811482,
+        "morans_i": 0.717055883659015,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": true,
+        "passed_gmm": true,
+        "passed_morans": true
+      },
+      {
+        "marker": "CD45",
+        "interest_score": 5.215460516506211,
+        "kurtosis": 0.6515844353425333,
+        "gmm_snr": 11.06932859302028,
+        "morans_i": 0.7231038613761885,
+        "morans_i_pvalue": 0.005,
+        "passed_kurtosis": false,
+        "passed_gmm": true,
+        "passed_morans": true
+      }
+    ]
+  },
+  "module2": {
+    "n_profiles_raw": 7,
+    "n_profiles_selected": 7,
+    "profiles": {
+      "Profile_0": {
+        "markers": [
+          "Beta-catenin",
+          "CD31",
+          "alphaSMA",
+          "E-Cadherin",
+          "PTEN",
+          "Vimentin"
+        ]
+      },
+      "Profile_1": {
+        "markers": [
+          "LAG-3",
+          "CD3E",
+          "PD-1",
+          "CD8A",
+          "CD45RO",
+          "CD45"
+        ]
+      },
+      "Profile_2": {
+        "markers": [
+          "GranzymeB",
+          "CD163",
+          "CD16",
+          "CD68",
+          "HLA-DR",
+          "VISTA"
+        ]
+      },
+      "Profile_3": {
+        "markers": [
+          "PanCK",
+          "Ki-67",
+          "PCNA"
+        ]
+      },
+      "Profile_4": {
+        "markers": [
+          "CD138",
+          "CD20",
+          "CD45RA",
+          "CD4"
+        ]
+      },
+      "Profile_5": {
+        "markers": [
+          "CD11c"
+        ]
+      },
+      "Profile_6": {
+        "markers": [
+          "PD-L1"
+        ]
+      }
+    }
+  }
+}
