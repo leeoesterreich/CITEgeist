@@ -33,6 +33,7 @@ from .gurobi_impl import (
 from .utils import (
     assert_neighborhood_size,
     cleanup_memory,
+    compute_optimal_radius,
     export_anndata_layers,
     get_neighbors_with_fixed_radius,
     setup_logging,
@@ -439,6 +440,11 @@ class CitegeistModel:
         per_marker_beta=True,
         beta_min=0.1,
         beta_max=2.0,
+        # Cell classification parameters (cell resolution only)
+        use_gating=None,
+        priority_dict=None,
+        threshold_method="auto",
+        use_negative_gates=False,
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -472,7 +478,12 @@ class CitegeistModel:
             lambda_laplacian = self.resolution_params["lambda_spatial"]
 
         if radius is None:
-            raise ValueError("Radius must be provided. Run `run_cell_proportion_model` with a radius argument.")
+            # Auto-detect optimal radius from spatial coordinates
+            source_adata = self.antibody_capture_adata or self.gene_expression_adata
+            if source_adata is None:
+                raise ValueError("No AnnData available for radius auto-detection")
+            radius = compute_optimal_radius(source_adata)
+            logging.info(f"Auto-detected radius: {radius:.2f} (3 rings)")
 
         if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
@@ -491,6 +502,18 @@ class CitegeistModel:
             else:
                 logging.warning("No spatial coordinates found for Laplacian smoothing - disabling")
                 lambda_laplacian = 0
+
+        # Dispatch to gating-based classification for cell resolution
+        if use_gating is None:
+            use_gating = (self.resolution == "cell")
+        if use_gating:
+            logging.info("Cell resolution: dispatching to gating-based classification")
+            return self._run_cell_classification(
+                threshold_method=threshold_method,
+                priority_dict=priority_dict,
+                use_negative_gates=use_negative_gates,
+                coords=coords,
+            )
 
         spot_names = self.antibody_capture_adata.obs_names
 
@@ -681,9 +704,16 @@ class CitegeistModel:
 
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 
+    def _run_cell_classification(self, **kwargs):
+        """Archived — gating-based cell classification module removed."""
+        raise NotImplementedError(
+            "Gating-based cell classification has been archived. "
+            "Use spot-resolution QP deconvolution (use_gating=False) instead."
+        )
+
     def run_cell_expression_pass1(
         self,
-        radius,
+        radius=None,
         alpha=0.5,
         global_enrichment_weight=0.5,
         local_enrichment_weight=0.5,
@@ -691,6 +721,8 @@ class CitegeistModel:
         checkpoint_interval=100,
         output_dir="checkpoints",
         rerun=True,
+        continuous_relaxation=True,
+        lambda_gex_reg=0.01,
     ):
         """
         Run first pass of gene expression deconvolution.
@@ -713,6 +745,14 @@ class CitegeistModel:
         """
         if not self.preprocessed_gex:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
+
+        # Auto-detect radius if not specified
+        if radius is None:
+            source_adata = self.gene_expression_adata or self.antibody_capture_adata
+            if source_adata is None:
+                raise ValueError("No AnnData available for radius auto-detection")
+            radius = compute_optimal_radius(source_adata)
+            logging.info(f"Auto-detected radius: {radius:.2f} (3 rings)")
 
         logging.info("Starting Pass 1: Error minimization with enrichment weights...")
 
@@ -806,6 +846,8 @@ class CitegeistModel:
             checkpoint_interval=checkpoint_interval,
             output_dir=output_dir,
             rerun=rerun,
+            continuous_relaxation=continuous_relaxation,
+            lambda_gex_reg=lambda_gex_reg,
         )
 
         # Get dimensions for NaN imputation and consistency checks
@@ -820,7 +862,7 @@ class CitegeistModel:
             logging.info(f"Found {len(nan_spots)} spots that failed to converge. Starting imputation...")
 
             imputed_count = 0
-            zero_profile = np.zeros((T, M), dtype=int)
+            zero_profile = np.zeros((T, M), dtype=float)
 
             for spot_idx in nan_spots:
                 # Prioritize imputing with zeros if cell proportions are negligible
@@ -839,7 +881,7 @@ class CitegeistModel:
                 neighbor_profiles = [spotwise_profiles[i] for i in neighbor_indices if i in spotwise_profiles]
 
                 if neighbor_profiles:
-                    imputed_profile = np.round(np.nanmean(neighbor_profiles, axis=0)).astype(int)
+                    imputed_profile = np.nanmean(neighbor_profiles, axis=0)
                     spotwise_profiles[spot_idx] = imputed_profile
                     logging.info(f"Imputed spot {spot_idx} using {len(neighbor_profiles)} neighbors.")
                     imputed_count += 1

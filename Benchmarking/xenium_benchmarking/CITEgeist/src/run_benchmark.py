@@ -160,7 +160,7 @@ def run_manual_benchmark(
     gex_adata: sc.AnnData,
     protein_adata: sc.AnnData,
     output_dir: Path,
-    radius: float = 205.0,
+    radius: Optional[float] = None,
     lambda_reg: float = 1.0,
     alpha_elastic: float = 0.7,
     max_y_change: float = 0.4,
@@ -173,8 +173,8 @@ def run_manual_benchmark(
 
     This is the fair benchmark baseline for method comparison.
 
-    Note: radius=205 corresponds to 2 rings (~18 neighbors) for Xenium
-    pseudo-Visium data with 100µm spot spacing.
+    Note: radius is auto-detected from spatial coordinates (3 rings optimal).
+    For Xenium pseudo-Visium with 100µm spacing, this gives ~305.
     """
     logger.info("=" * 70)
     logger.info(f"MANUAL MODE: Region {region_id} with ACHIEVABLE-7 profiles")
@@ -267,7 +267,7 @@ def run_hierarchical_benchmark(
     gex_adata: sc.AnnData,
     protein_adata: sc.AnnData,
     output_dir: Path,
-    radius: float = 205.0,
+    radius: Optional[float] = None,
     lambda_reg: float = 1.0,
     alpha_elastic: float = 0.7,
     max_y_change: float = 0.4,
@@ -571,7 +571,8 @@ def main():
     )
 
     # Optimization parameters
-    parser.add_argument("--radius", type=float, default=205.0, help="Spatial neighbor radius (205=2 rings for 100µm spacing)")
+    parser.add_argument("--radius", type=float, default=None,
+                        help="Spatial neighbor radius (auto-detected if not specified)")
     parser.add_argument("--lambda-reg", type=float, default=1.0, help="Regularization lambda")
     parser.add_argument("--alpha-elastic", type=float, default=0.7, help="Elastic net alpha")
     parser.add_argument("--max-y-change", type=float, default=0.4, help="Max Y change")

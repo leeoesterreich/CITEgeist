@@ -19,13 +19,13 @@ from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model import (
     identify_interesting_markers,
     analyze_marker_colocalization,
-    discover_profiles,
     # Module 2c: Profile selection
     select_profiles,
     # Module 4: Protein-anchored program discovery
     discover_anchored_programs,
     store_results_in_adata,
 )
+from CITEgeist.model.spatial_colocalization import discover_profiles_continuous
 
 def main():
 
@@ -59,7 +59,8 @@ def main():
 
     parser = argparse.ArgumentParser(description='Run CITEgeist on a single sample.')
     parser.add_argument('--path', type=str, required=True, help='Path to the sample')
-    parser.add_argument('--radius', type=float, required=True, help='Radius for neighbor detection')
+    parser.add_argument('--radius', type=float, default=None,
+                        help='Radius for neighbor detection (auto-detected if not specified)')
     parser.add_argument('--min_counts', type=float, default=100, required=True,
                        help='Minimum counts for filtering')
     parser.add_argument('--output_folder', type=str, default='output', help='Output folder')
@@ -184,12 +185,12 @@ def main():
             )
             print(f"  Found {len(coloc_result.pairs)} significant colocalization pairs")
 
-            # Module 2b: Discover profiles
-            print("\nModule 2b: Discovering profiles...")
-            discovery_result = discover_profiles(
+            # Module 2b: Discover profiles (using continuous weighting - more robust)
+            print("\nModule 2b: Discovering profiles (continuous weighting)...")
+            discovery_result = discover_profiles_continuous(
                 colocalization_result=coloc_result,
-                fdr_alpha=args.fdr_threshold,
                 top_k=args.top_k,
+                distance_metric="colocalization_score",
                 seed=args.discovery_seed,
                 verbose=True,
             )

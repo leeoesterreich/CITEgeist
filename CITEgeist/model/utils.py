@@ -53,6 +53,89 @@ def setup_logging(output_folder, sample_name):
 ### 📏 **Spatial Neighbor Functions**
 
 
+def compute_optimal_radius(
+    adata: sc.AnnData,
+    n_rings: float = 3.0,
+    fallback_spacing: float = 100.0,
+    min_spots: int = 10,
+) -> float:
+    """
+    Compute optimal spatial radius for neighborhood-based operations.
+
+    Uses median nearest-neighbor distance from spatial coordinates
+    to determine spot spacing, then computes radius for n_rings rings.
+
+    The default of 3 rings was empirically validated via radius sweep
+    benchmarking (see docs/plans/2026-02-07-radius-sweep-benchmark-design.md).
+
+    Args:
+        adata: AnnData with obsm['spatial'] coordinates.
+        n_rings: Number of neighborhood rings (default 3.0, empirically optimal).
+        fallback_spacing: Fallback spot spacing if auto-detection fails (default 100µm).
+        min_spots: Minimum spots required for reliable estimation.
+
+    Returns:
+        Optimal radius in same units as spatial coordinates.
+
+    Example:
+        >>> radius = compute_optimal_radius(adata)
+        >>> model.run_cell_proportion_model(radius=radius)
+    """
+    logger = logging.getLogger(__name__)
+
+    coords = adata.obsm.get("spatial", None)
+
+    if coords is None:
+        logger.warning(
+            f"No spatial coordinates in adata.obsm['spatial']. "
+            f"Using fallback spacing: {fallback_spacing}"
+        )
+        spot_spacing = fallback_spacing
+    elif coords.shape[0] < min_spots:
+        logger.warning(
+            f"Only {coords.shape[0]} spots (< {min_spots}). "
+            f"Using fallback spacing: {fallback_spacing}"
+        )
+        spot_spacing = fallback_spacing
+    else:
+        from scipy.spatial import cKDTree
+
+        # Filter out non-finite coordinates
+        valid_mask = np.all(np.isfinite(coords), axis=1)
+        valid_coords = coords[valid_mask]
+
+        if valid_coords.shape[0] < min_spots:
+            logger.warning(
+                f"Only {valid_coords.shape[0]} valid coordinates. "
+                f"Using fallback spacing: {fallback_spacing}"
+            )
+            spot_spacing = fallback_spacing
+        else:
+            tree = cKDTree(valid_coords)
+            # Query 2 nearest neighbors (self + nearest)
+            distances, _ = tree.query(valid_coords, k=2)
+            # distances[:, 1] is distance to nearest neighbor ([:, 0] is self = 0)
+            nn_distances = distances[:, 1]
+            spot_spacing = float(np.median(nn_distances))
+
+            logger.info(
+                f"Detected spot spacing: {spot_spacing:.2f} units "
+                f"(median of {len(nn_distances)} nearest-neighbor distances)"
+            )
+
+    # Compute radius for n rings
+    # Formula: radius = spot_spacing * (n_rings + 0.05)
+    # The 0.05 buffer ensures neighbors at exactly n_rings distance are included
+    radius = spot_spacing * (n_rings + 0.05)
+
+    logger.info(
+        f"Computed optimal radius: {radius:.2f} ({n_rings} rings, "
+        f"spot_spacing={spot_spacing:.2f})"
+    )
+
+    return radius
+
+
 def find_fixed_radius_neighbors(spot_index, adata, radius=50):
     """
     Find neighbors within a fixed radius of a given spot.
