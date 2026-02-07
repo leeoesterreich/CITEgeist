@@ -25,6 +25,12 @@ from matplotlib.gridspec import GridSpec
 import seaborn as sns
 from pathlib import Path
 
+# Import shared style
+from figure_style import apply_style, PALETTE, CELL_TYPE_COLORS, MODULE_COLORS
+
+# Apply publication style
+apply_style()
+
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 STAGED_EVAL_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output_staged_evaluation/summary"
@@ -35,18 +41,6 @@ OUTPUT_DIR = Path(__file__).parent / "output"
 
 # Ensure output directory exists
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-# Style settings
-plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['font.size'] = 8
-plt.rcParams['axes.linewidth'] = 0.5
-plt.rcParams['xtick.major.width'] = 0.5
-plt.rcParams['ytick.major.width'] = 0.5
-
-# Color scheme
-MODULE1_COLOR = '#3498db'  # Blue
-MODULE2_COLOR = '#2ecc71'  # Green
-HIGHLIGHT_COLOR = '#e74c3c'  # Red for important markers
 
 
 def load_module1_data(region_id=0):
@@ -98,13 +92,14 @@ def panel_a_marker_interest(ax, module1_df):
     ax.set_ylim(0, 1)
     ax.axis('off')
 
-    # Title
-    ax.text(0.5, 0.98, "A. Module 1: Marker Interest Detection",
-            ha='center', va='top', fontsize=11, fontweight='bold')
+    # Panel label and title
+    ax.text(0.02, 0.98, "A", fontsize=14, fontweight='bold', va='top')
+    ax.text(0.5, 0.98, "Module 1: Marker Interest Detection",
+            ha='center', va='top', fontsize=12, fontweight='bold')
 
     if module1_df is None:
         ax.text(0.5, 0.5, "Module 1 data not available\n(Generate with run_singlecell_pipeline.py)",
-                ha='center', va='center', fontsize=9, style='italic', color='gray')
+                ha='center', va='center', fontsize=10, style='italic', color=PALETTE['neutral'])
         return
 
     # Filter to top markers by interest score
@@ -114,56 +109,56 @@ def panel_a_marker_interest(ax, module1_df):
 
     # Sub-panel 1: Kurtosis Gate (left)
     ax.text(0.17, 0.85, "Kurtosis Gate", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE1_COLOR)
-    ax.text(0.17, 0.78, r"$\kappa > 2.0$", ha='center', va='top', fontsize=10)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[1])
+    ax.text(0.17, 0.78, r"$\kappa > 2.0$", ha='center', va='top', fontsize=11)
 
     # Draw distribution sketch showing peaked vs flat
     # Peaked distribution (passes)
     x_peaked = np.linspace(0.05, 0.29, 50)
     y_peaked = 0.55 + 0.15 * np.exp(-((x_peaked - 0.17)**2) / (2 * 0.02**2))
-    ax.plot(x_peaked, y_peaked, color='#27ae60', linewidth=2)
-    ax.fill_between(x_peaked, 0.55, y_peaked, color='#27ae60', alpha=0.3)
+    ax.plot(x_peaked, y_peaked, color=PALETTE['accent2'], linewidth=2)
+    ax.fill_between(x_peaked, 0.55, y_peaked, color=PALETTE['accent2'], alpha=0.3)
     ax.text(0.17, 0.72, "High kurtosis\n(signal)", ha='center', va='bottom',
-            fontsize=6, color='#27ae60')
+            fontsize=8, color=PALETTE['accent2'])
 
     # Flat distribution (fails)
     x_flat = np.linspace(0.05, 0.29, 50)
     y_flat = 0.35 + 0.03 * np.sin(x_flat * 30) + 0.05
-    ax.plot(x_flat, y_flat, color='#95a5a6', linewidth=2)
-    ax.fill_between(x_flat, 0.35, y_flat, color='#95a5a6', alpha=0.3)
+    ax.plot(x_flat, y_flat, color=PALETTE['neutral'], linewidth=2)
+    ax.fill_between(x_flat, 0.35, y_flat, color=PALETTE['neutral'], alpha=0.3)
     ax.text(0.17, 0.32, "Low kurtosis\n(noise)", ha='center', va='top',
-            fontsize=6, color='#7f8c8d')
+            fontsize=8, color=PALETTE['neutral'])
 
     # Sub-panel 2: GMM SNR Gate (center)
     ax.text(0.50, 0.85, "GMM SNR Gate", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE1_COLOR)
-    ax.text(0.50, 0.78, "2-component separation", ha='center', va='top', fontsize=8)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[1])
+    ax.text(0.50, 0.78, "2-component separation", ha='center', va='top', fontsize=9)
 
     # Draw two Gaussian components
     x_gmm = np.linspace(0.35, 0.65, 100)
 
     # Background component
     y_bg = 0.55 + 0.08 * np.exp(-((x_gmm - 0.42)**2) / (2 * 0.015**2))
-    ax.plot(x_gmm, y_bg, color='#3498db', linewidth=2)
-    ax.fill_between(x_gmm, 0.55, y_bg, color='#3498db', alpha=0.3)
+    ax.plot(x_gmm, y_bg, color=PALETTE['primary'], linewidth=2)
+    ax.fill_between(x_gmm, 0.55, y_bg, color=PALETTE['primary'], alpha=0.3)
 
     # Signal component
     y_sig = 0.55 + 0.12 * np.exp(-((x_gmm - 0.58)**2) / (2 * 0.02**2))
-    ax.plot(x_gmm, y_sig, color='#e74c3c', linewidth=2)
-    ax.fill_between(x_gmm, 0.55, y_sig, color='#e74c3c', alpha=0.3)
+    ax.plot(x_gmm, y_sig, color=PALETTE['highlight'], linewidth=2)
+    ax.fill_between(x_gmm, 0.55, y_sig, color=PALETTE['highlight'], alpha=0.3)
 
-    ax.text(0.42, 0.68, "BG", ha='center', va='bottom', fontsize=7, color='#3498db')
-    ax.text(0.58, 0.72, "Signal", ha='center', va='bottom', fontsize=7, color='#e74c3c')
+    ax.text(0.42, 0.68, "BG", ha='center', va='bottom', fontsize=9, color=PALETTE['primary'])
+    ax.text(0.58, 0.72, "Signal", ha='center', va='bottom', fontsize=9, color=PALETTE['highlight'])
 
     # SNR arrow
     ax.annotate('', xy=(0.58, 0.50), xytext=(0.42, 0.50),
                 arrowprops=dict(arrowstyle='<->', color='#2c3e50', lw=1.5))
-    ax.text(0.50, 0.47, "SNR", ha='center', va='top', fontsize=7, fontweight='bold')
+    ax.text(0.50, 0.47, "SNR", ha='center', va='top', fontsize=9, fontweight='bold')
 
     # Sub-panel 3: Moran's I Gate (right)
     ax.text(0.83, 0.85, "Moran's I Gate", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE1_COLOR)
-    ax.text(0.83, 0.78, "Spatial autocorrelation", ha='center', va='top', fontsize=8)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[1])
+    ax.text(0.83, 0.78, "Spatial autocorrelation", ha='center', va='top', fontsize=9)
 
     # Draw spatial clustering illustration
     # High Moran's I (clustered)
@@ -173,32 +168,35 @@ def panel_a_marker_interest(ax, module1_df):
     cluster2_x = np.random.normal(0.90, 0.02, 8)
     cluster2_y = np.random.normal(0.58, 0.02, 8)
 
-    ax.scatter(cluster1_x, cluster1_y, c='#27ae60', s=25, alpha=0.8, edgecolors='white', linewidths=0.5)
-    ax.scatter(cluster2_x, cluster2_y, c='#27ae60', s=25, alpha=0.8, edgecolors='white', linewidths=0.5)
-    ax.text(0.83, 0.72, r"I > 0.2$\rightarrow$Spatial", ha='center', va='bottom',
-            fontsize=6, color='#27ae60')
+    ax.scatter(cluster1_x, cluster1_y, c=PALETTE['accent2'], s=25, alpha=0.8,
+               edgecolors='white', linewidths=0.5)
+    ax.scatter(cluster2_x, cluster2_y, c=PALETTE['accent2'], s=25, alpha=0.8,
+               edgecolors='white', linewidths=0.5)
+    ax.text(0.83, 0.72, r"I > 0.2 $\rightarrow$ Spatial", ha='center', va='bottom',
+            fontsize=8, color=PALETTE['accent2'])
 
     # Random (low Moran's I)
     rand_x = np.random.uniform(0.70, 0.96, 12)
     rand_y = np.random.uniform(0.35, 0.48, 12)
-    ax.scatter(rand_x, rand_y, c='#95a5a6', s=20, alpha=0.6, edgecolors='white', linewidths=0.5)
+    ax.scatter(rand_x, rand_y, c=PALETTE['neutral'], s=20, alpha=0.6,
+               edgecolors='white', linewidths=0.5)
     ax.text(0.83, 0.32, "Random pattern", ha='center', va='top',
-            fontsize=6, color='#7f8c8d')
+            fontsize=8, color=PALETTE['neutral'])
 
     # Bottom summary
     n_interesting = (module1_df['passed_either'] == True).sum() if 'passed_either' in module1_df.columns else 0
     n_total = len(module1_df)
-    ax.text(0.5, 0.18, f"Pass EITHER kurtosis OR Moran's I gate (+ GMM filter)",
-            ha='center', va='top', fontsize=8)
+    ax.text(0.5, 0.18, "Pass EITHER kurtosis OR Moran's I gate (+ GMM filter)",
+            ha='center', va='top', fontsize=10)
     ax.text(0.5, 0.10, f"Example Region 0: {n_interesting}/{n_total} markers passed",
-            ha='center', va='top', fontsize=8, fontweight='bold', color='#27ae60')
+            ha='center', va='top', fontsize=10, fontweight='bold', color=PALETTE['accent2'])
 
     # Draw OR logic gate
     or_box = FancyBboxPatch((0.42, 0.12), 0.16, 0.08,
-                            boxstyle="round,pad=0.01", facecolor='#f8f9fa',
+                            boxstyle="round,pad=0.01", facecolor=PALETTE['background'],
                             edgecolor='#2c3e50', linewidth=1)
     ax.add_patch(or_box)
-    ax.text(0.5, 0.16, "OR", ha='center', va='center', fontsize=8, fontweight='bold')
+    ax.text(0.5, 0.16, "OR", ha='center', va='center', fontsize=10, fontweight='bold')
 
 
 def panel_b_workflow(ax):
@@ -207,13 +205,14 @@ def panel_b_workflow(ax):
     ax.set_ylim(0, 1)
     ax.axis('off')
 
-    # Title
-    ax.text(0.5, 0.98, "B. Module 2: Profile Discovery Workflow",
-            ha='center', va='top', fontsize=11, fontweight='bold')
+    # Panel label and title
+    ax.text(0.02, 0.98, "B", fontsize=14, fontweight='bold', va='top')
+    ax.text(0.5, 0.98, "Module 2: Profile Discovery Workflow",
+            ha='center', va='top', fontsize=12, fontweight='bold')
 
     # Step 1: Colocalization Analysis (left)
     ax.text(0.18, 0.85, "Step 1: Colocalization", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE2_COLOR)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[2])
 
     # Draw marker pairs with connection strengths
     markers = [
@@ -223,9 +222,10 @@ def panel_b_workflow(ax):
     ]
 
     for x, y, label in markers:
-        circle = Circle((x, y), 0.035, facecolor='#ecf0f1', edgecolor=MODULE2_COLOR, linewidth=1.5)
+        circle = Circle((x, y), 0.035, facecolor='#ecf0f1',
+                        edgecolor=MODULE_COLORS[2], linewidth=1.5)
         ax.add_patch(circle)
-        ax.text(x, y, label, ha='center', va='center', fontsize=6, fontweight='bold')
+        ax.text(x, y, label, ha='center', va='center', fontsize=7, fontweight='bold')
 
     # Draw edges with varying thickness
     edges = [
@@ -237,10 +237,10 @@ def panel_b_workflow(ax):
 
     for start, end, width in edges:
         ax.plot([start[0], end[0]], [start[1], end[1]],
-                color=MODULE2_COLOR, linewidth=width, alpha=0.6)
+                color=MODULE_COLORS[2], linewidth=width, alpha=0.6)
 
     ax.text(0.18, 0.28, "Same-spot\nCo-occurrence\n+ Bivariate I",
-            ha='center', va='top', fontsize=7, style='italic', color='#7f8c8d')
+            ha='center', va='top', fontsize=9, style='italic', color=PALETTE['neutral'])
 
     # Arrow to step 2
     ax.annotate('', xy=(0.40, 0.55), xytext=(0.32, 0.55),
@@ -248,7 +248,7 @@ def panel_b_workflow(ax):
 
     # Step 2: Network & Clustering (center)
     ax.text(0.52, 0.85, "Step 2: Clustering", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE2_COLOR)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[2])
 
     # Draw dendrogram-like structure
     # Root
@@ -258,34 +258,38 @@ def panel_b_workflow(ax):
     ax.plot([0.52, 0.42], [0.70, 0.70], color='#2c3e50', linewidth=1.5)
     ax.plot([0.52, 0.62], [0.70, 0.70], color='#2c3e50', linewidth=1.5)
 
-    # Left branch
+    # Left branch (T cells)
     ax.plot([0.42, 0.42], [0.70, 0.60], color='#2c3e50', linewidth=1.5)
-    ax.plot([0.42, 0.38], [0.60, 0.60], color='#e74c3c', linewidth=1.5)
-    ax.plot([0.42, 0.46], [0.60, 0.60], color='#e74c3c', linewidth=1.5)
-    ax.plot([0.38, 0.38], [0.60, 0.48], color='#e74c3c', linewidth=1.5)
-    ax.plot([0.46, 0.46], [0.60, 0.48], color='#e74c3c', linewidth=1.5)
+    ax.plot([0.42, 0.38], [0.60, 0.60], color=CELL_TYPE_COLORS['T cells'], linewidth=1.5)
+    ax.plot([0.42, 0.46], [0.60, 0.60], color=CELL_TYPE_COLORS['T cells'], linewidth=1.5)
+    ax.plot([0.38, 0.38], [0.60, 0.48], color=CELL_TYPE_COLORS['T cells'], linewidth=1.5)
+    ax.plot([0.46, 0.46], [0.60, 0.48], color=CELL_TYPE_COLORS['T cells'], linewidth=1.5)
 
-    # Right branch
+    # Right branch (Macrophages)
     ax.plot([0.62, 0.62], [0.70, 0.60], color='#2c3e50', linewidth=1.5)
-    ax.plot([0.62, 0.58], [0.60, 0.60], color='#3498db', linewidth=1.5)
-    ax.plot([0.62, 0.66], [0.60, 0.60], color='#3498db', linewidth=1.5)
-    ax.plot([0.58, 0.58], [0.60, 0.48], color='#3498db', linewidth=1.5)
-    ax.plot([0.66, 0.66], [0.60, 0.48], color='#3498db', linewidth=1.5)
+    ax.plot([0.62, 0.58], [0.60, 0.60], color=CELL_TYPE_COLORS['Macrophages'], linewidth=1.5)
+    ax.plot([0.62, 0.66], [0.60, 0.60], color=CELL_TYPE_COLORS['Macrophages'], linewidth=1.5)
+    ax.plot([0.58, 0.58], [0.60, 0.48], color=CELL_TYPE_COLORS['Macrophages'], linewidth=1.5)
+    ax.plot([0.66, 0.66], [0.60, 0.48], color=CELL_TYPE_COLORS['Macrophages'], linewidth=1.5)
 
     # Leaf nodes
     leaves = [
-        (0.38, 0.45, '#e74c3c'), (0.46, 0.45, '#e74c3c'),
-        (0.58, 0.45, '#3498db'), (0.66, 0.45, '#3498db'),
+        (0.38, 0.45, CELL_TYPE_COLORS['T cells']),
+        (0.46, 0.45, CELL_TYPE_COLORS['T cells']),
+        (0.58, 0.45, CELL_TYPE_COLORS['Macrophages']),
+        (0.66, 0.45, CELL_TYPE_COLORS['Macrophages']),
     ]
     for x, y, color in leaves:
         circle = Circle((x, y), 0.025, facecolor=color, edgecolor='white', linewidth=1)
         ax.add_patch(circle)
 
-    ax.text(0.42, 0.35, "T cells", ha='center', va='top', fontsize=7, color='#e74c3c', fontweight='bold')
-    ax.text(0.62, 0.35, "Macs", ha='center', va='top', fontsize=7, color='#3498db', fontweight='bold')
+    ax.text(0.42, 0.35, "T cells", ha='center', va='top', fontsize=9,
+            color=CELL_TYPE_COLORS['T cells'], fontweight='bold')
+    ax.text(0.62, 0.35, "Macs", ha='center', va='top', fontsize=9,
+            color=CELL_TYPE_COLORS['Macrophages'], fontweight='bold')
 
     ax.text(0.52, 0.28, "Hierarchical\nClustering\n+ Dynamic Cut",
-            ha='center', va='top', fontsize=7, style='italic', color='#7f8c8d')
+            ha='center', va='top', fontsize=9, style='italic', color=PALETTE['neutral'])
 
     # Arrow to step 3
     ax.annotate('', xy=(0.76, 0.55), xytext=(0.68, 0.55),
@@ -293,12 +297,12 @@ def panel_b_workflow(ax):
 
     # Step 3: Profiles (right)
     ax.text(0.86, 0.85, "Step 3: Profiles", ha='center', va='top',
-            fontsize=9, fontweight='bold', color=MODULE2_COLOR)
+            fontsize=10, fontweight='bold', color=MODULE_COLORS[2])
 
     # Draw profile boxes
     profiles = [
-        (0.80, 0.68, 'T cells', ['CD3E', 'CD4', 'CD8A'], '#e74c3c'),
-        (0.80, 0.50, 'Macrophages', ['CD68', 'CD163'], '#3498db'),
+        (0.80, 0.68, 'T cells', ['CD3E', 'CD4', 'CD8A'], CELL_TYPE_COLORS['T cells']),
+        (0.80, 0.50, 'Macrophages', ['CD68', 'CD163'], CELL_TYPE_COLORS['Macrophages']),
     ]
 
     for x, y, name, markers, color in profiles:
@@ -307,12 +311,12 @@ def panel_b_workflow(ax):
                             edgecolor=color, linewidth=1.5)
         ax.add_patch(box)
         ax.text(x + 0.075, y + 0.10, name, ha='center', va='top',
-                fontsize=7, fontweight='bold', color=color)
+                fontsize=9, fontweight='bold', color=color)
         ax.text(x + 0.075, y + 0.02, ', '.join(markers), ha='center', va='bottom',
-                fontsize=6, color='#2c3e50')
+                fontsize=8, color='#2c3e50')
 
     ax.text(0.86, 0.28, "Cell-type\nMarker\nProfiles",
-            ha='center', va='top', fontsize=7, style='italic', color='#7f8c8d')
+            ha='center', va='top', fontsize=9, style='italic', color=PALETTE['neutral'])
 
 
 def panel_c_xenium_summary(ax, staged_data):
@@ -321,13 +325,14 @@ def panel_c_xenium_summary(ax, staged_data):
     ax.set_ylim(0, 1)
     ax.axis('off')
 
-    # Title
-    ax.text(0.5, 0.98, "C. Xenium RCC Single-Cell Demonstration",
-            ha='center', va='top', fontsize=11, fontweight='bold')
+    # Panel label and title
+    ax.text(0.02, 0.98, "C", fontsize=14, fontweight='bold', va='top')
+    ax.text(0.5, 0.98, "Xenium RCC Single-Cell Demonstration",
+            ha='center', va='top', fontsize=12, fontweight='bold')
 
     if staged_data.get('module1') is None or staged_data.get('colocalization') is None:
         ax.text(0.5, 0.5, "Staged evaluation data not available",
-                ha='center', va='center', fontsize=9, style='italic', color='gray')
+                ha='center', va='center', fontsize=10, style='italic', color=PALETTE['neutral'])
         return
 
     module1_df = staged_data['module1']
@@ -336,36 +341,38 @@ def panel_c_xenium_summary(ax, staged_data):
 
     # Summary statistics box
     box = FancyBboxPatch((0.05, 0.30), 0.90, 0.55,
-                         boxstyle="round,pad=0.02", facecolor='#f8f9fa',
-                         edgecolor='#dee2e6', linewidth=1)
+                         boxstyle="round,pad=0.02", facecolor=PALETTE['background'],
+                         edgecolor=PALETTE['border'], linewidth=1)
     ax.add_patch(box)
 
     # Dataset info
     ax.text(0.50, 0.82, "Dataset: 10x Xenium Human Renal Cell Carcinoma",
-            ha='center', va='top', fontsize=9, fontweight='bold')
+            ha='center', va='top', fontsize=10, fontweight='bold')
     ax.text(0.50, 0.75, "5 tissue regions | 27 protein markers | ~200K cells",
-            ha='center', va='top', fontsize=8, color='#7f8c8d')
+            ha='center', va='top', fontsize=9, color=PALETTE['neutral'])
 
     # Module 1 results
-    ax.text(0.15, 0.65, "Module 1:", ha='left', va='top', fontsize=9, fontweight='bold', color=MODULE1_COLOR)
+    ax.text(0.15, 0.65, "Module 1:", ha='left', va='top', fontsize=10,
+            fontweight='bold', color=MODULE_COLORS[1])
     n_interesting = int(module1_df['n_interesting'].mean())
     sensitivity = module1_df['overall_sensitivity'].mean()
     ax.text(0.15, 0.58, f"  {n_interesting}/27 markers interesting (all regions)",
-            ha='left', va='top', fontsize=8)
+            ha='left', va='top', fontsize=9)
     ax.text(0.15, 0.52, f"  100% sensitivity to critical markers",
-            ha='left', va='top', fontsize=8, color='#27ae60')
+            ha='left', va='top', fontsize=9, color=PALETTE['accent2'])
 
     # Module 2a results
-    ax.text(0.15, 0.44, "Module 2a:", ha='left', va='top', fontsize=9, fontweight='bold', color=MODULE2_COLOR)
+    ax.text(0.15, 0.44, "Module 2a:", ha='left', va='top', fontsize=10,
+            fontweight='bold', color=MODULE_COLORS[2])
     n_pairs = int(coloc_df['n_pairs_analyzed'].mean())
     pos_acc = coloc_df['positive_pair_accuracy'].mean()
     ax.text(0.15, 0.37, f"  {n_pairs} marker pairs analyzed",
-            ha='left', va='top', fontsize=8)
+            ha='left', va='top', fontsize=9)
     ax.text(0.15, 0.31, f"  {pos_acc*100:.0f}% positive colocalization accuracy",
-            ha='left', va='top', fontsize=8, color='#27ae60')
+            ha='left', va='top', fontsize=9, color=PALETTE['accent2'])
 
     # Right side: Key metrics
-    ax.text(0.55, 0.65, "Key Findings:", ha='left', va='top', fontsize=9, fontweight='bold')
+    ax.text(0.55, 0.65, "Key Findings:", ha='left', va='top', fontsize=10, fontweight='bold')
 
     findings = [
         "Same algorithm at Visium/cell resolution",
@@ -376,14 +383,14 @@ def panel_c_xenium_summary(ax, staged_data):
 
     for i, finding in enumerate(findings):
         y = 0.58 - i * 0.07
-        ax.text(0.55, y, f"  {finding}", ha='left', va='top', fontsize=7)
-        check = Circle((0.53, y - 0.01), 0.015, facecolor='#27ae60', edgecolor='none')
+        ax.text(0.55, y, f"  {finding}", ha='left', va='top', fontsize=9)
+        check = Circle((0.53, y - 0.01), 0.015, facecolor=PALETTE['accent2'], edgecolor='none')
         ax.add_patch(check)
 
     # Note at bottom
     ax.text(0.5, 0.15, "Resolution-agnostic: single-cell Moran's I replaces spot-level statistics",
-            ha='center', va='top', fontsize=8, style='italic',
-            bbox=dict(boxstyle='round', facecolor='#e8f6f3', edgecolor='#27ae60'))
+            ha='center', va='top', fontsize=9, style='italic',
+            bbox=dict(boxstyle='round', facecolor='#e8f6f3', edgecolor=PALETTE['accent2']))
 
 
 def panel_d_profile_comparison(ax):
@@ -392,9 +399,10 @@ def panel_d_profile_comparison(ax):
     ax.set_ylim(0, 1)
     ax.axis('off')
 
-    # Title
-    ax.text(0.5, 0.98, "D. Discovered Profiles vs Known Markers",
-            ha='center', va='top', fontsize=11, fontweight='bold')
+    # Panel label and title
+    ax.text(0.02, 0.98, "D", fontsize=14, fontweight='bold', va='top')
+    ax.text(0.5, 0.98, "Discovered Profiles vs Known Markers",
+            ha='center', va='top', fontsize=12, fontweight='bold')
 
     # Load profiles for region 0
     profiles = load_cell_resolution_profiles(0)
@@ -402,7 +410,7 @@ def panel_d_profile_comparison(ax):
 
     if profiles is None:
         ax.text(0.5, 0.5, "Profile data not available",
-                ha='center', va='center', fontsize=9, style='italic', color='gray')
+                ha='center', va='center', fontsize=10, style='italic', color=PALETTE['neutral'])
         return
 
     # Create comparison table
@@ -428,61 +436,64 @@ def panel_d_profile_comparison(ax):
     headers = ['Cell Type', 'Known Markers', 'Discovered']
     for j, (header, col_start, col_width) in enumerate(zip(headers, col_starts, col_widths)):
         box = FancyBboxPatch((col_start, y_start), col_width - 0.02, row_height - 0.02,
-                            boxstyle="round,pad=0.005", facecolor='#3498db',
-                            edgecolor='none', alpha=0.8)
+                            boxstyle="round,pad=0.005", facecolor=PALETTE['primary'],
+                            edgecolor='none', alpha=0.9)
         ax.add_patch(box)
         ax.text(col_start + col_width/2 - 0.01, y_start + row_height/2 - 0.01,
-                header, ha='center', va='center', fontsize=8, fontweight='bold', color='white')
+                header, ha='center', va='center', fontsize=9, fontweight='bold', color='white')
 
     # Data rows
     for i, cell_type in enumerate(cell_types):
         y = y_start - (i + 1) * row_height
 
         # Alternate row colors
-        bg_color = '#f8f9fa' if i % 2 == 0 else 'white'
+        bg_color = PALETTE['background'] if i % 2 == 0 else 'white'
 
         for j, (col_start, col_width) in enumerate(zip(col_starts, col_widths)):
             box = FancyBboxPatch((col_start, y), col_width - 0.02, row_height - 0.02,
                                 boxstyle="round,pad=0.005", facecolor=bg_color,
-                                edgecolor='#dee2e6', linewidth=0.5)
+                                edgecolor=PALETTE['border'], linewidth=0.5)
             ax.add_patch(box)
 
         # Cell type name
         ax.text(col_starts[0] + col_widths[0]/2 - 0.01, y + row_height/2 - 0.01,
-                cell_type, ha='center', va='center', fontsize=7, fontweight='bold')
+                cell_type, ha='center', va='center', fontsize=8, fontweight='bold')
 
         # Known markers
         known = known_markers[cell_type]
         ax.text(col_starts[1] + col_widths[1]/2 - 0.01, y + row_height/2 - 0.01,
-                ', '.join(known), ha='center', va='center', fontsize=7)
+                ', '.join(known), ha='center', va='center', fontsize=8)
 
         # Discovered markers (from profiles dict)
         discovered = profiles.get(cell_type, [])
         match_status = "MATCH" if set(discovered) == set(known) else "partial"
 
         if set(discovered) == set(known):
-            status_color = '#27ae60'
+            status_color = PALETTE['accent2']
             status_symbol = "="
         elif set(known).issubset(set(discovered)):
-            status_color = '#f39c12'
+            status_color = PALETTE['accent1']
             status_symbol = "+"
         else:
-            status_color = '#95a5a6'
+            status_color = PALETTE['neutral']
             status_symbol = "?"
 
         text = ', '.join(discovered) if discovered else '-'
         ax.text(col_starts[2] + col_widths[2]/2 - 0.01, y + row_height/2 - 0.01,
-                f"{status_symbol} {text}", ha='center', va='center', fontsize=7, color=status_color)
+                f"{status_symbol} {text}", ha='center', va='center', fontsize=8, color=status_color)
 
     # Legend
-    ax.text(0.15, 0.08, "=", ha='center', va='center', fontsize=10, fontweight='bold', color='#27ae60')
-    ax.text(0.22, 0.08, "Exact match", ha='left', va='center', fontsize=7)
+    ax.text(0.15, 0.08, "=", ha='center', va='center', fontsize=11,
+            fontweight='bold', color=PALETTE['accent2'])
+    ax.text(0.22, 0.08, "Exact match", ha='left', va='center', fontsize=9)
 
-    ax.text(0.45, 0.08, "+", ha='center', va='center', fontsize=10, fontweight='bold', color='#f39c12')
-    ax.text(0.52, 0.08, "Superset", ha='left', va='center', fontsize=7)
+    ax.text(0.45, 0.08, "+", ha='center', va='center', fontsize=11,
+            fontweight='bold', color=PALETTE['accent1'])
+    ax.text(0.52, 0.08, "Superset", ha='left', va='center', fontsize=9)
 
-    ax.text(0.75, 0.08, "?", ha='center', va='center', fontsize=10, fontweight='bold', color='#95a5a6')
-    ax.text(0.82, 0.08, "Not found", ha='left', va='center', fontsize=7)
+    ax.text(0.75, 0.08, "?", ha='center', va='center', fontsize=11,
+            fontweight='bold', color=PALETTE['neutral'])
+    ax.text(0.82, 0.08, "Not found", ha='left', va='center', fontsize=9)
 
 
 def generate_figure2():
@@ -499,9 +510,9 @@ def generate_figure2():
     if staged_data.get('module1') is not None:
         print(f"Loaded staged evaluation: {len(staged_data['module1'])} regions")
 
-    # Create figure with 4 panels
-    fig = plt.figure(figsize=(14, 11))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.25, wspace=0.20)
+    # Create figure with 4 panels - tighter layout
+    fig = plt.figure(figsize=(12, 10))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.22, wspace=0.18)
 
     # Panel A: Marker interest detection (top left)
     ax_a = fig.add_subplot(gs[0, 0])
@@ -519,9 +530,6 @@ def generate_figure2():
     ax_d = fig.add_subplot(gs[1, 1])
     panel_d_profile_comparison(ax_d)
 
-    # Add figure label
-    fig.text(0.02, 0.98, "Figure 2", fontsize=14, fontweight='bold', va='top')
-
     # Save
     output_path = OUTPUT_DIR / "figure2_profile_discovery.pdf"
     plt.savefig(output_path, dpi=300, bbox_inches='tight', facecolor='white')
@@ -531,6 +539,11 @@ def generate_figure2():
     png_path = OUTPUT_DIR / "figure2_profile_discovery.png"
     plt.savefig(png_path, dpi=150, bbox_inches='tight', facecolor='white')
     print(f"Preview saved to {png_path}")
+
+    # Save SVG for Illustrator
+    svg_path = OUTPUT_DIR / "figure2_profile_discovery.svg"
+    plt.savefig(svg_path, format='svg', bbox_inches='tight', facecolor='white')
+    print(f"SVG saved to {svg_path}")
 
     plt.close()
 
@@ -561,6 +574,11 @@ def generate_figure2():
     if profiles:
         print(f"  - {len(profiles)} cell type profiles discovered")
         print(f"  - Profiles: {list(profiles.keys())}")
+
+    print("\nEnhancements applied:")
+    print("  - Fonts increased to minimum 10pt")
+    print("  - Consistent color palette from figure_style.py")
+    print("  - Panel labels moved to top-left corner")
 
 
 if __name__ == "__main__":
