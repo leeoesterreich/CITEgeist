@@ -232,40 +232,5 @@ The authors declare no competing interests.
 
 ---
 
-## Figure Legends
-
-**Figure 1. CITEgeist Framework Overview.**
-(A) Schematic of the five-module pipeline: Module 1 (Marker Interest Detection), Module 2 (Profile Assembly), Module 3 (Spatial Deconvolution), Module 4 (Program Discovery), Module 5 (Cross-Sample Integration). Arrows indicate data flow between modules.
-(B) Spatial-native operations highlighted at each stage: Moran's I for marker detection, colocalization networks for profile discovery, Laplacian regularization for proportion estimation, spatial coherence validation for programs.
-(C) Resolution flexibility: the same framework operates on spot-level (Visium) and single-cell (Xenium) data.
-
-**Figure 2. Modules 1-2: Automated Profile Discovery.**
-(A) Marker interest detection using three statistical gates: Moran's I spatial autocorrelation, Gaussian mixture modeling for signal-to-noise, and kurtosis analysis.
-(B) Profile assembly from spatial colocalization: pairwise marker relationships → network construction → hierarchical clustering → profile extraction.
-(C) Xenium single-cell demonstration showing discovered profiles from spatial colocalization analysis.
-(D) Validation: discovered profiles correctly recover known cell type markers (CD3E/CD8A for T cells, CD68/CD163 for macrophages, EPCAM/KRT for epithelial).
-
-**Figure 3. Module 3: Spatial Deconvolution Benchmarking.**
-(A) Two-pass deconvolution schematic: Pass 1 estimates proportions from protein markers with Laplacian regularization; Pass 2 deconvolves gene expression using proportion constraints.
-(B) Benchmarking on Xenium pseudo-Visium spots (n=7,054): comparison of CITEgeist, Cell2Location, RCTD, Tangram, and Seurat on Pearson correlation, Jensen-Shannon divergence, and RMSE.
-(C) Example spatial visualization of estimated proportions across a tissue region.
-
-**Figure 4. Module 4: Spatial Program Discovery.**
-(A) NMF-based program discovery schematic: cell type-specific expression layers → matrix factorization → program loadings and activities → Moran's I validation.
-(B) Program examples: top genes for selected programs across cell types with associated Moran's I values.
-(C) Moran's I validation: scatter plot of program activity variance vs spatial coherence (I values), with threshold for biologically meaningful programs.
-(D) Xenium single-cell programs demonstrating resolution-agnostic application.
-(E) Bivariate relationships: heatmap of program-program spatial correlations identifying co-localized and mutually exclusive pairs.
-
-**Figure 5. Module 5: Cross-Sample Integration.**
-(A) Integration schematic: per-sample programs → Harmony alignment → aligned programs → response analysis.
-(B) UMAP visualization of 590 programs from 14 samples, colored by cell type, showing successful integration.
-(C) Responder vs progressor enriched programs: bar plot showing 3 responder-enriched and 4 progressor-enriched aligned programs.
-(D) PyDESeq2 volcano plot: 127 significant genes (5 responder-up, 122 progressor-up) from pseudo-bulk differential expression analysis.
-(E) Conserved spatial relationship network: edges represent program pairs with consistent co-localization (green) or exclusion (red) across samples.
-
-**Figure 6. Interpretable Outputs and Interoperability.**
-(A) Workflow diagram showing CITEgeist outputs feeding into standard tools: PyDESeq2 for differential expression, GSEApy for pathway analysis, COMMOT for cell-cell communication.
-(B) Midkine (MDK) discovery summary: spatially resolved ligand-receptor signaling identified through COMMOT analysis of CITEgeist outputs.
-(C) Wet lab validation: summary of experimental confirmation of computationally predicted mechanisms.
+*Figure legends provided in separate document: CITEgeist_Patterns_v4_Figures.md*
 
