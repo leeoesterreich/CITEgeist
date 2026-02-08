@@ -84,7 +84,7 @@ Methods designed for label transfer rather than quantitative deconvolution perfo
 
 On simulated spatial data with known ground truth cell type proportions, CITEgeist achieved higher accuracy (r = 0.95, JSD = 0.16) than on real tissue data, demonstrating excellent performance under controlled conditions where the underlying cell type model matches the data generation process.
 
-For gene expression deconvolution (Pass 2), CITEgeist achieved mean Pearson r = 0.44 across 7 cell types with 100% gene coverage (395 genes evaluated). In comparison, scResolve achieved similar correlation (r = 0.43) but at only 32% spot coverage, meaning it could only provide deconvolved expression for a third of the tissue locations. CITEgeist's complete spatial coverage is critical for downstream spatial analyses and program discovery.
+For gene expression deconvolution (Pass 2), CITEgeist achieved mean Pearson r = 0.44 across 7 cell types with 100% gene coverage (395 genes evaluated), providing deconvolved expression estimates for every spatial location. This complete spatial coverage is critical for downstream spatial analyses and program discovery.
 
 Importantly, CITEgeist achieved this accuracy without requiring any external reference data—the protein measurements from the same tissue section provided sufficient information for competitive deconvolution. This demonstrates that same-slide proteomics can replace reference atlases for proportion estimation while avoiding potential artifacts from reference-sample mismatches.
 
@@ -96,7 +96,7 @@ For each cell type, we extract the deconvolved expression matrix (spots × genes
 
 To distinguish biologically meaningful programs from noise, we compute Moran's I spatial autocorrelation on each program's activity pattern across tissue space. Programs with significant positive Moran's I (I > 0.2, p < 0.01) exhibit spatial clustering—cells running these programs tend to co-localize. Programs with near-zero Moran's I have random spatial distributions and are less likely to represent coordinated tissue-level processes.
 
-Applied to 5 Xenium tissue regions with 7 cell types, Module 4 discovered 175 total programs (25 programs per region, 5 per cell type) (Figure 4B-C). Moran's I values ranged from 0.04 to 0.37, with 68% of programs exceeding the I > 0.15 threshold for moderate spatial coherence. The highest spatial coherence was observed in fibroblast programs (mean I = 0.28), consistent with the known spatial organization of stromal cells in tissue architecture. T cell programs showed more variable coherence (I range 0.08-0.26), reflecting heterogeneity in immune infiltration patterns.
+Applied to 5 Xenium tissue regions with 7 cell types, Module 4 discovered 175 total programs (25 programs per region, 5 per cell type) (Figure 4B-C). Moran's I values ranged from 0.04 to 0.37, with 57% of programs (100/175) exceeding the I > 0.15 threshold for moderate spatial coherence. The highest spatial coherence was observed in fibroblast programs (mean I = 0.28), consistent with the known spatial organization of stromal cells in tissue architecture. T cell programs showed more variable coherence (I range 0.08-0.26), reflecting heterogeneity in immune infiltration patterns.
 
 Example high-coherence programs included a fibroblast program enriched for HLA-DRA, FCGR3A, and HLA-DRB1 (Moran's I = 0.37), suggesting antigen-presenting fibroblast subpopulations with organized spatial distribution. A CD4+ T cell program with VIM, CD3E, and PTEN (I = 0.26) identified spatially clustered activated T cells (Figure 4D).
 
