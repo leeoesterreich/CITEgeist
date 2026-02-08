@@ -11,6 +11,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.patches import Patch
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
@@ -24,7 +25,18 @@ apply_style()
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 PYDESEQ_DIR = PROJECT_ROOT / "examples/output_module5_pydeseq"
 OUTPUT_DIR = Path(__file__).parent / "output"
+SCHEMATIC_DIR = OUTPUT_DIR / "schematics" / "rendered"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_schematic(filename):
+    """Load a rendered schematic PNG."""
+    filepath = SCHEMATIC_DIR / filename
+    if filepath.exists():
+        return mpimg.imread(str(filepath))
+    else:
+        print(f"WARNING: {filename} not found")
+        return None
 
 # Tool colors
 TOOL_COLORS = {
@@ -58,31 +70,42 @@ def load_enrichment_results():
 
 
 def panel_b_scanpy_umap(ax):
-    """Panel B: Simulated UMAP showing clustering."""
+    """Panel B: Real UMAP from deconvolved data."""
     ax.text(-0.05, 1.08, "B", fontsize=14, fontweight='bold', va='top', transform=ax.transAxes)
     ax.set_title("scanpy: Cluster Visualization", fontsize=10, fontweight='bold', loc='left', color=TOOL_COLORS['scanpy'])
 
-    np.random.seed(42)
-    cell_types = ['Epithelial', 'Fibroblasts', 'Macrophages', 'T cells', 'B cells', 'Endothelial']
-    centers = [(-3, 2), (2, 3), (-2, -2), (3, -1), (0, 4), (4, 1)]
+    # Use real deconvolved UMAP from Xenium benchmarking
+    umap_path = OUTPUT_DIR / "spatial_panels" / "deconvolved_umap_region0.png"
+    if umap_path.exists():
+        umap_img = mpimg.imread(str(umap_path))
+        ax.imshow(umap_img)
+        ax.axis('off')
+        ax.text(0.02, 0.02, "Deconvolved GEX layers\nenable cell-type clustering",
+                transform=ax.transAxes, fontsize=8, style='italic', va='bottom', color=PALETTE['neutral'])
+    else:
+        # Fallback to simulated if real data not available
+        print(f"WARNING: {umap_path} not found, using simulated data")
+        np.random.seed(42)
+        cell_types = ['Epithelial', 'Fibroblasts', 'Macrophages', 'T cells', 'B cells', 'Endothelial']
+        centers = [(-3, 2), (2, 3), (-2, -2), (3, -1), (0, 4), (4, 1)]
 
-    for ct, (cx, cy) in zip(cell_types, centers):
-        n = np.random.randint(80, 150)
-        x = np.random.normal(cx, 0.8, n)
-        y = np.random.normal(cy, 0.8, n)
-        color = get_cell_type_color(ct)
-        ax.scatter(x, y, c=color, s=8, alpha=0.6, label=ct.replace(' cells', ''), rasterized=True)
+        for ct, (cx, cy) in zip(cell_types, centers):
+            n = np.random.randint(80, 150)
+            x = np.random.normal(cx, 0.8, n)
+            y = np.random.normal(cy, 0.8, n)
+            color = get_cell_type_color(ct)
+            ax.scatter(x, y, c=color, s=8, alpha=0.6, label=ct.replace(' cells', ''), rasterized=True)
 
-    ax.set_xlabel("UMAP1", fontsize=9)
-    ax.set_ylabel("UMAP2", fontsize=9)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.legend(loc='upper right', fontsize=7, framealpha=0.9, markerscale=1.2)
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+        ax.set_xlabel("UMAP1", fontsize=9)
+        ax.set_ylabel("UMAP2", fontsize=9)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.legend(loc='upper right', fontsize=7, framealpha=0.9, markerscale=1.2)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
-    ax.text(0.02, 0.02, "Deconvolved GEX layers\nenable cell-type clustering",
-            transform=ax.transAxes, fontsize=8, style='italic', va='bottom', color=PALETTE['neutral'])
+        ax.text(0.02, 0.02, "Deconvolved GEX layers\nenable cell-type clustering",
+                transform=ax.transAxes, fontsize=8, style='italic', va='bottom', color=PALETTE['neutral'])
 
 
 def panel_c_volcano(ax, de_data):
@@ -164,7 +187,7 @@ def panel_d_enrichment(ax, enrichment_data):
     combined = combined.sort_values('neglog10p', ascending=True)
 
     combined['short_term'] = combined['Term'].apply(
-        lambda x: x.split('(')[0].strip()[:35] + '...' if len(x.split('(')[0].strip()) > 35 else x.split('(')[0].strip()
+        lambda x: x.split('(')[0].strip()[:45] + '...' if len(x.split('(')[0].strip()) > 45 else x.split('(')[0].strip()
     )
 
     colors = ['#2ecc71' if d == 'Responder' else '#e74c3c' for d in combined['direction']]
@@ -183,7 +206,7 @@ def panel_d_enrichment(ax, enrichment_data):
 
 
 def generate_figure6():
-    """Generate Figure 6 with data panels."""
+    """Generate Figure 6 by assembling schematic and data panels."""
     print("Loading data...")
     de_data = load_de_results()
     enrichment_data = load_enrichment_results()
@@ -193,22 +216,23 @@ def generate_figure6():
     if enrichment_data:
         print(f"Enrichment results: {list(enrichment_data.keys())}")
 
+    # Load schematics
+    panel_a_img = load_schematic("figure6_panel_a_workflow.png")
+    panel_e_img = load_schematic("figure6_panel_e_validation.png")
+
     plt.rcParams['figure.constrained_layout.use'] = False
 
     fig = plt.figure(figsize=(12, 8))
     gs = GridSpec(2, 3, figure=fig, height_ratios=[1, 1],
-                  hspace=0.35, wspace=0.30,
-                  left=0.06, right=0.98, top=0.95, bottom=0.08)
+                  hspace=0.20, wspace=0.20,
+                  left=0.04, right=0.98, top=0.95, bottom=0.06)
 
-    # Panel A: Placeholder for schematic
+    # Panel A: Downstream Analysis Workflow schematic
     ax_a = fig.add_subplot(gs[0, 0])
-    ax_a.text(0.5, 0.5, "Panel A: Schematic\n\nUse SVG file:\nfigure6_panel_a_workflow.svg",
-              ha='center', va='center', fontsize=10, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_a.set_xlim(0, 1)
-    ax_a.set_ylim(0, 1)
+    if panel_a_img is not None:
+        ax_a.imshow(panel_a_img)
     ax_a.axis('off')
-    ax_a.set_title("CITEgeist → Downstream", fontsize=11, fontweight='bold', loc='left')
+    ax_a.text(-0.02, 1.05, "A", fontsize=16, fontweight='bold', va='top', transform=ax_a.transAxes)
 
     # Panel B: scanpy UMAP (DATA)
     ax_b = fig.add_subplot(gs[0, 1])
@@ -222,15 +246,12 @@ def generate_figure6():
     ax_d = fig.add_subplot(gs[1, 0])
     panel_d_enrichment(ax_d, enrichment_data)
 
-    # Panel E: Placeholder for validation schematic
+    # Panel E: Experimental Validation schematic
     ax_e = fig.add_subplot(gs[1, 1:])
-    ax_e.text(0.5, 0.5, "Panel E: Schematic\n\nUse SVG file:\nfigure6_panel_e_validation.svg",
-              ha='center', va='center', fontsize=10, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_e.set_xlim(0, 1)
-    ax_e.set_ylim(0, 1)
+    if panel_e_img is not None:
+        ax_e.imshow(panel_e_img)
     ax_e.axis('off')
-    ax_e.set_title("Experimental Validation: Midkine Discovery", fontsize=11, fontweight='bold', loc='left')
+    ax_e.text(-0.02, 1.05, "E", fontsize=16, fontweight='bold', va='top', transform=ax_e.transAxes)
 
     plt.rcParams['savefig.bbox'] = 'standard'
 

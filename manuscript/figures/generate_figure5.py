@@ -10,6 +10,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 import matplotlib.patches as mpatches
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
@@ -35,7 +36,18 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 MODULE5_DIR = PROJECT_ROOT / "output/module5_integration"
 OUTPUT_DIR = Path(__file__).parent / "output"
+SCHEMATIC_DIR = OUTPUT_DIR / "schematics" / "rendered"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_schematic(filename):
+    """Load a rendered schematic PNG."""
+    filepath = SCHEMATIC_DIR / filename
+    if filepath.exists():
+        return mpimg.imread(str(filepath))
+    else:
+        print(f"WARNING: {filename} not found")
+        return None
 
 # Response colors
 RESPONSE_COLORS = {
@@ -163,23 +175,23 @@ def panel_d_volcano(ax):
 
 
 def generate_figure5():
-    """Generate Figure 5 with data panels."""
+    """Generate Figure 5 by assembling schematic and data panels."""
     print("Loading data...")
     aligned, embedding, metadata, response = load_data()
     print(f"Programs: {len(aligned)}, Embedding: {embedding.shape}")
 
-    fig = plt.figure(figsize=(11, 8))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.30, wspace=0.28)
+    # Load schematic
+    panel_a_img = load_schematic("figure5_panel_a_integration.png")
 
-    # Panel A: Placeholder for schematic
+    fig = plt.figure(figsize=(11, 8))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.20, wspace=0.22)
+
+    # Panel A: Cross-Sample Integration schematic
     ax_a = fig.add_subplot(gs[0, 0])
-    ax_a.text(0.5, 0.5, "Panel A: Schematic\n\nUse SVG file:\nfigure5_panel_a_integration.svg",
-              ha='center', va='center', fontsize=11, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_a.set_xlim(0, 1)
-    ax_a.set_ylim(0, 1)
+    if panel_a_img is not None:
+        ax_a.imshow(panel_a_img)
     ax_a.axis('off')
-    ax_a.set_title("Cross-Sample Integration", fontsize=12, fontweight='bold', loc='left', pad=10)
+    ax_a.text(-0.02, 1.05, "A", fontsize=16, fontweight='bold', va='top', transform=ax_a.transAxes)
 
     # Panel B: UMAP (DATA)
     ax_b = fig.add_subplot(gs[0, 1])

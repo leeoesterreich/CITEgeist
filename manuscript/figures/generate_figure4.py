@@ -9,6 +9,7 @@ Panels B, C, D: DATA - generated with matplotlib below
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
 
@@ -20,7 +21,18 @@ apply_style()
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 XENIUM_MODULE4_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output_module4_validation/singlecell"
 OUTPUT_DIR = Path(__file__).parent / "output"
+SCHEMATIC_DIR = OUTPUT_DIR / "schematics" / "rendered"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_schematic(filename):
+    """Load a rendered schematic PNG."""
+    filepath = SCHEMATIC_DIR / filename
+    if filepath.exists():
+        return mpimg.imread(str(filepath))
+    else:
+        print(f"WARNING: {filename} not found")
+        return None
 
 
 def load_xenium_programs():
@@ -158,7 +170,7 @@ def panel_d_summary(ax, programs_df):
 
 
 def generate_figure4():
-    """Generate Figure 4 with data panels."""
+    """Generate Figure 4 by assembling schematic and data panels."""
     print("Loading data...")
     programs = load_xenium_programs()
     if programs is not None:
@@ -166,18 +178,18 @@ def generate_figure4():
     else:
         print("WARNING: No program data available")
 
-    fig = plt.figure(figsize=(11, 8))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.30, wspace=0.28)
+    # Load schematic
+    panel_a_img = load_schematic("figure4_panel_a_nmf.png")
 
-    # Panel A: Placeholder for schematic
+    fig = plt.figure(figsize=(11, 8))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.20, wspace=0.22)
+
+    # Panel A: NMF Program Discovery schematic
     ax_a = fig.add_subplot(gs[0, 0])
-    ax_a.text(0.5, 0.5, "Panel A: Schematic\n\nUse SVG file:\nfigure4_panel_a_nmf.svg",
-              ha='center', va='center', fontsize=11, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_a.set_xlim(0, 1)
-    ax_a.set_ylim(0, 1)
+    if panel_a_img is not None:
+        ax_a.imshow(panel_a_img)
     ax_a.axis('off')
-    ax_a.set_title("Program Discovery", fontsize=12, fontweight='bold', loc='left', pad=10)
+    ax_a.text(-0.02, 1.05, "A", fontsize=16, fontweight='bold', va='top', transform=ax_a.transAxes)
 
     # Panel B: Top programs (DATA)
     ax_b = fig.add_subplot(gs[0, 1])

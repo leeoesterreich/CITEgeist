@@ -2,23 +2,19 @@
 """
 Figure 2: Modules 1-2 Profile Discovery
 
-Panels A, B, C: SCHEMATICS - need dedicated SVG files
-Panel D: DATA TABLE - generated with matplotlib
-
-Note: Figure 2 schematics are complex and not yet in svg_schematics.py.
-For now, this script generates Panel D only.
-Create A, B, C manually in Illustrator using consistent styling.
+Panels A, B, C: SVG schematics (embedded as PNG)
+Panel D: DATA TABLE - matplotlib
 """
 
 import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.patches import FancyBboxPatch
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
 
-# Import shared style
 from figure_style import apply_style, PALETTE, CELL_TYPE_COLORS
 
 apply_style()
@@ -27,7 +23,18 @@ apply_style()
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 CELL_RES_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output_cell_resolution"
 OUTPUT_DIR = Path(__file__).parent / "output"
+SCHEMATIC_DIR = OUTPUT_DIR / "schematics" / "rendered"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_schematic(filename):
+    """Load a rendered schematic PNG."""
+    filepath = SCHEMATIC_DIR / filename
+    if filepath.exists():
+        return mpimg.imread(str(filepath))
+    else:
+        print(f"WARNING: {filename} not found")
+        return None
 
 
 def load_cell_resolution_profiles(region_id=0):
@@ -41,7 +48,7 @@ def load_cell_resolution_profiles(region_id=0):
 
 def panel_d_profile_table(ax):
     """Panel D: Discovered profiles vs known markers table."""
-    ax.text(0.02, 0.98, "D", fontsize=14, fontweight='bold', va='top')
+    ax.text(-0.02, 1.05, "D", fontsize=14, fontweight='bold', va='top', transform=ax.transAxes)
     ax.axis('off')
 
     profiles = load_cell_resolution_profiles(0)
@@ -122,48 +129,44 @@ def panel_d_profile_table(ax):
 
 
 def generate_figure2():
-    """Generate Figure 2 with placeholders for schematics."""
-    print("Generating Figure 2...")
+    """Generate Figure 2 by assembling schematic and data panels."""
+    print("Loading schematics...")
+
+    panel_a = load_schematic("figure2_panel_a_marker_interest.png")
+    panel_b = load_schematic("figure2_panel_b_profile_discovery.png")
+    panel_c = load_schematic("figure2_panel_c_xenium_demo.png")
 
     fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.22, wspace=0.18)
+    gs = GridSpec(2, 2, figure=fig, hspace=0.15, wspace=0.12)
 
-    # Panel A: Placeholder
+    # Panel A: Marker Interest Detection (SVG schematic)
     ax_a = fig.add_subplot(gs[0, 0])
-    ax_a.text(0.5, 0.5, "Panel A: Schematic\n\nMarker Interest Detection\n(Create in Illustrator)",
-              ha='center', va='center', fontsize=10, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_a.set_xlim(0, 1)
-    ax_a.set_ylim(0, 1)
+    if panel_a is not None:
+        ax_a.imshow(panel_a)
     ax_a.axis('off')
-    ax_a.set_title("Module 1: Marker Interest Detection", fontsize=12, fontweight='bold', loc='left')
+    ax_a.text(-0.02, 1.05, "A", fontsize=16, fontweight='bold', va='top', transform=ax_a.transAxes)
 
-    # Panel B: Placeholder
+    # Panel B: Profile Discovery Workflow (SVG schematic)
     ax_b = fig.add_subplot(gs[0, 1])
-    ax_b.text(0.5, 0.5, "Panel B: Schematic\n\nProfile Discovery Workflow\n(Create in Illustrator)",
-              ha='center', va='center', fontsize=10, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_b.set_xlim(0, 1)
-    ax_b.set_ylim(0, 1)
+    if panel_b is not None:
+        ax_b.imshow(panel_b)
     ax_b.axis('off')
-    ax_b.set_title("Module 2: Profile Discovery Workflow", fontsize=12, fontweight='bold', loc='left')
+    ax_b.text(-0.02, 1.05, "B", fontsize=16, fontweight='bold', va='top', transform=ax_b.transAxes)
 
-    # Panel C: Placeholder
+    # Panel C: Xenium RCC Demonstration (SVG schematic)
     ax_c = fig.add_subplot(gs[1, 0])
-    ax_c.text(0.5, 0.5, "Panel C: Schematic\n\nXenium RCC Demonstration\n(Create in Illustrator)",
-              ha='center', va='center', fontsize=10, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_c.set_xlim(0, 1)
-    ax_c.set_ylim(0, 1)
+    if panel_c is not None:
+        ax_c.imshow(panel_c)
     ax_c.axis('off')
-    ax_c.set_title("Xenium RCC Single-Cell Demonstration", fontsize=12, fontweight='bold', loc='left')
+    ax_c.text(-0.02, 1.05, "C", fontsize=16, fontweight='bold', va='top', transform=ax_c.transAxes)
 
     # Panel D: Profile comparison table (DATA)
     ax_d = fig.add_subplot(gs[1, 1])
     ax_d.set_xlim(0, 1)
     ax_d.set_ylim(0, 1)
     panel_d_profile_table(ax_d)
-    ax_d.set_title("Discovered Profiles vs Known Markers", fontsize=12, fontweight='bold', loc='left')
+
+    plt.tight_layout()
 
     # Save
     for fmt, dpi in [('pdf', 300), ('png', 150), ('svg', None)]:
@@ -177,14 +180,8 @@ def generate_figure2():
     plt.close()
 
     print("\n" + "=" * 60)
-    print("Figure 2: Profile Discovery")
+    print("Figure 2: Profile Discovery - COMPLETE")
     print("=" * 60)
-    print("\nPanels A, B, C: SCHEMATICS - create in Illustrator")
-    print("Panel D: DATA TABLE - generated above")
-    print("\nFigure 2 schematics are complex. Recommended workflow:")
-    print("  1. Use figure2_profile_discovery.svg as template")
-    print("  2. Replace placeholders A, B, C with custom schematics")
-    print("  3. Export final figure")
 
 
 if __name__ == "__main__":

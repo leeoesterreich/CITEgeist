@@ -277,6 +277,171 @@ def figure1_panel_c():
 
 
 # =============================================================================
+# Figure 2 Schematics
+# =============================================================================
+
+def figure2_panel_a():
+    """Figure 2A: Marker Interest Detection (Module 1)."""
+    width, height = 400, 280
+    svg = svg_header(width, height)
+
+    # Title
+    svg += text(200, 25, "Module 1: Marker Interest Detection", "title")
+
+    # Input: Raw antibody data
+    svg += rounded_rect(20, 55, 80, 50, 5, COLORS['background'], COLORS['border'])
+    svg += text(60, 75, "Raw", "small bold")
+    svg += text(60, 90, "Antibodies", "small")
+
+    # Arrow
+    svg += arrow(105, 80, 135, 80)
+
+    # Three parallel test boxes
+    tests = [
+        ("Kurtosis", "≥ 2.0 = peaked", COLORS['primary'], 60),
+        ("GMM", "2-comp SNR", COLORS['secondary'], 115),
+        ("Moran's I", "Spatial clustering", COLORS['accent2'], 170),
+    ]
+    for label, desc, color, y in tests:
+        svg += rounded_rect(140, y, 90, 40, 5, color, 'black', 1.5)
+        svg += text(185, y + 18, label, "label bold white")
+        svg += text(185, y + 32, desc, "small white")
+
+    # Arrows from tests
+    for y in [80, 135, 190]:
+        svg += arrow(235, y, 265, y)
+
+    # Decision logic box
+    svg += rounded_rect(270, 90, 85, 65, 5, '#fff2cc', '#d6b656', 2)
+    svg += text(312, 110, "Decision", "label bold")
+    svg += text(312, 125, "Kurtosis OR", "small")
+    svg += text(312, 140, "Moran's I", "small")
+
+    # Arrows to outputs
+    svg += arrow(360, 110, 390, 90)
+    svg += arrow(360, 135, 390, 155)
+
+    # Output: Interesting/Boring
+    svg += rounded_rect(395, 70, 70, 35, 5, COLORS['accent2'], 'black', 1.5)
+    svg += text(430, 92, "Interesting", "small bold white")
+
+    svg += rounded_rect(395, 135, 70, 35, 5, COLORS['neutral'], 'black', 1.5)
+    svg += text(430, 157, "Boring", "small bold white")
+
+    # Bottom annotation
+    svg += text(200, 250, "Automatic identification of spatially-variable protein markers", "small italic neutral")
+
+    svg += svg_footer()
+    return svg
+
+
+def figure2_panel_b():
+    """Figure 2B: Profile Discovery Workflow (Module 2)."""
+    width, height = 400, 280
+    svg = svg_header(width, height)
+
+    # Title
+    svg += text(200, 25, "Module 2: Profile Discovery", "title")
+
+    # Stage 1: Colocalization
+    svg += rounded_rect(20, 55, 100, 55, 5, COLORS['primary'], '#2980b9', 1.5)
+    svg += text(70, 75, "2a: Colocalization", "small bold white")
+    svg += text(70, 92, "Same-spot, Adjacent", "small white")
+
+    # Arrow
+    svg += arrow(125, 82, 155, 82)
+
+    # Stage 2: Graph
+    svg += rounded_rect(160, 55, 100, 55, 5, COLORS['secondary'], '#7d3c98', 1.5)
+    svg += text(210, 75, "2b: Profile Graph", "small bold white")
+    svg += text(210, 92, "Clustering", "small white")
+
+    # Arrow
+    svg += arrow(265, 82, 295, 82)
+
+    # Stage 3: Selection
+    svg += rounded_rect(300, 55, 95, 55, 5, COLORS['accent2'], '#1e8449', 1.5)
+    svg += text(347, 75, "2c: Selection", "small bold white")
+    svg += text(347, 92, "Reconstruction", "small white")
+
+    # Show example profiles below
+    svg += text(200, 140, "Discovered Profiles:", "label bold")
+
+    # Profile boxes with markers
+    profiles = [
+        ("Epithelial", ["PanCK", "EPCAM"], COLORS['epithelial']),
+        ("Macrophage", ["CD68", "CD163"], COLORS['macrophages']),
+        ("T cells", ["CD3E", "CD4/8"], COLORS['tcells']),
+        ("Fibroblast", ["aSMA", "VIM"], COLORS['fibroblasts']),
+    ]
+    for i, (name, markers, color) in enumerate(profiles):
+        x = 30 + i * 95
+        svg += rounded_rect(x, 160, 85, 60, 5, color, 'black', 1.5)
+        svg += text(x + 42, 178, name, "small bold white")
+        svg += text(x + 42, 195, markers[0], "small white")
+        svg += text(x + 42, 210, markers[1], "small white")
+
+    # Bottom annotation
+    svg += text(200, 250, "Automatic marker-to-cell-type profile assembly", "small italic neutral")
+
+    svg += svg_footer()
+    return svg
+
+
+def figure2_panel_c():
+    """Figure 2C: Xenium RCC Single-Cell Demonstration."""
+    width, height = 400, 280
+    svg = svg_header(width, height)
+
+    # Title
+    svg += text(200, 25, "Xenium RCC Demonstration", "title")
+    svg += text(200, 45, "Single-Cell Resolution Validation", "subtitle neutral")
+
+    # Left: Ground truth (protein)
+    svg += text(100, 75, "Protein Ground Truth", "label bold", fill=COLORS['primary'])
+
+    # Simulated tissue section with colored cells
+    import random
+    random.seed(123)
+    cell_colors = [COLORS['epithelial'], COLORS['macrophages'], COLORS['tcells'],
+                   COLORS['fibroblasts'], COLORS['endothelial']]
+    for _ in range(35):
+        cx = random.randint(45, 155)
+        cy = random.randint(90, 180)
+        svg += circle(cx, cy, 6, random.choice(cell_colors), 'white', 0.5)
+
+    # Right: CITEgeist output
+    svg += text(300, 75, "CITEgeist Output", "label bold", fill=COLORS['accent2'])
+
+    # Similar pattern showing matching
+    random.seed(123)  # Same seed for matching pattern
+    for _ in range(35):
+        cx = random.randint(245, 355)
+        cy = random.randint(90, 180)
+        svg += circle(cx, cy, 6, random.choice(cell_colors), 'white', 0.5)
+
+    # Connecting arrows
+    svg += f'  <line x1="165" y1="135" x2="235" y2="135" stroke="{COLORS["text"]}" stroke-width="2" stroke-dasharray="4,2"/>\n'
+    svg += text(200, 125, "vs", "label bold")
+
+    # Accuracy metric
+    svg += rounded_rect(150, 200, 100, 40, 5, '#d5e8d4', '#82b366', 2)
+    svg += text(200, 218, "Acc: 94.2%", "label bold")
+    svg += text(200, 233, "5 regions", "small neutral")
+
+    # Legend
+    legend = [("Epi", COLORS['epithelial']), ("Mac", COLORS['macrophages']),
+              ("T", COLORS['tcells']), ("Fib", COLORS['fibroblasts']), ("Endo", COLORS['endothelial'])]
+    for i, (label, color) in enumerate(legend):
+        x = 40 + i * 70
+        svg += circle(x, 265, 6, color)
+        svg += text(x + 12, 269, label, "small", "start")
+
+    svg += svg_footer()
+    return svg
+
+
+# =============================================================================
 # Figure 3 Schematic
 # =============================================================================
 
@@ -538,6 +703,9 @@ def generate_all_schematics():
         'figure1_panel_a_pipeline.svg': figure1_panel_a,
         'figure1_panel_b_spatial_stats.svg': figure1_panel_b,
         'figure1_panel_c_resolution.svg': figure1_panel_c,
+        'figure2_panel_a_marker_interest.svg': figure2_panel_a,
+        'figure2_panel_b_profile_discovery.svg': figure2_panel_b,
+        'figure2_panel_c_xenium_demo.svg': figure2_panel_c,
         'figure3_panel_a_deconvolution.svg': figure3_panel_a,
         'figure4_panel_a_nmf.svg': figure4_panel_a,
         'figure5_panel_a_integration.svg': figure5_panel_a,

@@ -15,6 +15,7 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from matplotlib.gridspec import GridSpec
 from pathlib import Path
 from adjustText import adjust_text
@@ -27,12 +28,25 @@ apply_style()
 
 # Paths
 PROJECT_ROOT = Path(__file__).parent.parent.parent
-RESULTS_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/evaluation/results/method_comparison"
+# Use main benchmark results (6 cell types), not achievable_7 subset
+RESULTS_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/evaluation/results"
 GROUND_TRUTH_DIR = PROJECT_ROOT / "Benchmarking/xenium_pseudovisium/data/ground_truth"
-CITEGEIST_OUTPUT_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output_achievable_7"
+# Use standard output directory (6 cell types)
+CITEGEIST_OUTPUT_DIR = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output"
 GEX_RESULTS_FILE = PROJECT_ROOT / "Benchmarking/xenium_benchmarking/evaluation/results_gex_comparison_fair.json"
 OUTPUT_DIR = Path(__file__).parent / "output"
+SCHEMATIC_DIR = OUTPUT_DIR / "schematics" / "rendered"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def load_schematic(filename):
+    """Load a rendered schematic PNG."""
+    filepath = SCHEMATIC_DIR / filename
+    if filepath.exists():
+        return mpimg.imread(str(filepath))
+    else:
+        print(f"WARNING: {filename} not found")
+        return None
 
 
 def load_benchmark_summary():
@@ -58,12 +72,13 @@ def load_gex_benchmark():
 
 def prepare_method_data(summary_df):
     """Prepare proportion method data for plotting."""
+    # Use standard 6-cell-type benchmark method names (not achievable_7)
     method_mapping = {
-        'CITEgeist_achievable_7': 'CITEgeist',
-        'Cell2Location_achievable_7': 'Cell2Location',
-        'RCTD_achievable_7': 'RCTD',
-        'Tangram_achievable_7': 'Tangram',
-        'Seurat_achievable_7': 'Seurat',
+        'CITEgeist': 'CITEgeist',
+        'Cell2Location': 'Cell2Location',
+        'RCTD': 'RCTD',
+        'Tangram': 'Tangram',
+        'Seurat': 'Seurat',
     }
     data = {'method': [], 'pearson_r_mean': [], 'pearson_r_std': [],
             'jsd_mean': [], 'jsd_std': [], 'rmse_mean': [], 'rmse_std': []}
@@ -207,7 +222,7 @@ def panel_d_scatter(ax, region_id=0):
 
 
 def generate_figure3():
-    """Generate Figure 3 data panels."""
+    """Generate Figure 3 by assembling schematic and data panels."""
     print("Loading data...")
     summary_df = load_benchmark_summary()
     gex_data = load_gex_benchmark()
@@ -222,19 +237,19 @@ def generate_figure3():
     if gex_data:
         print(f"GEX methods: {list(gex_data.keys())}")
 
-    # Create figure with data panels only (Panel A is schematic SVG)
-    fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.35, wspace=0.30)
+    # Load schematic
+    panel_a_img = load_schematic("figure3_panel_a_deconvolution.png")
 
-    # Panel A: Placeholder for schematic
+    # Create figure
+    fig = plt.figure(figsize=(12, 10))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.25, wspace=0.25)
+
+    # Panel A: Two-Pass Deconvolution schematic
     ax_a = fig.add_subplot(gs[0, 0])
-    ax_a.text(0.5, 0.5, "Panel A: Schematic\n\nUse SVG file:\nfigure3_panel_a_deconvolution.svg",
-              ha='center', va='center', fontsize=11, style='italic',
-              bbox=dict(boxstyle='round', facecolor='#f0f0f0', edgecolor='gray'))
-    ax_a.set_xlim(0, 1)
-    ax_a.set_ylim(0, 1)
+    if panel_a_img is not None:
+        ax_a.imshow(panel_a_img)
     ax_a.axis('off')
-    ax_a.set_title("Two-Pass Deconvolution", fontsize=12, fontweight='bold', loc='left', pad=10)
+    ax_a.text(-0.02, 1.05, "A", fontsize=16, fontweight='bold', va='top', transform=ax_a.transAxes)
 
     # Panel B: Proportion benchmark (DATA)
     ax_b = fig.add_subplot(gs[0, 1])
