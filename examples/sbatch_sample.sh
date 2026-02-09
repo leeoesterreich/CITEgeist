@@ -14,6 +14,8 @@
 # Activate conda environment
 source /ix1/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/bin/activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/
 echo "Activated conda environment"
+echo "DEPRECATION NOTICE: canonical manuscript reproducibility is now in repro/"
+echo "  See: python -m repro.cli.repro --target v5_full --config repro/config/example.paths.yaml"
 
 
 # CHANGE THIS FOR REPRODUCIBILITY ON YOUR OWN COMPUTER

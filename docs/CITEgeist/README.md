@@ -135,19 +135,15 @@ Optional Parameters:
 
 ## Reproduction Instructions
 
-To reproduce the results from our manuscript:
-1. Download the benchmark datasets:
+Canonical manuscript reproduction (v5) now lives under `repro/`:
+
 ```bash
-python scripts/download_benchmark_data.py
+python -m repro.cli.validate_env --config repro/config/example.paths.yaml
+python -m repro.cli.repro --target v5_figures --config repro/config/example.paths.yaml
 ```
 
-2. Run the benchmark analysis:
-```bash
-python scripts/run_benchmarks.py \
-    --dataset_dir benchmark/data \
-    --output_dir benchmark/results
-```
+For full instructions:
 
-The benchmark scripts will generate figures and tables matching those in the manuscript. Expected runtime: 4-6 hours on a standard desktop computer.
-
-For detailed methodology and additional analysis scripts, please refer to our [benchmarking documentation](docs/Benchmarking/README.md).
+- `repro/README.md`
+- `repro/runbooks/reviewer_quickstart.md`
+- `repro/runbooks/full_reproduction.md`

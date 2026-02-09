@@ -1,0 +1,89 @@
+version: "1.0.0"
+submission_scope: "v5"
+
+datasets:
+  - id: "geo_processed_files"
+    source: "GEO (manuscript Data Availability)"
+    expected_subpaths:
+      - "HCC22-088-P1-S1/outs"
+      - "HCC22-088-P1-S2/outs"
+    checksum_optional: true
+
+targets:
+  - name: "quickstart"
+    command: "python -m repro.cli.repro --target quickstart --config repro/config/example.paths.yaml"
+    expected_outputs: []
+    runtime_tier: "minutes"
+  - name: "v5_figures"
+    command: "python -m repro.cli.repro --target v5_figures --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "manuscript/figures/output/figure1_pipeline_overview.pdf"
+      - "manuscript/figures/output/figure2_profile_discovery.pdf"
+      - "manuscript/figures/output/figure3_benchmarking.pdf"
+      - "manuscript/figures/output/figure4_midkine_esr1.pdf"
+      - "manuscript/figures/output/figure5_full_pipeline.pdf"
+      - "manuscript/figures/output/supp_figure2_de_pathway.pdf"
+    runtime_tier: "hours"
+  - name: "v5_full"
+    command: "python -m repro.cli.repro --target v5_full --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "manuscript/figures/output/figure1_pipeline_overview.pdf"
+    runtime_tier: "multi-hour"
+
+figures:
+  - figure_id: "Figure1"
+    script: "manuscript/figures/generate_figure1.py"
+    outputs:
+      - "manuscript/figures/output/figure1_pipeline_overview.pdf"
+  - figure_id: "Figure2"
+    script: "manuscript/figures/generate_figure2.py"
+    outputs:
+      - "manuscript/figures/output/figure2_profile_discovery.pdf"
+  - figure_id: "Figure3"
+    script: "manuscript/figures/generate_figure3.py"
+    outputs:
+      - "manuscript/figures/output/figure3_benchmarking.pdf"
+  - figure_id: "Figure4"
+    script: "manuscript/figures/generate_figure4.py"
+    outputs:
+      - "manuscript/figures/output/figure4_midkine_esr1.pdf"
+  - figure_id: "Figure5"
+    script: "manuscript/figures/generate_figure5.py"
+    outputs:
+      - "manuscript/figures/output/figure5_full_pipeline.pdf"
+  - figure_id: "SuppFigure2"
+    script: "manuscript/figures/generate_supp_figure2.py"
+    outputs:
+      - "manuscript/figures/output/supp_figure2_de_pathway.pdf"
+
+vignettes:
+  - id: "1"
+    notebook_path: "repro/vignettes/vignette_1_biopsy_heterogeneity.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 1 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "output/"
+  - id: "2"
+    notebook_path: "repro/vignettes/vignette_2_surgical_d538g.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 2 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "output/"
+  - id: "3"
+    notebook_path: "repro/vignettes/vignette_3_responder_macrophages.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 3 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "output/"
+  - id: "4"
+    notebook_path: "repro/vignettes/vignette_4_interoperability_commot.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 4 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "output/"
+  - id: "5"
+    notebook_path: "repro/vignettes/vignette_5_figure4_midkine_esr1.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 5 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "manuscript/figures/output/figure4_midkine_esr1.pdf"
+  - id: "6"
+    notebook_path: "repro/vignettes/vignette_6_figure5_full_pipeline.ipynb"
+    wrapper_command: "python -m repro.cli.run_vignette --id 6 --config repro/config/example.paths.yaml"
+    expected_outputs:
+      - "manuscript/figures/output/figure5_full_pipeline.pdf"

@@ -1,61 +1,54 @@
-# Reproducibility Guide
+# Reproducibility Guide (Canonical v5)
+
+The canonical entrypoint for manuscript reproducibility is now:
+
+- `repro/README.md`
+- `repro/runbooks/reviewer_quickstart.md`
+- CLI: `python -m repro.cli.*`
 
 ## For Reviewers
 
-### 1. Download the Code
+### 1. Download the code and data
 
-- Download the code from Figshare: [https://figshare.com/s/34e456fd7786e5211acc](https://figshare.com/s/34e456fd7786e5211acc)
-- Unzip the downloaded file to your preferred location
+1. Download the code from Figshare: [https://figshare.com/s/34e456fd7786e5211acc](https://figshare.com/s/34e456fd7786e5211acc)
+2. Download data from GEO (see manuscript Data Availability).
 
-### 2. Download and Prepare the Data
+### 2. Prepare data
 
-1. Download the data from GEO (see Data Availability section in the manuscript for the GEO link and Private Access Token)
-2. Run the following script to strip unique identifiers required by GEO:
+Use the publication prep script (correct filename):
 
 ```bash
-python publication_prep_scripts/delete_all_but_essentials.py --folder GSE289326/processed_files/
+python publication_prep_scripts/delete_all_but_essential.py --folder GSE289326/processed_files/
 ```
 
-Note: When prompted, select Option 2 and type 'Yes' to confirm.
+### 3. Configure paths and validate
 
-### 3. Set Up the Environment
-
-1. Install dependencies using the provided environment file:
 ```bash
-conda env create -f CITEgeist_dependencies.yml
+python -m repro.cli.validate_env --config repro/config/example.paths.yaml
 ```
 
-2. Activate the environment and set up a Jupyter kernel
+Required path keys:
 
-### 4. Obtain Gurobi License
+- `CITEGEIST_DATA_ROOT`
+- `CITEGEIST_OUTPUT_ROOT`
+- `CITEGEIST_LICENSE_FILE`
 
-CITEgeist requires a Gurobi license (free for academic use):
+### 4. Generate manuscript figure package (v5)
 
-1. Sign up for an academic license at: [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/)
-2. Follow the instructions to download and install your license
-3. Update the license file path in the notebooks to match your local license location
+```bash
+python -m repro.cli.run_figures --set v5_all --config repro/config/example.paths.yaml
+```
 
-### 5. Run the Analysis
+### 5. Run vignettes
 
-You can either:
+```bash
+python -m repro.cli.run_vignette --id 1 --config repro/config/example.paths.yaml
+python -m repro.cli.run_vignette --id 2 --config repro/config/example.paths.yaml
+python -m repro.cli.run_vignette --id 3 --config repro/config/example.paths.yaml
+python -m repro.cli.run_vignette --id 4 --config repro/config/example.paths.yaml
+```
 
-A. Run the notebooks directly:
-- Update data paths in the notebooks to match your local directory structure
-- Expected runtime: 
--- ~2 hours for vignette 1 on a standard computer (16 threads, 32GB RAM)
--- ~2 hours for vignette 2 on a standard computer (16 threads, 32GB RAM)
--- ~10 hours for vignette 3 on a standard computer (16 threads, 32GB RAM)
+## Notes
 
-B. Use SLURM distribution:
-- Use the provided `examples/sbatch_sample.sh` script for distributed computing
-
-### 6. Benchmarking
-
-For specific reproduction of benchmarking tests, please refer to the benchmarking section in the documentation.
-
-## System Requirements
-
-- RAM: 32GB (minimum)
-- CPU: 16 threads (recommended)
-- Storage: Sufficient space for the GEO dataset
-- Operating System: Linux/Unix recommended (Windows users may need additional configuration)
+- Scope is the v5 manuscript submission package.
+- Legacy scripts remain available during the compatibility phase, but `repro/` is canonical.

@@ -26,6 +26,18 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 - [Quick Start Guide](CITEgeist/README.md)
 - [Benchmarking Results](Benchmarking/README.md)
 - [Example Notebooks](CITEgeist/examples)
+- [Manuscript Reproducibility Hub (v5)](repro/README.md)
+
+## 🔁 Manuscript Reproducibility (v5)
+
+Canonical manuscript submission reproduction now lives under `repro/`.
+
+```bash
+python -m repro.cli.validate_env --config repro/config/example.paths.yaml
+python -m repro.cli.run_figures --set v5_all --config repro/config/example.paths.yaml
+```
+
+Reviewer-oriented runbook: `repro/runbooks/reviewer_quickstart.md`.
 
 ## 💻 System Requirements
 
