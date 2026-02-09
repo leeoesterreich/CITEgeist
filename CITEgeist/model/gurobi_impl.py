@@ -546,6 +546,7 @@ def optimize_cell_proportions_per_marker(
     lambda_sparse: float = 0.0,
     alpha_max: float = 0.8,
     lambda_alpha: float = 1.0,
+    lambda_coverage: float = 1.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
@@ -578,6 +579,13 @@ def optimize_cell_proportions_per_marker(
         lambda_laplacian: Weight for Laplacian smoothing (default: 0.1)
         coords: Spatial coordinates, shape (N, 2). Required if lambda_laplacian > 0.
         laplacian_k: Number of neighbors for Laplacian graph (default: 8)
+        lambda_sparse: Weight for L1 sparsity penalty on proportions (default: 0.0)
+        alpha_max: Maximum allowed alpha (baseline) value (default: 0.8)
+        lambda_alpha: Regularization strength for alpha values (default: 1.0)
+        lambda_coverage: Asymmetric loss exponent for marker count scaling (default: 1.0).
+            Controls how loss is weighted by number of markers per cell type:
+            0 = symmetric (no scaling), 1 = linear inverse scaling (1/n_markers).
+            Higher values boost single-marker cell types that may be underestimated.
 
     Returns:
         Tuple of:
