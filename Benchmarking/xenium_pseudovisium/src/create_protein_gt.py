@@ -58,8 +58,10 @@ def classify_cells_by_protein(expr_df: pd.DataFrame) -> pd.Series:
     4. Macrophages: CD68+ CD3E-
     5. Endothelial: CD31+ CD68- CD3E-
     6. Epithelial: PanCK+ or E-Cadherin high
-    7. Myofibroblasts: alphaSMA high, other markers negative
-    8. Stromal: Vimentin+ (remaining cells)
+    7. Fibroblasts/CAFs: alphaSMA high, other markers negative
+
+    NOTE: Vimentin gate removed - not specific for fibroblasts in RCC
+    due to EMT (epithelial-to-mesenchymal transition) in tumor cells.
 
     Args:
         expr_df: DataFrame with protein expression (cells x proteins)
@@ -80,13 +82,11 @@ def classify_cells_by_protein(expr_df: pd.DataFrame) -> pd.Series:
     PanCK_thresh = get_threshold(expr_df, 'PanCK', 25)  # Lower for sparse marker
     ECad_thresh = get_threshold(expr_df, 'E-Cadherin', 90)  # High for specificity
     alphaSMA_thresh = get_threshold(expr_df, 'alphaSMA', 75)  # Higher for specificity
-    Vim_thresh = get_threshold(expr_df, 'Vimentin', 50)
 
     logger.info("Gating thresholds:")
     logger.info(f"  CD3E: {CD3E_thresh:.1f}, CD4: {CD4_thresh:.1f}, CD8A: {CD8A_thresh:.1f}")
     logger.info(f"  CD20: {CD20_thresh:.1f}, CD68: {CD68_thresh:.1f}, CD31: {CD31_thresh:.1f}")
-    logger.info(f"  PanCK: {PanCK_thresh:.1f}, E-Cad: {ECad_thresh:.1f}")
-    logger.info(f"  alphaSMA: {alphaSMA_thresh:.1f}, Vimentin: {Vim_thresh:.1f}")
+    logger.info(f"  PanCK: {PanCK_thresh:.1f}, E-Cad: {ECad_thresh:.1f}, alphaSMA: {alphaSMA_thresh:.1f}")
 
     # Gate 1: B cells (CD20+)
     b_cells = expr_df['CD20'] > CD20_thresh
@@ -128,17 +128,12 @@ def classify_cells_by_protein(expr_df: pd.DataFrame) -> pd.Series:
     cell_types[epithelial] = 'Epithelial'
     logger.info(f"6. Epithelial (PanCK+ or E-Cad high): {epithelial.sum()} ({epithelial.mean()*100:.1f}%)")
 
-    # Gate 7: Myofibroblasts (alphaSMA high, other negative)
+    # Gate 7: Fibroblasts/CAFs (alphaSMA high, other negative)
+    # NOTE: Vimentin gate removed - not specific in RCC due to EMT in tumor cells
     asma_high = expr_df['alphaSMA'] > alphaSMA_thresh
     myofib = asma_high & ~cd31_pos & cd68_neg & cd3e_neg & (cell_types == 'Unknown')
     cell_types[myofib] = 'Fibroblasts'
     logger.info(f"7. Fibroblasts (alphaSMA high): {myofib.sum()} ({myofib.mean()*100:.1f}%)")
-
-    # Gate 8: Stromal (Vimentin+ remaining)
-    vim_pos = expr_df['Vimentin'] > Vim_thresh
-    stromal = vim_pos & (cell_types == 'Unknown')
-    cell_types[stromal] = 'Fibroblasts'
-    logger.info(f"8. Fibroblasts/Stromal (Vimentin+ remaining): {stromal.sum()} ({stromal.mean()*100:.1f}%)")
 
     logger.info(f"Unknown: {(cell_types == 'Unknown').sum()} ({(cell_types == 'Unknown').mean()*100:.1f}%)")
 
@@ -239,34 +234,24 @@ def main():
     # Save cell-level classifications
     cell_types.to_csv(output_dir / 'cell_type_assignments.csv', header=['cell_type'])
 
-    # Load cell-to-spot mapping from existing granular data
+    # Load cell-to-spot mapping from existing protein GT data
     logger.info("\nLoading cell-to-spot mapping...")
     cell_to_spot = pd.read_csv(
-        pseudovisium_dir / 'data_granular_gt' / 'cell_to_spot_mapping.csv',
+        output_dir / 'cell_to_spot_mapping.csv',
         index_col=0
     )
     cell_to_spot.index = cell_to_spot.index.astype(str)
     logger.info(f"Loaded mapping for {len(cell_to_spot)} cells")
 
-    # Copy h5ad files from granular data (same spots, different GT)
-    logger.info("\nCopying h5ad files...")
-    import shutil
-    for f in (pseudovisium_dir / 'data_granular_gt' / 'h5ad_objects').glob('*.h5ad'):
-        shutil.copy(f, output_dir / 'h5ad_objects' / f.name)
-
     # Process each region
     logger.info("\nCalculating spot-level proportions per region...")
-
-    # Load region info from existing data
-    with open(pseudovisium_dir / 'data_granular_gt' / 'dataset_summary.json') as f:
-        summary = json.load(f)
 
     all_stats = []
     for region_id in range(5):
         logger.info(f"\n--- Region {region_id} ---")
 
         # Load spot coordinates from existing GT
-        gt_path = pseudovisium_dir / 'data_granular_gt' / 'ground_truth' / f'Xenium_region_{region_id}_prop.csv'
+        gt_path = output_dir / 'ground_truth' / f'Xenium_region_{region_id}_prop.csv'
         existing_gt = pd.read_csv(gt_path, index_col=0)
 
         spot_coords = existing_gt[['spot_x', 'spot_y']].rename(columns={'spot_x': 'x', 'spot_y': 'y'})
@@ -311,11 +296,7 @@ def main():
     with open(output_dir / 'dataset_summary.json', 'w') as f:
         json.dump(summary, f, indent=2)
 
-    # Copy cell_to_spot mapping
-    shutil.copy(
-        pseudovisium_dir / 'data_granular_gt' / 'cell_to_spot_mapping.csv',
-        output_dir / 'cell_to_spot_mapping.csv'
-    )
+    # Note: cell_to_spot_mapping.csv is already in output_dir (not regenerated)
 
     logger.info("\n" + "=" * 60)
     logger.info("Protein-based ground truth created successfully!")

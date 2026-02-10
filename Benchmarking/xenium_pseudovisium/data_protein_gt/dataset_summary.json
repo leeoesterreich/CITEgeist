@@ -23,7 +23,7 @@
       "mean_Macrophages": 0.17545479794161448,
       "mean_Endothelial": 0.13582723975852817,
       "mean_Epithelial": 0.08270219984363333,
-      "mean_Fibroblasts": 0.2044787183612201
+      "mean_Fibroblasts": 0.05366700533830108
     },
     {
       "region_id": 1,
@@ -36,7 +36,7 @@
       "mean_Macrophages": 0.20892135866660244,
       "mean_Endothelial": 0.14243400153245356,
       "mean_Epithelial": 0.09675077205065635,
-      "mean_Fibroblasts": 0.22138072149942298
+      "mean_Fibroblasts": 0.07388909756502669
     },
     {
       "region_id": 2,
@@ -49,7 +49,7 @@
       "mean_Macrophages": 0.23993982614755408,
       "mean_Endothelial": 0.10747870106084906,
       "mean_Epithelial": 0.12631684736263674,
-      "mean_Fibroblasts": 0.1522831626215655
+      "mean_Fibroblasts": 0.040354682804211395
     },
     {
       "region_id": 3,
@@ -62,7 +62,7 @@
       "mean_Macrophages": 0.2876792515283112,
       "mean_Endothelial": 0.06849548310997532,
       "mean_Epithelial": 0.10554438902034992,
-      "mean_Fibroblasts": 0.1315560568116412
+      "mean_Fibroblasts": 0.021202795984703225
     },
     {
       "region_id": 4,
@@ -75,7 +75,7 @@
       "mean_Macrophages": 0.25843524850044963,
       "mean_Endothelial": 0.06679878712126663,
       "mean_Epithelial": 0.0632314690776387,
-      "mean_Fibroblasts": 0.15090501629865813
+      "mean_Fibroblasts": 0.02374273343753095
     }
   ]
 }
