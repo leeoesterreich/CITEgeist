@@ -173,6 +173,10 @@ def extract_proportions(ad_map, adata_ref, adata_sp, labels_key: str = "cell_typ
             index=adata_sp.obs_names,
             columns=adata_sp.uns['tangram_ct_pred_names'] if 'tangram_ct_pred_names' in adata_sp.uns else None
         )
+        # Normalize to sum to 1 (matching simulated benchmark methodology)
+        proportions = proportions.div(proportions.sum(axis=1), axis=0)
+        proportions = proportions.fillna(0)
+        logger.info(f"  Normalized proportions (row sum: {proportions.sum(axis=1).mean():.4f})")
     else:
         # Alternative: compute from mapping matrix
         logger.info("  Computing proportions from mapping matrix...")
@@ -346,6 +350,12 @@ def main():
     gex_path = input_dir / "h5ad_objects" / f"{args.prefix}_region_{args.region_id}_GEX.h5ad"
     adata_sp = sc.read_h5ad(gex_path)
     logger.info(f"  Spatial shape: {adata_sp.shape}")
+
+    # Normalize and log-transform spatial data to match reference preprocessing
+    # (Reference was processed with normalize_total + log1p in process_reference.py)
+    sc.pp.normalize_total(adata_sp)
+    sc.pp.log1p(adata_sp)
+    logger.info("  Applied normalize_total + log1p to spatial data")
 
     # Find marker genes
     markers = find_marker_genes(adata_ref, n_markers=args.n_markers)
