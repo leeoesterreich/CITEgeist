@@ -357,14 +357,34 @@ def export_for_tangram(
     adata: ad.AnnData,
     output_dir: Path,
 ) -> None:
-    """Export in format for Tangram."""
+    """Export in format for Tangram.
+
+    Tangram expects log-normalized data (normalize_total + log1p), NOT z-scaled.
+    The main adata.X is z-scaled after Harmony, so we need to re-normalize from raw.
+    """
     logger.info("Exporting for Tangram...")
 
     tg_dir = output_dir / "tangram"
     tg_dir.mkdir(parents=True, exist_ok=True)
 
-    # Tangram needs normalized counts + cell type labels
-    adata_export = adata.copy()
+    # Tangram needs log-normalized counts (NOT z-scaled!)
+    # Start from raw counts and apply normalize_total + log1p
+    if adata.raw is not None:
+        adata_export = adata.raw.to_adata()
+    else:
+        adata_export = adata.copy()
+
+    # Copy over cell type annotations
+    adata_export.obs["cell_type"] = adata.obs["cell_type"]
+    adata_export.obs["sample"] = adata.obs["sample"]
+    adata_export.obs["batch"] = adata.obs["batch"]
+
+    # Apply log-normalization (matching simulated benchmark preprocessing)
+    sc.pp.normalize_total(adata_export)
+    sc.pp.log1p(adata_export)
+
+    logger.info(f"  X range after log-norm: [{adata_export.X.min():.2f}, {adata_export.X.max():.2f}]")
+
     adata_export.write_h5ad(tg_dir / "reference.h5ad")
     logger.info(f"  Saved to {tg_dir / 'reference.h5ad'}")
 
