@@ -620,6 +620,17 @@ def optimize_cell_proportions_per_marker(
             markers_per_celltype[j] += 1
     markers_per_celltype = np.maximum(markers_per_celltype, 1.0)
 
+    # Compute asymmetric loss boost for underestimation
+    # Cell types with fewer markers get higher boost
+    max_markers = np.max(markers_per_celltype)
+    underestimation_boost = np.power(max_markers / markers_per_celltype, lambda_coverage)
+
+    if lambda_coverage > 0:
+        logging.info(f"Asymmetric loss enabled: lambda_coverage={lambda_coverage}")
+        for j, ct_name in enumerate(cell_type_names):
+            if underestimation_boost[j] > 1.01:  # Only log if meaningful boost
+                logging.info(f"  {ct_name}: {markers_per_celltype[j]:.0f} markers -> {underestimation_boost[j]:.2f}x boost")
+
     logging.info(f"Per-marker beta optimization: {N} spots, {M} markers, {T} cell types")
     logging.info(f"Markers with assignments: {marker_has_owner.sum()}/{M}")
 
