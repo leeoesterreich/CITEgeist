@@ -28,7 +28,7 @@ GT_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchm
 RESULTS_DIR = BASE_DIR / "evaluation" / "results" / "method_comparison"
 
 METHODS = {
-    "CITEgeist": BASE_DIR / "CITEgeist" / "output_protein_gt",
+    "CITEgeist": BASE_DIR / "CITEgeist" / "output" / "manual",  # Updated for asymmetric loss benchmark
     "Cell2Location": BASE_DIR / "Cell2Location" / "output_protein_gt",
     "Tangram": BASE_DIR / "Tangram" / "output_protein_gt",
     "RCTD": BASE_DIR / "RCTD" / "output_protein_gt",
