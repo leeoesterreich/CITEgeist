@@ -1,7 +1,7 @@
 """
-Full 5-method comparison against protein-gated ground truth.
+Full method comparison against protein-gated ground truth.
 
-Evaluates CITEgeist, Cell2Location, Tangram, RCTD, and Seurat
+Evaluates CITEgeist, Cell2Location, Tangram, RCTD, Seurat, CARD, and CARD (ref-free)
 against the achievable-7 protein GT and produces a summary table.
 """
 
@@ -33,6 +33,8 @@ METHODS = {
     "Tangram": BASE_DIR / "Tangram" / "output_protein_gt",
     "RCTD": BASE_DIR / "RCTD" / "output_protein_gt",
     "Seurat": BASE_DIR / "Seurat" / "output_protein_gt",
+    "CARD": BASE_DIR / "CARD" / "output_protein_gt",
+    "CARD (ref-free)": BASE_DIR / "CARD" / "output_protein_gt_reffree",
 }
 
 

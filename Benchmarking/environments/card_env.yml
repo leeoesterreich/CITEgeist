@@ -1,0 +1,29 @@
+name: CARD_env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-base>=4.0
+  - r-devtools
+  - r-matrix
+  - r-ggplot2
+  - r-rcolorbrewer
+  - r-optparse
+  - r-jsonlite
+  - r-dplyr
+  - r-reshape2
+  # Bioconductor dependencies
+  - bioconductor-singlecellexperiment
+  - bioconductor-summarizedexperiment
+  # Spatial/statistical dependencies (CARD requires these)
+  - r-rann
+  - r-mcmcpack
+  - r-nmf
+  - r-rcppml
+  - r-spatstat
+  - r-scatterpie
+  - r-ggcorrplot
+  # MuSiC dependency (for reference-based deconvolution)
+  - bioconductor-biobase
+  - bioconductor-preprocesscore
