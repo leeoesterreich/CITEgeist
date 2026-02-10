@@ -170,7 +170,7 @@ def figure1_panel_a():
 
 def figure1_panel_b():
     """Figure 1B: Spatial Statistics Foundation."""
-    width, height = 400, 280
+    width, height = 400, 320
     svg = svg_header(width, height)
 
     # Title
@@ -210,9 +210,9 @@ def figure1_panel_b():
     svg += text(330, 170, "Neighbor weighting", "small italic neutral")
 
     # Bottom annotation
-    svg += rounded_rect(50, 200, 300, 35, 5, COLORS['background'], COLORS['border'])
-    svg += text(200, 222, "All modules leverage spatial context through", "small italic neutral")
-    svg += text(200, 237, "neighbor-weighted statistics", "small italic neutral")
+    svg += rounded_rect(50, 220, 300, 50, 5, COLORS['background'], COLORS['border'])
+    svg += text(200, 245, "All modules leverage spatial context through", "small italic neutral")
+    svg += text(200, 262, "neighbor-weighted statistics", "small italic neutral")
 
     svg += svg_footer()
     return svg
@@ -282,11 +282,11 @@ def figure1_panel_c():
 
 def figure2_panel_a():
     """Figure 2A: Marker Interest Detection (Module 1)."""
-    width, height = 400, 280
+    width, height = 480, 280
     svg = svg_header(width, height)
 
     # Title
-    svg += text(200, 25, "Module 1: Marker Interest Detection", "title")
+    svg += text(width / 2, 25, "Module 1: Marker Interest Detection", "title")
 
     # Input: Raw antibody data
     svg += rounded_rect(20, 55, 80, 50, 5, COLORS['background'], COLORS['border'])
@@ -329,7 +329,7 @@ def figure2_panel_a():
     svg += text(430, 157, "Boring", "small bold white")
 
     # Bottom annotation
-    svg += text(200, 250, "Automatic identification of spatially-variable protein markers", "small italic neutral")
+    svg += text(width / 2, 250, "Automatic identification of spatially-variable protein markers", "small italic neutral")
 
     svg += svg_footer()
     return svg
@@ -576,7 +576,7 @@ def figure5_panel_a():
     for i, c in enumerate(sample_colors):
         svg += rounded_rect(20, 50 + i*35, 50, 30, 3, c, 'black', 1)
         svg += text(45, 70 + i*35, f"S{i+1}", "label bold")
-    svg += text(45, 45, "14 Samples", "small bold")
+    svg += text(45, 45, "12 Samples", "small bold")
 
     # Arrow
     svg += arrow(75, 110, 105, 110)

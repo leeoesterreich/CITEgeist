@@ -21,6 +21,10 @@ source activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_
 
 cd "${REPO}"
 
+export CITEGEIST_DATA_ROOT="${REPO}"
+export CITEGEIST_OUTPUT_ROOT="${REPO}/output"
+export CITEGEIST_LICENSE_FILE="${REPO}/LICENSE"
+
 echo "=============================================="
 echo "Generating Supplementary Figures"
 echo "Start time: $(date)"
