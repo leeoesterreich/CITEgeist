@@ -206,6 +206,7 @@ def run_manual_benchmark(
         alpha=alpha_elastic,
         max_y_change=max_y_change,
         validation_warn_only=True,
+        lambda_coverage=1.0,  # Enable asymmetric loss for better marker utilization
     )
 
     prop_time = time.time() - start_time
@@ -447,6 +448,7 @@ def run_hierarchical_benchmark(
         alpha=alpha_elastic,
         max_y_change=max_y_change,
         validation_warn_only=True,
+        lambda_coverage=1.0,  # Enable asymmetric loss for better marker utilization
     )
     prop_time = time.time() - start_time
     logger.info(f"Cell proportion optimization completed in {prop_time:.1f}s")
