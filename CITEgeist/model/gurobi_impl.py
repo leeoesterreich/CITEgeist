@@ -667,7 +667,40 @@ def optimize_cell_proportions_per_marker(
         # add normalized error: (1/n_owners) * (1/markers_per_celltype[j]) * (S - β*Y)²
         # This ensures equal loss weight per cell type regardless of marker count,
         # and shared markers contribute to all owner cell types.
+        #
+        # Asymmetric loss: when lambda_coverage > 0, cell types with fewer markers
+        # get extra penalty for underestimation (when residual > 0, i.e., observed
+        # signal exceeds predicted). This is modeled using auxiliary variables:
+        #   R_pos >= residual, R_pos >= 0  =>  R_pos = max(residual, 0)
+        # Then add: weight * (boost - 1) * R_pos^2 to penalize positive residuals.
         error_terms = []
+        asymmetric_terms = []
+        asymmetric_constraints = []
+
+        # Track which cell types need asymmetric boost
+        use_asymmetric = lambda_coverage > 0
+        boosted_celltypes = set()
+        if use_asymmetric:
+            for j in range(T):
+                if underestimation_boost[j] > 1.01:  # Only add if meaningful boost
+                    boosted_celltypes.add(j)
+
+        # Create auxiliary variables for asymmetric loss (only if needed)
+        R_pos = {}
+        if use_asymmetric and len(boosted_celltypes) > 0:
+            # We need R_pos[i, j, m] for each (spot, celltype, marker) triplet
+            # where celltype j has boost > 1 and owns marker m
+            for m in range(M):
+                if not marker_has_owner[m]:
+                    continue
+                for j in marker_owners[m]:
+                    if j in boosted_celltypes:
+                        for i in range(N):
+                            R_pos[(i, j, m)] = model.addVar(
+                                lb=0, vtype=GRB.CONTINUOUS,
+                                name=f"R_pos_{i}_{j}_{m}"
+                            )
+
         for m in range(M):
             if not marker_has_owner[m]:
                 continue
@@ -680,12 +713,34 @@ def optimize_cell_proportions_per_marker(
 
             for j in owners_m:
                 weight = 1.0 / (n_owners * markers_per_celltype[j])
+                boost_extra = underestimation_boost[j] - 1.0  # Extra weight beyond 1x
+
                 for i in range(N):
                     S_im = marker_level_data[i, m] - alpha_m  # baseline-subtracted
                     Y_ij = Y[i, j]
-                    error_terms.append(weight * (S_im - beta_m * Y_ij) * (S_im - beta_m * Y_ij))
+                    residual = S_im - beta_m * Y_ij
+
+                    # Symmetric squared error (always applied)
+                    error_terms.append(weight * residual * residual)
+
+                    # Asymmetric boost for underestimation (positive residual)
+                    if use_asymmetric and j in boosted_celltypes:
+                        R_pos_ijm = R_pos[(i, j, m)]
+                        # Constraint: R_pos >= residual (combined with R_pos >= 0, gives max(residual, 0))
+                        asymmetric_constraints.append((R_pos_ijm, residual))
+                        # Extra penalty: weight * boost_extra * R_pos^2
+                        asymmetric_terms.append(weight * boost_extra * R_pos_ijm * R_pos_ijm)
 
         total_error = gp.quicksum(error_terms)
+
+        # Add asymmetric loss terms if any
+        if len(asymmetric_terms) > 0:
+            total_error += gp.quicksum(asymmetric_terms)
+            logging.info(f"Asymmetric loss: added {len(asymmetric_terms)} boost terms for {len(boosted_celltypes)} cell types")
+
+        # Add constraints for asymmetric loss auxiliary variables
+        for R_pos_var, residual_expr in asymmetric_constraints:
+            model.addConstr(R_pos_var >= residual_expr)
 
         # Regularization terms (elastic net on Y)
         l1_term = gp.quicksum(Y[i, j] for i in range(N) for j in range(T))
