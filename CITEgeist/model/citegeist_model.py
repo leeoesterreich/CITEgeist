@@ -440,6 +440,7 @@ class CitegeistModel:
         per_marker_beta=True,
         beta_min=0.1,
         beta_max=2.0,
+        lambda_coverage=1.0,
         # Cell classification parameters (cell resolution only)
         use_gating=None,
         priority_dict=None,
@@ -467,6 +468,8 @@ class CitegeistModel:
                 marker-level signal variation. If False, use legacy per-celltype beta with marker averaging.
             beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.1)
             beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
+            lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. 0 = symmetric,
+                1 = linear inverse, 2 = aggressive. Default: 1.0
         """
 
         # Use resolution preset for laplacian_k if caller used default
@@ -549,6 +552,7 @@ class CitegeistModel:
                     coords=coords,
                     laplacian_k=laplacian_k,
                     lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
+                    lambda_coverage=lambda_coverage,
                 )
 
                 # Store marker betas and baselines for downstream analysis
