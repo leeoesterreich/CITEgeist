@@ -35,7 +35,9 @@ cat(sprintf("Start time: %s\n", Sys.time()))
 
 # Base paths
 BASE_PATH <- "/ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations"
-REF_PATH <- file.path(BASE_PATH, "models/Wu_scRNA_ref_ERpos.h5seurat")
+CARD_DIR <- "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CARD"
+REF_COUNTS_PATH <- file.path(CARD_DIR, "reference_csv/reference_counts.csv")
+REF_CELLTYPES_PATH <- file.path(CARD_DIR, "reference_csv/reference_cell_types.csv")
 DATA_PATH <- file.path(BASE_PATH, "scCube_12k/replicates/mixed/ST_sim")
 
 replicate_name <- paste0("Wu_ST_", rep_index)
@@ -63,26 +65,21 @@ if (mode == "reference") {
   # =========================================
   # Reference-based CARD
   # =========================================
-  cat("\nLoading reference data...\n")
+  cat("\nLoading reference data from CSV...\n")
 
-  # Load reference using Seurat
-  library(Seurat)
-  library(SeuratDisk)
-
-  sc_ref <- LoadH5Seurat(REF_PATH)
-  sc_data <- sc_ref@assays$RNA@counts
-  sc_data <- round(exp(sc_data) - 1)  # Convert logcounts to counts
-  sc_meta <- sc_ref@meta.data
+  # Load pre-converted reference CSV files
+  sc_data <- as.matrix(read.csv(REF_COUNTS_PATH, row.names=1, check.names=FALSE))
+  sc_celltypes <- read.csv(REF_CELLTYPES_PATH, row.names=1, check.names=FALSE)
 
   cat(sprintf("  Reference: %d genes x %d cells\n", nrow(sc_data), ncol(sc_data)))
-  cat(sprintf("  Cell types: %s\n", paste(unique(sc_meta$celltype_major), collapse=", ")))
+  cat(sprintf("  Cell types: %s\n", paste(unique(sc_celltypes$cell_type), collapse=", ")))
 
   # Create metadata for CARD
   sc_meta_card <- data.frame(
-    cellID = rownames(sc_meta),
-    cellType = sc_meta$celltype_major,
+    cellID = rownames(sc_celltypes),
+    cellType = sc_celltypes$cell_type,
     sampleInfo = "sample1",
-    row.names = rownames(sc_meta)
+    row.names = rownames(sc_celltypes)
   )
 
   # Create CARD object

@@ -27,3 +27,14 @@ dependencies:
   # MuSiC dependency (for reference-based deconvolution)
   - bioconductor-biobase
   - bioconductor-preprocesscore
+  # Spatial libraries for sf package (CARD dependency)
+  - gdal
+  - proj
+  - geos
+  - udunits2
+  - r-sf
+  - r-units
+  - r-s2
+  - r-concaveman
+  # Note: Simulation benchmarks use pre-converted CSV files instead of h5seurat
+  # to avoid version conflicts between r-seuratdisk (R 4.0) and r-rcppml (R 4.2+)
