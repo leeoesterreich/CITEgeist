@@ -42,8 +42,9 @@ def generate_figure1():
     panel_c = load_schematic("figure1_panel_c_resolution.png")
 
     # Create figure with 2 rows: Panel A on top (full width), B and C below
-    fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(2, 2, figure=fig, height_ratios=[1.2, 1], hspace=0.15, wspace=0.10)
+    # Increased hspace to 0.35 and figure height to 12 to prevent Panel B bottom text from overlapping gray box
+    fig = plt.figure(figsize=(12, 12))
+    gs = GridSpec(2, 2, figure=fig, height_ratios=[1.2, 1], hspace=0.35, wspace=0.10)
 
     # Panel A: Full width top row
     ax_a = fig.add_subplot(gs[0, :])

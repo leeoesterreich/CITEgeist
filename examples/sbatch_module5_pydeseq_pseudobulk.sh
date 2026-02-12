@@ -2,7 +2,7 @@
 #SBATCH --job-name=module5_pseudobulk
 #SBATCH --output=slurm_log/module5_pseudobulk_%j.out
 #SBATCH --error=slurm_log/module5_pseudobulk_%j.err
-#SBATCH --time=2:00:00
+#SBATCH --time=4:00:00
 #SBATCH --partition=htc
 #SBATCH --nodes=1
 #SBATCH --ntasks=1

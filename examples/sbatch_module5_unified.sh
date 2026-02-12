@@ -11,7 +11,7 @@
 #SBATCH --mail-user=alc376@pitt.edu
 
 # Module 5: Cross-Sample Integration
-# Integrates all 14 patient samples using Harmony-style batch correction
+# Integrates all 12 patient samples using Harmony-style batch correction
 
 mkdir -p slurm_log
 

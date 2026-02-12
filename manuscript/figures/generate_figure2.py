@@ -136,8 +136,10 @@ def generate_figure2():
     panel_b = load_schematic("figure2_panel_b_profile_discovery.png")
     panel_c = load_schematic("figure2_panel_c_xenium_demo.png")
 
-    fig = plt.figure(figsize=(12, 10))
-    gs = GridSpec(2, 2, figure=fig, hspace=0.15, wspace=0.12)
+    # Increased figure width from 12 to 14 and wspace from 0.12 to 0.18 to prevent
+    # Panel A right edge from being cut off (SVG content extends to ~465px on 400px canvas)
+    fig = plt.figure(figsize=(14, 10))
+    gs = GridSpec(2, 2, figure=fig, hspace=0.15, wspace=0.18)
 
     # Panel A: Marker Interest Detection (SVG schematic)
     ax_a = fig.add_subplot(gs[0, 0])

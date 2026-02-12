@@ -36,7 +36,7 @@ logging.basicConfig(
 # Data location
 DATA_ROOT = Path("/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 
-# All 14 patient samples
+# All 12 patient samples (deduplicated: P4-S2_1i_rep replaces P4-S2, P5-S2_F_rep replaces P5-S2)
 ALL_SAMPLES = [
     "HCC22-088-P1-S1",
     "HCC22-088-P1-S2",
@@ -45,10 +45,8 @@ ALL_SAMPLES = [
     "HCC22-088-P3-S1_A",
     "HCC22-088-P3-S2",
     "HCC22-088-P4-S1",
-    "HCC22-088-P4-S2",
     "HCC22-088-P4-S2_1i_rep",
     "HCC22-088-P5-S1",
-    "HCC22-088-P5-S2",
     "HCC22-088-P5-S2_F_rep",
     "HCC22-088-P6-S1",
     "HCC22-088-P6-S2_D",
@@ -63,10 +61,8 @@ SAMPLE_METADATA = {
     "HCC22-088-P3-S1_A": {"type": "biopsy", "min_counts": 100},
     "HCC22-088-P3-S2": {"type": "surgical", "min_counts": 25},
     "HCC22-088-P4-S1": {"type": "biopsy", "min_counts": 100},
-    "HCC22-088-P4-S2": {"type": "surgical", "min_counts": 25},
     "HCC22-088-P4-S2_1i_rep": {"type": "surgical", "min_counts": 25},
     "HCC22-088-P5-S1": {"type": "biopsy", "min_counts": 100},
-    "HCC22-088-P5-S2": {"type": "surgical", "min_counts": 25},
     "HCC22-088-P5-S2_F_rep": {"type": "surgical", "min_counts": 25},
     "HCC22-088-P6-S1": {"type": "biopsy", "min_counts": 100},
     "HCC22-088-P6-S2_D": {"type": "surgical", "min_counts": 25},
@@ -113,6 +109,11 @@ def run_module3(
     output_dir: Path,
     profile: dict = None,
     skip_gex: bool = False,
+    cellpose_segmentation: bool = False,
+    cellpose_resolution: str = "hires",
+    cellpose_gpu: bool = False,
+    cellpose_diameter: float = None,
+    nuclei_prior_lambda: float = 1.0,
 ) -> dict:
     """
     Run Module 3 (cell proportions + gene expression deconvolution).
@@ -122,6 +123,11 @@ def run_module3(
         output_dir: Output directory
         profile: Cell profile dictionary (default: UNIFIED_PROFILE)
         skip_gex: If True, skip gene expression deconvolution (faster)
+        cellpose_segmentation: If True, run built-in Cellpose nuclei segmentation
+        cellpose_resolution: Image resolution mode for segmentation (lowres/hires/fullres)
+        cellpose_gpu: If True, request GPU for Cellpose
+        cellpose_diameter: Optional Cellpose diameter override
+        nuclei_prior_lambda: Soft-prior weight for nuclei abundance target
 
     Returns:
         Dict with result summary
@@ -179,10 +185,31 @@ def run_module3(
     model.load_cell_profile_dict(profile)
     logger.info(f"Loaded unified profile with {len(profile)} cell types: {list(profile.keys())}")
 
+    if cellpose_segmentation:
+        logger.info(
+            "Running Cellpose nuclei segmentation (resolution=%s, gpu=%s)...",
+            cellpose_resolution,
+            cellpose_gpu,
+        )
+        nuclei_counts = model.compute_spot_nuclei_counts_cellpose(
+            resolution_mode=cellpose_resolution,
+            use_gpu=cellpose_gpu,
+            diameter=cellpose_diameter,
+            save_masks=True,
+        )
+        logger.info(
+            "Nuclei segmentation done: nuclei=%d, median_per_spot=%.3f",
+            int(nuclei_counts.sum()),
+            float(np.median(nuclei_counts.values)),
+        )
+
     # Run cell proportion model (Pass 1) - radius auto-detected
     logger.info("Running cell proportion model...")
     global_props, finetuned_props = model.run_cell_proportion_model(
         validation_warn_only=True,  # Don't fail on rare cell types
+        use_nuclei_prior=cellpose_segmentation,
+        nuclei_prior_lambda=nuclei_prior_lambda,
+        nuclei_target_col="nuclei_count_target",
     )
 
     # Append proportions to adata
@@ -251,6 +278,35 @@ def main():
         type=str,
         help="Optional path to custom profile JSON file",
     )
+    parser.add_argument(
+        "--cellpose-segmentation",
+        action="store_true",
+        help="Run built-in Cellpose nuclei segmentation and use as soft abundance prior.",
+    )
+    parser.add_argument(
+        "--cellpose-resolution",
+        type=str,
+        default="hires",
+        choices=["lowres", "hires", "fullres"],
+        help="Image resolution mode for Cellpose segmentation.",
+    )
+    parser.add_argument(
+        "--cellpose-gpu",
+        action="store_true",
+        help="Request GPU execution for Cellpose nuclei model.",
+    )
+    parser.add_argument(
+        "--cellpose-diameter",
+        type=float,
+        default=None,
+        help="Optional Cellpose diameter override.",
+    )
+    parser.add_argument(
+        "--nuclei-prior-lambda",
+        type=float,
+        default=1.0,
+        help="Soft-prior weight for nuclei abundance target.",
+    )
 
     args = parser.parse_args()
 
@@ -284,6 +340,11 @@ def main():
         output_dir=output_dir,
         profile=profile,
         skip_gex=args.skip_gex,
+        cellpose_segmentation=args.cellpose_segmentation,
+        cellpose_resolution=args.cellpose_resolution,
+        cellpose_gpu=args.cellpose_gpu,
+        cellpose_diameter=args.cellpose_diameter,
+        nuclei_prior_lambda=args.nuclei_prior_lambda,
     )
 
     # Save metadata

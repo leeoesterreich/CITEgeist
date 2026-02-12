@@ -40,6 +40,11 @@ from .utils import (
     setup_logging,
     validate_cell_profile_dict,
 )
+from .segmentation import (
+    compute_spot_nuclei_counts_from_adata,
+    normalize_nuclei_counts_for_prior,
+    save_segmentation_artifacts,
+)
 
 
 RESOLUTION_DEFAULTS = {
@@ -500,6 +505,76 @@ class CitegeistModel:
             f"scale_per_marker={scale_per_marker}, no per-spot normalization."
         )
 
+    def compute_spot_nuclei_counts_cellpose(
+        self,
+        resolution_mode: str = "hires",
+        use_gpu: bool = False,
+        diameter: Optional[float] = None,
+        flow_threshold: float = 0.4,
+        cellprob_threshold: float = 0.0,
+        max_fullres_side: int = 9000,
+        save_masks: bool = True,
+    ) -> pd.Series:
+        """
+        Compute per-spot nuclei counts from Visium histology using Cellpose.
+
+        Writes the following columns to both gene/protein AnnData .obs (when present):
+            - nuclei_count_raw
+            - nuclei_count_target
+
+        Returns:
+            pd.Series: Raw nuclei counts indexed by spot.
+        """
+        source_adata = self.antibody_capture_adata
+        if source_adata is None:
+            source_adata = self.gene_expression_adata
+        if source_adata is None:
+            source_adata = self.adata
+        if source_adata is None:
+            raise ValueError("No AnnData available to run Cellpose segmentation.")
+
+        seg_result = compute_spot_nuclei_counts_from_adata(
+            adata=source_adata,
+            resolution_mode=resolution_mode,
+            use_gpu=use_gpu,
+            diameter=diameter,
+            flow_threshold=flow_threshold,
+            cellprob_threshold=cellprob_threshold,
+            max_fullres_side=max_fullres_side,
+        )
+        target = normalize_nuclei_counts_for_prior(seg_result.nuclei_count_raw)
+
+        # Attach to available AnnData objects using aligned index assignment
+        for ad in (self.gene_expression_adata, self.antibody_capture_adata, self.adata):
+            if ad is None:
+                continue
+            common = ad.obs_names.intersection(seg_result.nuclei_count_raw.index)
+            if len(common) == 0:
+                continue
+            ad.obs.loc[common, "nuclei_count_raw"] = seg_result.nuclei_count_raw.loc[common].astype(float).values
+            ad.obs.loc[common, "nuclei_count_target"] = target.loc[common].astype(float).values
+
+        output_paths = save_segmentation_artifacts(
+            output_folder=self.output_folder,
+            sample_name=self.sample_name,
+            result=seg_result,
+            save_masks=save_masks,
+        )
+        self.results["nuclei_counts"] = {
+            "resolution_mode": resolution_mode,
+            "n_nuclei": int(seg_result.nuclei_count_raw.sum()),
+            "n_spots": int(seg_result.nuclei_count_raw.shape[0]),
+            "image_shape": seg_result.image_shape,
+            "outputs": output_paths,
+        }
+        logging.info(
+            "Computed nuclei counts from Cellpose (%s): nuclei=%d, spots=%d.",
+            resolution_mode,
+            int(seg_result.nuclei_count_raw.sum()),
+            int(seg_result.nuclei_count_raw.shape[0]),
+        )
+        return seg_result.nuclei_count_raw
+
     def run_cell_proportion_model(
         self,
         radius=None,
@@ -523,6 +598,10 @@ class CitegeistModel:
         beta_min=0.1,
         beta_max=2.0,
         lambda_coverage=1.0,
+        # Optional nuclei abundance prior (spot mode)
+        use_nuclei_prior=False,
+        nuclei_prior_lambda=1.0,
+        nuclei_target_col="nuclei_count_target",
         # Cell classification parameters (cell resolution only)
         use_gating=None,
         priority_dict=None,
@@ -552,6 +631,10 @@ class CitegeistModel:
             beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
             lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. 0 = symmetric,
                 1 = linear inverse, 2 = aggressive. Default: 1.0
+            use_nuclei_prior (bool): If True, add soft prior encouraging per-spot total
+                abundance to match nuclei-derived targets from `nuclei_target_col`.
+            nuclei_prior_lambda (float): Weight of soft abundance prior.
+            nuclei_target_col (str): .obs column containing normalized abundance target.
         """
 
         # Use resolution preset for laplacian_k if caller used default
@@ -601,6 +684,27 @@ class CitegeistModel:
             )
 
         spot_names = self.antibody_capture_adata.obs_names
+        spot_abundance_target = None
+        lambda_abundance_prior = 0.0
+        if use_nuclei_prior:
+            if self.antibody_capture_adata is None:
+                raise ValueError("Antibody capture data must be loaded to use nuclei prior.")
+            if nuclei_target_col not in self.antibody_capture_adata.obs.columns:
+                raise ValueError(
+                    f"Nuclei prior requested but column '{nuclei_target_col}' not found in antibody_capture_adata.obs. "
+                    "Run compute_spot_nuclei_counts_cellpose() first."
+                )
+            target_series = self.antibody_capture_adata.obs.loc[spot_names, nuclei_target_col]
+            spot_abundance_target = target_series.to_numpy(dtype=float)
+            if np.isnan(spot_abundance_target).any() or np.isinf(spot_abundance_target).any():
+                raise ValueError(f"Invalid values in nuclei target column '{nuclei_target_col}'.")
+            lambda_abundance_prior = float(nuclei_prior_lambda)
+            logging.info(
+                "Using nuclei abundance prior: lambda=%.3f, target_col='%s', median=%.3f",
+                lambda_abundance_prior,
+                nuclei_target_col,
+                float(np.median(spot_abundance_target)),
+            )
 
         if per_marker_beta:
             # ====== NEW PER-MARKER BETA APPROACH ======
@@ -635,6 +739,8 @@ class CitegeistModel:
                     laplacian_k=laplacian_k,
                     lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
                     lambda_coverage=lambda_coverage,
+                    spot_abundance_target=spot_abundance_target,
+                    lambda_abundance_prior=lambda_abundance_prior,
                 )
 
                 # Store marker betas and baselines for downstream analysis
@@ -707,6 +813,8 @@ class CitegeistModel:
                     checkpoint_interval=checkpoint_interval,
                     output_dir=finetune_output_dir,
                     rerun=True,
+                    spot_abundance_target=spot_abundance_target,
+                    lambda_abundance_prior=lambda_abundance_prior,
                 )
 
                 global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
@@ -734,6 +842,8 @@ class CitegeistModel:
                     lambda_laplacian=lambda_laplacian,
                     coords=coords,
                     laplacian_k=laplacian_k,
+                    spot_abundance_target=spot_abundance_target,
+                    lambda_abundance_prior=lambda_abundance_prior,
                 )
             except ValueError as e:
                 error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
@@ -770,6 +880,8 @@ class CitegeistModel:
                     lambda_reg=lambda_reg,
                     alpha=alpha,
                     max_y_change=max_y_change,
+                    spot_abundance_target=spot_abundance_target,
+                    lambda_abundance_prior=lambda_abundance_prior,
                 )
 
                 global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)

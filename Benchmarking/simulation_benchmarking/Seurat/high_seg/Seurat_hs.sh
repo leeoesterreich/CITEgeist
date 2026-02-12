@@ -7,14 +7,16 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=64G
 #SBATCH --array=0-4  # Adjust this based on the number of replicates
+#SBATCH --mail-type=FAIL
+#SBATCH --mail-user=alc376@pitt.edu
 
 # Load R module
 module load gcc/12.2.0 r/4.4.0
 
 # Define input directory
-INPUT_DIR="/ix1/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/replicates/high_seg/h5ad_objects"
-OUTPUT_H5SEURAT_DIR="/ix1/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/replicates/high_seg/h5seurat"
-OUTPUT_DIR="/ix1/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/scCube_12k/Seurat/high_seg/"
+INPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects"
+OUTPUT_H5SEURAT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/high_seg/h5seurat"
+OUTPUT_DIR="/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/high_seg/output"
 
 mkdir -pv "$OUTPUT_H5SEURAT_DIR"
 

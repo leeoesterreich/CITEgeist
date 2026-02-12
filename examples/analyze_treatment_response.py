@@ -66,8 +66,8 @@ PATIENT_SAMPLES = {
     "P1": {"biopsy": "HCC22-088-P1-S1", "surgical": "HCC22-088-P1-S2"},
     "P2": {"biopsy": "HCC22-088-P2-S1", "surgical": "HCC22-088-P2-S2"},
     "P3": {"biopsy": "HCC22-088-P3-S1_A", "surgical": "HCC22-088-P3-S2"},
-    "P4": {"biopsy": "HCC22-088-P4-S1", "surgical": "HCC22-088-P4-S2"},
-    "P5": {"biopsy": "HCC22-088-P5-S1", "surgical": "HCC22-088-P5-S2"},
+    "P4": {"biopsy": "HCC22-088-P4-S1", "surgical": "HCC22-088-P4-S2_1i_rep"},
+    "P5": {"biopsy": "HCC22-088-P5-S1", "surgical": "HCC22-088-P5-S2_F_rep"},
     "P6": {"biopsy": "HCC22-088-P6-S1", "surgical": "HCC22-088-P6-S2_D"},
 }
 

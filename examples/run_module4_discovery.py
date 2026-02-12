@@ -45,7 +45,7 @@ DATA_ROOT = Path("/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData
 # Use unified profile Module 3 outputs (10 cell types)
 MODULE3_OUTPUT = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/output/module3_unified")
 
-# All 14 patient samples
+# All 12 patient samples (deduplicated: P4-S2_1i_rep replaces P4-S2, P5-S2_F_rep replaces P5-S2)
 ALL_SAMPLES = [
     "HCC22-088-P1-S1",
     "HCC22-088-P1-S2",
@@ -54,10 +54,8 @@ ALL_SAMPLES = [
     "HCC22-088-P3-S1_A",
     "HCC22-088-P3-S2",
     "HCC22-088-P4-S1",
-    "HCC22-088-P4-S2",
     "HCC22-088-P4-S2_1i_rep",
     "HCC22-088-P5-S1",
-    "HCC22-088-P5-S2",
     "HCC22-088-P5-S2_F_rep",
     "HCC22-088-P6-S1",
     "HCC22-088-P6-S2_D",
@@ -72,11 +70,9 @@ SAMPLE_METADATA = {
     "HCC22-088-P3-S1_A": {"patient": "P3", "timepoint": "S1", "response": "Responder"},
     "HCC22-088-P3-S2": {"patient": "P3", "timepoint": "S2", "response": "Responder"},
     "HCC22-088-P4-S1": {"patient": "P4", "timepoint": "S1", "response": "Progressor"},
-    "HCC22-088-P4-S2": {"patient": "P4", "timepoint": "S2", "response": "Progressor"},
-    "HCC22-088-P4-S2_1i_rep": {"patient": "P4", "timepoint": "S2_rep", "response": "Progressor"},
+    "HCC22-088-P4-S2_1i_rep": {"patient": "P4", "timepoint": "S2", "response": "Progressor"},
     "HCC22-088-P5-S1": {"patient": "P5", "timepoint": "S1", "response": "Responder"},
-    "HCC22-088-P5-S2": {"patient": "P5", "timepoint": "S2", "response": "Responder"},
-    "HCC22-088-P5-S2_F_rep": {"patient": "P5", "timepoint": "S2_rep", "response": "Responder"},
+    "HCC22-088-P5-S2_F_rep": {"patient": "P5", "timepoint": "S2", "response": "Responder"},
     "HCC22-088-P6-S1": {"patient": "P6", "timepoint": "S1", "response": "Responder"},
     "HCC22-088-P6-S2_D": {"patient": "P6", "timepoint": "S2", "response": "Responder"},
 }

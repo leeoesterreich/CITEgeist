@@ -26,7 +26,7 @@ cat(sprintf("[%s] Loading converted Seurat object: %s\n", Sys.time(), converted_
 query_obj <- LoadH5Seurat(converted_file)
 
 # Load reference Seurat object
-ref_file  <- "/bgfs/alee/LO_LAB/Personal/Brent_Schlegel/Projects/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat"
+ref_file  <- "/ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat"
 cat(sprintf("[%s] Loading reference Seurat object: %s\n", Sys.time(), ref_file))
 Wu_scRNA_ref <- LoadH5Seurat(ref_file)
 Wu_scRNA_ref <- FindVariableFeatures(Wu_scRNA_ref)
@@ -60,7 +60,10 @@ run_spatial_deconvolution <- function(query_obj, ref_obj, rep_name, output_dir) 
     "B-cells", "CAFs", "Cancer Epithelial", "Endothelial", "Myeloid",
     "Normal Epithelial", "PVL", "Plasmablasts", "T-cells"
   )]
-  
+
+  # Normalize predictions to sum to 1 per spot (critical for fair comparison)
+  seurat_predictions <- seurat_predictions / rowSums(seurat_predictions)
+
   output_file <- file.path(output_dir, paste0(rep_name, "_Seurat_deconv_predictions.csv"))
   write.csv(seurat_predictions, output_file, row.names = TRUE)
   cat(sprintf("[%s] Saved deconvolution predictions: %s\n", Sys.time(), output_file))

@@ -46,6 +46,10 @@ dev = [
     "pylint>=3.0",
     "pre-commit>=3.0",
 ]
+imaging = [
+    "cellpose>=3.0.0",
+    "scikit-image>=0.22.0",
+]
 
 [tool.black]
 line-length = 120

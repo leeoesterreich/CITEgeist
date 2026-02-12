@@ -35,10 +35,25 @@ logger = logging.getLogger(__name__)
 
 
 def get_response_status(sample_name: str) -> str:
-    """Determine response status based on patient ID."""
-    if 'P1-' in sample_name or 'P5-' in sample_name:
-        return 'responder'
-    return 'progressor'
+    """Determine response status based on patient ID.
+
+    Patient response mapping (from clinical data):
+    - P1, P4: Progressors (2 patients)
+    - P2, P3, P5, P6: Responders (4 patients)
+    """
+    if 'P1-' in sample_name or 'P4-' in sample_name:
+        return 'progressor'
+    return 'responder'
+
+
+def get_timepoint(sample_name: str) -> str:
+    """Determine timepoint from sample name.
+
+    S1 = biopsy (pre-treatment), S2 = surgical (post-treatment).
+    """
+    if '-S1' in sample_name:
+        return 'biopsy'
+    return 'surgical'
 
 
 def load_sample_expression(sample_name: str, output_dir: Path) -> Optional[pd.DataFrame]:
@@ -56,10 +71,11 @@ def create_pseudobulk(samples: List[str], output_dir: Path) -> tuple:
 
     Returns:
         counts_df: genes x samples matrix
-        metadata_df: sample metadata with condition
+        metadata_df: sample metadata with condition and timepoint
     """
     sample_sums = {}
     conditions = {}
+    timepoints = {}
 
     for sample in samples:
         gex_df = load_sample_expression(sample, output_dir)
@@ -70,8 +86,9 @@ def create_pseudobulk(samples: List[str], output_dir: Path) -> tuple:
         sample_sum = gex_df.sum(axis=0)
         sample_sums[sample] = sample_sum
         conditions[sample] = get_response_status(sample)
+        timepoints[sample] = get_timepoint(sample)
 
-        logger.info(f"  {sample}: {len(gex_df)} spots -> pseudobulk ({conditions[sample]})")
+        logger.info(f"  {sample}: {len(gex_df)} spots -> pseudobulk ({conditions[sample]}, {timepoints[sample]})")
 
     # Create counts matrix (genes x samples)
     counts_df = pd.DataFrame(sample_sums).T
@@ -79,7 +96,8 @@ def create_pseudobulk(samples: List[str], output_dir: Path) -> tuple:
     # Create metadata
     metadata_df = pd.DataFrame({
         'sample': list(conditions.keys()),
-        'condition': list(conditions.values())
+        'condition': list(conditions.values()),
+        'timepoint': [timepoints[s] for s in conditions.keys()]
     })
     metadata_df = metadata_df.set_index('sample')
 
@@ -121,7 +139,7 @@ def run_pydeseq2_pseudobulk(
     dds = DeseqDataSet(
         counts=counts_int,
         metadata=metadata_df,
-        design="~condition",
+        design="~condition + timepoint",
         inference=inference,
         refit_cooks=False
     )
@@ -202,14 +220,15 @@ def main():
         "HCC22-088-P1-S1", "HCC22-088-P1-S2",
         "HCC22-088-P2-S1", "HCC22-088-P2-S2",
         "HCC22-088-P3-S1_A", "HCC22-088-P3-S2",
-        "HCC22-088-P4-S1", "HCC22-088-P4-S2", "HCC22-088-P4-S2_1i_rep",
-        "HCC22-088-P5-S1", "HCC22-088-P5-S2", "HCC22-088-P5-S2_F_rep",
+        "HCC22-088-P4-S1", "HCC22-088-P4-S2_1i_rep",
+        "HCC22-088-P5-S1", "HCC22-088-P5-S2_F_rep",
         "HCC22-088-P6-S1", "HCC22-088-P6-S2_D"
     ]
 
     logger.info("="*60)
     logger.info("Module 5 PyDESeq2 Analysis (Pseudo-bulk)")
-    logger.info("Comparing Responder (P1, P5) vs Progressor (P2-P4, P6)")
+    logger.info("Comparing Responder (P2, P3, P5, P6) vs Progressor (P1, P4)")
+    logger.info("Design: ~condition + timepoint (biopsy vs surgical)")
     logger.info("="*60)
 
     # Create pseudo-bulk matrix

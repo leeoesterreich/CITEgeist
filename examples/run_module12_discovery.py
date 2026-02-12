@@ -45,7 +45,7 @@ logging.basicConfig(
 # Patient data location
 DATA_ROOT = Path("/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 
-# All 14 patient samples
+# All 12 patient samples (deduplicated: P4-S2_1i_rep replaces P4-S2, P5-S2_F_rep replaces P5-S2)
 ALL_SAMPLES = [
     "HCC22-088-P1-S1",
     "HCC22-088-P1-S2",
@@ -54,10 +54,8 @@ ALL_SAMPLES = [
     "HCC22-088-P3-S1_A",
     "HCC22-088-P3-S2",
     "HCC22-088-P4-S1",
-    "HCC22-088-P4-S2",
     "HCC22-088-P4-S2_1i_rep",
     "HCC22-088-P5-S1",
-    "HCC22-088-P5-S2",
     "HCC22-088-P5-S2_F_rep",
     "HCC22-088-P6-S1",
     "HCC22-088-P6-S2_D",

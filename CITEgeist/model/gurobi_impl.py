@@ -358,6 +358,8 @@ def optimize_cell_proportions(
     lambda_laplacian: float = 0.1,
     coords: Optional[np.ndarray] = None,
     laplacian_k: int = 8,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions using Gurobi.
@@ -381,6 +383,9 @@ def optimize_cell_proportions(
             Set to 0 to disable spatial smoothing.
         coords: Spatial coordinates, shape (N, 2). Required if lambda_laplacian > 0.
         laplacian_k: Number of neighbors for Laplacian graph (default: 8).
+        spot_abundance_target: Optional per-spot abundance target (shape N,).
+            When provided, objective includes soft penalty on row-sum mismatch.
+        lambda_abundance_prior: Weight of abundance soft-prior term.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]: Y_values (N x T), beta_values (T,)
@@ -389,6 +394,12 @@ def optimize_cell_proportions(
     from gurobipy import GRB
 
     N, T = profile_based_antibody_data.shape
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != N:
+            raise ValueError(
+                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
+            )
 
     # Build spatial Laplacian for smoothing if requested
     L_coo = None
@@ -454,7 +465,16 @@ def optimize_cell_proportions(
                     laplacian_terms.append(L_val * Y[i_spot, k] * Y[j_spot, k])
             laplacian_term = lambda_laplacian * gp.quicksum(laplacian_terms)
 
-        model.setObjective(total_error + regularization_term + laplacian_term, GRB.MINIMIZE)
+        abundance_prior_term = 0
+        if spot_abundance_target is not None and lambda_abundance_prior > 0:
+            abundance_terms = []
+            for i in range(N):
+                row_sum = gp.quicksum(Y[i, j] for j in range(T))
+                target_i = float(spot_abundance_target[i])
+                abundance_terms.append((row_sum - target_i) * (row_sum - target_i))
+            abundance_prior_term = lambda_abundance_prior * gp.quicksum(abundance_terms)
+
+        model.setObjective(total_error + regularization_term + laplacian_term + abundance_prior_term, GRB.MINIMIZE)
 
         # Sum of proportions constraints
         for i in range(N):
@@ -547,6 +567,8 @@ def optimize_cell_proportions_per_marker(
     alpha_max: float = 0.8,
     lambda_alpha: float = 1.0,
     lambda_coverage: float = 1.0,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
@@ -586,6 +608,8 @@ def optimize_cell_proportions_per_marker(
             Controls how loss is weighted by number of markers per cell type:
             0 = symmetric (no scaling), 1 = linear inverse scaling (1/n_markers).
             Higher values boost single-marker cell types that may be underestimated.
+        spot_abundance_target: Optional per-spot abundance target (shape N,).
+        lambda_abundance_prior: Weight of abundance soft-prior term.
 
     Returns:
         Tuple of:
@@ -595,6 +619,12 @@ def optimize_cell_proportions_per_marker(
     """
     N, M = marker_level_data.shape
     T = len(cell_type_names)
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != N:
+            raise ValueError(
+                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
+            )
 
     # Validate assignment matrix shape
     if assignment_matrix.shape != (M, T):
@@ -769,7 +799,19 @@ def optimize_cell_proportions_per_marker(
             )
             logging.info(f"Sparsity penalty enabled (neg-L2): lambda_sparse={lambda_sparse}")
 
-        model.setObjective(total_error + regularization_term + laplacian_term + sparsity_term, GRB.MINIMIZE)
+        abundance_prior_term = 0
+        if spot_abundance_target is not None and lambda_abundance_prior > 0:
+            abundance_terms = []
+            for i in range(N):
+                row_sum = gp.quicksum(Y[i, j] for j in range(T))
+                target_i = float(spot_abundance_target[i])
+                abundance_terms.append((row_sum - target_i) * (row_sum - target_i))
+            abundance_prior_term = lambda_abundance_prior * gp.quicksum(abundance_terms)
+
+        model.setObjective(
+            total_error + regularization_term + laplacian_term + sparsity_term + abundance_prior_term,
+            GRB.MINIMIZE,
+        )
 
         # Sum of proportions constraints
         for i in range(N):
@@ -1402,6 +1444,8 @@ def finetune_cell_proportions(
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Refine cell proportions using local neighborhood optimization with parallelization.
@@ -1442,6 +1486,10 @@ def finetune_cell_proportions(
             Directory for checkpoints.
         rerun (bool):
             Whether to rerun if results exist.
+        spot_abundance_target (Optional[np.ndarray]):
+            Optional per-spot abundance target (shape N,).
+        lambda_abundance_prior (float):
+            Weight of abundance soft-prior term.
 
     Returns:
         Tuple[np.ndarray, np.ndarray]:
@@ -1462,6 +1510,12 @@ def finetune_cell_proportions(
         raise ValueError("initial_beta_values must be a 1D array of length T.")
 
     N, T = profile_based_antibody_data.shape
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != N:
+            raise ValueError(
+                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
+            )
     if initial_Y_values.shape != (N, T):
         raise ValueError("Mismatch between profile_based_antibody_data and initial_Y_values shapes.")
     if len(cell_type_names) != T:
@@ -1504,6 +1558,8 @@ def finetune_cell_proportions(
                         beta_vary=beta_vary,
                         max_iterations=max_iterations,
                         max_y_change=max_y_change,
+                        spot_abundance_target=spot_abundance_target,
+                        lambda_abundance_prior=lambda_abundance_prior,
                     )
                     futures[future] = spot_idx
 
@@ -1570,6 +1626,8 @@ def deconvolute_local_cell_proportions(
     normalize_beta: bool = True,
     max_iterations: int = 20,
     max_y_change: float = 0.4,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization.
@@ -1602,6 +1660,10 @@ def deconvolute_local_cell_proportions(
         max_y_change (float):
             Maximum allowed change in Y values between iterations (default: 0.2).
             Values are constrained to vary by at most this amount while staying in [0,1].
+        spot_abundance_target (Optional[np.ndarray]):
+            Optional per-spot abundance target (shape N,).
+        lambda_abundance_prior (float):
+            Weight of abundance soft-prior term.
 
     Returns:
         Optional[np.ndarray]:
@@ -1619,6 +1681,12 @@ def deconvolute_local_cell_proportions(
 
     local_antibody_data = profile_based_antibody_data[neighbor_indices, :]
     local_N, T = local_antibody_data.shape
+    local_abundance_target = None
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != profile_based_antibody_data.shape[0]:
+            raise ValueError("spot_abundance_target length does not match profile_based_antibody_data rows.")
+        local_abundance_target = spot_abundance_target[neighbor_indices]
 
     if local_N == 0:
         logging.error(f"[Local Cell Props] Spot {spot_idx} has empty local antibody data.")
@@ -1681,7 +1749,15 @@ def deconvolute_local_cell_proportions(
             l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
             l2 = gp.quicksum(Y_vars[i, j] * Y_vars[i, j] for i in range(local_N) for j in range(T))
             reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
-            model.setObjective(total_error + reg_term, GRB.MINIMIZE)
+            abundance_prior_term = 0
+            if local_abundance_target is not None and lambda_abundance_prior > 0:
+                abundance_terms = []
+                for i in range(local_N):
+                    row_sum = gp.quicksum(Y_vars[i, j] for j in range(T))
+                    target_i = float(local_abundance_target[i])
+                    abundance_terms.append((row_sum - target_i) * (row_sum - target_i))
+                abundance_prior_term = lambda_abundance_prior * gp.quicksum(abundance_terms)
+            model.setObjective(total_error + reg_term + abundance_prior_term, GRB.MINIMIZE)
 
             model.write('local_cell_proportions_model.mps')
 
@@ -1769,6 +1845,8 @@ def deconvolute_local_cell_proportions_per_marker(
     max_y_change: float = 0.4,
     marker_exclusivity: Optional[np.ndarray] = None,
     marker_alpha: Optional[np.ndarray] = None,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Optional[np.ndarray]:
     """
     Refine cell proportions for a single spot via local neighborhood optimization with per-marker beta.
@@ -1795,6 +1873,8 @@ def deconvolute_local_cell_proportions_per_marker(
             If provided, multiplies the loss weight for each marker.
         marker_alpha: Optional (M,) array of per-marker baselines from global EM.
             If provided, signal is baseline-subtracted before reconstruction.
+        spot_abundance_target: Optional per-spot abundance target (shape N,).
+        lambda_abundance_prior: Weight of abundance soft-prior term.
 
     Returns:
         Refined proportions (T,) for the specified spot, or None on failure.
@@ -1832,6 +1912,12 @@ def deconvolute_local_cell_proportions_per_marker(
 
     local_marker_data = marker_level_data[neighbor_indices, :]
     local_N = local_marker_data.shape[0]
+    local_abundance_target = None
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != N_global:
+            raise ValueError("spot_abundance_target length does not match marker_level_data rows.")
+        local_abundance_target = spot_abundance_target[neighbor_indices]
 
     if local_N == 0:
         logging.error(f"[Local Cell Props] Spot {spot_idx} has empty local marker data.")
@@ -1902,7 +1988,15 @@ def deconvolute_local_cell_proportions_per_marker(
             l1 = gp.quicksum(Y_vars[i, j] for i in range(local_N) for j in range(T))
             l2 = gp.quicksum(Y_vars[i, j] * Y_vars[i, j] for i in range(local_N) for j in range(T))
             reg_term = lambda_reg * (alpha * l1 + (1.0 - alpha) * l2)
-            model.setObjective(total_error + reg_term, GRB.MINIMIZE)
+            abundance_prior_term = 0
+            if local_abundance_target is not None and lambda_abundance_prior > 0:
+                abundance_terms = []
+                for i in range(local_N):
+                    row_sum = gp.quicksum(Y_vars[i, j] for j in range(T))
+                    target_i = float(local_abundance_target[i])
+                    abundance_terms.append((row_sum - target_i) * (row_sum - target_i))
+                abundance_prior_term = lambda_abundance_prior * gp.quicksum(abundance_terms)
+            model.setObjective(total_error + reg_term + abundance_prior_term, GRB.MINIMIZE)
 
             model.optimize()
 
@@ -1999,6 +2093,8 @@ def finetune_cell_proportions_per_marker(
     checkpoint_interval: int = 100,
     output_dir: str = "checkpoints",
     rerun: bool = False,
+    spot_abundance_target: Optional[np.ndarray] = None,
+    lambda_abundance_prior: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Refine cell proportions using local neighborhood optimization with per-marker beta.
@@ -2024,6 +2120,8 @@ def finetune_cell_proportions_per_marker(
         checkpoint_interval: Number of spots between checkpoints.
         output_dir: Directory for checkpoints.
         rerun: Whether to rerun if results exist.
+        spot_abundance_target: Optional per-spot abundance target (shape N,).
+        lambda_abundance_prior: Weight of abundance soft-prior term.
 
     Returns:
         Tuple of:
@@ -2039,6 +2137,12 @@ def finetune_cell_proportions_per_marker(
 
     N, M = marker_level_data.shape
     T = len(cell_type_names)
+    if spot_abundance_target is not None:
+        spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
+        if spot_abundance_target.shape[0] != N:
+            raise ValueError(
+                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
+            )
 
     if initial_Y_values.ndim != 2 or initial_Y_values.shape[0] != N or initial_Y_values.shape[1] != T:
         raise ValueError(f"initial_Y_values shape {initial_Y_values.shape} != expected ({N}, {T})")
@@ -2088,6 +2192,8 @@ def finetune_cell_proportions_per_marker(
                         max_y_change=max_y_change,
                         marker_exclusivity=marker_exclusivity,
                         marker_alpha=marker_alpha,
+                        spot_abundance_target=spot_abundance_target,
+                        lambda_abundance_prior=lambda_abundance_prior,
                     )
                     futures[future] = spot_idx
 

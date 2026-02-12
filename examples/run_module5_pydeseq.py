@@ -7,7 +7,7 @@ Performs differential expression analysis comparing responder vs progressor samp
 
 Strategy:
 1. Load gene expression from all patient samples
-2. Assign response status based on patient ID (P1, P5 = responder; P2-P4, P6 = progressor)
+2. Assign response status based on patient ID (P1, P4 = progressor; P2, P3, P5, P6 = responder)
 3. Run PyDESeq2 comparing responder vs progressor spots
 4. Pathway enrichment with GSEApy
 
@@ -46,13 +46,13 @@ def get_response_status(sample_name: str) -> str:
     Determine response status for a sample based on patient ID.
 
     Patient response mapping (from clinical data):
-    - P1, P5: Responders
-    - P2, P3, P4, P6: Progressors
+    - P1, P4: Progressors (2 patients)
+    - P2, P3, P5, P6: Responders (4 patients)
     """
-    if 'P1-' in sample_name or 'P5-' in sample_name:
-        return 'responder'
-    else:
+    if 'P1-' in sample_name or 'P4-' in sample_name:
         return 'progressor'
+    else:
+        return 'responder'
 
 
 def load_sample_expression(sample_name: str, output_dir: Path) -> Optional[pd.DataFrame]:
@@ -224,14 +224,14 @@ def main():
         "HCC22-088-P1-S1", "HCC22-088-P1-S2",
         "HCC22-088-P2-S1", "HCC22-088-P2-S2",
         "HCC22-088-P3-S1_A", "HCC22-088-P3-S2",
-        "HCC22-088-P4-S1", "HCC22-088-P4-S2", "HCC22-088-P4-S2_1i_rep",
-        "HCC22-088-P5-S1", "HCC22-088-P5-S2", "HCC22-088-P5-S2_F_rep",
+        "HCC22-088-P4-S1", "HCC22-088-P4-S2_1i_rep",
+        "HCC22-088-P5-S1", "HCC22-088-P5-S2_F_rep",
         "HCC22-088-P6-S1", "HCC22-088-P6-S2_D"
     ]
 
     logger.info("="*60)
     logger.info("Module 5 PyDESeq2 Analysis")
-    logger.info("Comparing Responder (P1, P5) vs Progressor (P2-P4, P6)")
+    logger.info("Comparing Responder (P2, P3, P5, P6) vs Progressor (P1, P4)")
     logger.info("="*60)
 
     # Collect expression data from all samples
