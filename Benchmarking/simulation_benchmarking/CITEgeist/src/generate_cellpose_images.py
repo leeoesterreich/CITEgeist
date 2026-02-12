@@ -214,3 +214,52 @@ def generate_he_image(
                 )
 
     return img
+
+
+def load_cell_data(replicate_id: int, condition: str, input_dir: Path) -> pd.DataFrame:
+    """
+    Load cell-to-spot index data from scCube simulation.
+
+    Args:
+        replicate_id: Replicate number (0-4)
+        condition: 'high_seg' or 'mixed'
+        input_dir: Base path to scCube replicates directory
+
+    Returns:
+        DataFrame with Cell, Cell_type, point_x, point_y, spot columns
+    """
+    index_file = input_dir / condition / "ST_sim" / f"Wu_ST_{replicate_id}_index.csv"
+
+    if not index_file.exists():
+        raise FileNotFoundError(f"Index file not found: {index_file}")
+
+    df = pd.read_csv(index_file, index_col=0)
+    logger.info("Loaded %d cells from %s", len(df), index_file)
+
+    # Log cell type distribution
+    for ct, count in df["Cell_type"].value_counts().items():
+        logger.info("  %s: %d", ct, count)
+
+    return df
+
+
+def compute_nuclei_counts(cell_df: pd.DataFrame) -> pd.Series:
+    """
+    Compute ground truth nuclei counts per spot.
+
+    Args:
+        cell_df: DataFrame with 'spot' column
+
+    Returns:
+        Series with spot names as index, cell counts as values
+    """
+    counts = cell_df.groupby("spot").size()
+    counts.name = "nuclei_count"
+    logger.info(
+        "Nuclei counts: min=%d, max=%d, mean=%.1f, total=%d",
+        counts.min(),
+        counts.max(),
+        counts.mean(),
+        counts.sum(),
+    )
+    return counts
