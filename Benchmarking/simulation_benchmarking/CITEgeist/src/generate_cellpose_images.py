@@ -57,3 +57,70 @@ def create_gaussian_kernel(sigma: float, size: int = None) -> np.ndarray:
     y, x = np.ogrid[:size, :size]
     kernel = np.exp(-((x - center) ** 2 + (y - center) ** 2) / (2 * sigma ** 2))
     return kernel
+
+
+def generate_dapi_image(
+    cell_coords: np.ndarray,
+    image_size: Tuple[int, int],
+    sigma: float = 3.5,
+    padding: int = 100,
+) -> np.ndarray:
+    """
+    Generate DAPI-style grayscale image with Gaussian nuclei.
+
+    Args:
+        cell_coords: Nx2 array of (x, y) coordinates in original units
+        image_size: (width, height) of output image
+        sigma: Gaussian sigma for nuclei
+        padding: Padding in pixels around coordinate extent
+
+    Returns:
+        RGB uint8 numpy array (grayscale stored as RGB)
+    """
+    width, height = image_size
+
+    # Compute coordinate scaling
+    x_min, x_max = cell_coords[:, 0].min(), cell_coords[:, 0].max()
+    y_min, y_max = cell_coords[:, 1].min(), cell_coords[:, 1].max()
+
+    scale_x = (width - 2 * padding) / (x_max - x_min + 1e-6)
+    scale_y = (height - 2 * padding) / (y_max - y_min + 1e-6)
+
+    # Create float accumulator for Gaussian blending
+    img_float = np.zeros((height, width), dtype=np.float32)
+
+    # Create Gaussian kernel once
+    kernel = create_gaussian_kernel(sigma)
+    k_size = kernel.shape[0]
+    k_half = k_size // 2
+
+    # Draw each nucleus
+    for x_orig, y_orig in cell_coords:
+        # Transform to image coordinates
+        x_px = int(padding + (x_orig - x_min) * scale_x)
+        y_px = int(padding + (y_orig - y_min) * scale_y)
+
+        # Compute kernel bounds with clipping
+        x_start = max(0, x_px - k_half)
+        x_end = min(width, x_px + k_half + 1)
+        y_start = max(0, y_px - k_half)
+        y_end = min(height, y_px + k_half + 1)
+
+        # Corresponding kernel region
+        kx_start = x_start - (x_px - k_half)
+        kx_end = k_size - ((x_px + k_half + 1) - x_end)
+        ky_start = y_start - (y_px - k_half)
+        ky_end = k_size - ((y_px + k_half + 1) - y_end)
+
+        # Add Gaussian to image (max blending for overlapping nuclei)
+        if x_end > x_start and y_end > y_start:
+            img_float[y_start:y_end, x_start:x_end] = np.maximum(
+                img_float[y_start:y_end, x_start:x_end],
+                kernel[ky_start:ky_end, kx_start:kx_end] * DAPI_NUCLEUS_INTENSITY,
+            )
+
+    # Convert to uint8 RGB (grayscale replicated to 3 channels)
+    img_gray = np.clip(img_float, 0, 255).astype(np.uint8)
+    img_rgb = np.stack([img_gray, img_gray, img_gray], axis=-1)
+
+    return img_rgb
