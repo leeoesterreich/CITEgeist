@@ -161,7 +161,7 @@ def compute_gex_metrics(pred: pd.DataFrame, gt: pd.DataFrame) -> Dict[str, float
     common_spots = pred_t.columns.intersection(gt.columns)
 
     if len(common_genes_lower) == 0 or len(common_spots) == 0:
-        return {"pearson_r": np.nan, "rmse": np.nan, "mae": np.nan, "n_genes": 0, "n_spots": 0}
+        return {"pearson_r": np.nan, "rmse": np.nan, "nrmse": np.nan, "mae": np.nan, "n_genes": 0, "n_spots": 0}
 
     pred_genes = [pred_genes_lower[g] for g in common_genes_lower]
     gt_genes = [gt_genes_lower[g] for g in common_genes_lower]
@@ -184,9 +184,14 @@ def compute_gex_metrics(pred: pd.DataFrame, gt: pd.DataFrame) -> Dict[str, float
     rmse = np.sqrt(np.mean((gt_flat - pred_flat) ** 2))
     mae = np.mean(np.abs(gt_flat - pred_flat))
 
+    # NRMSE: normalize by range of ground truth
+    gt_range = gt_flat.max() - gt_flat.min()
+    nrmse = rmse / gt_range if gt_range > 0 else np.nan
+
     return {
         "pearson_r": float(pearson_r) if not np.isnan(pearson_r) else np.nan,
         "rmse": float(rmse),
+        "nrmse": float(nrmse) if not np.isnan(nrmse) else np.nan,
         "mae": float(mae),
         "n_genes": len(common_genes_lower),
         "n_spots": len(common_spots),
@@ -235,8 +240,8 @@ def main():
 
     # Print summary
     print("\n--- Overall GEX Metrics ---")
-    print(f"{'Method':<16} {'Pearson r':>10} {'RMSE':>10} {'MAE':>10} {'Cell Types':>12} {'Regions':>8}")
-    print("-" * 66)
+    print(f"{'Method':<16} {'Pearson r':>10} {'RMSE':>10} {'NRMSE':>10} {'MAE':>10} {'Cell Types':>12} {'Regions':>8}")
+    print("-" * 78)
 
     method_summaries = {}
 
@@ -250,15 +255,17 @@ def main():
         valid = df.dropna(subset=["pearson_r"])
         mean_r = valid["pearson_r"].mean()
         mean_rmse = valid["rmse"].mean()
+        mean_nrmse = valid["nrmse"].mean()
         mean_mae = valid["mae"].mean()
         n_ct = valid["cell_type"].nunique()
         n_reg = valid["region_id"].nunique()
 
-        print(f"{method_name:<16} {mean_r:>10.4f} {mean_rmse:>10.4f} {mean_mae:>10.4f} {n_ct:>12} {n_reg:>8}")
+        print(f"{method_name:<16} {mean_r:>10.4f} {mean_rmse:>10.4f} {mean_nrmse:>10.4f} {mean_mae:>10.4f} {n_ct:>12} {n_reg:>8}")
 
         method_summaries[method_name] = {
             "mean_pearson_r": mean_r,
             "mean_rmse": mean_rmse,
+            "mean_nrmse": mean_nrmse,
             "mean_mae": mean_mae,
             "n_cell_types": n_ct,
             "n_regions": n_reg,
