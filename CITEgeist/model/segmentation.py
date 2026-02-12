@@ -265,10 +265,11 @@ def run_cellpose_nuclei_segmentation(
     flow_threshold: float = 0.4,
     cellprob_threshold: float = 0.0,
     model=None,
+    model_type: str = "nuclei",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Run Cellpose nuclei model and return mask labels + centroid array."""
     if model is None:
-        model = _build_cellpose_model(use_gpu=use_gpu)
+        model = _build_cellpose_model(use_gpu=use_gpu, model_type=model_type)
 
     eval_out = model.eval(
         image_rgb_uint8,
@@ -298,7 +299,7 @@ def run_cellpose_nuclei_segmentation(
     return masks, centroids
 
 
-def _build_cellpose_model(use_gpu: bool = False):
+def _build_cellpose_model(use_gpu: bool = False, model_type: str = "nuclei"):
     try:
         from cellpose import models
     except Exception as exc:
@@ -309,12 +310,12 @@ def _build_cellpose_model(use_gpu: bool = False):
 
     # Support both legacy Cellpose API (`Cellpose`) and newer API (`CellposeModel`).
     if hasattr(models, "Cellpose"):
-        return models.Cellpose(gpu=use_gpu, model_type="nuclei")
+        return models.Cellpose(gpu=use_gpu, model_type=model_type)
     if hasattr(models, "CellposeModel"):
         try:
-            return models.CellposeModel(gpu=use_gpu, model_type="nuclei")
+            return models.CellposeModel(gpu=use_gpu, model_type=model_type)
         except TypeError:
-            return models.CellposeModel(gpu=use_gpu, pretrained_model="nuclei")
+            return models.CellposeModel(gpu=use_gpu, pretrained_model=model_type)
     raise AttributeError("cellpose.models has neither `Cellpose` nor `CellposeModel`; unsupported Cellpose version.")
 
 
