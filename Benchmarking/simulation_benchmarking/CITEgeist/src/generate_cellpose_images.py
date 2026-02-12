@@ -263,3 +263,122 @@ def compute_nuclei_counts(cell_df: pd.DataFrame) -> pd.Series:
         counts.sum(),
     )
     return counts
+
+
+def generate_images_for_replicate(
+    replicate_id: int,
+    condition: str,
+    input_dir: Path,
+    output_dir: Path,
+    modes: list,
+    image_size: int,
+    nucleus_sigma: float,
+) -> None:
+    """Generate images and nuclei counts for a single replicate."""
+    logger.info("=== Replicate %d, Condition: %s ===", replicate_id, condition)
+
+    # Load cell data
+    cell_df = load_cell_data(replicate_id, condition, input_dir)
+    cell_coords = cell_df[["point_x", "point_y"]].values
+
+    # Compute and save nuclei counts
+    nuclei_counts = compute_nuclei_counts(cell_df)
+    counts_dir = output_dir / condition / "nuclei_counts"
+    counts_dir.mkdir(parents=True, exist_ok=True)
+    counts_path = counts_dir / f"Wu_rep_{replicate_id}_nuclei_counts.csv"
+    nuclei_counts.to_csv(counts_path, header=True)
+    logger.info("Saved nuclei counts: %s", counts_path)
+
+    # Generate images for each mode
+    for mode in modes:
+        logger.info("Generating %s image...", mode)
+
+        if mode == "dapi":
+            img_array = generate_dapi_image(
+                cell_coords,
+                image_size=(image_size, image_size),
+                sigma=nucleus_sigma,
+            )
+        elif mode == "h_and_e":
+            img_array = generate_he_image(
+                cell_coords,
+                image_size=(image_size, image_size),
+                nucleus_sigma=nucleus_sigma,
+            )
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
+
+        # Save image
+        img_dir = output_dir / condition / "images" / mode
+        img_dir.mkdir(parents=True, exist_ok=True)
+        img_path = img_dir / f"Wu_rep_{replicate_id}_cellpose.png"
+
+        Image.fromarray(img_array).save(img_path)
+        logger.info("Saved: %s (%dx%d)", img_path, img_array.shape[1], img_array.shape[0])
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Generate Cellpose-compatible images from scCube simulation data"
+    )
+    parser.add_argument(
+        "--replicate-id",
+        type=int,
+        required=True,
+        help="Replicate ID (0-4)",
+    )
+    parser.add_argument(
+        "--condition",
+        choices=["high_seg", "mixed"],
+        required=True,
+        help="Simulation condition",
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        default=DEFAULT_INPUT_DIR,
+        help="Path to scCube replicates directory",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="Output directory for images and nuclei counts",
+    )
+    parser.add_argument(
+        "--mode",
+        choices=["dapi", "h_and_e", "both"],
+        default="both",
+        help="Image mode (default: both)",
+    )
+    parser.add_argument(
+        "--image-size",
+        type=int,
+        default=8000,
+        help="Image size in pixels (default: 8000)",
+    )
+    parser.add_argument(
+        "--nucleus-sigma",
+        type=float,
+        default=3.5,
+        help="Gaussian sigma for nuclei (default: 3.5)",
+    )
+    args = parser.parse_args()
+
+    modes = ["dapi", "h_and_e"] if args.mode == "both" else [args.mode]
+
+    generate_images_for_replicate(
+        replicate_id=args.replicate_id,
+        condition=args.condition,
+        input_dir=args.input_dir,
+        output_dir=args.output_dir,
+        modes=modes,
+        image_size=args.image_size,
+        nucleus_sigma=args.nucleus_sigma,
+    )
+
+    logger.info("Done!")
+
+
+if __name__ == "__main__":
+    main()
