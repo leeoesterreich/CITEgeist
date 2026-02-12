@@ -297,6 +297,41 @@ CITEgeist is organized into 5 modules that form a complete spatial multi-omics a
 
 **Test**: `tests/test_citegeist_simulated.py`
 
+#### Module 3 Alternative: Discrete Cell Assignment (IQP)
+
+**Files**: `CITEgeist/model/gurobi_impl.py`, `CITEgeist/model/citegeist_model.py`, `CITEgeist/model/segmentation.py`
+
+**Purpose**: When nuclei counts are available (from Cellpose segmentation or Xenium cell mapping), assign discrete integer cell counts per type instead of continuous proportions.
+
+**Method**:
+- **E-step**: Integer Quadratic Programming (IQP) solver assigns discrete cell identities
+- **M-step**: Ordinary Least Squares (OLS) optimizes per-marker beta coefficients
+- Iterates until beta convergence or max iterations reached
+
+**Key Functions**:
+- `solve_discrete_cell_counts()`: Single-spot IQP optimization with Gurobi
+- `optimize_discrete_cell_assignment_em()`: Full EM algorithm over all spots
+- `run_discrete_cell_assignment()`: CitegeistModel entry point (replaces `run_cell_proportion_model()`)
+- `preprocess_antibody_discrete()`: CLR normalization preserving cellularity signal
+
+**Benchmark Results (Xenium pseudo-Visium, achievable-7 cell types)**:
+| Metric | Discrete | Continuous Baseline | Improvement |
+|--------|----------|---------------------|-------------|
+| Proportion Pearson | 0.658 | 0.600 | +10% |
+| Proportion RMSE | 0.128 | 0.167 | -23% |
+| GEX Pearson | 0.407 | 0.35-0.37 | +10-16% |
+
+**Usage**:
+```python
+# Requires nuclei counts (from Cellpose or Xenium n_cells)
+model.preprocess_antibody_discrete()  # NOT preprocess_antibody()
+cell_counts_df = model.run_discrete_cell_assignment(nuclei_counts=nuclei_series)
+model.run_cell_expression_pass1(use_discrete_mode=True, cell_counts=cell_counts_df)
+```
+
+**Tests**: `tests/test_discrete_assignment.py`
+**Example**: `examples/run_module3_discrete.py`
+
 ---
 
 ### Module 4: Protein-Anchored Spatial Transcriptomic Program Discovery
@@ -363,6 +398,7 @@ CITEgeist is organized into 5 modules that form a complete spatial multi-omics a
 | **2b** | Profile Discovery | Marker pairs | Cell type profiles | `spatial_colocalization.py` |
 | **2c** | Profile Selection | Multiple profiles | Optimal profiles | `spatial_colocalization.py` |
 | **3** | Deconvolution (2-Pass) | GEX + antibody profiles | Proportions + deconvolved layers | `gurobi_impl.py`, `citegeist_model.py` |
+| **3-alt** | Discrete Cell Assignment | GEX + antibody + nuclei counts | Integer cell counts + deconvolved layers | `gurobi_impl.py`, `segmentation.py` |
 | **4** | Anchored Programs | Deconvolved layers | Spatial programs per cell type | `anchored_program_discovery.py` |
 | **4b** | Bivariate Relationships | Program H matrices | Program-pair correlations | `anchored_program_discovery.py` |
 | **5** | Cross-sample Integration | Multi-sample programs | Conserved relationships | `cross_sample_integration.py` |
