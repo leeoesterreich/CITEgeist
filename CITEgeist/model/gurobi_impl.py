@@ -2988,6 +2988,307 @@ def _run_dummy_models() -> Dict[str, bool]:
     return results
 
 
+# ===========================================================================
+# Discrete Cell Assignment (Integer Quadratic Programming)
+# ===========================================================================
+
+
+def solve_discrete_cell_counts(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    nuclei_counts: np.ndarray,
+    beta_values: np.ndarray,
+    alpha_values: Optional[np.ndarray] = None,
+    max_nuclei_cap: int = 30,
+    timeout_per_spot: float = 60.0,
+) -> np.ndarray:
+    """
+    Solve IQP for discrete cell counts given fixed beta (E-step).
+
+    Mathematical formulation:
+        minimize    Σᵢ Σₘ (X[i,m] - α[m] - Σₜ c[i,t] × profile[t,m] × β[m])²
+        subject to  Σₜ c[i,t] = N_i     ∀ spots i with N_i > 0
+                    c[i,t] ∈ Z≥0        ∀ i, t
+
+    Args:
+        marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
+        marker_names: List of marker names (length M)
+        assignment_matrix: (M, T) binary matrix where A[m,t]=1 if marker m belongs to type t
+        cell_type_names: List of cell type names (length T)
+        nuclei_counts: (N,) integer nuclei count per spot from Cellpose segmentation
+        beta_values: (M,) per-marker scaling factors from previous EM iteration
+        alpha_values: (M,) per-marker baselines (optional, defaults to zeros)
+        max_nuclei_cap: Above this nuclei count, use continuous relaxation + rounding
+        timeout_per_spot: Maximum seconds per spot optimization (default: 60)
+
+    Returns:
+        c_values: (N, T) integer cell counts per type per spot
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    if assignment_matrix.shape != (M, T):
+        raise ValueError(f"Assignment matrix shape {assignment_matrix.shape} != expected ({M}, {T})")
+    if nuclei_counts.shape != (N,):
+        raise ValueError(f"nuclei_counts shape {nuclei_counts.shape} != expected ({N},)")
+    if beta_values.shape != (M,):
+        raise ValueError(f"beta_values shape {beta_values.shape} != expected ({M},)")
+
+    if alpha_values is None:
+        alpha_values = np.zeros(M, dtype=np.float64)
+
+    # Build profile matrix: profile[t, m] = assignment_matrix[m, t]
+    # (transposed for convenience in formulation)
+    profile_matrix = assignment_matrix.T  # Shape: (T, M)
+
+    c_values = np.zeros((N, T), dtype=np.int64)
+
+    for i in range(N):
+        N_i = int(nuclei_counts[i])
+
+        # Skip spots with no nuclei
+        if N_i <= 0:
+            continue
+
+        # Baseline-subtracted observed signal
+        X_i = marker_level_data[i, :] - alpha_values  # Shape: (M,)
+
+        # Decide whether to use integer or continuous relaxation
+        use_integer = N_i <= max_nuclei_cap
+
+        try:
+            model = gp.Model(f"discrete_cell_spot_{i}")
+            model.setParam("OutputFlag", 0)
+            model.setParam("TimeLimit", timeout_per_spot)
+
+            # Decision variables: c[t] = count of cell type t at spot i
+            if use_integer:
+                c = model.addVars(T, lb=0, ub=N_i, vtype=GRB.INTEGER, name="c")
+            else:
+                c = model.addVars(T, lb=0, ub=N_i, vtype=GRB.CONTINUOUS, name="c")
+
+            # Constraint: sum of counts equals nuclei count
+            model.addConstr(quicksum(c[t] for t in range(T)) == N_i, name="nuclei_sum")
+
+            # Objective: minimize reconstruction error
+            # For each marker m: error = X[i,m] - Σₜ c[t] × profile[t,m] × β[m]
+            obj_terms = []
+            for m in range(M):
+                pred = quicksum(c[t] * profile_matrix[t, m] * beta_values[m] for t in range(T))
+                residual = X_i[m] - pred
+                obj_terms.append(residual * residual)
+
+            model.setObjective(quicksum(obj_terms), GRB.MINIMIZE)
+            model.optimize()
+
+            if model.Status == GRB.OPTIMAL or model.Status == GRB.TIME_LIMIT:
+                for t in range(T):
+                    val = c[t].X
+                    if use_integer:
+                        c_values[i, t] = int(round(val))
+                    else:
+                        # Continuous relaxation: round to integers
+                        c_values[i, t] = int(round(val))
+
+                # Verify and fix sum constraint after rounding
+                current_sum = c_values[i, :].sum()
+                if current_sum != N_i:
+                    diff = N_i - current_sum
+                    # Adjust the largest value to maintain exact sum
+                    if diff > 0:
+                        max_idx = np.argmax(c_values[i, :])
+                        c_values[i, max_idx] += diff
+                    else:
+                        # Remove from largest non-zero
+                        sorted_idx = np.argsort(c_values[i, :])[::-1]
+                        for idx in sorted_idx:
+                            if c_values[i, idx] > 0:
+                                remove = min(-diff, c_values[i, idx])
+                                c_values[i, idx] -= remove
+                                diff += remove
+                                if diff == 0:
+                                    break
+            else:
+                # Infeasible or error: use uniform fallback
+                logging.warning(f"Spot {i}: optimization status {model.Status}, using uniform fallback")
+                uniform_count = N_i // T
+                remainder = N_i % T
+                for t in range(T):
+                    c_values[i, t] = uniform_count + (1 if t < remainder else 0)
+
+        except Exception as exc:
+            logging.warning(f"Spot {i}: exception {exc}, using uniform fallback")
+            uniform_count = N_i // T
+            remainder = N_i % T
+            for t in range(T):
+                c_values[i, t] = uniform_count + (1 if t < remainder else 0)
+
+    return c_values
+
+
+def optimize_discrete_cell_assignment_em(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    nuclei_counts: np.ndarray,
+    max_em_iterations: int = 20,
+    beta_convergence_tol: float = 1e-3,
+    beta_min: float = 0.1,
+    beta_max: float = 2.0,
+    max_nuclei_cap: int = 30,
+    timeout_per_spot: float = 60.0,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
+    """
+    EM algorithm for discrete cell assignment with per-marker beta.
+
+    E-step: Solve IQP for cell counts given current beta
+    M-step: Update beta via OLS given cell counts
+
+    Mathematical formulation for M-step (beta update):
+        β[m] = Σᵢ (X[i,m] - α[m]) × pred[i,m] / Σᵢ pred[i,m]²
+        where pred[i,m] = Σₜ c[i,t] × profile[t,m]
+
+    Args:
+        marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
+        marker_names: List of marker names (length M)
+        assignment_matrix: (M, T) binary matrix where A[m,t]=1 if marker m belongs to type t
+        cell_type_names: List of cell type names (length T)
+        nuclei_counts: (N,) integer nuclei count per spot from Cellpose segmentation
+        max_em_iterations: Maximum EM iterations (default: 20)
+        beta_convergence_tol: Convergence tolerance for beta change (default: 1e-3)
+        beta_min: Minimum allowed beta value (default: 0.1)
+        beta_max: Maximum allowed beta value (default: 2.0)
+        max_nuclei_cap: Above this nuclei count, use continuous relaxation (default: 30)
+        timeout_per_spot: Maximum seconds per spot optimization (default: 60)
+
+    Returns:
+        Tuple of:
+        - c_values: (N, T) integer cell counts per type per spot
+        - beta_values: (M,) final per-marker scaling factors
+        - marker_beta_dict: {marker_name: beta_value}
+        - alpha_values: (M,) per-marker baselines
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    logging.info(f"Discrete cell assignment EM: {N} spots, {M} markers, {T} cell types")
+    logging.info(f"Total nuclei: {nuclei_counts.sum()}, mean per spot: {nuclei_counts.mean():.2f}")
+
+    # Build profile matrix (T x M)
+    profile_matrix = assignment_matrix.T
+
+    # Initialize beta and alpha
+    beta_values = np.ones(M, dtype=np.float64)
+    alpha_values = np.zeros(M, dtype=np.float64)
+
+    # Initialize cell counts (uniform distribution)
+    c_values = np.zeros((N, T), dtype=np.int64)
+    for i in range(N):
+        N_i = int(nuclei_counts[i])
+        if N_i > 0:
+            uniform_count = N_i // T
+            remainder = N_i % T
+            for t in range(T):
+                c_values[i, t] = uniform_count + (1 if t < remainder else 0)
+
+    prev_loss = float('inf')
+
+    for iteration in range(max_em_iterations):
+        logging.info(f"\n=== EM Iteration {iteration + 1}/{max_em_iterations} ===")
+
+        # ==================== E-Step ====================
+        # Solve IQP for cell counts given current beta
+        c_values = solve_discrete_cell_counts(
+            marker_level_data=marker_level_data,
+            marker_names=marker_names,
+            assignment_matrix=assignment_matrix,
+            cell_type_names=cell_type_names,
+            nuclei_counts=nuclei_counts,
+            beta_values=beta_values,
+            alpha_values=alpha_values,
+            max_nuclei_cap=max_nuclei_cap,
+            timeout_per_spot=timeout_per_spot,
+        )
+
+        # ==================== M-Step ====================
+        # Update beta via OLS: β[m] = Σᵢ X'[i,m] × pred[i,m] / Σᵢ pred[i,m]²
+        # where X' = X - α (baseline-subtracted) and pred[i,m] = Σₜ c[i,t] × profile[t,m]
+
+        # Compute predictions: pred[i,m] = Σₜ c[i,t] × profile[t,m]
+        pred = c_values @ profile_matrix  # Shape: (N, M)
+
+        beta_prev = beta_values.copy()
+        for m in range(M):
+            pred_m = pred[:, m]  # Shape: (N,)
+            X_m = marker_level_data[:, m]  # Shape: (N,)
+
+            # First estimate alpha (intercept) via robust median
+            # For markers with signal, alpha captures baseline
+            if pred_m.sum() > 0:
+                # Estimate alpha as median of X - beta*pred for spots with pred > 0
+                mask = pred_m > 0
+                if mask.sum() > 5:
+                    residuals = X_m[mask] - beta_values[m] * pred_m[mask]
+                    alpha_values[m] = np.clip(np.median(residuals), 0, 0.5)
+                else:
+                    alpha_values[m] = 0.0
+            else:
+                alpha_values[m] = 0.0
+
+            # Baseline-subtracted signal
+            X_prime_m = X_m - alpha_values[m]
+
+            # OLS for beta: β = Σ X' × pred / Σ pred²
+            numerator = np.sum(X_prime_m * pred_m)
+            denominator = np.sum(pred_m * pred_m)
+
+            if denominator > 1e-10:
+                beta_values[m] = np.clip(numerator / denominator, beta_min, beta_max)
+            else:
+                beta_values[m] = 1.0  # Default if no signal
+
+        # Compute reconstruction loss
+        X_pred = alpha_values[np.newaxis, :] + pred * beta_values[np.newaxis, :]
+        loss = np.sum((marker_level_data - X_pred) ** 2)
+
+        # Check convergence
+        beta_change = np.max(np.abs(beta_values - beta_prev))
+        loss_change = abs(prev_loss - loss) / max(abs(prev_loss), 1e-10)
+
+        logging.info(f"  Loss: {loss:.4f} (change: {loss_change:.6f})")
+        logging.info(f"  Beta range: [{beta_values.min():.3f}, {beta_values.max():.3f}]")
+        logging.info(f"  Max beta change: {beta_change:.6f}")
+        logging.info(f"  Cell count range: [{c_values.sum(axis=1).min()}, {c_values.sum(axis=1).max()}]")
+
+        # Log cell type distribution
+        total_cells_per_type = c_values.sum(axis=0)
+        total_cells = c_values.sum()
+        for t, ct_name in enumerate(cell_type_names):
+            pct = 100 * total_cells_per_type[t] / total_cells if total_cells > 0 else 0.0
+            logging.info(f"    {ct_name}: {total_cells_per_type[t]} cells ({pct:.1f}%)")
+
+        if beta_change < beta_convergence_tol and iteration > 0:
+            logging.info(f"Converged after {iteration + 1} iterations (beta change < {beta_convergence_tol})")
+            break
+
+        if loss > prev_loss and iteration > 0:
+            logging.warning(f"Loss increased from {prev_loss:.4f} to {loss:.4f}")
+
+        prev_loss = loss
+
+    # Build marker beta dictionary
+    marker_beta_dict = {marker_names[m]: beta_values[m] for m in range(M)}
+
+    logging.info(f"\nFinal beta values:")
+    for m, name in enumerate(marker_names):
+        logging.info(f"  {name}: β={beta_values[m]:.3f}, α={alpha_values[m]:.3f}")
+
+    return c_values, beta_values, marker_beta_dict, alpha_values
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.info("Running gurobi_impl to write .mps files using CitegeistModel where available")

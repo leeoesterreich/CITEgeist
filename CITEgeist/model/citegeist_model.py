@@ -28,6 +28,7 @@ from .gurobi_impl import (
     normalize_counts,
     optimize_cell_proportions,
     optimize_cell_proportions_per_marker,
+    optimize_discrete_cell_assignment_em,
     optimize_gene_expression,
 )
 from .utils import (
@@ -418,6 +419,87 @@ class CitegeistModel:
 
         print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
 
+    def preprocess_antibody_discrete(
+        self,
+        winsorize_lower: int = 5,
+        winsorize_upper: int = 95,
+        scale_per_marker: bool = True,
+    ) -> None:
+        """
+        Preprocess antibody data for discrete cell assignment.
+
+        Unlike preprocess_antibody(), this method does NOT apply per-spot normalization
+        (CLR or row normalization), preserving the cellularity signal where more cells
+        in a spot produce higher total antibody signal.
+
+        Args:
+            winsorize_lower: Lower percentile for winsorization (default: 5)
+            winsorize_upper: Upper percentile for winsorization (default: 95)
+            scale_per_marker: If True, scale each marker column to [0, 1] range
+                after winsorization (default: True)
+
+        Note:
+            This preprocessing is designed for discrete cell assignment where
+            the total signal intensity correlates with cell count. The standard
+            preprocess_antibody() normalizes away this information.
+        """
+        if self.antibody_capture_adata is None:
+            raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
+
+        # Step 1: Extract and ensure matrix is dense
+        matrix = (
+            self.antibody_capture_adata.X.toarray()
+            if hasattr(self.antibody_capture_adata.X, "toarray")
+            else self.antibody_capture_adata.X
+        )
+        matrix = np.asarray(matrix, dtype=np.float64)
+
+        # Step 2: Validate initial data
+        if np.isnan(matrix).any() or np.isinf(matrix).any():
+            raise ValueError("Antibody capture matrix contains NaN or Inf values before preprocessing.")
+
+        # Step 3: Winsorize per marker (column-wise) to cap extreme values
+        for col_idx in range(matrix.shape[1]):
+            col = matrix[:, col_idx]
+            lower_bound = np.percentile(col, winsorize_lower)
+            upper_bound = np.percentile(col, winsorize_upper)
+            matrix[:, col_idx] = np.clip(col, lower_bound, upper_bound)
+
+        # Step 4: Optional per-marker scaling to [0, 1]
+        if scale_per_marker:
+            for col_idx in range(matrix.shape[1]):
+                col = matrix[:, col_idx]
+                col_min = col.min()
+                col_max = col.max()
+                if col_max > col_min:
+                    matrix[:, col_idx] = (col - col_min) / (col_max - col_min)
+                else:
+                    # Constant column - set to 0
+                    matrix[:, col_idx] = 0.0
+
+        # Step 5: Final validation
+        if np.isnan(matrix).any() or np.isinf(matrix).any():
+            raise ValueError("NaN or Inf values detected in antibody capture matrix after preprocessing.")
+
+        # Step 6: Reassign processed matrix
+        self.antibody_capture_adata.X = matrix
+
+        # Update status flag
+        self.preprocessed_antibody = True
+
+        # Log row sum statistics to confirm cellularity signal is preserved
+        row_sums = matrix.sum(axis=1)
+        logging.info(
+            f"Discrete antibody preprocessing complete: "
+            f"Row sums range [{row_sums.min():.2f}, {row_sums.max():.2f}], "
+            f"mean={row_sums.mean():.2f}, std={row_sums.std():.2f}"
+        )
+        print(
+            f"Antibody capture data preprocessing completed for discrete mode: "
+            f"Winsorized [{winsorize_lower}%, {winsorize_upper}%], "
+            f"scale_per_marker={scale_per_marker}, no per-spot normalization."
+        )
+
     def run_cell_proportion_model(
         self,
         radius=None,
@@ -715,6 +797,139 @@ class CitegeistModel:
             "Use spot-resolution QP deconvolution (use_gating=False) instead."
         )
 
+    def run_discrete_cell_assignment(
+        self,
+        nuclei_counts: Optional[pd.Series] = None,
+        max_em_iterations: int = 20,
+        beta_convergence_tol: float = 1e-3,
+        max_nuclei_cap: int = 30,
+        beta_min: float = 0.1,
+        beta_max: float = 2.0,
+        timeout_per_spot: float = 60.0,
+    ) -> pd.DataFrame:
+        """
+        Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
+
+        This method replaces run_cell_proportion_model() when nuclei counts are
+        available from Cellpose segmentation. Instead of estimating continuous
+        proportions, it assigns integer cell counts per type per spot.
+
+        Args:
+            nuclei_counts: Series with spot names as index and integer nuclei
+                counts as values. If None, looks for 'nuclei_count' in
+                antibody_capture_adata.obs.
+            max_em_iterations: Maximum EM iterations (default: 20)
+            beta_convergence_tol: Convergence tolerance for beta (default: 1e-3)
+            max_nuclei_cap: Above this count, use continuous relaxation (default: 30)
+            beta_min: Minimum beta value (default: 0.1)
+            beta_max: Maximum beta value (default: 2.0)
+            timeout_per_spot: Max seconds per spot optimization (default: 60)
+
+        Returns:
+            DataFrame with cell type columns and integer count values per spot.
+
+        Note:
+            Requires preprocess_antibody_discrete() to be called first (not
+            preprocess_antibody()) to preserve cellularity signal.
+        """
+        if self.antibody_capture_adata is None:
+            raise ValueError("Antibody capture data not available. Run split_adata() first.")
+
+        if not self.preprocessed_antibody:
+            raise ValueError(
+                "Antibody data not preprocessed. Run preprocess_antibody_discrete() first. "
+                "Note: Use preprocess_antibody_discrete(), NOT preprocess_antibody(), "
+                "to preserve cellularity signal for discrete assignment."
+            )
+
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
+
+        # Get nuclei counts
+        if nuclei_counts is None:
+            if 'nuclei_count' in self.antibody_capture_adata.obs.columns:
+                nuclei_counts = self.antibody_capture_adata.obs['nuclei_count'].astype(int)
+                logging.info(f"Using nuclei_count from adata.obs: {nuclei_counts.sum()} total nuclei")
+            else:
+                raise ValueError(
+                    "nuclei_counts not provided and 'nuclei_count' not found in adata.obs. "
+                    "Run Cellpose segmentation first or provide nuclei_counts argument."
+                )
+
+        # Validate nuclei counts align with spots
+        spot_names = self.antibody_capture_adata.obs_names
+        if not nuclei_counts.index.equals(spot_names):
+            # Try to reindex
+            if set(nuclei_counts.index) >= set(spot_names):
+                nuclei_counts = nuclei_counts.loc[spot_names]
+            else:
+                missing = set(spot_names) - set(nuclei_counts.index)
+                raise ValueError(f"nuclei_counts missing {len(missing)} spots: {list(missing)[:5]}...")
+
+        nuclei_array = nuclei_counts.values.astype(int)
+
+        # Get marker-level data using existing function (imported at module level)
+        marker_level_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
+            self.antibody_capture_adata, self.cell_profile_dict
+        )
+
+        logging.info(f"Running discrete cell assignment: {len(spot_names)} spots, "
+                    f"{len(marker_names)} markers, {len(cell_type_names)} cell types")
+        logging.info(f"Total nuclei: {nuclei_array.sum()}, mean per spot: {nuclei_array.mean():.2f}")
+
+        # Run EM optimization
+        c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
+            marker_level_data=marker_level_data,
+            marker_names=marker_names,
+            assignment_matrix=assignment_matrix,
+            cell_type_names=cell_type_names,
+            nuclei_counts=nuclei_array,
+            max_em_iterations=max_em_iterations,
+            beta_convergence_tol=beta_convergence_tol,
+            beta_min=beta_min,
+            beta_max=beta_max,
+            max_nuclei_cap=max_nuclei_cap,
+            timeout_per_spot=timeout_per_spot,
+        )
+
+        # Store results
+        self.results["marker_beta"] = marker_beta_dict
+        self.results["marker_alpha"] = {marker_names[i]: alpha_values[i] for i in range(len(marker_names))}
+        self.results["discrete_cell_counts"] = c_values
+        self.results["nuclei_counts"] = nuclei_array
+
+        # Create DataFrame
+        cell_counts_df = pd.DataFrame(
+            c_values,
+            index=spot_names,
+            columns=cell_type_names,
+        )
+
+        # Compute proportions for Phase 2 compatibility
+        row_sums = c_values.sum(axis=1, keepdims=True)
+        row_sums = np.maximum(row_sums, 1)  # Avoid division by zero
+        proportions = c_values / row_sums
+        cell_prop_df = pd.DataFrame(proportions, index=spot_names, columns=cell_type_names)
+        self.results["cell_prop"] = cell_prop_df
+
+        # Save outputs
+        counts_path = os.path.join(self.output_folder, f"{self.sample_name}_discrete_cell_counts.csv")
+        cell_counts_df.to_csv(counts_path)
+        logging.info(f"Saved discrete cell counts to {counts_path}")
+
+        prop_path = os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_discrete.csv")
+        cell_prop_df.to_csv(prop_path)
+        logging.info(f"Saved derived proportions to {prop_path}")
+
+        # Log summary
+        total_per_type = c_values.sum(axis=0)
+        logging.info("Cell type distribution:")
+        for t, ct_name in enumerate(cell_type_names):
+            pct = 100 * total_per_type[t] / c_values.sum() if c_values.sum() > 0 else 0
+            logging.info(f"  {ct_name}: {total_per_type[t]} cells ({pct:.1f}%)")
+
+        return cell_counts_df
+
     def run_cell_expression_pass1(
         self,
         radius=None,
@@ -727,6 +942,8 @@ class CitegeistModel:
         rerun=True,
         continuous_relaxation=True,
         lambda_gex_reg=0.01,
+        cell_counts: Optional[pd.DataFrame] = None,
+        use_discrete_mode: bool = False,
     ):
         """
         Run first pass of gene expression deconvolution.
@@ -740,6 +957,12 @@ class CitegeistModel:
             checkpoint_interval (int): Number of spots between checkpoints
             output_dir (str): Directory for checkpoints
             rerun (bool): Whether to rerun if results exist
+            cell_counts (pd.DataFrame, optional): Integer cell counts per type from
+                run_discrete_cell_assignment(). If provided with use_discrete_mode=True,
+                uses counts as fixed multipliers instead of proportions.
+            use_discrete_mode (bool): If True, use discrete cell counts instead of
+                continuous proportions for deconvolution. Requires cell_counts or
+                'discrete_cell_counts' in self.results.
 
         Returns:
             Dict[str, Any]: {
@@ -763,10 +986,40 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
-        if "cell_prop" not in self.results or self.results["cell_prop"] is None:
-            raise ValueError("Cell proportions not computed. Run cell proportion model first.")
+        # Handle discrete mode vs continuous mode
+        if use_discrete_mode:
+            logging.info("Using discrete mode: cell counts as fixed multipliers")
 
-        cell_props_values = self.results["cell_prop"].values
+            # Get cell counts
+            if cell_counts is not None:
+                discrete_counts = cell_counts.values
+            elif "discrete_cell_counts" in self.results:
+                discrete_counts = self.results["discrete_cell_counts"]
+            else:
+                raise ValueError(
+                    "Discrete mode requires cell_counts argument or "
+                    "'discrete_cell_counts' in self.results. "
+                    "Run run_discrete_cell_assignment() first."
+                )
+
+            # For discrete mode, we still need proportions for the optimizer
+            # but we'll use counts as the effective weights
+            total_counts = discrete_counts.sum(axis=1, keepdims=True)
+            total_counts = np.maximum(total_counts, 1)  # Avoid division by zero
+            cell_props_values = discrete_counts / total_counts
+
+            # Log discrete mode info
+            zero_count_spots = np.where(discrete_counts.sum(axis=1) == 0)[0]
+            if len(zero_count_spots) > 0:
+                logging.warning(
+                    f"Found {len(zero_count_spots)} spots with zero cells. "
+                    f"These will be skipped in deconvolution."
+                )
+        else:
+            if "cell_prop" not in self.results or self.results["cell_prop"] is None:
+                raise ValueError("Cell proportions not computed. Run cell proportion model first.")
+
+            cell_props_values = self.results["cell_prop"].values
 
         # Diagnostic check for low or zero cell proportions
         total_props_per_spot = cell_props_values.sum(axis=1)

@@ -100,6 +100,29 @@ pip install -e .[dev]
 ```
 
 ### Gurobi License Requirement
+
+**CRITICAL: Before running any Gurobi-dependent code (tests, optimization, benchmarks), you MUST load the Gurobi module:**
+
+```bash
+module load gurobi/12.0.3
+```
+
+If the version is unavailable, check available versions with:
+```bash
+module avail gurobi
+```
+
+This applies to:
+- Running tests (`pytest`)
+- Running CITEgeist optimization (Module 3)
+- Any script that imports `gurobipy`
+- SLURM batch scripts (add to script header)
+
+For SLURM scripts, add this line after the `#SBATCH` directives:
+```bash
+module load gurobi/12.0.3
+```
+
 CITEgeist requires a valid Gurobi license (free for academic use):
 - Academic license: https://www.gurobi.com/downloads/end-user-license-agreement-academic/
 - License file location must be configured in code or environment
@@ -378,9 +401,15 @@ Located in `CITEgeist/tests/`:
 - `visualize_simulated_benchmarks.py` - Benchmark result visualization
 
 ### Running Tests
+
+**IMPORTANT:** Load Gurobi module before running tests:
 ```bash
+module load gurobi/12.0.3  # Run `module avail gurobi` if version unavailable
+eval "$(conda shell.bash hook)" && conda activate ~/alc376_bgfs/envs/CITEgeist_env
 cd CITEgeist/tests
 python test_citegeist_simulated.py
+# Or use pytest:
+pytest tests/ -v
 ```
 
 ### Benchmarking
