@@ -31,6 +31,119 @@ class SegmentationResult:
     image_shape: Tuple[int, int]
 
 
+# Known platform spot diameters in microns
+PLATFORM_SPOT_DIAMETERS_UM = {
+    "visium": 55.0,
+    "visium_v1": 55.0,
+    "visium_v2": 55.0,
+    "visium_hd": 8.0,
+    "visium_hd_2um": 2.0,
+    "xenium_pseudovisium": 55.0,  # Simulated Visium from Xenium
+}
+
+# Known platform spot spacings in microns (center-to-center)
+PLATFORM_SPOT_SPACINGS_UM = {
+    "visium": 100.0,
+    "visium_v1": 100.0,
+    "visium_v2": 100.0,
+    "visium_hd": 8.0,  # HD bins are contiguous
+    "visium_hd_2um": 2.0,
+}
+
+
+def detect_spot_diameter_pixels(
+    adata,
+    pixel_size_um: Optional[float] = None,
+    spot_diameter_um: Optional[float] = None,
+) -> float:
+    """
+    Auto-detect spot diameter in pixels for nuclei-to-spot assignment.
+
+    Detection hierarchy:
+    1. If spot_diameter_um is provided explicitly, use it
+    2. If scalefactors contains spot_diameter_fullres, use it directly
+    3. If platform metadata is available, use known platform geometry
+    4. Raise error with guidance if auto-detection fails
+
+    Args:
+        adata: AnnData with spatial metadata
+        pixel_size_um: Microns per pixel in the coordinate frame. Required if
+            spot_diameter_um is provided or platform-based detection is used.
+        spot_diameter_um: Explicit spot diameter in microns (overrides auto-detection)
+
+    Returns:
+        Spot diameter in pixels (in the fullres/coordinate frame)
+
+    Raises:
+        ValueError: If spot diameter cannot be determined
+    """
+    lib = _get_first_library_payload(adata)
+    scalefactors = lib.get("scalefactors", {})
+
+    # Priority 1: Explicit diameter in microns
+    if spot_diameter_um is not None:
+        if pixel_size_um is None or pixel_size_um <= 0:
+            raise ValueError(
+                "pixel_size_um must be provided when specifying spot_diameter_um. "
+                "This is the microns-per-pixel scale of your coordinate system."
+            )
+        diameter_px = spot_diameter_um / pixel_size_um
+        logging.info(
+            "Using explicit spot diameter: %.1f µm = %.1f pixels (pixel_size=%.4f µm/px)",
+            spot_diameter_um, diameter_px, pixel_size_um
+        )
+        return diameter_px
+
+    # Priority 2: Existing scalefactors (standard Visium from SpaceRanger)
+    if "spot_diameter_fullres" in scalefactors:
+        diameter_px = float(scalefactors["spot_diameter_fullres"])
+        if np.isfinite(diameter_px) and diameter_px > 0:
+            logging.info(
+                "Using spot_diameter_fullres from scalefactors: %.1f pixels", diameter_px
+            )
+            return diameter_px
+
+    # Priority 3: Platform metadata
+    platform = None
+    if "platform" in adata.uns:
+        platform = str(adata.uns["platform"]).lower().strip()
+    elif "spatial" in adata.uns:
+        # Check library key for platform hints
+        lib_key = next(iter(adata.uns["spatial"].keys()), "").lower()
+        for known_platform in PLATFORM_SPOT_DIAMETERS_UM:
+            if known_platform.replace("_", "") in lib_key.replace("_", ""):
+                platform = known_platform
+                break
+
+    if platform and platform in PLATFORM_SPOT_DIAMETERS_UM:
+        if pixel_size_um is None or pixel_size_um <= 0:
+            raise ValueError(
+                f"Detected platform '{platform}' but pixel_size_um is required to convert "
+                f"spot diameter from microns to pixels. Please provide pixel_size_um "
+                f"(microns per pixel in your coordinate frame)."
+            )
+        diameter_um = PLATFORM_SPOT_DIAMETERS_UM[platform]
+        diameter_px = diameter_um / pixel_size_um
+        logging.info(
+            "Detected platform '%s': spot diameter = %.1f µm = %.1f pixels",
+            platform, diameter_um, diameter_px
+        )
+        return diameter_px
+
+    # Auto-detection failed - provide helpful error
+    raise ValueError(
+        "Could not auto-detect spot diameter. Please provide one of:\n"
+        "  1. spot_diameter_um: Explicit spot diameter in microns (e.g., 55.0 for Visium)\n"
+        "  2. Ensure adata.uns['spatial'][lib]['scalefactors']['spot_diameter_fullres'] exists\n"
+        "  3. Set adata.uns['platform'] to a known platform: "
+        f"{list(PLATFORM_SPOT_DIAMETERS_UM.keys())}\n\n"
+        "Common spot diameters:\n"
+        "  - Visium: 55 µm diameter, 100 µm center-to-center spacing\n"
+        "  - Visium HD: 8 µm bins (contiguous)\n"
+        "  - Xenium pseudo-Visium: typically 55 µm to match Visium geometry"
+    )
+
+
 def _require_spatial_uns(adata) -> Dict:
     if "spatial" not in adata.uns:
         raise ValueError("AnnData missing `uns['spatial']`; cannot access Visium images/scalefactors.")
@@ -368,9 +481,33 @@ def compute_spot_nuclei_counts_from_adata(
     fullres_patch_mode: bool = False,
     fullres_patch_radius_multiplier: float = 1.5,
     fullres_patch_workers: int = 4,
+    spot_diameter_um: Optional[float] = None,
+    pixel_size_um: Optional[float] = None,
 ) -> SegmentationResult:
     """
     End-to-end segmentation + centroid assignment for an AnnData Visium object.
+
+    Spot diameter is determined by (in order of priority):
+    1. spot_diameter_um parameter (explicit, requires pixel_size_um)
+    2. scalefactors['spot_diameter_fullres'] from adata.uns['spatial']
+    3. Platform-based detection from adata.uns['platform'] (requires pixel_size_um)
+
+    Args:
+        adata: AnnData with spatial coordinates and histology images
+        resolution_mode: Image resolution to use ('lowres', 'hires', 'fullres')
+        use_gpu: Whether to use GPU for Cellpose
+        diameter: Cellpose diameter parameter (nucleus size, not spot size)
+        flow_threshold: Cellpose flow threshold
+        cellprob_threshold: Cellpose cell probability threshold
+        max_fullres_side: Max image dimension for fullres fallback
+        fullres_patch_mode: Use per-spot patch segmentation for fullres
+        fullres_patch_radius_multiplier: Patch size as multiple of spot radius
+        fullres_patch_workers: Number of parallel workers for patch mode
+        spot_diameter_um: Explicit spot diameter in microns (e.g., 55.0 for Visium)
+        pixel_size_um: Microns per pixel in coordinate frame (required for um-based params)
+
+    Returns:
+        SegmentationResult with nuclei counts per spot
     """
     if "spatial" not in adata.obsm:
         raise ValueError("AnnData missing `obsm['spatial']`; cannot map nuclei to spots.")
@@ -381,11 +518,12 @@ def compute_spot_nuclei_counts_from_adata(
         max_fullres_side=max_fullres_side,
     )
 
-    lib = _get_first_library_payload(adata)
-    scalefactors = lib.get("scalefactors", {})
-    spot_diam_fullres = float(scalefactors.get("spot_diameter_fullres", np.nan))
-    if not np.isfinite(spot_diam_fullres) or spot_diam_fullres <= 0:
-        raise ValueError("Missing/invalid `spot_diameter_fullres` in scalefactors.")
+    # Auto-detect spot diameter using the detection hierarchy
+    spot_diam_fullres = detect_spot_diameter_pixels(
+        adata=adata,
+        pixel_size_um=pixel_size_um,
+        spot_diameter_um=spot_diameter_um,
+    )
 
     spot_centers_fullres = np.asarray(adata.obsm["spatial"], dtype=np.float64)
 

@@ -1,8 +1,13 @@
 """
 Full method comparison against protein-gated ground truth.
 
-Evaluates CITEgeist, Cell2Location, Tangram, RCTD, Seurat, CARD, and CARD (ref-free)
+Evaluates CITEgeist, Cell2Location, Tangram, RCTD, Seurat, and CARD
 against the achievable-7 protein GT and produces a summary table.
+
+Note on CARD:
+- Uses VIM-excluded results (output_protein_gt_novim) because VIM is a pan-mesenchymal
+  marker expressed in RCC cells, not fibroblast-specific in kidney tissue.
+- CARD ref-free is not compatible with Xenium's 405-gene panel (<20 markers/cell type).
 """
 
 import json
@@ -33,8 +38,10 @@ METHODS = {
     "Tangram": BASE_DIR / "Tangram" / "output_protein_gt",
     "RCTD": BASE_DIR / "RCTD" / "output_protein_gt",
     "Seurat": BASE_DIR / "Seurat" / "output_protein_gt",
-    "CARD": BASE_DIR / "CARD" / "output_protein_gt",
-    "CARD (ref-free)": BASE_DIR / "CARD" / "output_protein_gt_reffree",
+    # CARD: VIM excluded - VIM is a pan-mesenchymal marker expressed in RCC cells,
+    # not fibroblast-specific in kidney tissue. Including it caused severe bias (93% fibroblasts).
+    "CARD": BASE_DIR / "CARD" / "output_protein_gt_novim",
+    # Note: CARD ref-free not compatible with Xenium's 405-gene panel (<20 markers/cell type)
 }
 
 
