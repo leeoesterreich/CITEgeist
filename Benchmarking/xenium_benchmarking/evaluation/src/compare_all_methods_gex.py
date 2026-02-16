@@ -95,7 +95,8 @@ def load_citegeist_gex(region_id: int) -> Dict[str, pd.DataFrame]:
 def load_citegeist_discrete_gex(region_id: int) -> Dict[str, pd.DataFrame]:
     """Load CITEgeist Discrete (Cellpose+IQP) GEX layers."""
     sample_name = f"Xenium_region_{region_id}"
-    base_layers = BASE_DIR / "CITEgeist" / "output_discrete_cellpose" / sample_name / f"{sample_name}_pass1" / "layers"
+    # v2 uses fixed coordinate conversion
+    base_layers = BASE_DIR / "CITEgeist" / "output_discrete_cellpose_v2" / sample_name / f"{sample_name}_pass1" / "layers"
 
     # Check pass1 subdirectory first (standard export), then direct layers dir
     layers_dir = base_layers / "pass1"
