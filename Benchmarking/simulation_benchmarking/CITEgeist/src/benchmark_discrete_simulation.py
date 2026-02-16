@@ -52,16 +52,17 @@ DEFAULT_IMAGE_DIR = REPO_ROOT / "Benchmarking/simulation_benchmarking/CITEgeist"
 DEFAULT_H5AD_DIR = DEFAULT_SCCUBE_DIR  # h5ad_objects are under condition folders
 
 # Simulation cell type profile (9 cell types in simulation)
+# Format: {"cell_type": {"Major": [markers]}}
 SIMULATION_CELL_PROFILE_DICT = {
-    "B-cells": ["B-cells_Protein_1", "B-cells_Protein_2"],
-    "CAFs": ["CAFs_Protein_1", "CAFs_Protein_2"],
-    "Cancer Epithelial": ["Cancer Epithelial_Protein_1", "Cancer Epithelial_Protein_2"],
-    "Endothelial": ["Endothelial_Protein_1", "Endothelial_Protein_2"],
-    "Myeloid": ["Myeloid_Protein_1", "Myeloid_Protein_2"],
-    "Normal Epithelial": ["Normal Epithelial_Protein_1", "Normal Epithelial_Protein_2"],
-    "PVL": ["PVL_Protein_1", "PVL_Protein_2"],
-    "Plasmablasts": ["Plasmablasts_Protein_1", "Plasmablasts_Protein_2"],
-    "T-cells": ["T-cells_Protein_1", "T-cells_Protein_2"],
+    "B-cells": {"Major": ["B-cells_Protein_1", "B-cells_Protein_2"]},
+    "CAFs": {"Major": ["CAFs_Protein_1", "CAFs_Protein_2"]},
+    "Cancer Epithelial": {"Major": ["Cancer Epithelial_Protein_1", "Cancer Epithelial_Protein_2"]},
+    "Endothelial": {"Major": ["Endothelial_Protein_1", "Endothelial_Protein_2"]},
+    "Myeloid": {"Major": ["Myeloid_Protein_1", "Myeloid_Protein_2"]},
+    "Normal Epithelial": {"Major": ["Normal Epithelial_Protein_1", "Normal Epithelial_Protein_2"]},
+    "PVL": {"Major": ["PVL_Protein_1", "PVL_Protein_2"]},
+    "Plasmablasts": {"Major": ["Plasmablasts_Protein_1", "Plasmablasts_Protein_2"]},
+    "T-cells": {"Major": ["T-cells_Protein_1", "T-cells_Protein_2"]},
 }
 
 # Model type mapping
@@ -201,7 +202,8 @@ def run_benchmark(
     spot_centers_px = padding + spot_centers * scale
 
     # Estimate spot radius (based on typical spot spacing)
-    spot_radius_px = scale * 0.8  # ~80% of 1 coordinate unit
+    # scCube places cells within ~1.2 coord units of spot center
+    spot_radius_px = scale * 1.2  # ~120% of 1 coordinate unit to capture all cells
 
     pred_counts = assign_nuclei_centroids_to_spots(
         centroids_xy=centroids,
@@ -260,8 +262,8 @@ def run_benchmark(
     start = time.time()
     cell_counts = model.run_discrete_cell_assignment(
         nuclei_counts=pred_aligned,
-        max_iterations=max_em_iterations,
-        convergence_threshold=1e-4,
+        max_em_iterations=max_em_iterations,
+        beta_convergence_tol=1e-4,
         max_nuclei_cap=30,
     )
     timings["discrete_assignment_sec"] = time.time() - start
@@ -289,10 +291,85 @@ def run_benchmark(
 
     results["proportion_correlation"] = float(prop_corr)
     results["proportion_rmse"] = float(prop_rmse)
-    results["timings"] = timings
 
     logger.info("Proportion correlation: %.3f", prop_corr)
     logger.info("Proportion RMSE: %.4f", prop_rmse)
+
+    # Step 6: Run GEX deconvolution and evaluate against ground truth
+    logger.info("Running GEX deconvolution...")
+    start = time.time()
+    try:
+        deconv_result = model.run_cell_expression_pass1(
+            use_discrete_mode=True,
+            cell_counts=cell_counts,
+        )
+        timings["gex_deconv_sec"] = time.time() - start
+        logger.info("GEX deconvolution completed in %.1fs", timings["gex_deconv_sec"])
+
+        # Extract spotwise profiles from result dict
+        # Format: {spot_idx: np.ndarray of shape (n_cell_types, n_genes)}
+        spotwise_profiles = deconv_result["spotwise_profiles"]
+        n_spots, n_types, n_genes = deconv_result["dimensions"]
+
+        # Get cell type names and gene names
+        cell_type_names = list(SIMULATION_CELL_PROFILE_DICT.keys())
+        gene_names = model.gene_expression_adata.var_names.tolist()
+        spot_names = model.gene_expression_adata.obs_names.tolist()
+
+        # Export predicted layers in format expected by benchmarking_gex.py
+        # {cell_type}_layer.csv: spots as rows, genes as columns (same as GT format)
+        result_dir = output_dir / condition / mode / f"Wu_rep_{replicate_id}"
+        layers_dir = result_dir / "layers"
+        layers_dir.mkdir(parents=True, exist_ok=True)
+
+        for ct_idx, ct_name in enumerate(cell_type_names):
+            # Extract this cell type's expression across all spots
+            # Shape: (n_spots, n_genes) - spots as rows, genes as columns
+            ct_expr = np.zeros((n_spots, n_genes))
+            for spot_idx, profile in spotwise_profiles.items():
+                ct_expr[spot_idx, :] = profile[ct_idx, :]
+
+            # Create DataFrame with spots as rows, genes as columns (matches GT format)
+            ct_df = pd.DataFrame(ct_expr, index=spot_names, columns=gene_names)
+            layer_path = layers_dir / f"{ct_name}_layer.csv"
+            ct_df.to_csv(layer_path)
+
+        logger.info("Exported %d cell type layers to %s", len(cell_type_names), layers_dir)
+
+        # Load ground truth GEX and compute metrics using existing framework
+        gt_gex_dir = sccube_dir / condition / "ST_GEX_sim" / f"sample_{replicate_id}" / "layers"
+
+        if gt_gex_dir.exists():
+            # Import benchmarking function
+            sys.path.insert(0, str(REPO_ROOT / "Benchmarking/simulation_benchmarking/src"))
+            from benchmarking_gex import calculate_rmse
+
+            logger.info("Comparing against ground truth GEX: %s", gt_gex_dir)
+            gex_metrics = calculate_rmse(str(gt_gex_dir), str(layers_dir), normalize="range")
+
+            results["gex_average_rmse"] = float(gex_metrics["average_rmse"])
+            results["gex_median_rmse"] = float(gex_metrics["median_rmse"])
+            results["gex_average_nrmse"] = float(gex_metrics["average_nrmse"])
+            results["gex_median_nrmse"] = float(gex_metrics["median_nrmse"])
+            results["gex_average_mae"] = float(gex_metrics["average_mae"])
+            results["gex_median_mae"] = float(gex_metrics["median_mae"])
+            results["gex_per_celltype"] = {
+                ct: {k: float(v) for k, v in metrics.items()}
+                for ct, metrics in gex_metrics["metrics_per_cell_type"].items()
+            }
+
+            logger.info("GEX Average RMSE: %.4f", gex_metrics["average_rmse"])
+            logger.info("GEX Average NRMSE: %.4f", gex_metrics["average_nrmse"])
+        else:
+            logger.warning("Ground truth GEX not found at %s", gt_gex_dir)
+
+    except Exception as e:
+        logger.error("GEX deconvolution failed: %s", str(e))
+        import traceback
+        logger.error(traceback.format_exc())
+        results["gex_error"] = str(e)
+
+    results["timings"] = timings
 
     # Save results
     result_dir = output_dir / condition / mode / f"Wu_rep_{replicate_id}"

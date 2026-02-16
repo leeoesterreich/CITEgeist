@@ -92,6 +92,36 @@ def load_citegeist_gex(region_id: int) -> Dict[str, pd.DataFrame]:
     return ct_dfs
 
 
+def load_citegeist_discrete_gex(region_id: int) -> Dict[str, pd.DataFrame]:
+    """Load CITEgeist Discrete (Cellpose+IQP) GEX layers."""
+    sample_name = f"Xenium_region_{region_id}"
+    base_layers = BASE_DIR / "CITEgeist" / "output_discrete_cellpose" / sample_name / f"{sample_name}_pass1" / "layers"
+
+    # Check pass1 subdirectory first (standard export), then direct layers dir
+    layers_dir = base_layers / "pass1"
+    if not layers_dir.exists():
+        layers_dir = base_layers
+
+    if not layers_dir.exists():
+        logger.warning(f"CITEgeist Discrete layers not found for region {region_id}: {layers_dir}")
+        return {}
+
+    ct_dfs = {}
+    for ct in ACHIEVABLE_7_CELL_TYPES:
+        # CITEgeist replaces spaces with _ but keeps + in filenames
+        ct_file = ct.replace(" ", "_")
+        for pattern in [
+            f"{ct_file}_layer_pass1.csv",
+            f"{ct_file}_layer.csv",
+        ]:
+            layer_file = layers_dir / pattern
+            if layer_file.exists():
+                ct_dfs[ct] = pd.read_csv(layer_file, index_col=0)
+                break
+
+    return ct_dfs
+
+
 def load_competitor_gex(method: str, region_id: int) -> Dict[str, pd.DataFrame]:
     """Load C2L or Tangram GEX layers (spots x genes CSVs)."""
     layers_dir = BASE_DIR / method / "output_protein_gt" / f"Xenium_region_{region_id}" / "layers"
@@ -206,6 +236,7 @@ def main():
     # Methods that produce GEX layers
     methods = {
         "CITEgeist": lambda rid: load_citegeist_gex(rid),
+        "CITEgeist_Discrete": lambda rid: load_citegeist_discrete_gex(rid),
         "Cell2Location": lambda rid: load_competitor_gex("Cell2Location", rid),
         "Tangram": lambda rid: load_competitor_gex("Tangram", rid),
         "scResolve": lambda rid: load_scresolve_gex(rid),
@@ -245,7 +276,7 @@ def main():
 
     method_summaries = {}
 
-    for method_name in ["CITEgeist", "Cell2Location", "Tangram", "scResolve"]:
+    for method_name in ["CITEgeist", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"]:
         metrics_list = all_results.get(method_name, [])
         if not metrics_list:
             print(f"{method_name:<16} {'N/A':>10} {'N/A':>10} {'N/A':>10} {'0':>12} {'0':>8}")

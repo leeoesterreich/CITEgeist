@@ -29,12 +29,13 @@ DEFAULT_INPUT_DIR = Path(
 )
 
 # Color constants (from actual Visium H&E and Xenium DAPI analysis)
+# Increased intensity/contrast for better Cellpose detection
 DAPI_BACKGROUND = (0, 0, 0)
-DAPI_NUCLEUS_INTENSITY = 180  # Grayscale intensity
+DAPI_NUCLEUS_INTENSITY = 255  # Maximum intensity for best Cellpose detection
 
 HE_BACKGROUND = (250, 250, 250)
-HE_NUCLEUS_COLOR = (140, 90, 130)  # Purple/magenta (hematoxylin)
-HE_CYTOPLASM_COLOR = (240, 220, 220)  # Pale pink (eosin)
+HE_NUCLEUS_COLOR = (80, 40, 90)  # Darker purple for better contrast
+HE_CYTOPLASM_COLOR = (240, 200, 210)  # Slightly more saturated pink
 
 
 def create_gaussian_kernel(sigma: float, size: int = None) -> np.ndarray:
@@ -59,19 +60,61 @@ def create_gaussian_kernel(sigma: float, size: int = None) -> np.ndarray:
     return kernel
 
 
+def create_dapi_kernel(radius: float, edge_sigma: float = 2.0, size: int = None) -> np.ndarray:
+    """
+    Create a filled disk with soft edge for realistic DAPI rendering.
+
+    Real DAPI nuclei appear as bright filled disks with distinct edges,
+    not smooth Gaussian falloffs. This kernel creates a flat-top disk
+    with a soft Gaussian edge for more realistic appearance.
+
+    Args:
+        radius: Radius of the solid disk portion (pixels)
+        edge_sigma: Gaussian sigma for soft edge falloff (pixels)
+        size: Kernel size (default: 2*(radius + 3*edge_sigma) + 1)
+
+    Returns:
+        2D numpy array with filled disk and soft boundary, normalized to [0, 1]
+    """
+    if size is None:
+        size = int(np.ceil(2 * (radius + 3 * edge_sigma)))
+        if size % 2 == 0:
+            size += 1
+
+    center = size // 2
+    y, x = np.ogrid[:size, :size]
+    dist = np.sqrt((x - center) ** 2 + (y - center) ** 2)
+
+    # Solid disk up to radius, then Gaussian falloff
+    kernel = np.zeros((size, size), dtype=np.float32)
+    inner = dist <= radius
+    outer = dist > radius
+
+    kernel[inner] = 1.0
+    if edge_sigma > 0:
+        kernel[outer] = np.exp(-((dist[outer] - radius) ** 2) / (2 * edge_sigma ** 2))
+
+    return kernel
+
+
 def generate_dapi_image(
     cell_coords: np.ndarray,
     image_size: Tuple[int, int],
-    sigma: float = 3.5,
+    nucleus_radius: float = 8.0,
+    edge_sigma: float = 2.0,
     padding: int = 100,
 ) -> np.ndarray:
     """
-    Generate DAPI-style grayscale image with Gaussian nuclei.
+    Generate DAPI-style grayscale image with realistic filled-disk nuclei.
+
+    Uses a flat-top disk kernel with soft edge to mimic real DAPI appearance,
+    where nuclei appear as bright filled regions with distinct boundaries.
 
     Args:
         cell_coords: Nx2 array of (x, y) coordinates in original units
         image_size: (width, height) of output image
-        sigma: Gaussian sigma for nuclei
+        nucleus_radius: Radius of the solid nucleus disk (pixels)
+        edge_sigma: Gaussian sigma for soft edge falloff (pixels)
         padding: Padding in pixels around coordinate extent
 
     Returns:
@@ -86,11 +129,11 @@ def generate_dapi_image(
     scale_x = (width - 2 * padding) / (x_max - x_min + 1e-6)
     scale_y = (height - 2 * padding) / (y_max - y_min + 1e-6)
 
-    # Create float accumulator for Gaussian blending
+    # Create float accumulator for blending
     img_float = np.zeros((height, width), dtype=np.float32)
 
-    # Create Gaussian kernel once
-    kernel = create_gaussian_kernel(sigma)
+    # Create filled-disk kernel with soft edge (realistic DAPI appearance)
+    kernel = create_dapi_kernel(nucleus_radius, edge_sigma)
     k_size = kernel.shape[0]
     k_half = k_size // 2
 
@@ -112,7 +155,7 @@ def generate_dapi_image(
         ky_start = y_start - (y_px - k_half)
         ky_end = k_size - ((y_px + k_half + 1) - y_end)
 
-        # Add Gaussian to image (max blending for overlapping nuclei)
+        # Add kernel to image (max blending for overlapping nuclei)
         if x_end > x_start and y_end > y_start:
             img_float[y_start:y_end, x_start:x_end] = np.maximum(
                 img_float[y_start:y_end, x_start:x_end],
@@ -129,8 +172,8 @@ def generate_dapi_image(
 def generate_he_image(
     cell_coords: np.ndarray,
     image_size: Tuple[int, int],
-    nucleus_sigma: float = 3.5,
-    cytoplasm_radius: int = 10,
+    nucleus_sigma: float = 6.0,
+    cytoplasm_radius: int = 15,
     padding: int = 100,
 ) -> np.ndarray:
     """
@@ -272,7 +315,9 @@ def generate_images_for_replicate(
     output_dir: Path,
     modes: list,
     image_size: int,
-    nucleus_sigma: float,
+    nucleus_radius: float,
+    edge_sigma: float,
+    he_nucleus_sigma: float,
 ) -> None:
     """Generate images and nuclei counts for a single replicate."""
     logger.info("=== Replicate %d, Condition: %s ===", replicate_id, condition)
@@ -294,16 +339,18 @@ def generate_images_for_replicate(
         logger.info("Generating %s image...", mode)
 
         if mode == "dapi":
+            # Use filled-disk kernel for realistic DAPI
             img_array = generate_dapi_image(
                 cell_coords,
                 image_size=(image_size, image_size),
-                sigma=nucleus_sigma,
+                nucleus_radius=nucleus_radius,
+                edge_sigma=edge_sigma,
             )
         elif mode == "h_and_e":
             img_array = generate_he_image(
                 cell_coords,
                 image_size=(image_size, image_size),
-                nucleus_sigma=nucleus_sigma,
+                nucleus_sigma=he_nucleus_sigma,
             )
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -358,10 +405,22 @@ def main():
         help="Image size in pixels (default: 8000)",
     )
     parser.add_argument(
-        "--nucleus-sigma",
+        "--nucleus-radius",
         type=float,
-        default=3.5,
-        help="Gaussian sigma for nuclei (default: 3.5)",
+        default=8.0,
+        help="DAPI nucleus radius in pixels (default: 8.0, ~16px diameter solid disk)",
+    )
+    parser.add_argument(
+        "--edge-sigma",
+        type=float,
+        default=2.0,
+        help="DAPI nucleus edge softness sigma (default: 2.0)",
+    )
+    parser.add_argument(
+        "--he-nucleus-sigma",
+        type=float,
+        default=6.0,
+        help="H&E nucleus Gaussian sigma (default: 6.0)",
     )
     args = parser.parse_args()
 
@@ -374,7 +433,9 @@ def main():
         output_dir=args.output_dir,
         modes=modes,
         image_size=args.image_size,
-        nucleus_sigma=args.nucleus_sigma,
+        nucleus_radius=args.nucleus_radius,
+        edge_sigma=args.edge_sigma,
+        he_nucleus_sigma=args.he_nucleus_sigma,
     )
 
     logger.info("Done!")
