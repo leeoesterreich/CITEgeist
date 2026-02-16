@@ -126,21 +126,27 @@ def convert_micron_to_pixel(
     """
     Convert spot coordinates from microns to pixels in the morphology image frame.
 
+    Uses pixel_bounds to handle image cropping and padding correctly. The pixel_bounds
+    field stores where the image crop starts in the full Xenium image coordinate system.
+
     Args:
         spot_coords_micron: Array of shape (N, 2) with coordinates in microns
-        coord_info: Coordinate info dictionary with pixel_size and micron_bounds
+        coord_info: Coordinate info dictionary with pixel_size and pixel_bounds
 
     Returns:
         Array of shape (N, 2) with coordinates in pixels
     """
     pixel_size = float(coord_info["pixel_size"])
-    x_min_micron = float(coord_info["micron_bounds"]["x_min"])
-    y_min_micron = float(coord_info["micron_bounds"]["y_min"])
 
-    # Convert: pixel = (micron - origin) / pixel_size
+    # Get crop origin in full image pixel coordinates
+    px_x_min = float(coord_info["pixel_bounds"]["x_min"])
+    px_y_min = float(coord_info["pixel_bounds"]["y_min"])
+
+    # Convert: first to full image pixels, then subtract crop origin
+    # pixel_in_crop = micron / pixel_size - crop_origin
     spot_coords_pixel = np.empty_like(spot_coords_micron, dtype=np.float64)
-    spot_coords_pixel[:, 0] = (spot_coords_micron[:, 0] - x_min_micron) / pixel_size
-    spot_coords_pixel[:, 1] = (spot_coords_micron[:, 1] - y_min_micron) / pixel_size
+    spot_coords_pixel[:, 0] = spot_coords_micron[:, 0] / pixel_size - px_x_min
+    spot_coords_pixel[:, 1] = spot_coords_micron[:, 1] / pixel_size - px_y_min
 
     return spot_coords_pixel
 

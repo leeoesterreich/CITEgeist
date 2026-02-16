@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=cellpose_discrete
-#SBATCH --partition=gpu
+#SBATCH --cluster=gpu
+#SBATCH --partition=l40s
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=32G
