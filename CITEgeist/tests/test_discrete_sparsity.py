@@ -339,5 +339,78 @@ class TestContinuousRelaxationSparsity:
         assert (result >= 0).all()
 
 
+class TestModelAPI:
+    """Test CitegeistModel API with lambda_sparse."""
+
+    def test_model_api_accepts_lambda_sparse(self):
+        """run_discrete_cell_assignment should accept lambda_sparse parameter."""
+        import tempfile
+        import anndata as ad
+        import pandas as pd
+
+        # Create minimal test data
+        np.random.seed(42)
+        n_spots = 5
+        n_genes = 10
+        n_markers = 4
+
+        # GEX data
+        gex_X = np.random.poisson(5, (n_spots, n_genes))
+        gex_adata = ad.AnnData(
+            X=gex_X.astype(np.float32),
+            obs={'barcode': [f'spot_{i}' for i in range(n_spots)]},
+            var={'gene_names': [f'gene_{i}' for i in range(n_genes)]},
+        )
+        gex_adata.obs_names = gex_adata.obs['barcode']
+        gex_adata.var_names = gex_adata.var['gene_names']
+
+        # Antibody data
+        cite_X = np.random.uniform(0.5, 2.0, (n_spots, n_markers))
+        cite_adata = ad.AnnData(
+            X=cite_X.astype(np.float32),
+            obs={
+                'barcode': [f'spot_{i}' for i in range(n_spots)],
+                'nuclei_count': np.random.randint(2, 5, n_spots),
+            },
+            var={'protein_names': ['TypeA_marker', 'TypeB_marker', 'TypeC_marker', 'TypeD_marker']},
+        )
+        cite_adata.obs_names = cite_adata.obs['barcode']
+        cite_adata.var_names = cite_adata.var['protein_names']
+
+        # Cell profile dict in the format expected by map_antibodies_to_profiles_v2
+        # Each cell type maps to a dict with "Major" key containing marker list
+        cell_profile_dict = {
+            'TypeA': {'Major': ['TypeA_marker']},
+            'TypeB': {'Major': ['TypeB_marker']},
+            'TypeC': {'Major': ['TypeC_marker']},
+            'TypeD': {'Major': ['TypeD_marker']},
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from CITEgeist.model.citegeist_model import CitegeistModel
+
+            model = CitegeistModel(
+                sample_name='test',
+                output_folder=tmpdir,
+                simulation=True,
+                gene_expression_adata=gex_adata,
+                antibody_capture_adata=cite_adata,
+            )
+
+            model.preprocess_antibody_discrete()
+            model.cell_profile_dict = cell_profile_dict
+
+            # Should accept lambda_sparse
+            result = model.run_discrete_cell_assignment(
+                lambda_sparse=0.3,
+                max_em_iterations=2,
+            )
+
+            # Verify it returns a DataFrame
+            assert isinstance(result, pd.DataFrame)
+            assert result.shape[0] == n_spots
+            assert set(result.columns) == set(cell_profile_dict.keys())
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

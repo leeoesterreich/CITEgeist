@@ -918,6 +918,7 @@ class CitegeistModel:
         beta_min: float = 0.1,
         beta_max: float = 2.0,
         timeout_per_spot: float = 60.0,
+        lambda_sparse: float = 0.0,
     ) -> pd.DataFrame:
         """
         Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
@@ -936,6 +937,9 @@ class CitegeistModel:
             beta_min: Minimum beta value (default: 0.1)
             beta_max: Maximum beta value (default: 2.0)
             timeout_per_spot: Max seconds per spot optimization (default: 60)
+            lambda_sparse: Sparsity regularization weight (default: 0.0). Higher
+                values encourage fewer active cell types per spot. Typical range
+                is 0.0 to 1.0.
 
         Returns:
             DataFrame with cell type columns and integer count values per spot.
@@ -988,6 +992,8 @@ class CitegeistModel:
         logging.info(f"Running discrete cell assignment: {len(spot_names)} spots, "
                     f"{len(marker_names)} markers, {len(cell_type_names)} cell types")
         logging.info(f"Total nuclei: {nuclei_array.sum()}, mean per spot: {nuclei_array.mean():.2f}")
+        if lambda_sparse > 0:
+            logging.info(f"Sparsity regularization enabled: lambda_sparse={lambda_sparse}")
 
         # Run EM optimization
         c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
@@ -1002,6 +1008,7 @@ class CitegeistModel:
             beta_max=beta_max,
             max_nuclei_cap=max_nuclei_cap,
             timeout_per_spot=timeout_per_spot,
+            lambda_sparse=lambda_sparse,
         )
 
         # Store results
