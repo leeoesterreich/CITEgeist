@@ -3109,14 +3109,22 @@ def solve_discrete_cell_counts(
     alpha_values: Optional[np.ndarray] = None,
     max_nuclei_cap: int = 30,
     timeout_per_spot: float = 60.0,
+    lambda_sparse: float = 0.0,
 ) -> np.ndarray:
     """
     Solve IQP for discrete cell counts given fixed beta (E-step).
 
     Mathematical formulation:
         minimize    Σᵢ Σₘ (X[i,m] - α[m] - Σₜ c[i,t] × profile[t,m] × β[m])²
+                    + λ_sparse × Σₜ y[t]
         subject to  Σₜ c[i,t] = N_i     ∀ spots i with N_i > 0
                     c[i,t] ∈ Z≥0        ∀ i, t
+                    y[t] ∈ {0, 1}       ∀ t (indicator: y[t]=1 iff c[t]>0)
+                    c[i,t] ≤ N_i × y[t] ∀ i, t (big-M constraint)
+
+    The sparsity penalty (lambda_sparse > 0) encourages solutions with fewer
+    active cell types per spot, matching biological reality that most spots
+    have 2-4 dominant cell types rather than all types present.
 
     Args:
         marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
@@ -3128,6 +3136,8 @@ def solve_discrete_cell_counts(
         alpha_values: (M,) per-marker baselines (optional, defaults to zeros)
         max_nuclei_cap: Above this nuclei count, use continuous relaxation + rounding
         timeout_per_spot: Maximum seconds per spot optimization (default: 60)
+        lambda_sparse: Sparsity penalty weight (default: 0.0). Higher values
+            encourage fewer active cell types per spot. Typical range: 0.0-1.0
 
     Returns:
         c_values: (N, T) integer cell counts per type per spot
@@ -3178,7 +3188,19 @@ def solve_discrete_cell_counts(
             # Constraint: sum of counts equals nuclei count
             model.addConstr(quicksum(c[t] for t in range(T)) == N_i, name="nuclei_sum")
 
-            # Objective: minimize reconstruction error
+            # Sparsity regularization via indicator variables
+            # y[t] = 1 if c[t] > 0, else y[t] = 0
+            # Add big-M constraint: c[t] <= N_i * y[t]
+            y = None
+            if lambda_sparse > 0.0:
+                y = model.addVars(T, vtype=GRB.BINARY, name="y")
+                for t in range(T):
+                    # Big-M constraint: c[t] <= N_i * y[t]
+                    # If y[t] = 0, then c[t] must be 0
+                    # If y[t] = 1, then c[t] can be up to N_i
+                    model.addConstr(c[t] <= N_i * y[t], name=f"indicator_{t}")
+
+            # Objective: minimize reconstruction error + sparsity penalty
             # For each marker m: error = X[i,m] - Σₜ c[t] × profile[t,m] × β[m]
             obj_terms = []
             for m in range(M):
@@ -3186,7 +3208,12 @@ def solve_discrete_cell_counts(
                 residual = X_i[m] - pred
                 obj_terms.append(residual * residual)
 
-            model.setObjective(quicksum(obj_terms), GRB.MINIMIZE)
+            # Add sparsity penalty: lambda_sparse * sum(y[t])
+            if lambda_sparse > 0.0 and y is not None:
+                sparsity_penalty = lambda_sparse * quicksum(y[t] for t in range(T))
+                model.setObjective(quicksum(obj_terms) + sparsity_penalty, GRB.MINIMIZE)
+            else:
+                model.setObjective(quicksum(obj_terms), GRB.MINIMIZE)
             model.optimize()
 
             if model.Status == GRB.OPTIMAL or model.Status == GRB.TIME_LIMIT:
