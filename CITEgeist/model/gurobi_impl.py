@@ -3193,7 +3193,9 @@ def solve_discrete_cell_counts(
             # Add big-M constraint: c[t] <= N_i * y[t]
             y = None
             if lambda_sparse > 0.0:
-                y = model.addVars(T, vtype=GRB.BINARY, name="y")
+                # When using continuous relaxation, indicators should also be continuous
+                y_vtype = GRB.BINARY if use_integer else GRB.CONTINUOUS
+                y = model.addVars(T, lb=0, ub=1, vtype=y_vtype, name="y")
                 for t in range(T):
                     # Big-M constraint: c[t] <= N_i * y[t]
                     # If y[t] = 0, then c[t] must be 0
@@ -3273,6 +3275,7 @@ def optimize_discrete_cell_assignment_em(
     beta_max: float = 2.0,
     max_nuclei_cap: int = 30,
     timeout_per_spot: float = 60.0,
+    lambda_sparse: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     EM algorithm for discrete cell assignment with per-marker beta.
@@ -3296,6 +3299,8 @@ def optimize_discrete_cell_assignment_em(
         beta_max: Maximum allowed beta value (default: 2.0)
         max_nuclei_cap: Above this nuclei count, use continuous relaxation (default: 30)
         timeout_per_spot: Maximum seconds per spot optimization (default: 60)
+        lambda_sparse: Sparsity penalty weight (default: 0.0). Higher values encourage
+            fewer active cell types per spot. Typical range: 0.0-1.0
 
     Returns:
         Tuple of:
@@ -3307,8 +3312,14 @@ def optimize_discrete_cell_assignment_em(
     N, M = marker_level_data.shape
     T = len(cell_type_names)
 
+    # Validate lambda_sparse
+    if lambda_sparse < 0:
+        raise ValueError(f"lambda_sparse must be non-negative, got {lambda_sparse}")
+
     logging.info(f"Discrete cell assignment EM: {N} spots, {M} markers, {T} cell types")
     logging.info(f"Total nuclei: {nuclei_counts.sum()}, mean per spot: {nuclei_counts.mean():.2f}")
+    if lambda_sparse > 0:
+        logging.info(f"Sparsity regularization: lambda_sparse={lambda_sparse}")
 
     # Build profile matrix (T x M)
     profile_matrix = assignment_matrix.T
@@ -3344,6 +3355,7 @@ def optimize_discrete_cell_assignment_em(
             alpha_values=alpha_values,
             max_nuclei_cap=max_nuclei_cap,
             timeout_per_spot=timeout_per_spot,
+            lambda_sparse=lambda_sparse,
         )
 
         # ==================== M-Step ====================

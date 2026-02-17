@@ -8,7 +8,7 @@ import pytest
 import sys
 
 sys.path.insert(0, '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist')
-from CITEgeist.model.gurobi_impl import solve_discrete_cell_counts
+from CITEgeist.model.gurobi_impl import solve_discrete_cell_counts, optimize_discrete_cell_assignment_em
 
 
 class TestDiscreteSparsity:
@@ -223,6 +223,120 @@ class TestDiscreteSparsityEdgeCases:
         except ValueError as e:
             # If it raises, should be a clear message
             assert "lambda" in str(e).lower() or "sparse" in str(e).lower()
+
+
+class TestEMSparsity:
+    """Tests for EM algorithm with sparsity."""
+
+    @pytest.fixture
+    def em_problem(self):
+        """Create problem for EM testing."""
+        np.random.seed(42)
+        N, M, T = 10, 6, 3
+        # Create realistic problem with some structure
+        marker_level_data = np.random.uniform(0.2, 1.5, (N, M))
+        marker_names = [f"M{i}" for i in range(M)]
+        # Each pair of markers -> one type
+        assignment_matrix = np.zeros((M, T))
+        assignment_matrix[0:2, 0] = 1
+        assignment_matrix[2:4, 1] = 1
+        assignment_matrix[4:6, 2] = 1
+        cell_type_names = ["Type0", "Type1", "Type2"]
+        nuclei_counts = np.random.randint(3, 8, N)
+        return {
+            "marker_level_data": marker_level_data,
+            "marker_names": marker_names,
+            "assignment_matrix": assignment_matrix,
+            "cell_type_names": cell_type_names,
+            "nuclei_counts": nuclei_counts,
+        }
+
+    def test_em_accepts_lambda_sparse(self, em_problem):
+        """EM function should accept lambda_sparse parameter."""
+        result = optimize_discrete_cell_assignment_em(
+            **em_problem,
+            lambda_sparse=0.1,
+            max_em_iterations=2,
+        )
+        assert len(result) == 4  # c_values, beta, stats, alpha
+
+    def test_em_sparsity_propagation(self, em_problem):
+        """lambda_sparse should affect EM results."""
+        result_no_sparse = optimize_discrete_cell_assignment_em(
+            **em_problem,
+            lambda_sparse=0.0,
+            max_em_iterations=5,
+        )
+        result_with_sparse = optimize_discrete_cell_assignment_em(
+            **em_problem,
+            lambda_sparse=0.5,
+            max_em_iterations=5,
+        )
+
+        c_no_sparse = result_no_sparse[0]
+        c_with_sparse = result_with_sparse[0]
+
+        # Both should satisfy nuclei constraint
+        np.testing.assert_array_equal(c_no_sparse.sum(axis=1), em_problem["nuclei_counts"])
+        np.testing.assert_array_equal(c_with_sparse.sum(axis=1), em_problem["nuclei_counts"])
+
+        # High sparsity should result in same or fewer active types overall
+        active_no_sparse = (c_no_sparse > 0).sum()
+        active_with_sparse = (c_with_sparse > 0).sum()
+        assert active_with_sparse <= active_no_sparse
+
+    def test_em_convergence_with_sparsity(self, em_problem):
+        """EM should still converge with sparsity penalty."""
+        c_values, beta, stats, alpha = optimize_discrete_cell_assignment_em(
+            **em_problem,
+            lambda_sparse=0.3,
+            max_em_iterations=20,
+            beta_convergence_tol=1e-3,
+        )
+
+        # Should have valid output shapes
+        assert c_values.shape == (10, 3)
+        assert beta.shape == (6,)
+        assert isinstance(stats, dict)
+        assert alpha.shape == (6,)
+
+    def test_em_rejects_negative_lambda(self, em_problem):
+        """Negative lambda_sparse should raise ValueError."""
+        with pytest.raises(ValueError, match="non-negative"):
+            optimize_discrete_cell_assignment_em(
+                **em_problem,
+                lambda_sparse=-0.1,
+            )
+
+
+class TestContinuousRelaxationSparsity:
+    """Test sparsity with continuous relaxation (high nuclei counts)."""
+
+    def test_continuous_relaxation_uses_continuous_indicators(self):
+        """When using continuous relaxation, indicator variables should also be continuous."""
+        # This is a behavioral test - high nuclei spots should still work with sparsity
+        marker_level_data = np.array([[1.0, 0.5, 0.3]])
+        marker_names = ["M0", "M1", "M2"]
+        assignment_matrix = np.eye(3)
+        cell_type_names = ["Type0", "Type1", "Type2"]
+        nuclei_counts = np.array([50])  # Above default max_nuclei_cap=30
+        beta_values = np.ones(3)
+
+        result = solve_discrete_cell_counts(
+            marker_level_data=marker_level_data,
+            marker_names=marker_names,
+            assignment_matrix=assignment_matrix,
+            cell_type_names=cell_type_names,
+            nuclei_counts=nuclei_counts,
+            beta_values=beta_values,
+            lambda_sparse=0.5,
+            max_nuclei_cap=30,
+        )
+
+        # Should sum to nuclei count
+        assert result.sum() == 50
+        # Result should be non-negative integers
+        assert (result >= 0).all()
 
 
 if __name__ == "__main__":
