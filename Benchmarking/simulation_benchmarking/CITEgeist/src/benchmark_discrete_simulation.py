@@ -262,13 +262,14 @@ def run_benchmark(
     use_gpu: bool = False,
     cellpose_diameter: Optional[float] = None,
     max_em_iterations: int = 20,
+    lambda_sparse: float = 0.0,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse}
     timings = {}
 
     # Step 1: Load image
@@ -369,6 +370,7 @@ def run_benchmark(
         max_em_iterations=max_em_iterations,
         beta_convergence_tol=1e-4,
         max_nuclei_cap=30,
+        lambda_sparse=lambda_sparse,
     )
     timings["discrete_assignment_sec"] = time.time() - start
 
@@ -502,6 +504,8 @@ def main():
     parser.add_argument("--use-gpu", action="store_true")
     parser.add_argument("--cellpose-diameter", type=float, default=None)
     parser.add_argument("--max-em-iterations", type=int, default=20)
+    parser.add_argument("--lambda-sparse", type=float, default=0.0,
+                        help="Sparsity penalty for IQP (default: 0.0)")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -514,6 +518,7 @@ def main():
         use_gpu=args.use_gpu,
         cellpose_diameter=args.cellpose_diameter,
         max_em_iterations=args.max_em_iterations,
+        lambda_sparse=args.lambda_sparse,
     )
 
     print("\n=== RESULTS ===")
