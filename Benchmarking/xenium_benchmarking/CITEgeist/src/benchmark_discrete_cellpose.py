@@ -253,6 +253,7 @@ def run_discrete_benchmark(
     run_gex: bool = True,
     min_counts: int = 25,
     spot_diameter_um: float = 55.0,
+    scale_mode: str = "per_marker",
 ) -> Dict[str, Any]:
     """
     Run full discrete CITEgeist benchmark for one region.
@@ -375,7 +376,7 @@ def run_discrete_benchmark(
     model.preprocess_antibody_discrete(
         winsorize_lower=5,
         winsorize_upper=95,
-        scale_per_marker=True,
+        scale_mode=scale_mode,
     )
     timings["preprocess_sec"] = time.time() - t0
 
@@ -576,6 +577,12 @@ def main():
         default=25,
         help="Minimum counts filter for GEX preprocessing",
     )
+    parser.add_argument(
+        "--scale-mode",
+        choices=["per_marker", "global", "none"],
+        default="per_marker",
+        help="Antibody scaling mode: per_marker (default), global, or none",
+    )
 
     args = parser.parse_args()
 
@@ -598,6 +605,7 @@ def main():
         run_gex=not args.skip_gex,
         min_counts=args.min_counts,
         spot_diameter_um=args.spot_diameter_um,
+        scale_mode=args.scale_mode,
     )
 
     # Print summary

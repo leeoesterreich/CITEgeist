@@ -263,13 +263,14 @@ def run_benchmark(
     cellpose_diameter: Optional[float] = None,
     max_em_iterations: int = 20,
     lambda_sparse: float = 0.0,
+    scale_mode: str = "per_marker",
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode}
     timings = {}
 
     # Step 1: Load image
@@ -359,7 +360,7 @@ def run_benchmark(
         antibody_capture_adata=adata_cite,
     )
 
-    model.preprocess_antibody_discrete()
+    model.preprocess_antibody_discrete(scale_mode=scale_mode)
     model.preprocess_gex(target_sum=10000)
     model.load_cell_profile_dict(SIMULATION_CELL_PROFILE_DICT)
 
@@ -506,6 +507,9 @@ def main():
     parser.add_argument("--max-em-iterations", type=int, default=20)
     parser.add_argument("--lambda-sparse", type=float, default=0.0,
                         help="Sparsity penalty for IQP (default: 0.0)")
+    parser.add_argument("--scale-mode", choices=["per_marker", "global", "none"],
+                        default="per_marker",
+                        help="Antibody scaling mode: per_marker (default), global, or none")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -519,6 +523,7 @@ def main():
         cellpose_diameter=args.cellpose_diameter,
         max_em_iterations=args.max_em_iterations,
         lambda_sparse=args.lambda_sparse,
+        scale_mode=args.scale_mode,
     )
 
     print("\n=== RESULTS ===")

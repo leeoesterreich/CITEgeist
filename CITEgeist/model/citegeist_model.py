@@ -429,6 +429,7 @@ class CitegeistModel:
         winsorize_lower: int = 5,
         winsorize_upper: int = 95,
         scale_per_marker: bool = True,
+        scale_mode: str = "per_marker",
     ) -> None:
         """
         Preprocess antibody data for discrete cell assignment.
@@ -440,13 +441,22 @@ class CitegeistModel:
         Args:
             winsorize_lower: Lower percentile for winsorization (default: 5)
             winsorize_upper: Upper percentile for winsorization (default: 95)
-            scale_per_marker: If True, scale each marker column to [0, 1] range
-                after winsorization (default: True)
+            scale_per_marker: DEPRECATED - use scale_mode instead. If True and
+                scale_mode not specified, uses 'per_marker' scaling.
+            scale_mode: Scaling mode after winsorization. Options:
+                - 'per_marker': Scale each marker independently to [0, 1] (default)
+                - 'global': Scale all markers together using global min/max.
+                    Better for datasets with rare cell types, as it preserves
+                    relative signal magnitude across markers.
+                - 'none': No scaling, just winsorization.
 
         Note:
             This preprocessing is designed for discrete cell assignment where
             the total signal intensity correlates with cell count. The standard
             preprocess_antibody() normalizes away this information.
+
+            For datasets with rare cell types, use scale_mode='global' to avoid
+            inflating signal from low-abundance markers.
         """
         if self.antibody_capture_adata is None:
             raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
@@ -470,8 +480,13 @@ class CitegeistModel:
             upper_bound = np.percentile(col, winsorize_upper)
             matrix[:, col_idx] = np.clip(col, lower_bound, upper_bound)
 
-        # Step 4: Optional per-marker scaling to [0, 1]
-        if scale_per_marker:
+        # Step 4: Scaling based on scale_mode
+        # Handle deprecated scale_per_marker parameter
+        if not scale_per_marker and scale_mode == "per_marker":
+            scale_mode = "none"
+
+        if scale_mode == "per_marker":
+            # Scale each marker independently to [0, 1]
             for col_idx in range(matrix.shape[1]):
                 col = matrix[:, col_idx]
                 col_min = col.min()
@@ -481,6 +496,21 @@ class CitegeistModel:
                 else:
                     # Constant column - set to 0
                     matrix[:, col_idx] = 0.0
+        elif scale_mode == "global":
+            # Scale all markers together using global min/max
+            # This preserves relative signal magnitude across markers,
+            # preventing rare cell type markers from being inflated
+            global_min = matrix.min()
+            global_max = matrix.max()
+            if global_max > global_min:
+                matrix = (matrix - global_min) / (global_max - global_min)
+            else:
+                matrix = np.zeros_like(matrix)
+        elif scale_mode == "none":
+            # No scaling, just use winsorized values
+            pass
+        else:
+            raise ValueError(f"Invalid scale_mode: {scale_mode}. Use 'per_marker', 'global', or 'none'.")
 
         # Step 5: Final validation
         if np.isnan(matrix).any() or np.isinf(matrix).any():
@@ -502,7 +532,7 @@ class CitegeistModel:
         print(
             f"Antibody capture data preprocessing completed for discrete mode: "
             f"Winsorized [{winsorize_lower}%, {winsorize_upper}%], "
-            f"scale_per_marker={scale_per_marker}, no per-spot normalization."
+            f"scale_mode={scale_mode}, no per-spot normalization."
         )
 
     def compute_spot_nuclei_counts_cellpose(
