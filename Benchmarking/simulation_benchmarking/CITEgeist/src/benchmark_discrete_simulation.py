@@ -268,13 +268,15 @@ def run_benchmark(
     global_solve: bool = True,
     global_time_limit: float = 300.0,
     global_mip_gap: float = 0.05,
+    use_continuous_prior: bool = False,
+    lambda_continuous: float = 50.0,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous}
     timings = {}
 
     # Step 1: Load image
@@ -386,6 +388,29 @@ def run_benchmark(
         )
         logger.info("Prior proportions: %s", dict(zip(cell_type_names, prior_proportions)))
 
+    # Optional: Run continuous optimization first to get prior for discrete
+    continuous_prior = None
+    if use_continuous_prior:
+        logger.info("Running continuous optimization first (hybrid mode)...")
+        start_cont = time.time()
+
+        # Run continuous proportion model
+        cont_props_df = model.run_cell_proportion_model(
+            max_workers=8,
+            lambda_smooth=0.3,
+            use_neighbor_finetuning=True,
+        )
+        timings["continuous_sec"] = time.time() - start_cont
+        logger.info("Continuous optimization completed in %.1fs", timings["continuous_sec"])
+
+        # Convert to numpy array matching spot order
+        continuous_prior = cont_props_df.values
+        logger.info("Continuous prior shape: %s", continuous_prior.shape)
+        results["use_continuous_prior"] = True
+        results["lambda_continuous"] = lambda_continuous
+    else:
+        results["use_continuous_prior"] = False
+
     # Run discrete assignment
     start = time.time()
     cell_counts = model.run_discrete_cell_assignment(
@@ -399,6 +424,8 @@ def run_benchmark(
         global_solve=global_solve,
         global_time_limit=global_time_limit,
         global_mip_gap=global_mip_gap,
+        continuous_prior=continuous_prior,
+        lambda_continuous=lambda_continuous if use_continuous_prior else 0.0,
     )
     timings["discrete_assignment_sec"] = time.time() - start
 
@@ -547,6 +574,10 @@ def main():
                         help="Time limit for global IQP solver in seconds (default: 300)")
     parser.add_argument("--global-mip-gap", type=float, default=0.05,
                         help="MIP gap tolerance for global solver (default: 0.05)")
+    parser.add_argument("--use-continuous-prior", action="store_true", default=False,
+                        help="Run continuous optimization first, use as prior for discrete (hybrid mode)")
+    parser.add_argument("--lambda-continuous", type=float, default=50.0,
+                        help="Regularization weight for continuous prior (default: 50.0)")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -565,6 +596,8 @@ def main():
         global_solve=args.global_solve,
         global_time_limit=args.global_time_limit,
         global_mip_gap=args.global_mip_gap,
+        use_continuous_prior=args.use_continuous_prior,
+        lambda_continuous=args.lambda_continuous,
     )
 
     print("\n=== RESULTS ===")

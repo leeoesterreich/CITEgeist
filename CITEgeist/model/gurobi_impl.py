@@ -3366,6 +3366,8 @@ def solve_discrete_cell_counts_global(
     time_limit: float = 300.0,
     mip_gap: float = 0.05,
     prev_c_values: Optional[np.ndarray] = None,
+    continuous_prior: Optional[np.ndarray] = None,
+    lambda_continuous: float = 0.0,
 ) -> np.ndarray:
     """
     Solve global IQP for discrete cell counts across all spots jointly.
@@ -3376,6 +3378,7 @@ def solve_discrete_cell_counts_global(
 
     Mathematical formulation:
         minimize    sum_i sum_m (X[i,m] - alpha[m] - beta[m] * sum_t c[i,t] * profile[t,m])^2
+                    + lambda_continuous * sum_i sum_t (c[i,t]/N_i - p[i,t])^2
         subject to  sum_t c[i,t] = N_i     for all spots i
                     c[i,t] in Z>=0         for all i, t
                     c[i,t] <= N_i          for all i, t
@@ -3391,6 +3394,8 @@ def solve_discrete_cell_counts_global(
         time_limit: Maximum solver time in seconds (default: 300)
         mip_gap: Acceptable optimality gap (default: 0.05 = 5%)
         prev_c_values: (N, T) previous cell counts for warm-start (optional)
+        continuous_prior: (N, T) continuous proportions from continuous optimization (optional)
+        lambda_continuous: Regularization weight for continuous prior (default: 0.0)
 
     Returns:
         c_values: (N, T) integer cell counts per type per spot
@@ -3436,12 +3441,23 @@ def solve_discrete_cell_counts_global(
 
     model.update()
 
-    # Warm-start from previous solution or uniform distribution
+    # Warm-start from previous solution, continuous prior, or uniform distribution
     for i in range(N):
         N_i = int(nuclei_counts[i])
         if prev_c_values is not None:
             for t in range(T):
                 c[i, t].Start = int(prev_c_values[i, t])
+        elif continuous_prior is not None:
+            # Initialize from continuous prior (round to integers)
+            target_counts = continuous_prior[i, :] * N_i
+            # Use largest-remainder method to ensure sum equals N_i
+            floor_counts = np.floor(target_counts).astype(int)
+            remainders = target_counts - floor_counts
+            deficit = N_i - floor_counts.sum()
+            # Add 1 to cells with largest remainders
+            top_indices = np.argsort(remainders)[::-1][:deficit]
+            for t in range(T):
+                c[i, t].Start = floor_counts[t] + (1 if t in top_indices else 0)
         else:
             # Uniform distribution
             base = N_i // T
@@ -3471,7 +3487,26 @@ def solve_discrete_cell_counts_global(
             residual = X_i[m] - alpha_values[m] - beta_values[m] * pred_im
             error_terms.append(residual * residual)
 
-    model.setObjective(quicksum(error_terms), GRB.MINIMIZE)
+    # Add continuous prior regularization if provided
+    # Penalizes (c[i,t]/N_i - p[i,t])^2 = (c[i,t] - N_i*p[i,t])^2 / N_i^2
+    prior_terms = []
+    if continuous_prior is not None and lambda_continuous > 0:
+        logging.info(f"Using continuous prior with lambda={lambda_continuous:.2f}")
+        for i in range(N):
+            N_i = int(nuclei_counts[i])
+            if N_i > 0:
+                for t in range(T):
+                    # Target count from continuous proportion
+                    target_count = N_i * continuous_prior[i, t]
+                    # Deviation penalty (scaled by 1/N_i^2 to normalize)
+                    deviation = (c[i, t] - target_count) / N_i
+                    prior_terms.append(deviation * deviation)
+
+    total_objective = quicksum(error_terms)
+    if prior_terms:
+        total_objective += lambda_continuous * quicksum(prior_terms)
+
+    model.setObjective(total_objective, GRB.MINIMIZE)
 
     # Solve
     logging.info("Starting global IQP optimization...")
@@ -3534,6 +3569,8 @@ def optimize_discrete_cell_assignment_em(
     global_solve: bool = True,
     global_time_limit: float = 300.0,
     global_mip_gap: float = 0.05,
+    continuous_prior: Optional[np.ndarray] = None,
+    lambda_continuous: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     EM algorithm for discrete cell assignment with per-marker beta.
@@ -3567,6 +3604,10 @@ def optimize_discrete_cell_assignment_em(
         global_solve: If True (default), use global IQP solver. If False, use per-spot IQP.
         global_time_limit: Time limit for global solver in seconds (default: 300).
         global_mip_gap: Acceptable MIP gap for global solver (default: 0.05 = 5%).
+        continuous_prior: (N, T) continuous proportions from continuous optimization (optional).
+            If provided with lambda_continuous > 0, the IQP will be biased toward these values.
+        lambda_continuous: Weight for continuous prior regularization (default: 0.0).
+            Higher values make discrete solution closer to continuous. Typical range: 1.0-100.0
 
     Returns:
         Tuple of:
@@ -3628,6 +3669,8 @@ def optimize_discrete_cell_assignment_em(
                 time_limit=global_time_limit,
                 mip_gap=global_mip_gap,
                 prev_c_values=c_values if iteration > 0 else None,
+                continuous_prior=continuous_prior,
+                lambda_continuous=lambda_continuous,
             )
         else:
             # Per-spot solve (original behavior)

@@ -954,6 +954,8 @@ class CitegeistModel:
         global_solve: bool = True,
         global_time_limit: float = 300.0,
         global_mip_gap: float = 0.05,
+        continuous_prior: Optional[np.ndarray] = None,
+        lambda_continuous: float = 0.0,
     ) -> pd.DataFrame:
         """
         Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
@@ -988,6 +990,13 @@ class CitegeistModel:
                 marker-celltype relationships.
             global_time_limit: Time limit for global solver in seconds (default: 300).
             global_mip_gap: Acceptable MIP gap for global solver (default: 0.05).
+            continuous_prior: (N, T) array of continuous proportions from continuous
+                optimization. If provided with lambda_continuous > 0, the discrete
+                IQP will be regularized toward these proportions. This enables a
+                hybrid approach: run continuous first, then discretize.
+            lambda_continuous: Weight for continuous prior regularization (default: 0.0).
+                Higher values make discrete solution closer to continuous. Typical
+                range is 10.0-100.0 for strong regularization.
 
         Returns:
             DataFrame with cell type columns and integer count values per spot.
@@ -1046,6 +1055,11 @@ class CitegeistModel:
             logging.info(f"Prior regularization enabled: lambda_prior={lambda_prior}")
             logging.info(f"Prior proportions: {dict(zip(cell_type_names, prior_proportions))}")
 
+        # Log if using continuous prior (hybrid approach)
+        if continuous_prior is not None and lambda_continuous > 0:
+            logging.info(f"Using continuous prior with lambda_continuous={lambda_continuous}")
+            logging.info(f"Continuous prior shape: {continuous_prior.shape}")
+
         # Run EM optimization
         c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
             marker_level_data=marker_level_data,
@@ -1065,6 +1079,8 @@ class CitegeistModel:
             global_solve=global_solve,
             global_time_limit=global_time_limit,
             global_mip_gap=global_mip_gap,
+            continuous_prior=continuous_prior,
+            lambda_continuous=lambda_continuous,
         )
 
         # Store results
