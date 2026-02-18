@@ -2,7 +2,7 @@
 #SBATCH --job-name=discrete_global_xenium
 #SBATCH --output=logs/discrete_global_xenium_%A_%a.out
 #SBATCH --error=logs/discrete_global_xenium_%A_%a.err
-#SBATCH --array=0-13
+#SBATCH --array=0-4
 #SBATCH --time=02:00:00
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=16
