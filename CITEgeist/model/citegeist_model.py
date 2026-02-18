@@ -956,6 +956,10 @@ class CitegeistModel:
         global_mip_gap: float = 0.05,
         continuous_prior: Optional[np.ndarray] = None,
         lambda_continuous: float = 0.0,
+        constraint_slack: int = 0,
+        lambda_reg: float = 0.0,
+        alpha_elastic: float = 0.5,
+        use_marker_weighting: bool = False,
     ) -> pd.DataFrame:
         """
         Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
@@ -997,6 +1001,11 @@ class CitegeistModel:
             lambda_continuous: Weight for continuous prior regularization (default: 0.0).
                 Higher values make discrete solution closer to continuous. Typical
                 range is 10.0-100.0 for strong regularization.
+            constraint_slack: Allow ±slack cells deviation from nuclei count (default: 0).
+                Setting to 1 allows the optimizer more flexibility like continuous model.
+            lambda_reg: Elastic net regularization weight on proportions (default: 0.0).
+            alpha_elastic: L1/L2 trade-off for elastic net (0=L2, 1=L1, default: 0.5).
+            use_marker_weighting: Weight errors by marker coverage (default: False).
 
         Returns:
             DataFrame with cell type columns and integer count values per spot.
@@ -1081,6 +1090,10 @@ class CitegeistModel:
             global_mip_gap=global_mip_gap,
             continuous_prior=continuous_prior,
             lambda_continuous=lambda_continuous,
+            constraint_slack=constraint_slack,
+            lambda_reg=lambda_reg,
+            alpha_elastic=alpha_elastic,
+            use_marker_weighting=use_marker_weighting,
         )
 
         # Store results

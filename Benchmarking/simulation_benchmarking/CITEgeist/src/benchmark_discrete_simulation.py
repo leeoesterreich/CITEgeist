@@ -272,13 +272,17 @@ def run_benchmark(
     lambda_continuous: float = 50.0,
     use_clr_preprocessing: bool = False,
     nuclei_scaled_clr: bool = False,
+    constraint_slack: int = 0,
+    lambda_reg: float = 0.0,
+    alpha_elastic: float = 0.5,
+    use_marker_weighting: bool = False,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing, "nuclei_scaled_clr": nuclei_scaled_clr}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing, "nuclei_scaled_clr": nuclei_scaled_clr, "constraint_slack": constraint_slack, "lambda_reg": lambda_reg, "alpha_elastic": alpha_elastic, "use_marker_weighting": use_marker_weighting}
     timings = {}
 
     # Step 1: Load image
@@ -453,6 +457,10 @@ def run_benchmark(
         global_mip_gap=global_mip_gap,
         continuous_prior=continuous_prior,
         lambda_continuous=lambda_continuous if use_continuous_prior else 0.0,
+        constraint_slack=constraint_slack,
+        lambda_reg=lambda_reg,
+        alpha_elastic=alpha_elastic,
+        use_marker_weighting=use_marker_weighting,
     )
     timings["discrete_assignment_sec"] = time.time() - start
 
@@ -609,6 +617,14 @@ def main():
                         help="Use continuous CLR preprocessing instead of discrete per-marker scaling")
     parser.add_argument("--nuclei-scaled-clr", action="store_true", default=False,
                         help="Use CLR preprocessing scaled by nuclei counts (re-injects cellularity signal)")
+    parser.add_argument("--constraint-slack", type=int, default=0,
+                        help="Allow ±N cells deviation from nuclei count (default: 0 = exact)")
+    parser.add_argument("--lambda-reg", type=float, default=0.0,
+                        help="Elastic net regularization weight (default: 0.0)")
+    parser.add_argument("--alpha-elastic", type=float, default=0.5,
+                        help="L1/L2 trade-off for elastic net (0=L2, 1=L1, default: 0.5)")
+    parser.add_argument("--use-marker-weighting", action="store_true", default=False,
+                        help="Weight errors by marker coverage per cell type")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -631,6 +647,10 @@ def main():
         lambda_continuous=args.lambda_continuous,
         use_clr_preprocessing=args.use_clr_preprocessing,
         nuclei_scaled_clr=args.nuclei_scaled_clr,
+        constraint_slack=args.constraint_slack,
+        lambda_reg=args.lambda_reg,
+        alpha_elastic=args.alpha_elastic,
+        use_marker_weighting=args.use_marker_weighting,
     )
 
     print("\n=== RESULTS ===")

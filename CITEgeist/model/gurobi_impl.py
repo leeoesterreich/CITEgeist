@@ -3368,6 +3368,10 @@ def solve_discrete_cell_counts_global(
     prev_c_values: Optional[np.ndarray] = None,
     continuous_prior: Optional[np.ndarray] = None,
     lambda_continuous: float = 0.0,
+    constraint_slack: int = 0,
+    lambda_reg: float = 0.0,
+    alpha_elastic: float = 0.5,
+    use_marker_weighting: bool = False,
 ) -> np.ndarray:
     """
     Solve global IQP for discrete cell counts across all spots jointly.
@@ -3377,11 +3381,12 @@ def solve_discrete_cell_counts_global(
     enforces globally consistent marker-celltype behavior across the tissue.
 
     Mathematical formulation:
-        minimize    sum_i sum_m (X[i,m] - alpha[m] - beta[m] * sum_t c[i,t] * profile[t,m])^2
+        minimize    sum_i sum_m w[m] * (X[i,m] - alpha[m] - beta[m] * sum_t c[i,t] * profile[t,m])^2
+                    + lambda_reg * (alpha_elastic * L1(c/N) + (1-alpha_elastic) * L2(c/N))
                     + lambda_continuous * sum_i sum_t (c[i,t]/N_i - p[i,t])^2
-        subject to  sum_t c[i,t] = N_i     for all spots i
+        subject to  N_i - slack <= sum_t c[i,t] <= N_i + slack   for all spots i
                     c[i,t] in Z>=0         for all i, t
-                    c[i,t] <= N_i          for all i, t
+                    c[i,t] <= N_i + slack  for all i, t
 
     Args:
         marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
@@ -3396,6 +3401,10 @@ def solve_discrete_cell_counts_global(
         prev_c_values: (N, T) previous cell counts for warm-start (optional)
         continuous_prior: (N, T) continuous proportions from continuous optimization (optional)
         lambda_continuous: Regularization weight for continuous prior (default: 0.0)
+        constraint_slack: Allow ±slack cells deviation from nuclei count (default: 0 = exact)
+        lambda_reg: Elastic net regularization weight (default: 0.0 = no regularization)
+        alpha_elastic: L1/L2 trade-off (0=pure L2, 1=pure L1, default: 0.5)
+        use_marker_weighting: Weight error by 1/(n_owners * markers_per_type) (default: False)
 
     Returns:
         c_values: (N, T) integer cell counts per type per spot
@@ -3417,8 +3426,28 @@ def solve_discrete_cell_counts_global(
     # Build profile matrix: profile[t, m] = assignment_matrix[m, t]
     profile_matrix = assignment_matrix.T  # Shape: (T, M)
 
+    # Compute marker weighting if enabled
+    # Weight by 1/(n_owners * markers_per_type) to balance cell types
+    marker_weights = np.ones(M, dtype=np.float64)
+    if use_marker_weighting:
+        # Count markers per cell type
+        markers_per_type = assignment_matrix.sum(axis=0)  # Shape: (T,)
+        # For each marker, compute weight
+        for m in range(M):
+            owners = np.where(assignment_matrix[m, :] > 0)[0]
+            n_owners = len(owners)
+            if n_owners > 0:
+                # Average markers per owner type
+                avg_markers = np.mean([markers_per_type[t] for t in owners])
+                marker_weights[m] = 1.0 / (n_owners * max(avg_markers, 1.0))
+        logging.info(f"Marker weighting enabled: weights range [{marker_weights.min():.3f}, {marker_weights.max():.3f}]")
+
     logging.info(f"Global IQP: {N} spots x {T} cell types = {N * T} integer variables")
     logging.info(f"Time limit: {time_limit}s, MIP gap: {mip_gap:.1%}")
+    if constraint_slack > 0:
+        logging.info(f"Constraint slack: ±{constraint_slack} cells")
+    if lambda_reg > 0:
+        logging.info(f"Elastic net: lambda={lambda_reg:.2f}, alpha={alpha_elastic:.2f}")
 
     # Create Gurobi model
     model = gp.Model("global_discrete_cell_assignment")
@@ -3431,10 +3460,11 @@ def solve_discrete_cell_counts_global(
     c = {}
     for i in range(N):
         N_i = int(nuclei_counts[i])
+        ub_i = N_i + constraint_slack  # Allow slack in upper bound
         for t in range(T):
             c[i, t] = model.addVar(
                 lb=0,
-                ub=N_i,
+                ub=ub_i,
                 vtype=GRB.INTEGER,
                 name=f"c_{i}_{t}"
             )
@@ -3465,17 +3495,18 @@ def solve_discrete_cell_counts_global(
             for t in range(T):
                 c[i, t].Start = base + (1 if t < remainder else 0)
 
-    # Constraint: sum of counts equals nuclei per spot
+    # Constraint: sum of counts within slack of nuclei per spot
     for i in range(N):
         N_i = int(nuclei_counts[i])
         if N_i > 0:
-            model.addConstr(
-                quicksum(c[i, t] for t in range(T)) == N_i,
-                name=f"nuclei_{i}"
-            )
+            sum_c_i = quicksum(c[i, t] for t in range(T))
+            lb_i = max(0, N_i - constraint_slack)
+            ub_i = N_i + constraint_slack
+            model.addConstr(sum_c_i >= lb_i, name=f"nuclei_lb_{i}")
+            model.addConstr(sum_c_i <= ub_i, name=f"nuclei_ub_{i}")
 
     # Objective: minimize reconstruction error across all spots and markers
-    # For each (spot, marker): error = (X[i,m] - alpha[m] - beta[m] * pred[i,m])^2
+    # For each (spot, marker): error = w[m] * (X[i,m] - alpha[m] - beta[m] * pred[i,m])^2
     # where pred[i,m] = sum_t c[i,t] * profile[t,m]
     error_terms = []
     for i in range(N):
@@ -3485,7 +3516,22 @@ def solve_discrete_cell_counts_global(
             pred_im = quicksum(c[i, t] * profile_matrix[t, m] for t in range(T))
             # Residual: observed - baseline - beta * predicted
             residual = X_i[m] - alpha_values[m] - beta_values[m] * pred_im
-            error_terms.append(residual * residual)
+            # Apply marker weighting
+            error_terms.append(marker_weights[m] * residual * residual)
+
+    # Elastic net regularization on proportions: lambda * (alpha*L1 + (1-alpha)*L2)
+    # L1 = sum |c[i,t]/N_i|, L2 = sum (c[i,t]/N_i)^2
+    reg_terms = []
+    if lambda_reg > 0:
+        for i in range(N):
+            N_i = int(nuclei_counts[i])
+            if N_i > 0:
+                for t in range(T):
+                    prop_it = c[i, t] / N_i  # Proportion
+                    # L2 term (always quadratic)
+                    reg_terms.append((1 - alpha_elastic) * prop_it * prop_it)
+                    # L1 term: for non-negative variables, |x| = x
+                    reg_terms.append(alpha_elastic * prop_it)
 
     # Add continuous prior regularization if provided
     # Penalizes (c[i,t]/N_i - p[i,t])^2 = (c[i,t] - N_i*p[i,t])^2 / N_i^2
@@ -3503,6 +3549,8 @@ def solve_discrete_cell_counts_global(
                     prior_terms.append(deviation * deviation)
 
     total_objective = quicksum(error_terms)
+    if reg_terms:
+        total_objective += lambda_reg * quicksum(reg_terms)
     if prior_terms:
         total_objective += lambda_continuous * quicksum(prior_terms)
 
@@ -3520,26 +3568,29 @@ def solve_discrete_cell_counts_global(
             for t in range(T):
                 c_values[i, t] = int(round(c[i, t].X))
 
-        # Verify and fix sum constraint after rounding (should be minimal adjustment)
+        # Verify sum constraint (only fix if outside slack bounds)
         for i in range(N):
             N_i = int(nuclei_counts[i])
             current_sum = c_values[i, :].sum()
-            if current_sum != N_i:
-                diff = N_i - current_sum
-                if diff > 0:
-                    # Add to largest value
-                    max_idx = np.argmax(c_values[i, :])
-                    c_values[i, max_idx] += diff
-                else:
-                    # Remove from largest non-zero
-                    sorted_idx = np.argsort(c_values[i, :])[::-1]
-                    for idx in sorted_idx:
-                        if c_values[i, idx] > 0:
-                            remove = min(-diff, c_values[i, idx])
-                            c_values[i, idx] -= remove
-                            diff += remove
-                            if diff == 0:
-                                break
+            lb_i = max(0, N_i - constraint_slack)
+            ub_i = N_i + constraint_slack
+
+            if current_sum < lb_i:
+                # Below lower bound - add cells
+                diff = lb_i - current_sum
+                max_idx = np.argmax(c_values[i, :])
+                c_values[i, max_idx] += diff
+            elif current_sum > ub_i:
+                # Above upper bound - remove cells
+                diff = current_sum - ub_i
+                sorted_idx = np.argsort(c_values[i, :])[::-1]
+                for idx in sorted_idx:
+                    if c_values[i, idx] > 0:
+                        remove = min(diff, c_values[i, idx])
+                        c_values[i, idx] -= remove
+                        diff -= remove
+                        if diff == 0:
+                            break
 
         gap = model.MIPGap if hasattr(model, 'MIPGap') and model.SolCount > 0 else float('inf')
         logging.info(f"Global IQP solved: status={model.status}, "
@@ -3571,6 +3622,10 @@ def optimize_discrete_cell_assignment_em(
     global_mip_gap: float = 0.05,
     continuous_prior: Optional[np.ndarray] = None,
     lambda_continuous: float = 0.0,
+    constraint_slack: int = 0,
+    lambda_reg: float = 0.0,
+    alpha_elastic: float = 0.5,
+    use_marker_weighting: bool = False,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     EM algorithm for discrete cell assignment with per-marker beta.
@@ -3608,6 +3663,12 @@ def optimize_discrete_cell_assignment_em(
             If provided with lambda_continuous > 0, the IQP will be biased toward these values.
         lambda_continuous: Weight for continuous prior regularization (default: 0.0).
             Higher values make discrete solution closer to continuous. Typical range: 1.0-100.0
+        constraint_slack: Allow ±slack cells deviation from nuclei count (default: 0 = exact).
+            Setting to 1 allows the optimizer more flexibility like the continuous model.
+        lambda_reg: Elastic net regularization weight on proportions (default: 0.0).
+        alpha_elastic: L1/L2 trade-off (0=pure L2, 1=pure L1, default: 0.5).
+        use_marker_weighting: Weight error by 1/(n_owners * markers_per_type) (default: False).
+            Balances influence of cell types with different numbers of markers.
 
     Returns:
         Tuple of:
@@ -3671,6 +3732,10 @@ def optimize_discrete_cell_assignment_em(
                 prev_c_values=c_values if iteration > 0 else None,
                 continuous_prior=continuous_prior,
                 lambda_continuous=lambda_continuous,
+                constraint_slack=constraint_slack,
+                lambda_reg=lambda_reg,
+                alpha_elastic=alpha_elastic,
+                use_marker_weighting=use_marker_weighting,
             )
         else:
             # Per-spot solve (original behavior)
