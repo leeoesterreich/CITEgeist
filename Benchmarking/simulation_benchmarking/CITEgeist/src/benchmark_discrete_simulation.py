@@ -394,8 +394,8 @@ def run_benchmark(
         logger.info("Running continuous optimization first (hybrid mode)...")
         start_cont = time.time()
 
-        # Run continuous proportion model
-        cont_props_df = model.run_cell_proportion_model(
+        # Run continuous proportion model (returns tuple: global, finetuned)
+        global_props_df, finetuned_props_df = model.run_cell_proportion_model(
             max_workers=8,
             lambda_laplacian=0.1,
             skip_finetuning=False,
@@ -403,8 +403,8 @@ def run_benchmark(
         timings["continuous_sec"] = time.time() - start_cont
         logger.info("Continuous optimization completed in %.1fs", timings["continuous_sec"])
 
-        # Convert to numpy array matching spot order
-        continuous_prior = cont_props_df.values
+        # Use finetuned proportions as the continuous prior
+        continuous_prior = finetuned_props_df.values
         logger.info("Continuous prior shape: %s", continuous_prior.shape)
         results["use_continuous_prior"] = True
         results["lambda_continuous"] = lambda_continuous
