@@ -254,6 +254,9 @@ def run_discrete_benchmark(
     min_counts: int = 25,
     spot_diameter_um: float = 55.0,
     scale_mode: str = "per_marker",
+    global_solve: bool = True,
+    global_time_limit: float = 300.0,
+    global_mip_gap: float = 0.05,
 ) -> Dict[str, Any]:
     """
     Run full discrete CITEgeist benchmark for one region.
@@ -269,6 +272,9 @@ def run_discrete_benchmark(
         run_gex: Whether to run GEX deconvolution
         min_counts: Minimum counts filter for GEX preprocessing
         spot_diameter_um: Spot diameter in microns
+        global_solve: Whether to use global IQP solver (True) or per-spot solver (False)
+        global_time_limit: Time limit for global IQP solver in seconds
+        global_mip_gap: MIP gap tolerance for global solver
 
     Returns:
         Dictionary with benchmark results and timing
@@ -396,6 +402,9 @@ def run_discrete_benchmark(
         beta_min=0.1,
         beta_max=2.0,
         timeout_per_spot=60.0,
+        global_solve=global_solve,
+        global_time_limit=global_time_limit,
+        global_mip_gap=global_mip_gap,
     )
     timings["discrete_assignment_sec"] = time.time() - t0
 
@@ -584,6 +593,32 @@ def main():
         help="Antibody scaling mode: per_marker (default), global, or none",
     )
 
+    # Global solve parameters
+    parser.add_argument(
+        "--global-solve",
+        action="store_true",
+        default=True,
+        help="Use global IQP solver (default: True)",
+    )
+    parser.add_argument(
+        "--no-global-solve",
+        action="store_false",
+        dest="global_solve",
+        help="Use per-spot IQP solver instead of global",
+    )
+    parser.add_argument(
+        "--global-time-limit",
+        type=float,
+        default=300.0,
+        help="Time limit for global IQP solver in seconds (default: 300)",
+    )
+    parser.add_argument(
+        "--global-mip-gap",
+        type=float,
+        default=0.05,
+        help="MIP gap tolerance for global solver (default: 0.05)",
+    )
+
     args = parser.parse_args()
 
     # Validate region
@@ -606,6 +641,9 @@ def main():
         min_counts=args.min_counts,
         spot_diameter_um=args.spot_diameter_um,
         scale_mode=args.scale_mode,
+        global_solve=args.global_solve,
+        global_time_limit=args.global_time_limit,
+        global_mip_gap=args.global_mip_gap,
     )
 
     # Print summary
