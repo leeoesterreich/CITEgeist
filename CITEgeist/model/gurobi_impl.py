@@ -3099,6 +3099,62 @@ def _run_dummy_models() -> Dict[str, bool]:
 # ===========================================================================
 
 
+def estimate_prior_proportions_from_markers(
+    raw_marker_data: np.ndarray,
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+) -> np.ndarray:
+    """
+    Estimate expected global cell type proportions from raw marker signal.
+
+    Uses the mean expression of markers assigned to each cell type (before
+    any scaling) to estimate the relative abundance of each type. This provides
+    a prior that prevents rare cell type over-inflation during discrete assignment.
+
+    Args:
+        raw_marker_data: (N, M) raw antibody data (NOT scaled)
+        assignment_matrix: (M, T) binary matrix mapping markers to cell types
+        cell_type_names: List of cell type names (length T)
+
+    Returns:
+        prior_proportions: (T,) normalized proportions summing to 1.0
+
+    Example:
+        >>> raw_data, marker_names, assignment, cell_types = map_antibodies_to_profiles_v2(...)
+        >>> prior = estimate_prior_proportions_from_markers(raw_data, assignment, cell_types)
+        >>> model.run_discrete_cell_assignment(prior_proportions=prior, lambda_prior=0.5)
+    """
+    N, M = raw_marker_data.shape
+    T = len(cell_type_names)
+
+    # Compute mean signal per marker across all spots
+    marker_means = raw_marker_data.mean(axis=0)  # Shape: (M,)
+
+    # For each cell type, compute mean of its assigned markers' signals
+    # This uses raw signal, so abundant types will have higher values
+    type_signals = np.zeros(T, dtype=np.float64)
+    for t in range(T):
+        assigned_markers = assignment_matrix[:, t] > 0
+        if assigned_markers.any():
+            type_signals[t] = marker_means[assigned_markers].mean()
+        else:
+            type_signals[t] = 0.0
+
+    # Normalize to proportions
+    total = type_signals.sum()
+    if total > 0:
+        prior_proportions = type_signals / total
+    else:
+        # Fallback to uniform if no signal
+        prior_proportions = np.ones(T) / T
+
+    logging.info("Estimated prior proportions from raw marker signals:")
+    for t, name in enumerate(cell_type_names):
+        logging.info(f"  {name}: {100*prior_proportions[t]:.1f}%")
+
+    return prior_proportions
+
+
 def solve_discrete_cell_counts(
     marker_level_data: np.ndarray,
     marker_names: List[str],
@@ -3110,6 +3166,8 @@ def solve_discrete_cell_counts(
     max_nuclei_cap: int = 30,
     timeout_per_spot: float = 60.0,
     lambda_sparse: float = 0.0,
+    prior_proportions: Optional[np.ndarray] = None,
+    lambda_prior: float = 0.0,
 ) -> np.ndarray:
     """
     Solve IQP for discrete cell counts given fixed beta (E-step).
@@ -3117,6 +3175,7 @@ def solve_discrete_cell_counts(
     Mathematical formulation:
         minimize    Σᵢ Σₘ (X[i,m] - α[m] - Σₜ c[i,t] × profile[t,m] × β[m])²
                     + λ_sparse × Σₜ y[t]
+                    + λ_prior × Σₜ (c[i,t] - N_i × π[t])²
         subject to  Σₜ c[i,t] = N_i     ∀ spots i with N_i > 0
                     c[i,t] ∈ Z≥0        ∀ i, t
                     y[t] ∈ {0, 1}       ∀ t (indicator: y[t]=1 iff c[t]>0)
@@ -3125,6 +3184,10 @@ def solve_discrete_cell_counts(
     The sparsity penalty (lambda_sparse > 0) encourages solutions with fewer
     active cell types per spot, matching biological reality that most spots
     have 2-4 dominant cell types rather than all types present.
+
+    The prior penalty (lambda_prior > 0) regularizes towards expected global
+    proportions π[t], preventing rare cell type over-inflation caused by
+    per-marker scaling artifacts.
 
     Args:
         marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
@@ -3138,6 +3201,11 @@ def solve_discrete_cell_counts(
         timeout_per_spot: Maximum seconds per spot optimization (default: 60)
         lambda_sparse: Sparsity penalty weight (default: 0.0). Higher values
             encourage fewer active cell types per spot. Typical range: 0.0-1.0
+        prior_proportions: (T,) expected global proportions per cell type.
+            If None and lambda_prior > 0, uses uniform prior (1/T).
+        lambda_prior: Prior penalty weight (default: 0.0). Higher values
+            pull assignments towards the expected global proportions.
+            Typical range: 0.0-1.0
 
     Returns:
         c_values: (N, T) integer cell counts per type per spot
@@ -3154,6 +3222,17 @@ def solve_discrete_cell_counts(
 
     if alpha_values is None:
         alpha_values = np.zeros(M, dtype=np.float64)
+
+    # Handle prior proportions
+    if prior_proportions is None and lambda_prior > 0:
+        # Uniform prior if not specified
+        prior_proportions = np.ones(T, dtype=np.float64) / T
+    elif prior_proportions is not None:
+        prior_proportions = np.asarray(prior_proportions, dtype=np.float64)
+        if prior_proportions.shape != (T,):
+            raise ValueError(f"prior_proportions shape {prior_proportions.shape} != expected ({T},)")
+        # Normalize to sum to 1
+        prior_proportions = prior_proportions / (prior_proportions.sum() + 1e-10)
 
     # Build profile matrix: profile[t, m] = assignment_matrix[m, t]
     # (transposed for convenience in formulation)
@@ -3202,7 +3281,7 @@ def solve_discrete_cell_counts(
                     # If y[t] = 1, then c[t] can be up to N_i
                     model.addConstr(c[t] <= N_i * y[t], name=f"indicator_{t}")
 
-            # Objective: minimize reconstruction error + sparsity penalty
+            # Objective: minimize reconstruction error + sparsity penalty + prior penalty
             # For each marker m: error = X[i,m] - Σₜ c[t] × profile[t,m] × β[m]
             obj_terms = []
             for m in range(M):
@@ -3210,12 +3289,25 @@ def solve_discrete_cell_counts(
                 residual = X_i[m] - pred
                 obj_terms.append(residual * residual)
 
+            total_objective = quicksum(obj_terms)
+
             # Add sparsity penalty: lambda_sparse * sum(y[t])
             if lambda_sparse > 0.0 and y is not None:
                 sparsity_penalty = lambda_sparse * quicksum(y[t] for t in range(T))
-                model.setObjective(quicksum(obj_terms) + sparsity_penalty, GRB.MINIMIZE)
-            else:
-                model.setObjective(quicksum(obj_terms), GRB.MINIMIZE)
+                total_objective = total_objective + sparsity_penalty
+
+            # Add prior penalty: lambda_prior * sum_t (c[t] - N_i * pi[t])^2
+            # This regularizes towards expected global proportions
+            if lambda_prior > 0.0 and prior_proportions is not None:
+                prior_terms = []
+                for t in range(T):
+                    expected_count = N_i * prior_proportions[t]
+                    deviation = c[t] - expected_count
+                    prior_terms.append(deviation * deviation)
+                prior_penalty = lambda_prior * quicksum(prior_terms)
+                total_objective = total_objective + prior_penalty
+
+            model.setObjective(total_objective, GRB.MINIMIZE)
             model.optimize()
 
             if model.Status == GRB.OPTIMAL or model.Status == GRB.TIME_LIMIT:
@@ -3263,6 +3355,167 @@ def solve_discrete_cell_counts(
     return c_values
 
 
+def solve_discrete_cell_counts_global(
+    marker_level_data: np.ndarray,
+    marker_names: List[str],
+    assignment_matrix: np.ndarray,
+    cell_type_names: List[str],
+    nuclei_counts: np.ndarray,
+    beta_values: np.ndarray,
+    alpha_values: Optional[np.ndarray] = None,
+    time_limit: float = 300.0,
+    mip_gap: float = 0.05,
+    prev_c_values: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """
+    Solve global IQP for discrete cell counts across all spots jointly.
+
+    Unlike solve_discrete_cell_counts() which optimizes each spot independently,
+    this function formulates a single IQP over all N*T integer variables. This
+    enforces globally consistent marker-celltype behavior across the tissue.
+
+    Mathematical formulation:
+        minimize    sum_i sum_m (X[i,m] - alpha[m] - beta[m] * sum_t c[i,t] * profile[t,m])^2
+        subject to  sum_t c[i,t] = N_i     for all spots i
+                    c[i,t] in Z>=0         for all i, t
+                    c[i,t] <= N_i          for all i, t
+
+    Args:
+        marker_level_data: (N, M) antibody data (preprocessed for discrete mode)
+        marker_names: List of marker names (length M)
+        assignment_matrix: (M, T) binary matrix where A[m,t]=1 if marker m belongs to type t
+        cell_type_names: List of cell type names (length T)
+        nuclei_counts: (N,) integer nuclei count per spot
+        beta_values: (M,) per-marker scaling factors
+        alpha_values: (M,) per-marker baselines (optional, defaults to zeros)
+        time_limit: Maximum solver time in seconds (default: 300)
+        mip_gap: Acceptable optimality gap (default: 0.05 = 5%)
+        prev_c_values: (N, T) previous cell counts for warm-start (optional)
+
+    Returns:
+        c_values: (N, T) integer cell counts per type per spot
+    """
+    N, M = marker_level_data.shape
+    T = len(cell_type_names)
+
+    # Input validation
+    if assignment_matrix.shape != (M, T):
+        raise ValueError(f"assignment_matrix shape {assignment_matrix.shape} != expected ({M}, {T})")
+    if nuclei_counts.shape != (N,):
+        raise ValueError(f"nuclei_counts shape {nuclei_counts.shape} != expected ({N},)")
+    if beta_values.shape != (M,):
+        raise ValueError(f"beta_values shape {beta_values.shape} != expected ({M},)")
+
+    if alpha_values is None:
+        alpha_values = np.zeros(M, dtype=np.float64)
+
+    # Build profile matrix: profile[t, m] = assignment_matrix[m, t]
+    profile_matrix = assignment_matrix.T  # Shape: (T, M)
+
+    logging.info(f"Global IQP: {N} spots x {T} cell types = {N * T} integer variables")
+    logging.info(f"Time limit: {time_limit}s, MIP gap: {mip_gap:.1%}")
+
+    # Create Gurobi model
+    model = gp.Model("global_discrete_cell_assignment")
+    model.setParam("OutputFlag", 1)  # Show progress for long solves
+    model.setParam("TimeLimit", time_limit)
+    model.setParam("MIPGap", mip_gap)
+    model.setParam("Threads", 0)  # Use all available cores
+
+    # Create integer variables: c[i, t] = count of cell type t at spot i
+    c = {}
+    for i in range(N):
+        N_i = int(nuclei_counts[i])
+        for t in range(T):
+            c[i, t] = model.addVar(
+                lb=0,
+                ub=N_i,
+                vtype=GRB.INTEGER,
+                name=f"c_{i}_{t}"
+            )
+
+    model.update()
+
+    # Warm-start from previous solution or uniform distribution
+    for i in range(N):
+        N_i = int(nuclei_counts[i])
+        if prev_c_values is not None:
+            for t in range(T):
+                c[i, t].Start = int(prev_c_values[i, t])
+        else:
+            # Uniform distribution
+            base = N_i // T
+            remainder = N_i % T
+            for t in range(T):
+                c[i, t].Start = base + (1 if t < remainder else 0)
+
+    # Constraint: sum of counts equals nuclei per spot
+    for i in range(N):
+        N_i = int(nuclei_counts[i])
+        if N_i > 0:
+            model.addConstr(
+                quicksum(c[i, t] for t in range(T)) == N_i,
+                name=f"nuclei_{i}"
+            )
+
+    # Objective: minimize reconstruction error across all spots and markers
+    # For each (spot, marker): error = (X[i,m] - alpha[m] - beta[m] * pred[i,m])^2
+    # where pred[i,m] = sum_t c[i,t] * profile[t,m]
+    error_terms = []
+    for i in range(N):
+        X_i = marker_level_data[i, :]  # Shape: (M,)
+        for m in range(M):
+            # Predicted signal from cell counts
+            pred_im = quicksum(c[i, t] * profile_matrix[t, m] for t in range(T))
+            # Residual: observed - baseline - beta * predicted
+            residual = X_i[m] - alpha_values[m] - beta_values[m] * pred_im
+            error_terms.append(residual * residual)
+
+    model.setObjective(quicksum(error_terms), GRB.MINIMIZE)
+
+    # Solve
+    logging.info("Starting global IQP optimization...")
+    model.optimize()
+
+    # Check solution status
+    if model.status in [GRB.OPTIMAL, GRB.TIME_LIMIT, GRB.SUBOPTIMAL]:
+        # Extract solution
+        c_values = np.zeros((N, T), dtype=np.int64)
+        for i in range(N):
+            for t in range(T):
+                c_values[i, t] = int(round(c[i, t].X))
+
+        # Verify and fix sum constraint after rounding (should be minimal adjustment)
+        for i in range(N):
+            N_i = int(nuclei_counts[i])
+            current_sum = c_values[i, :].sum()
+            if current_sum != N_i:
+                diff = N_i - current_sum
+                if diff > 0:
+                    # Add to largest value
+                    max_idx = np.argmax(c_values[i, :])
+                    c_values[i, max_idx] += diff
+                else:
+                    # Remove from largest non-zero
+                    sorted_idx = np.argsort(c_values[i, :])[::-1]
+                    for idx in sorted_idx:
+                        if c_values[i, idx] > 0:
+                            remove = min(-diff, c_values[i, idx])
+                            c_values[i, idx] -= remove
+                            diff += remove
+                            if diff == 0:
+                                break
+
+        gap = model.MIPGap if hasattr(model, 'MIPGap') and model.SolCount > 0 else float('inf')
+        logging.info(f"Global IQP solved: status={model.status}, "
+                     f"gap={gap:.2%}, time={model.Runtime:.1f}s")
+
+        return c_values
+
+    else:
+        raise RuntimeError(f"Global IQP failed: status={model.status}")
+
+
 def optimize_discrete_cell_assignment_em(
     marker_level_data: np.ndarray,
     marker_names: List[str],
@@ -3276,6 +3529,8 @@ def optimize_discrete_cell_assignment_em(
     max_nuclei_cap: int = 30,
     timeout_per_spot: float = 60.0,
     lambda_sparse: float = 0.0,
+    prior_proportions: Optional[np.ndarray] = None,
+    lambda_prior: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     EM algorithm for discrete cell assignment with per-marker beta.
@@ -3301,6 +3556,11 @@ def optimize_discrete_cell_assignment_em(
         timeout_per_spot: Maximum seconds per spot optimization (default: 60)
         lambda_sparse: Sparsity penalty weight (default: 0.0). Higher values encourage
             fewer active cell types per spot. Typical range: 0.0-1.0
+        prior_proportions: (T,) expected global proportions per cell type.
+            Can be estimated from raw marker signals or from continuous mode.
+            If None, no prior regularization is applied regardless of lambda_prior.
+        lambda_prior: Prior penalty weight (default: 0.0). Higher values
+            pull assignments towards prior_proportions. Typical range: 0.0-1.0
 
     Returns:
         Tuple of:
@@ -3312,14 +3572,19 @@ def optimize_discrete_cell_assignment_em(
     N, M = marker_level_data.shape
     T = len(cell_type_names)
 
-    # Validate lambda_sparse
+    # Validate lambda_sparse and lambda_prior
     if lambda_sparse < 0:
         raise ValueError(f"lambda_sparse must be non-negative, got {lambda_sparse}")
+    if lambda_prior < 0:
+        raise ValueError(f"lambda_prior must be non-negative, got {lambda_prior}")
 
     logging.info(f"Discrete cell assignment EM: {N} spots, {M} markers, {T} cell types")
     logging.info(f"Total nuclei: {nuclei_counts.sum()}, mean per spot: {nuclei_counts.mean():.2f}")
     if lambda_sparse > 0:
         logging.info(f"Sparsity regularization: lambda_sparse={lambda_sparse}")
+    if lambda_prior > 0 and prior_proportions is not None:
+        logging.info(f"Prior regularization: lambda_prior={lambda_prior}")
+        logging.info(f"Prior proportions: {dict(zip(cell_type_names, prior_proportions))}")
 
     # Build profile matrix (T x M)
     profile_matrix = assignment_matrix.T
@@ -3356,6 +3621,8 @@ def optimize_discrete_cell_assignment_em(
             max_nuclei_cap=max_nuclei_cap,
             timeout_per_spot=timeout_per_spot,
             lambda_sparse=lambda_sparse,
+            prior_proportions=prior_proportions,
+            lambda_prior=lambda_prior,
         )
 
         # ==================== M-Step ====================
