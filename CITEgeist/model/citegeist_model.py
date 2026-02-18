@@ -949,6 +949,11 @@ class CitegeistModel:
         beta_max: float = 2.0,
         timeout_per_spot: float = 60.0,
         lambda_sparse: float = 0.0,
+        prior_proportions: Optional[np.ndarray] = None,
+        lambda_prior: float = 0.0,
+        global_solve: bool = True,
+        global_time_limit: float = 300.0,
+        global_mip_gap: float = 0.05,
     ) -> pd.DataFrame:
         """
         Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
@@ -970,6 +975,19 @@ class CitegeistModel:
             lambda_sparse: Sparsity regularization weight (default: 0.0). Higher
                 values encourage fewer active cell types per spot. Typical range
                 is 0.0 to 1.0.
+            prior_proportions: Optional array of expected global proportions per
+                cell type (length = n_cell_types). If provided along with
+                lambda_prior > 0, regularizes assignments towards these proportions.
+                Can be estimated from raw marker signals or from continuous mode.
+            lambda_prior: Prior regularization weight (default: 0.0). Higher values
+                pull assignments towards prior_proportions. Typical range is 0.0-1.0.
+                This helps prevent rare cell type over-inflation caused by scaling.
+            global_solve: If True (default), use global IQP solver for joint
+                optimization across all spots. If False, use per-spot IQP
+                (original behavior). Global solve enforces globally consistent
+                marker-celltype relationships.
+            global_time_limit: Time limit for global solver in seconds (default: 300).
+            global_mip_gap: Acceptable MIP gap for global solver (default: 0.05).
 
         Returns:
             DataFrame with cell type columns and integer count values per spot.
@@ -1024,6 +1042,9 @@ class CitegeistModel:
         logging.info(f"Total nuclei: {nuclei_array.sum()}, mean per spot: {nuclei_array.mean():.2f}")
         if lambda_sparse > 0:
             logging.info(f"Sparsity regularization enabled: lambda_sparse={lambda_sparse}")
+        if lambda_prior > 0 and prior_proportions is not None:
+            logging.info(f"Prior regularization enabled: lambda_prior={lambda_prior}")
+            logging.info(f"Prior proportions: {dict(zip(cell_type_names, prior_proportions))}")
 
         # Run EM optimization
         c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
@@ -1039,6 +1060,11 @@ class CitegeistModel:
             max_nuclei_cap=max_nuclei_cap,
             timeout_per_spot=timeout_per_spot,
             lambda_sparse=lambda_sparse,
+            prior_proportions=prior_proportions,
+            lambda_prior=lambda_prior,
+            global_solve=global_solve,
+            global_time_limit=global_time_limit,
+            global_mip_gap=global_mip_gap,
         )
 
         # Store results
