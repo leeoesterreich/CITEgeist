@@ -883,3 +883,98 @@ Expected results:
 
 **Total commits:** 7
 **Total new lines:** ~250
+
+---
+
+## Implementation Progress (2026-02-17 21:45 EST)
+
+### Completed Tasks
+
+| Task | Status | Commit |
+|------|--------|--------|
+| 1. Add `solve_discrete_cell_counts_global()` | ✅ DONE | `6b04e47c` |
+| 2. Add time limit test | ✅ DONE | `0313551c` |
+| 3. Add warm-start test | ✅ DONE | `93bc1f39` |
+| 4. Integrate into EM | ✅ DONE | `3a574e77` |
+| 5. Update CitegeistModel API | ✅ DONE | `c4f88d30` |
+| 6. Add CLI flags (simulation) | ✅ DONE | `68e0f498` |
+| 6b. Add CLI flags (xenium) | ✅ DONE | `32f85ce2` |
+| 7. Create SLURM scripts | ✅ DONE | `4708675f`, `c1b6d4a0`, `b65fd086` |
+| 8. Run benchmarks | 🔄 IN PROGRESS | Jobs submitted |
+
+### Unit Tests
+
+All 4 tests passed (job 8036245):
+- `test_global_solve_returns_valid_counts` ✅
+- `test_global_solve_respects_time_limit` ✅
+- `test_global_solve_with_warm_start` ✅
+- `test_em_with_global_solve` ✅
+
+### Benchmark Jobs Running
+
+| Job ID | Dataset | Replicates | Status | Runtime |
+|--------|---------|------------|--------|---------|
+| 8036246 | mixed | 5 (0-4) | RUNNING | ~11 min |
+| 8036247 | high_seg | 5 (0-4) | RUNNING | ~11 min |
+| 8037412 | xenium | 5 (0-4) | RUNNING | ~6 min |
+
+Jobs are in Cellpose segmentation phase (CPU, 8000x8000 images). Expected total runtime: 30-60 min per job.
+
+### Next Steps
+
+1. **Wait for benchmarks to complete** (~20-50 min remaining)
+
+2. **Check results when done:**
+```bash
+# Mixed results (TARGET: prop_corr ≥0.65, baseline was ~0.43)
+for f in Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/Wu_rep_*/benchmark_results.json; do
+    python3 -c "import json; d=json.load(open('$f')); print(f'{f}: prop_corr={d[\"proportion_correlation\"]:.3f}')"
+done
+
+# High_seg results (TARGET: no regression from ~0.76)
+for f in Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/high_seg/dapi/Wu_rep_*/benchmark_results.json; do
+    python3 -c "import json; d=json.load(open('$f')); print(f'{f}: prop_corr={d[\"proportion_correlation\"]:.3f}')"
+done
+
+# Xenium results
+for f in Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_global/*/benchmark_results.json; do
+    python3 -c "import json; d=json.load(open('$f')); print(f'{f}: prop_corr={d.get(\"proportion_correlation\", \"N/A\")}')"
+done
+```
+
+3. **Compare to baseline:**
+```bash
+# Baseline mixed (per-spot IQP)
+for f in Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_geomfix_nolegacy/mixed/dapi/Wu_rep_*/benchmark_results.json; do
+    python3 -c "import json; d=json.load(open('$f')); print(f'baseline: {d[\"proportion_correlation\"]:.3f}')"
+done
+```
+
+4. **If results meet targets:** Mark Task 8 complete, finish branch
+
+5. **If results don't meet targets:** Debug, check logs, iterate
+
+### Commits Made (11 total)
+
+```
+b65fd086 fix(benchmark): correct xenium array range to 0-4
+c1b6d4a0 fix(benchmark): correct xenium SLURM script filename and arg name
+32f85ce2 feat(benchmark): add --global-solve CLI flags to xenium discrete benchmark
+4708675f chore(benchmark): add SLURM scripts for global IQP benchmarks
+68e0f498 feat(benchmark): add --global-solve CLI flags to discrete benchmark
+c4f88d30 feat(discrete): expose global_solve params in CitegeistModel API
+3a574e77 feat(discrete): integrate global IQP into EM algorithm
+93bc1f39 test(discrete): add warm-start test for global IQP
+0313551c test(discrete): add time limit test for global IQP
+6b04e47c feat(discrete): add solve_discrete_cell_counts_global() function
+e4228fd5 docs: add global IQP discrete implementation plan
+```
+
+### Key Files Modified
+
+- `CITEgeist/model/gurobi_impl.py` - Added `solve_discrete_cell_counts_global()`, modified EM E-step
+- `CITEgeist/model/citegeist_model.py` - Added global_solve params to API
+- `CITEgeist/tests/test_discrete_global_solve.py` - New test file with 4 tests
+- `Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py` - CLI flags
+- `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_discrete_cellpose.py` - CLI flags
+- `Benchmarking/*/slurm/sbatch_discrete_global_*.sh` - New SLURM scripts
