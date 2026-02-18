@@ -388,6 +388,13 @@ def run_benchmark(
         )
         logger.info("Prior proportions: %s", dict(zip(cell_type_names, prior_proportions)))
 
+    # Get cell type names from discrete mapping (needed for alignment)
+    from CITEgeist.model.gurobi_impl import map_antibodies_to_profiles_v2
+    _, _, _, discrete_cell_type_names = map_antibodies_to_profiles_v2(
+        model.antibody_capture_adata, SIMULATION_CELL_PROFILE_DICT
+    )
+    logger.info("Discrete cell type order: %s", discrete_cell_type_names)
+
     # Optional: Run continuous optimization first to get prior for discrete
     continuous_prior = None
     if use_continuous_prior:
@@ -402,10 +409,12 @@ def run_benchmark(
         )
         timings["continuous_sec"] = time.time() - start_cont
         logger.info("Continuous optimization completed in %.1fs", timings["continuous_sec"])
+        logger.info("Continuous cell type order: %s", list(finetuned_props_df.columns))
 
-        # Use finetuned proportions as the continuous prior
+        # CRITICAL: Reorder continuous prior columns to match discrete cell type order
+        finetuned_props_df = finetuned_props_df[discrete_cell_type_names]
         continuous_prior = finetuned_props_df.values
-        logger.info("Continuous prior shape: %s", continuous_prior.shape)
+        logger.info("Continuous prior shape: %s (reordered to match discrete)", continuous_prior.shape)
         results["use_continuous_prior"] = True
         results["lambda_continuous"] = lambda_continuous
     else:
