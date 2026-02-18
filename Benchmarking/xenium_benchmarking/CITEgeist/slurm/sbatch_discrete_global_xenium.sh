@@ -17,8 +17,8 @@ conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_e
 
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 
-python Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_discrete_xenium.py \
-    --region-id ${SLURM_ARRAY_TASK_ID} \
+python Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_discrete_cellpose.py \
+    --region ${SLURM_ARRAY_TASK_ID} \
     --output-dir Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_global \
     --global-solve \
     --global-time-limit 600 \
