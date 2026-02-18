@@ -264,13 +264,17 @@ def run_benchmark(
     max_em_iterations: int = 20,
     lambda_sparse: float = 0.0,
     scale_mode: str = "per_marker",
+    lambda_prior: float = 0.0,
+    global_solve: bool = True,
+    global_time_limit: float = 300.0,
+    global_mip_gap: float = 0.05,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap}
     timings = {}
 
     # Step 1: Load image
@@ -364,6 +368,24 @@ def run_benchmark(
     model.preprocess_gex(target_sum=10000)
     model.load_cell_profile_dict(SIMULATION_CELL_PROFILE_DICT)
 
+    # Estimate prior proportions from raw marker data if lambda_prior > 0
+    prior_proportions = None
+    if lambda_prior > 0:
+        from CITEgeist.model.gurobi_impl import (
+            estimate_prior_proportions_from_markers,
+            map_antibodies_to_profiles_v2,
+        )
+        # Get raw marker data (before preprocessing) and assignment matrix
+        raw_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
+            adata_cite, SIMULATION_CELL_PROFILE_DICT
+        )
+        prior_proportions = estimate_prior_proportions_from_markers(
+            raw_marker_data=raw_data,
+            assignment_matrix=assignment_matrix,
+            cell_type_names=cell_type_names,
+        )
+        logger.info("Prior proportions: %s", dict(zip(cell_type_names, prior_proportions)))
+
     # Run discrete assignment
     start = time.time()
     cell_counts = model.run_discrete_cell_assignment(
@@ -372,6 +394,11 @@ def run_benchmark(
         beta_convergence_tol=1e-4,
         max_nuclei_cap=30,
         lambda_sparse=lambda_sparse,
+        prior_proportions=prior_proportions,
+        lambda_prior=lambda_prior,
+        global_solve=global_solve,
+        global_time_limit=global_time_limit,
+        global_mip_gap=global_mip_gap,
     )
     timings["discrete_assignment_sec"] = time.time() - start
 
@@ -510,6 +537,16 @@ def main():
     parser.add_argument("--scale-mode", choices=["per_marker", "global", "none"],
                         default="per_marker",
                         help="Antibody scaling mode: per_marker (default), global, or none")
+    parser.add_argument("--lambda-prior", type=float, default=0.0,
+                        help="Prior regularization weight (default: 0.0). Uses marker-based prior.")
+    parser.add_argument("--global-solve", action="store_true", default=True,
+                        help="Use global IQP solver (default: True)")
+    parser.add_argument("--no-global-solve", action="store_false", dest="global_solve",
+                        help="Use per-spot IQP solver instead of global")
+    parser.add_argument("--global-time-limit", type=float, default=300.0,
+                        help="Time limit for global IQP solver in seconds (default: 300)")
+    parser.add_argument("--global-mip-gap", type=float, default=0.05,
+                        help="MIP gap tolerance for global solver (default: 0.05)")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -524,6 +561,10 @@ def main():
         max_em_iterations=args.max_em_iterations,
         lambda_sparse=args.lambda_sparse,
         scale_mode=args.scale_mode,
+        lambda_prior=args.lambda_prior,
+        global_solve=args.global_solve,
+        global_time_limit=args.global_time_limit,
+        global_mip_gap=args.global_mip_gap,
     )
 
     print("\n=== RESULTS ===")
