@@ -3531,6 +3531,9 @@ def optimize_discrete_cell_assignment_em(
     lambda_sparse: float = 0.0,
     prior_proportions: Optional[np.ndarray] = None,
     lambda_prior: float = 0.0,
+    global_solve: bool = True,
+    global_time_limit: float = 300.0,
+    global_mip_gap: float = 0.05,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
     """
     EM algorithm for discrete cell assignment with per-marker beta.
@@ -3561,6 +3564,9 @@ def optimize_discrete_cell_assignment_em(
             If None, no prior regularization is applied regardless of lambda_prior.
         lambda_prior: Prior penalty weight (default: 0.0). Higher values
             pull assignments towards prior_proportions. Typical range: 0.0-1.0
+        global_solve: If True (default), use global IQP solver. If False, use per-spot IQP.
+        global_time_limit: Time limit for global solver in seconds (default: 300).
+        global_mip_gap: Acceptable MIP gap for global solver (default: 0.05 = 5%).
 
     Returns:
         Tuple of:
@@ -3609,21 +3615,36 @@ def optimize_discrete_cell_assignment_em(
         logging.info(f"\n=== EM Iteration {iteration + 1}/{max_em_iterations} ===")
 
         # ==================== E-Step ====================
-        # Solve IQP for cell counts given current beta
-        c_values = solve_discrete_cell_counts(
-            marker_level_data=marker_level_data,
-            marker_names=marker_names,
-            assignment_matrix=assignment_matrix,
-            cell_type_names=cell_type_names,
-            nuclei_counts=nuclei_counts,
-            beta_values=beta_values,
-            alpha_values=alpha_values,
-            max_nuclei_cap=max_nuclei_cap,
-            timeout_per_spot=timeout_per_spot,
-            lambda_sparse=lambda_sparse,
-            prior_proportions=prior_proportions,
-            lambda_prior=lambda_prior,
-        )
+        if global_solve:
+            # Global solve: single IQP over all spots
+            c_values = solve_discrete_cell_counts_global(
+                marker_level_data=marker_level_data,
+                marker_names=marker_names,
+                assignment_matrix=assignment_matrix,
+                cell_type_names=cell_type_names,
+                nuclei_counts=nuclei_counts,
+                beta_values=beta_values,
+                alpha_values=alpha_values,
+                time_limit=global_time_limit,
+                mip_gap=global_mip_gap,
+                prev_c_values=c_values if iteration > 0 else None,
+            )
+        else:
+            # Per-spot solve (original behavior)
+            c_values = solve_discrete_cell_counts(
+                marker_level_data=marker_level_data,
+                marker_names=marker_names,
+                assignment_matrix=assignment_matrix,
+                cell_type_names=cell_type_names,
+                nuclei_counts=nuclei_counts,
+                beta_values=beta_values,
+                alpha_values=alpha_values,
+                max_nuclei_cap=max_nuclei_cap,
+                timeout_per_spot=timeout_per_spot,
+                lambda_sparse=lambda_sparse,
+                prior_proportions=prior_proportions,
+                lambda_prior=lambda_prior,
+            )
 
         # ==================== M-Step ====================
         # Update beta via OLS: β[m] = Σᵢ X'[i,m] × pred[i,m] / Σᵢ pred[i,m]²

@@ -139,3 +139,42 @@ def test_global_solve_with_warm_start():
 
     corr = np.corrcoef(c_values_1.flatten(), c_values_2.flatten())[0, 1]
     assert corr > 0.95, f"Expected high correlation, got {corr}"
+
+
+def test_em_with_global_solve():
+    """EM algorithm works with global_solve=True."""
+    N, M, T = 50, 6, 3
+
+    np.random.seed(789)
+    marker_level_data = np.random.rand(N, M).astype(np.float64)
+
+    assignment_matrix = np.zeros((M, T), dtype=np.float64)
+    assignment_matrix[0:2, 0] = 1
+    assignment_matrix[2:4, 1] = 1
+    assignment_matrix[4:6, 2] = 1
+
+    marker_names = [f"marker_{i}" for i in range(M)]
+    cell_type_names = ["TypeA", "TypeB", "TypeC"]
+    nuclei_counts = np.random.randint(3, 12, size=N).astype(np.int64)
+
+    from CITEgeist.model.gurobi_impl import optimize_discrete_cell_assignment_em
+
+    c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
+        marker_level_data=marker_level_data,
+        marker_names=marker_names,
+        assignment_matrix=assignment_matrix,
+        cell_type_names=cell_type_names,
+        nuclei_counts=nuclei_counts,
+        max_em_iterations=3,
+        global_solve=True,
+        global_time_limit=30.0,
+        global_mip_gap=0.10,
+    )
+
+    assert c_values.shape == (N, T)
+    assert c_values.dtype == np.int64
+    assert (c_values >= 0).all()
+    np.testing.assert_array_equal(c_values.sum(axis=1), nuclei_counts)
+    assert beta_values.shape == (M,)
+    assert len(marker_beta_dict) == M
+    assert alpha_values.shape == (M,)
