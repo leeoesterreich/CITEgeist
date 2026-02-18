@@ -367,7 +367,11 @@ def run_benchmark(
         antibody_capture_adata=adata_cite,
     )
 
-    model.preprocess_antibody_discrete(scale_mode=scale_mode)
+    if use_clr_preprocessing:
+        logger.info("Using CLR preprocessing (continuous model style)")
+        model.preprocess_antibody()  # CLR normalization
+    else:
+        model.preprocess_antibody_discrete(scale_mode=scale_mode)
     model.preprocess_gex(target_sum=10000)
     model.load_cell_profile_dict(SIMULATION_CELL_PROFILE_DICT)
 
