@@ -270,13 +270,14 @@ def run_benchmark(
     global_mip_gap: float = 0.05,
     use_continuous_prior: bool = False,
     lambda_continuous: float = 50.0,
+    use_clr_preprocessing: bool = False,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing}
     timings = {}
 
     # Step 1: Load image
@@ -587,6 +588,8 @@ def main():
                         help="Run continuous optimization first, use as prior for discrete (hybrid mode)")
     parser.add_argument("--lambda-continuous", type=float, default=50.0,
                         help="Regularization weight for continuous prior (default: 50.0)")
+    parser.add_argument("--use-clr-preprocessing", action="store_true", default=False,
+                        help="Use continuous CLR preprocessing instead of discrete per-marker scaling")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -607,6 +610,7 @@ def main():
         global_mip_gap=args.global_mip_gap,
         use_continuous_prior=args.use_continuous_prior,
         lambda_continuous=args.lambda_continuous,
+        use_clr_preprocessing=args.use_clr_preprocessing,
     )
 
     print("\n=== RESULTS ===")
