@@ -397,8 +397,8 @@ def run_benchmark(
         # Run continuous proportion model
         cont_props_df = model.run_cell_proportion_model(
             max_workers=8,
-            lambda_smooth=0.3,
-            use_neighbor_finetuning=True,
+            lambda_laplacian=0.1,
+            skip_finetuning=False,
         )
         timings["continuous_sec"] = time.time() - start_cont
         logger.info("Continuous optimization completed in %.1fs", timings["continuous_sec"])
