@@ -271,13 +271,14 @@ def run_benchmark(
     use_continuous_prior: bool = False,
     lambda_continuous: float = 50.0,
     use_clr_preprocessing: bool = False,
+    nuclei_scaled_clr: bool = False,
 ) -> Dict[str, Any]:
     """Run full discrete benchmark pipeline."""
     logger.info("=" * 60)
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing, "nuclei_scaled_clr": nuclei_scaled_clr}
     timings = {}
 
     # Step 1: Load image
@@ -367,9 +368,21 @@ def run_benchmark(
         antibody_capture_adata=adata_cite,
     )
 
-    if use_clr_preprocessing:
+    if use_clr_preprocessing or nuclei_scaled_clr:
         logger.info("Using CLR preprocessing (continuous model style)")
         model.preprocess_antibody()  # CLR normalization
+
+        if nuclei_scaled_clr:
+            # Scale CLR values by nuclei counts to re-inject cellularity signal
+            # This gives the IQP signal magnitude proportional to cell count
+            logger.info("Applying nuclei scaling to CLR-normalized data")
+            aligned_nuclei = pred_counts.reindex(model.antibody_capture_adata.obs_names).fillna(1).values
+            mean_nuclei = aligned_nuclei.mean()
+            if mean_nuclei > 0:
+                scale_factors = aligned_nuclei / mean_nuclei
+                model.antibody_capture_adata.X = model.antibody_capture_adata.X * scale_factors[:, np.newaxis]
+                logger.info("Nuclei scaling applied: mean=%.1f, range=[%.1f, %.1f]",
+                           mean_nuclei, scale_factors.min(), scale_factors.max())
     else:
         model.preprocess_antibody_discrete(scale_mode=scale_mode)
     model.preprocess_gex(target_sum=10000)
@@ -594,6 +607,8 @@ def main():
                         help="Regularization weight for continuous prior (default: 50.0)")
     parser.add_argument("--use-clr-preprocessing", action="store_true", default=False,
                         help="Use continuous CLR preprocessing instead of discrete per-marker scaling")
+    parser.add_argument("--nuclei-scaled-clr", action="store_true", default=False,
+                        help="Use CLR preprocessing scaled by nuclei counts (re-injects cellularity signal)")
     args = parser.parse_args()
 
     results = run_benchmark(
@@ -615,6 +630,7 @@ def main():
         use_continuous_prior=args.use_continuous_prior,
         lambda_continuous=args.lambda_continuous,
         use_clr_preprocessing=args.use_clr_preprocessing,
+        nuclei_scaled_clr=args.nuclei_scaled_clr,
     )
 
     print("\n=== RESULTS ===")
