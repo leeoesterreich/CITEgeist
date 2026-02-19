@@ -48,6 +48,22 @@ CELLTYPE_TO_FILENAME = {
     "Fibroblasts": "Fibroblasts",
 }
 
+# =============================================================================
+# CITEGEIST VARIANT PATHS
+# =============================================================================
+
+CITEGEIST_VARIANTS = {
+    "CITEgeist_Continuous": "output/manual",
+    "CITEgeist_Hybrid": "output/hybrid_cellpose",
+    "CITEgeist_Discrete": "output_discrete_cellpose_fixed",
+}
+
+METHOD_NOTES = {
+    "CITEgeist_Continuous": "CLR antibody normalization, QP optimization",
+    "CITEgeist_Hybrid": "CLR antibody normalization, QP optimization -> discretize via nuclei counts",
+    "CITEgeist_Discrete": "Per-marker scaling (no CLR), IQP optimization with nuclei constraints",
+}
+
 
 def load_gt_gex(region_id: int, cell_type: str) -> pd.DataFrame:
     """Load GT GEX for a cell type (genes x spots)."""
@@ -60,12 +76,29 @@ def load_gt_gex(region_id: int, cell_type: str) -> pd.DataFrame:
     return pd.read_csv(gt_path, index_col=0)
 
 
-def load_citegeist_gex(region_id: int) -> Dict[str, pd.DataFrame]:
-    """Load CITEgeist GEX layers (spots x genes CSVs)."""
-    # CITEgeist exports layers to {sample}_pass1/layers/pass1/
+def load_citegeist_gex(region_id: int, variant: str = "CITEgeist_Continuous") -> Dict[str, pd.DataFrame]:
+    """Load CITEgeist GEX layers for any variant.
+
+    Args:
+        region_id: Xenium region ID (0-4)
+        variant: One of CITEGEIST_VARIANTS keys
+
+    Returns:
+        Dict mapping cell type names to (spots x genes) DataFrames
+    """
+    variant_path = CITEGEIST_VARIANTS.get(variant)
+    if variant_path is None:
+        raise ValueError(f"Unknown CITEgeist variant: {variant}. Valid: {list(CITEGEIST_VARIANTS.keys())}")
+
     sample_name = f"Xenium_region_{region_id}"
-    # Updated path for asymmetric loss benchmark (output/manual)
-    base_layers = BASE_DIR / "CITEgeist" / "output" / "manual" / f"{sample_name}_pass1" / "layers"
+
+    # PATH DIFFERENCE: Continuous stores layers as sibling, Hybrid/Discrete as nested
+    if variant == "CITEgeist_Continuous":
+        # Continuous: output/manual/Xenium_region_X_pass1/layers/pass1/
+        base_layers = BASE_DIR / "CITEgeist" / variant_path / f"{sample_name}_pass1" / "layers"
+    else:
+        # Hybrid/Discrete: output/{variant}/Xenium_region_X/Xenium_region_X_pass1/layers/
+        base_layers = BASE_DIR / "CITEgeist" / variant_path / sample_name / f"{sample_name}_pass1" / "layers"
 
     # Check pass1 subdirectory first (standard export), then direct layers dir
     layers_dir = base_layers / "pass1"
@@ -73,38 +106,7 @@ def load_citegeist_gex(region_id: int) -> Dict[str, pd.DataFrame]:
         layers_dir = base_layers
 
     if not layers_dir.exists():
-        logger.warning(f"CITEgeist layers not found for region {region_id}: {layers_dir}")
-        return {}
-
-    ct_dfs = {}
-    for ct in ACHIEVABLE_7_CELL_TYPES:
-        # CITEgeist replaces spaces with _ but keeps + in filenames
-        ct_file = ct.replace(" ", "_")
-        for pattern in [
-            f"{ct_file}_layer_pass1.csv",
-            f"{ct_file}_layer.csv",
-        ]:
-            layer_file = layers_dir / pattern
-            if layer_file.exists():
-                ct_dfs[ct] = pd.read_csv(layer_file, index_col=0)
-                break
-
-    return ct_dfs
-
-
-def load_citegeist_discrete_gex(region_id: int) -> Dict[str, pd.DataFrame]:
-    """Load CITEgeist Discrete (Cellpose+IQP) GEX layers."""
-    sample_name = f"Xenium_region_{region_id}"
-    # v2 uses fixed coordinate conversion
-    base_layers = BASE_DIR / "CITEgeist" / "output_discrete_cellpose_v2" / sample_name / f"{sample_name}_pass1" / "layers"
-
-    # Check pass1 subdirectory first (standard export), then direct layers dir
-    layers_dir = base_layers / "pass1"
-    if not layers_dir.exists():
-        layers_dir = base_layers
-
-    if not layers_dir.exists():
-        logger.warning(f"CITEgeist Discrete layers not found for region {region_id}: {layers_dir}")
+        logger.warning(f"{variant} layers not found for region {region_id}: {layers_dir}")
         return {}
 
     ct_dfs = {}
@@ -236,8 +238,9 @@ def main():
 
     # Methods that produce GEX layers
     methods = {
-        "CITEgeist": lambda rid: load_citegeist_gex(rid),
-        "CITEgeist_Discrete": lambda rid: load_citegeist_discrete_gex(rid),
+        "CITEgeist_Continuous": lambda rid: load_citegeist_gex(rid, "CITEgeist_Continuous"),
+        "CITEgeist_Hybrid": lambda rid: load_citegeist_gex(rid, "CITEgeist_Hybrid"),
+        "CITEgeist_Discrete": lambda rid: load_citegeist_gex(rid, "CITEgeist_Discrete"),
         "Cell2Location": lambda rid: load_competitor_gex("Cell2Location", rid),
         "Tangram": lambda rid: load_competitor_gex("Tangram", rid),
         "scResolve": lambda rid: load_scresolve_gex(rid),
@@ -277,7 +280,7 @@ def main():
 
     method_summaries = {}
 
-    for method_name in ["CITEgeist", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"]:
+    for method_name in ["CITEgeist_Continuous", "CITEgeist_Hybrid", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"]:
         metrics_list = all_results.get(method_name, [])
         if not metrics_list:
             print(f"{method_name:<16} {'N/A':>10} {'N/A':>10} {'N/A':>10} {'0':>12} {'0':>8}")
@@ -305,7 +308,7 @@ def main():
 
     # Per-cell-type table
     print("\n--- Per-Cell-Type GEX Pearson r (mean across regions) ---")
-    sorted_methods = [m for m in ["CITEgeist", "Cell2Location", "Tangram", "scResolve"] if all_results.get(m)]
+    sorted_methods = [m for m in ["CITEgeist_Continuous", "CITEgeist_Hybrid", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"] if all_results.get(m)]
 
     header = f"{'Cell Type':<20}"
     for m in sorted_methods:
