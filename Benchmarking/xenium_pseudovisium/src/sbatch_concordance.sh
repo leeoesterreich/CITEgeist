@@ -9,8 +9,8 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
 
-module load python/ondemand-jupyter-python3.11
-source /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/bin/activate
+eval "$(conda shell.bash hook)"
+conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
 
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 python Benchmarking/xenium_pseudovisium/src/analyze_celltype_concordance.py
