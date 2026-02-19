@@ -367,8 +367,13 @@ def main():
             return [convert_numpy(v) for v in obj]
         return obj
 
+    output_data = {
+        "method_notes": METHOD_NOTES,
+        "results": convert_numpy(all_results),
+    }
+
     with open(results_dir / "full_comparison_gex.json", "w") as f:
-        json.dump(convert_numpy(all_results), f, indent=2)
+        json.dump(output_data, f, indent=2)
 
     print(f"\nResults saved to: {results_dir / 'full_comparison_gex.json'}")
     print("=" * 80)
