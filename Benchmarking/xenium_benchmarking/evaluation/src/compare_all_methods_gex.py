@@ -88,7 +88,8 @@ def load_citegeist_gex(region_id: int, variant: str = "CITEgeist_Continuous") ->
     """
     variant_path = CITEGEIST_VARIANTS.get(variant)
     if variant_path is None:
-        raise ValueError(f"Unknown CITEgeist variant: {variant}. Valid: {list(CITEGEIST_VARIANTS.keys())}")
+        logger.warning(f"Unknown CITEgeist variant: {variant}. Valid: {list(CITEGEIST_VARIANTS.keys())}")
+        return {}
 
     sample_name = f"Xenium_region_{region_id}"
 
