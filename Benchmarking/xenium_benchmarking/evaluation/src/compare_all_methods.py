@@ -32,8 +32,30 @@ BASE_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benc
 GT_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt")
 RESULTS_DIR = BASE_DIR / "evaluation" / "results" / "method_comparison"
 
+# =============================================================================
+# METHOD DOCUMENTATION
+# =============================================================================
+
+METHOD_NOTES = {
+    "CITEgeist_Continuous": "CLR antibody normalization, QP optimization",
+    "CITEgeist_Hybrid": "CLR antibody normalization, QP optimization -> discretize via nuclei counts",
+    "CITEgeist_Discrete": "Per-marker scaling (no CLR), IQP optimization with nuclei constraints",
+}
+
+CITEGEIST_COMMON_PARAMS = {
+    "data_source": "data_protein_gt (protein-gated achievable-7)",
+    "min_counts": 25,
+    "gex_preprocessing": "filter_gex + preprocess_gex(target_sum=10000)",
+    "cell_profile_dict": "ACHIEVABLE_7_CELL_PROFILE_DICT (alphaSMA-only fibroblasts)",
+    "n_regions": 5,
+}
+
 METHODS = {
-    "CITEgeist": BASE_DIR / "CITEgeist" / "output" / "manual",  # Updated for asymmetric loss benchmark
+    # CITEgeist variants
+    "CITEgeist_Continuous": BASE_DIR / "CITEgeist" / "output" / "manual",
+    "CITEgeist_Hybrid": BASE_DIR / "CITEgeist" / "output" / "hybrid_cellpose",
+    "CITEgeist_Discrete": BASE_DIR / "CITEgeist" / "output_discrete_cellpose_fixed",
+    # Other methods
     "Cell2Location": BASE_DIR / "Cell2Location" / "output_protein_gt",
     "Tangram": BASE_DIR / "Tangram" / "output_protein_gt",
     "RCTD": BASE_DIR / "RCTD" / "output_protein_gt",
@@ -41,7 +63,6 @@ METHODS = {
     # CARD: VIM excluded - VIM is a pan-mesenchymal marker expressed in RCC cells,
     # not fibroblast-specific in kidney tissue. Including it caused severe bias (93% fibroblasts).
     "CARD": BASE_DIR / "CARD" / "output_protein_gt_novim",
-    # Note: CARD ref-free not compatible with Xenium's 405-gene panel (<20 markers/cell type)
 }
 
 
