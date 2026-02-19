@@ -111,10 +111,19 @@ def main():
     print("FULL METHOD COMPARISON - Protein-Gated Ground Truth (Achievable-7)")
     print("=" * 80)
 
+    # Print method notes
+    print("\n--- Method Notes ---")
+    for method, note in METHOD_NOTES.items():
+        print(f"  {method}: {note}")
+
+    print("\n--- Common CITEgeist Parameters ---")
+    for key, val in CITEGEIST_COMMON_PARAMS.items():
+        print(f"  {key}: {val}")
+
     # Overall metrics table
     print("\n--- Overall Metrics ---")
-    print(f"{'Method':<16} {'Pearson r':>10} {'RMSE':>10} {'MAE':>10} {'JSD':>10}")
-    print("-" * 56)
+    print(f"{'Method':<24} {'Pearson r':>10} {'RMSE':>10} {'MAE':>10} {'JSD':>10}")
+    print("-" * 64)
 
     # Sort by Pearson r descending
     sorted_methods = sorted(
@@ -127,7 +136,7 @@ def main():
         s = all_results[method]["summary"]
         jsd_str = f"{s['overall_mean_jsd']:.4f}" if "overall_mean_jsd" in s else "N/A"
         print(
-            f"{method:<16} "
+            f"{method:<24} "
             f"{s['overall_mean_pearson_r']:>10.4f} "
             f"{s['overall_mean_rmse']:>10.4f} "
             f"{s['overall_mean_mae']:>10.4f} "
@@ -227,8 +236,14 @@ def main():
             return [convert_numpy(v) for v in obj]
         return obj
 
+    output_data = {
+        "method_notes": METHOD_NOTES,
+        "citegeist_common_params": CITEGEIST_COMMON_PARAMS,
+        "results": convert_numpy(all_results),
+    }
+
     with open(combined_output, "w") as f:
-        json.dump(convert_numpy(all_results), f, indent=2)
+        json.dump(output_data, f, indent=2)
     print(f"\nFull results saved to: {combined_output}")
 
     print("\n" + "=" * 80)
