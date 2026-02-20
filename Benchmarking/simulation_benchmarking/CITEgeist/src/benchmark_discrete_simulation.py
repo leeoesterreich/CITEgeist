@@ -272,6 +272,7 @@ def run_benchmark(
     lambda_continuous: float = 50.0,
     use_clr_preprocessing: bool = False,
     nuclei_scaled_clr: bool = False,
+    per_cell_normalization: bool = False,
     constraint_slack: int = 0,
     lambda_reg: float = 0.0,
     alpha_elastic: float = 0.5,
@@ -282,7 +283,7 @@ def run_benchmark(
     logger.info("BENCHMARK: replicate=%d, condition=%s, mode=%s", replicate_id, condition, mode)
     logger.info("=" * 60)
 
-    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing, "nuclei_scaled_clr": nuclei_scaled_clr, "constraint_slack": constraint_slack, "lambda_reg": lambda_reg, "alpha_elastic": alpha_elastic, "use_marker_weighting": use_marker_weighting}
+    results = {"replicate_id": replicate_id, "condition": condition, "mode": mode, "lambda_sparse": lambda_sparse, "scale_mode": scale_mode, "lambda_prior": lambda_prior, "global_solve": global_solve, "global_time_limit": global_time_limit, "global_mip_gap": global_mip_gap, "use_continuous_prior": use_continuous_prior, "lambda_continuous": lambda_continuous, "use_clr_preprocessing": use_clr_preprocessing, "nuclei_scaled_clr": nuclei_scaled_clr, "per_cell_normalization": per_cell_normalization, "constraint_slack": constraint_slack, "lambda_reg": lambda_reg, "alpha_elastic": alpha_elastic, "use_marker_weighting": use_marker_weighting}
     timings = {}
 
     # Step 1: Load image
@@ -372,7 +373,48 @@ def run_benchmark(
         antibody_capture_adata=adata_cite,
     )
 
-    if use_clr_preprocessing or nuclei_scaled_clr:
+    if per_cell_normalization:
+        # Per-cell normalization: Y_per_cell = Y_raw / nuclei_count, then CLR
+        # This adjusts for cellularity while preserving marker relationships via CLR
+        logger.info("Using per-cell normalization: (Y / nuclei_count) -> CLR")
+
+        # Get raw data (dense)
+        raw_matrix = (
+            model.antibody_capture_adata.X.toarray()
+            if hasattr(model.antibody_capture_adata.X, "toarray")
+            else model.antibody_capture_adata.X.copy()
+        )
+        raw_matrix = np.asarray(raw_matrix, dtype=np.float64)
+
+        # Align nuclei counts to antibody spots
+        aligned_nuclei = pred_counts.reindex(model.antibody_capture_adata.obs_names).fillna(1).values
+        # Avoid division by zero - use minimum of 1
+        aligned_nuclei = np.maximum(aligned_nuclei, 1.0)
+
+        # Divide by nuclei count to get signal per cell
+        per_cell_matrix = raw_matrix / aligned_nuclei[:, np.newaxis]
+
+        logger.info("Per-cell normalization: raw range [%.2f, %.2f] -> per-cell range [%.2f, %.2f]",
+                   raw_matrix.min(), raw_matrix.max(),
+                   per_cell_matrix.min(), per_cell_matrix.max())
+
+        # Apply CLR normalization (like continuous model) to preserve marker relationships
+        # CLR = log(x / geometric_mean(x)) for each spot
+        from scipy.stats import gmean
+        # Add small constant to avoid log(0)
+        per_cell_matrix = per_cell_matrix + 1e-6
+        # Compute geometric mean per spot (row)
+        geo_means = gmean(per_cell_matrix, axis=1, keepdims=True)
+        # CLR transform
+        clr_matrix = np.log(per_cell_matrix / geo_means)
+
+        logger.info("CLR normalization: range [%.2f, %.2f]", clr_matrix.min(), clr_matrix.max())
+
+        model.antibody_capture_adata.X = clr_matrix
+        model.preprocessed_antibody = True  # Mark as preprocessed
+        logger.info("Per-cell + CLR preprocessing complete: shape %s", clr_matrix.shape)
+
+    elif use_clr_preprocessing or nuclei_scaled_clr:
         logger.info("Using CLR preprocessing (continuous model style)")
         model.preprocess_antibody()  # CLR normalization
 
@@ -617,6 +659,8 @@ def main():
                         help="Use continuous CLR preprocessing instead of discrete per-marker scaling")
     parser.add_argument("--nuclei-scaled-clr", action="store_true", default=False,
                         help="Use CLR preprocessing scaled by nuclei counts (re-injects cellularity signal)")
+    parser.add_argument("--per-cell-normalization", action="store_true", default=False,
+                        help="Divide raw signal by nuclei count (Y/N) before scaling - proper count-space normalization")
     parser.add_argument("--constraint-slack", type=int, default=0,
                         help="Allow ±N cells deviation from nuclei count (default: 0 = exact)")
     parser.add_argument("--lambda-reg", type=float, default=0.0,
@@ -647,6 +691,7 @@ def main():
         lambda_continuous=args.lambda_continuous,
         use_clr_preprocessing=args.use_clr_preprocessing,
         nuclei_scaled_clr=args.nuclei_scaled_clr,
+        per_cell_normalization=args.per_cell_normalization,
         constraint_slack=args.constraint_slack,
         lambda_reg=args.lambda_reg,
         alpha_elastic=args.alpha_elastic,

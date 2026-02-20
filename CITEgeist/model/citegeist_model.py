@@ -939,6 +939,102 @@ class CitegeistModel:
             "Use spot-resolution QP deconvolution (use_gating=False) instead."
         )
 
+    def discretize_proportions(
+        self,
+        proportions_df: pd.DataFrame,
+        nuclei_counts: pd.Series,
+    ) -> pd.DataFrame:
+        """
+        Convert continuous cell type proportions to integer cell counts.
+
+        Uses the largest remainder method (Hamilton/Vinton method) to allocate
+        integer cell counts while ensuring sum(counts) = nuclei_count for each spot.
+        This is the recommended approach when discrete cell counts are needed,
+        as it achieves ~94% of continuous model performance vs ~69% for direct IQP.
+
+        Args:
+            proportions_df: DataFrame with cell type columns and proportion values (0-1).
+                Output from run_cell_proportion_model().
+            nuclei_counts: Series with nuclei count per spot (from Cellpose or similar).
+
+        Returns:
+            DataFrame with cell type columns and integer count values per spot.
+            Guaranteed: sum of counts per spot == nuclei_count for that spot.
+
+        Example:
+            >>> # Run continuous model first
+            >>> global_props, finetuned_props = model.run_cell_proportion_model()
+            >>> # Get nuclei counts from Cellpose
+            >>> nuclei_counts = pd.Series({'spot_1': 10, 'spot_2': 8, ...})
+            >>> # Discretize
+            >>> cell_counts = model.discretize_proportions(finetuned_props, nuclei_counts)
+
+        Note:
+            The largest remainder method:
+            1. Computes raw_counts = proportions * nuclei_count
+            2. Takes floor of each value
+            3. Allocates remaining cells to cell types with largest fractional parts
+            This guarantees exact sum while minimizing total rounding error.
+        """
+        # Align indices
+        common_spots = proportions_df.index.intersection(nuclei_counts.index)
+        if len(common_spots) == 0:
+            raise ValueError("No common spots between proportions_df and nuclei_counts")
+
+        if len(common_spots) < len(proportions_df):
+            logging.warning(
+                f"Only {len(common_spots)}/{len(proportions_df)} spots have nuclei counts. "
+                "Missing spots will be excluded."
+            )
+
+        props = proportions_df.loc[common_spots]
+        nuclei = nuclei_counts.loc[common_spots]
+
+        cell_counts = pd.DataFrame(
+            index=common_spots,
+            columns=props.columns,
+            dtype=int
+        )
+
+        for spot in common_spots:
+            N = int(nuclei[spot])
+            p = props.loc[spot].values.astype(float)
+
+            if N == 0:
+                cell_counts.loc[spot] = 0
+                continue
+
+            # Ensure proportions sum to 1
+            p_sum = p.sum()
+            if p_sum > 0:
+                p = p / p_sum
+
+            # Initial floor allocation
+            raw_counts = p * N
+            floor_counts = np.floor(raw_counts).astype(int)
+
+            # Remainders for largest remainder method
+            remainders = raw_counts - floor_counts
+
+            # How many more cells to allocate
+            deficit = N - floor_counts.sum()
+
+            # Allocate to largest remainders
+            if deficit > 0:
+                indices = np.argsort(-remainders)
+                for i in range(int(deficit)):
+                    floor_counts[indices[i]] += 1
+
+            cell_counts.loc[spot] = floor_counts
+
+        logging.info(
+            f"Discretized {len(common_spots)} spots: "
+            f"total cells={cell_counts.values.sum()}, "
+            f"mean per spot={cell_counts.sum(axis=1).mean():.1f}"
+        )
+
+        return cell_counts
+
     def run_discrete_cell_assignment(
         self,
         nuclei_counts: Optional[pd.Series] = None,

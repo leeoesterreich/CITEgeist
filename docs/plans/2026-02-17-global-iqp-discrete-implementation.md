@@ -977,4 +977,64 @@ e4228fd5 docs: add global IQP discrete implementation plan
 - `CITEgeist/tests/test_discrete_global_solve.py` - New test file with 4 tests
 - `Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py` - CLI flags
 - `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_discrete_cellpose.py` - CLI flags
+
+---
+
+## Investigation Results (2026-02-18)
+
+### Benchmark Results: Global IQP Did NOT Improve Performance
+
+| Dataset | Global IQP prop_corr | Baseline (per-spot) | Target |
+|---------|---------------------|---------------------|--------|
+| mixed | **0.437** | ~0.43 | ≥0.65 |
+| high_seg | ~0.76 | ~0.76 | no regression |
+
+Global IQP achieved essentially the same results as per-spot IQP. The joint optimization did not improve proportion correlation.
+
+### RULED OUT: Laplacian Spatial Smoothing
+
+**Hypothesis**: The continuous model's Laplacian smoothing (λ=0.1) provides spatial regularization that the discrete model lacks, explaining the performance gap.
+
+**Experiment** (job 8039891):
+- Ran continuous model on mixed dataset with λ=0.0 (OFF) and λ=0.1 (ON)
+- 5 replicates each
+
+**Results**:
+| lambda_laplacian | Rep 0 | Rep 1 | Rep 2 | Rep 3 | Rep 4 | Mean |
+|-----------------|-------|-------|-------|-------|-------|------|
+| 0.0 (OFF) | 0.911 | 0.905 | 0.893 | 0.908 | 0.888 | **0.901** |
+| 0.1 (ON) | 0.918 | 0.913 | 0.905 | 0.917 | 0.900 | **0.911** |
+
+**Conclusion**: Laplacian smoothing adds only ~0.01 improvement. The 0.47 gap between continuous (0.90) and discrete (0.43) is NOT caused by missing spatial regularization.
+
+**DO NOT add Laplacian to discrete model** - it will not address the root cause.
+
+### Root Cause: Discrete Model Predicts Uniform Distributions
+
+**Observation**: The discrete model predicts near-uniform cell type proportions regardless of true distribution.
+
+**Ground truth (mixed dataset)**:
+- Cancer Epithelial: 43.1%
+- CAFs: 29.7%
+- T-cells: 10.0%
+- Myeloid: 9.1%
+- Others: <5% each
+
+**Discrete model predicts**:
+- All cell types: ~9-15% (nearly uniform)
+
+### Current Hypothesis: Preprocessing Difference
+
+| Model | Preprocessing | Effect |
+|-------|--------------|--------|
+| Continuous | CLR (Centered Log-Ratio) | Preserves relative marker magnitudes |
+| Discrete | Per-marker max scaling | Normalizes each marker to [0,1] independently |
+
+The per-marker scaling may destroy the signal magnitude information needed to distinguish abundant from rare cell types. When every marker is scaled to [0,1], the IQP cannot distinguish between a marker from a 43% cell type vs a 0.5% cell type.
+
+### Next Investigation Steps
+
+1. Test discrete model with CLR preprocessing (same as continuous)
+2. Compare learned β values between continuous and discrete
+3. Analyze whether the β values correctly capture relative cell type abundance
 - `Benchmarking/*/slurm/sbatch_discrete_global_*.sh` - New SLURM scripts

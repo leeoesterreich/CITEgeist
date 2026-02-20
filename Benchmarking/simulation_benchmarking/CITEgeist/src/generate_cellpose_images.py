@@ -100,8 +100,8 @@ def create_dapi_kernel(radius: float, edge_sigma: float = 2.0, size: int = None)
 def generate_dapi_image(
     cell_coords: np.ndarray,
     image_size: Tuple[int, int],
-    nucleus_radius: float = 8.0,
-    edge_sigma: float = 2.0,
+    nucleus_radius: float = 15.0,
+    edge_sigma: float = 3.0,
     padding: int = 100,
 ) -> np.ndarray:
     """
@@ -109,6 +109,10 @@ def generate_dapi_image(
 
     Uses a flat-top disk kernel with soft edge to mimic real DAPI appearance,
     where nuclei appear as bright filled regions with distinct boundaries.
+
+    Note: Nucleus size (radius=15, edge_sigma=3 -> ~36px total diameter) is
+    calibrated to match Cellpose 'nuclei' model expectations (~30+ pixels).
+    Smaller nuclei (e.g., radius=8) result in poor detection accuracy.
 
     Args:
         cell_coords: Nx2 array of (x, y) coordinates in original units
@@ -172,12 +176,16 @@ def generate_dapi_image(
 def generate_he_image(
     cell_coords: np.ndarray,
     image_size: Tuple[int, int],
-    nucleus_sigma: float = 6.0,
-    cytoplasm_radius: int = 15,
+    nucleus_sigma: float = 10.0,
+    cytoplasm_radius: int = 25,
     padding: int = 100,
 ) -> np.ndarray:
     """
     Generate H&E-style image with pink cytoplasm and purple nuclei.
+
+    Note: Nucleus sigma=10 gives FWHM ~24px and kernel extent ~60px,
+    calibrated to match Cellpose 'cyto2' model expectations. Cytoplasm
+    radius=25 maintains realistic nucleus-to-cytoplasm ratio.
 
     Args:
         cell_coords: Nx2 array of (x, y) coordinates in original units
@@ -407,20 +415,20 @@ def main():
     parser.add_argument(
         "--nucleus-radius",
         type=float,
-        default=8.0,
-        help="DAPI nucleus radius in pixels (default: 8.0, ~16px diameter solid disk)",
+        default=15.0,
+        help="DAPI nucleus radius in pixels (default: 15.0, ~30px diameter solid disk, calibrated for Cellpose)",
     )
     parser.add_argument(
         "--edge-sigma",
         type=float,
-        default=2.0,
-        help="DAPI nucleus edge softness sigma (default: 2.0)",
+        default=3.0,
+        help="DAPI nucleus edge softness sigma (default: 3.0)",
     )
     parser.add_argument(
         "--he-nucleus-sigma",
         type=float,
-        default=6.0,
-        help="H&E nucleus Gaussian sigma (default: 6.0)",
+        default=10.0,
+        help="H&E nucleus Gaussian sigma (default: 10.0, ~24px FWHM, calibrated for Cellpose)",
     )
     args = parser.parse_args()
 
