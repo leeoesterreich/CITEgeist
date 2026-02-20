@@ -1,0 +1,19 @@
+{
+    "benchmark_dataset": "xenium_pseudovisium_protein_gated",
+    "description": "Xenium all-genes pseudo-Visium regions with protein-gated cell type ground truth",
+    "n_regions": 5,
+    "n_spots_total": 7054,
+    "n_spots_per_region": [1407, 1417, 1352, 1464, 1414],
+    "cell_types": [
+        "B cells",
+        "CD4+ T cells",
+        "CD8+ T cells",
+        "Macrophages",
+        "Endothelial",
+        "Epithelial",
+        "Fibroblasts"
+    ],
+    "ground_truth_source": "Single-cell protein gating (hierarchical)",
+    "proportion_files": "proportions/Xenium_region_{0-4}_prop.csv",
+    "gex_files": "gex/Xenium_region_{0-4}/"
+}
