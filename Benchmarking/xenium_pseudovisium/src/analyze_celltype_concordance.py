@@ -30,11 +30,10 @@ XENIUM_DIR = Path('/ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RN
 PSEUDOVISIUM_DIR = Path('/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium')
 OUTPUT_DIR = PSEUDOVISIUM_DIR / 'analysis'
 
-# Cell type order (matches create_protein_gt.py)
+# Cell type order - using combined "T cells" since RNA can't distinguish CD4/CD8
 CELL_TYPE_ORDER = [
     "B cells",
-    "CD4+ T cells",
-    "CD8+ T cells",
+    "T cells",  # Combined CD4+ and CD8+ (RNA can't separate them reliably)
     "Macrophages",
     "Endothelial",
     "Epithelial",
@@ -75,37 +74,30 @@ def classify_cells_by_protein(expr_df: pd.DataFrame) -> pd.Series:
     b_cells = expr_df['CD20'] > CD20_thresh
     cell_types[b_cells] = 'B cells'
 
-    # 2. CD4+ T cells (CD3E+ CD4+ CD8A-)
+    # 2. T cells (CD3E+) - combined, since RNA can't distinguish CD4/CD8
     t_cell_base = expr_df['CD3E'] > CD3E_thresh
-    cd4_pos = expr_df['CD4'] > CD4_thresh
-    cd8_neg = expr_df['CD8A'] < CD8A_thresh
-    cd4_tcells = t_cell_base & cd4_pos & cd8_neg & (cell_types == 'Unknown')
-    cell_types[cd4_tcells] = 'CD4+ T cells'
+    t_cells = t_cell_base & (cell_types == 'Unknown')
+    cell_types[t_cells] = 'T cells'
 
-    # 3. CD8+ T cells (CD3E+ CD8A+)
-    cd8_pos = expr_df['CD8A'] > CD8A_thresh
-    cd8_tcells = t_cell_base & cd8_pos & (cell_types == 'Unknown')
-    cell_types[cd8_tcells] = 'CD8+ T cells'
-
-    # 4. Macrophages (CD68+ CD3E-)
+    # 3. Macrophages (CD68+ CD3E-)
     cd68_pos = expr_df['CD68'] > CD68_thresh
     cd3e_neg = expr_df['CD3E'] < CD3E_thresh
     macrophages = cd68_pos & cd3e_neg & (cell_types == 'Unknown')
     cell_types[macrophages] = 'Macrophages'
 
-    # 5. Endothelial (CD31+ CD68- CD3E-)
+    # 4. Endothelial (CD31+ CD68- CD3E-)
     cd31_pos = expr_df['CD31'] > CD31_thresh
     cd68_neg = expr_df['CD68'] < CD68_thresh
     endothelial = cd31_pos & cd68_neg & cd3e_neg & (cell_types == 'Unknown')
     cell_types[endothelial] = 'Endothelial'
 
-    # 6. Epithelial (PanCK+ or E-Cadherin high)
+    # 5. Epithelial (PanCK+ or E-Cadherin high)
     panck_pos = expr_df['PanCK'] > PanCK_thresh
     ecad_high = expr_df['E-Cadherin'] > ECad_thresh
     epithelial = (panck_pos | ecad_high) & (cell_types == 'Unknown')
     cell_types[epithelial] = 'Epithelial'
 
-    # 7. Fibroblasts (alphaSMA high)
+    # 6. Fibroblasts (alphaSMA high)
     asma_high = expr_df['alphaSMA'] > alphaSMA_thresh
     myofib = asma_high & ~cd31_pos & cd68_neg & cd3e_neg & (cell_types == 'Unknown')
     cell_types[myofib] = 'Fibroblasts'
@@ -151,9 +143,10 @@ RNA_CLUSTER_MAP = {
     10: "Vascular Stromal",
 }
 
-# Simplified mapping to match 7 protein-gated types
+# Simplified mapping - RNA can't distinguish CD4/CD8 T cells reliably
+# (CD4 gene is lowly expressed, only ~34% detection in protein-gated CD4+ T cells)
 RNA_SIMPLIFIED_MAP = {
-    "CD8+ T cells": "CD8+ T cells",
+    "CD8+ T cells": "T cells",      # Combine all T cells
     "Macrophages": "Macrophages",
     "Mixed Immune": "Macrophages",  # Closest match
     "Epithelial": "Epithelial",
@@ -161,7 +154,7 @@ RNA_SIMPLIFIED_MAP = {
     "Stromal": "Fibroblasts",
     "Endothelial": "Endothelial",
     "B cells": "B cells",
-    "Proliferating T": "CD4+ T cells",  # Generic T cell
+    "Proliferating T": "T cells",   # Combine all T cells
     "Vascular Stromal": "Endothelial",
 }
 
