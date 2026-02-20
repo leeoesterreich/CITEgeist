@@ -195,7 +195,8 @@ def compute_gex_metrics(pred: pd.DataFrame, gt: pd.DataFrame) -> Dict[str, float
     common_spots = pred_t.columns.intersection(gt.columns)
 
     if len(common_genes_lower) == 0 or len(common_spots) == 0:
-        return {"pearson_r": np.nan, "rmse": np.nan, "nrmse": np.nan, "mae": np.nan, "n_genes": 0, "n_spots": 0}
+        return {"pearson_r": np.nan, "rmse": np.nan, "nrmse": np.nan, "mae": np.nan,
+                "raw_rmse": np.nan, "raw_nrmse": np.nan, "n_genes": 0, "n_spots": 0}
 
     pred_genes = [pred_genes_lower[g] for g in common_genes_lower]
     gt_genes = [gt_genes_lower[g] for g in common_genes_lower]
@@ -203,9 +204,20 @@ def compute_gex_metrics(pred: pd.DataFrame, gt: pd.DataFrame) -> Dict[str, float
     pred_aligned = pred_t.loc[pred_genes, common_spots].values
     gt_aligned = gt.loc[gt_genes, common_spots].values
 
-    # CPM normalization + log1p
-    pred_log = np.log1p(normalize_per_spot_cpm(pred_aligned))
-    gt_log = np.log1p(normalize_per_spot_cpm(gt_aligned))
+    # === RAW COUNT METRICS (CPM only, no log) ===
+    pred_cpm = normalize_per_spot_cpm(pred_aligned)
+    gt_cpm = normalize_per_spot_cpm(gt_aligned)
+
+    pred_cpm_flat = pred_cpm.flatten()
+    gt_cpm_flat = gt_cpm.flatten()
+
+    raw_rmse = np.sqrt(np.mean((gt_cpm_flat - pred_cpm_flat) ** 2))
+    gt_cpm_range = gt_cpm_flat.max() - gt_cpm_flat.min()
+    raw_nrmse = raw_rmse / gt_cpm_range if gt_cpm_range > 0 else np.nan
+
+    # === LOG-TRANSFORMED METRICS (CPM + log1p) ===
+    pred_log = np.log1p(pred_cpm)
+    gt_log = np.log1p(gt_cpm)
 
     pred_flat = pred_log.flatten()
     gt_flat = gt_log.flatten()
@@ -227,6 +239,8 @@ def compute_gex_metrics(pred: pd.DataFrame, gt: pd.DataFrame) -> Dict[str, float
         "rmse": float(rmse),
         "nrmse": float(nrmse) if not np.isnan(nrmse) else np.nan,
         "mae": float(mae),
+        "raw_rmse": float(raw_rmse),
+        "raw_nrmse": float(raw_nrmse) if not np.isnan(raw_nrmse) else np.nan,
         "n_genes": len(common_genes_lower),
         "n_spots": len(common_spots),
     }
@@ -275,16 +289,16 @@ def main():
         all_results[method_name] = method_metrics
 
     # Print summary
-    print("\n--- Overall GEX Metrics ---")
-    print(f"{'Method':<16} {'Pearson r':>10} {'RMSE':>10} {'NRMSE':>10} {'MAE':>10} {'Cell Types':>12} {'Regions':>8}")
-    print("-" * 78)
+    print("\n--- Overall GEX Metrics (log-CPM) ---")
+    print(f"{'Method':<20} {'Pearson r':>10} {'RMSE':>10} {'NRMSE':>10} {'MAE':>10} {'CellTypes':>10} {'Regions':>8}")
+    print("-" * 80)
 
     method_summaries = {}
 
     for method_name in ["CITEgeist_Continuous", "CITEgeist_Hybrid", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"]:
         metrics_list = all_results.get(method_name, [])
         if not metrics_list:
-            print(f"{method_name:<16} {'N/A':>10} {'N/A':>10} {'N/A':>10} {'0':>12} {'0':>8}")
+            print(f"{method_name:<20} {'N/A':>10} {'N/A':>10} {'N/A':>10} {'N/A':>10} {'0':>10} {'0':>8}")
             continue
 
         df = pd.DataFrame(metrics_list)
@@ -296,7 +310,7 @@ def main():
         n_ct = valid["cell_type"].nunique()
         n_reg = valid["region_id"].nunique()
 
-        print(f"{method_name:<16} {mean_r:>10.4f} {mean_rmse:>10.4f} {mean_nrmse:>10.4f} {mean_mae:>10.4f} {n_ct:>12} {n_reg:>8}")
+        print(f"{method_name:<20} {mean_r:>10.4f} {mean_rmse:>10.4f} {mean_nrmse:>10.4f} {mean_mae:>10.4f} {n_ct:>10} {n_reg:>8}")
 
         method_summaries[method_name] = {
             "mean_pearson_r": mean_r,
@@ -306,6 +320,26 @@ def main():
             "n_cell_types": n_ct,
             "n_regions": n_reg,
         }
+
+    # Print RAW metrics (CPM only, no log transform)
+    print("\n--- Overall GEX Metrics (RAW CPM, no log) ---")
+    print(f"{'Method':<20} {'Raw RMSE':>12} {'Raw NRMSE':>12}")
+    print("-" * 46)
+
+    for method_name in ["CITEgeist_Continuous", "CITEgeist_Hybrid", "CITEgeist_Discrete", "Cell2Location", "Tangram", "scResolve"]:
+        metrics_list = all_results.get(method_name, [])
+        if not metrics_list:
+            print(f"{method_name:<20} {'N/A':>12} {'N/A':>12}")
+            continue
+
+        df = pd.DataFrame(metrics_list)
+        valid = df.dropna(subset=["raw_rmse"])
+        if len(valid) > 0:
+            mean_raw_rmse = valid["raw_rmse"].mean()
+            mean_raw_nrmse = valid["raw_nrmse"].mean()
+            print(f"{method_name:<20} {mean_raw_rmse:>12.1f} {mean_raw_nrmse:>12.4f}")
+        else:
+            print(f"{method_name:<20} {'N/A':>12} {'N/A':>12}")
 
     # Per-cell-type table
     print("\n--- Per-Cell-Type GEX Pearson r (mean across regions) ---")
