@@ -291,3 +291,6 @@ Benchmarking/simulation_benchmarking/*/output*/
 # Large annotation files
 Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_annotations.csv
 Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_scores.csv
+
+# Generated audit reports
+Benchmarking/audit_report.csv
