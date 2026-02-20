@@ -1,0 +1,428 @@
+{
+  "metadata": {
+    "generated_at": "2026-02-20T17:33:12.020270+00:00",
+    "benchmark_dataset": "xenium_pseudovisium_protein_gated",
+    "n_spots": 7054,
+    "n_regions": 5,
+    "cell_types": [
+      "B cells",
+      "CD4+ T cells",
+      "CD8+ T cells",
+      "Macrophages",
+      "Endothelial",
+      "Epithelial",
+      "Fibroblasts"
+    ],
+    "ground_truth_type": "protein_gated"
+  },
+  "methods": {
+    "CARD": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "exclude_vim": true
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.037017217832957604,
+            "pearson_r_std": 0.0760487193467958
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.6172899169932017,
+            "pearson_r_std": 0.08981538547838597
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.65412931304181,
+            "pearson_r_std": 0.06468452994779447
+          },
+          "Macrophages": {
+            "pearson_r": 0.6897126357429557,
+            "pearson_r_std": 0.06905056352698273
+          },
+          "Endothelial": {
+            "pearson_r": 0.751511860812424,
+            "pearson_r_std": 0.034964977117893
+          },
+          "Epithelial": {
+            "pearson_r": 0.25292941308682176,
+            "pearson_r_std": 0.13671709210645275
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.18250144846171065,
+            "pearson_r_std": 0.06832626668214133
+          }
+        },
+        "overall": {
+          "pearson_r": 0.264645793865144,
+          "pearson_r_std": 0.035977201011836775,
+          "rmse": 0.23159001457425504,
+          "mae": 0.13448916570785457,
+          "jsd": 0.4996744288462553
+        }
+      },
+      "gex_metrics": null,
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/CARD_results.json"
+    },
+    "CITEgeist_Continuous": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "preprocessing": "CLR",
+        "optimization": "QP"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.6813000754102533,
+            "pearson_r_std": 0.2689047767213331
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.39237810246870974,
+            "pearson_r_std": 0.16258548559886407
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.8004206061054455,
+            "pearson_r_std": 0.05802226316833099
+          },
+          "Macrophages": {
+            "pearson_r": 0.7945023970592437,
+            "pearson_r_std": 0.02237301773617431
+          },
+          "Endothelial": {
+            "pearson_r": 0.589238540335514,
+            "pearson_r_std": 0.1645331602399041
+          },
+          "Epithelial": {
+            "pearson_r": 0.6066949720437288,
+            "pearson_r_std": 0.07561730486184544
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.5775226680808985,
+            "pearson_r_std": 0.08397115064870993
+          }
+        },
+        "overall": {
+          "pearson_r": 0.7253685725859373,
+          "pearson_r_std": 0.056944460418952035,
+          "rmse": 0.10914129036746249,
+          "mae": 0.07983074920401487,
+          "jsd": 0.3601373637036635
+        }
+      },
+      "gex_metrics": {
+        "pearson_r": 0.3647903241659766,
+        "rmse_cpm": 4.506549194757919,
+        "raw_rmse": 11023.081075806227,
+        "n_genes": 395
+      },
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/CITEgeist_Continuous_results.json"
+    },
+    "CITEgeist_Discrete": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "preprocessing": "per_marker",
+        "optimization": "IQP"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.5065850612566039,
+            "pearson_r_std": 0.25380621330228503
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.6333956369756478,
+            "pearson_r_std": 0.04489957002525501
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.6880931167982575,
+            "pearson_r_std": 0.04539537311836638
+          },
+          "Macrophages": {
+            "pearson_r": 0.6172950366911769,
+            "pearson_r_std": 0.03348214554185748
+          },
+          "Endothelial": {
+            "pearson_r": 0.5895311578299451,
+            "pearson_r_std": 0.13426697589533895
+          },
+          "Epithelial": {
+            "pearson_r": 0.7218969810978126,
+            "pearson_r_std": 0.02900134959186174
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.5371451410512658,
+            "pearson_r_std": 0.07263784713579083
+          }
+        },
+        "overall": {
+          "pearson_r": 0.5872346249543047,
+          "pearson_r_std": 0.05060487481286583,
+          "rmse": 0.1488810791724317,
+          "mae": 0.0980435124458554,
+          "jsd": 0.38328674811710156
+        }
+      },
+      "gex_metrics": {
+        "pearson_r": 0.3835372376512464,
+        "rmse_cpm": 4.434238026528127,
+        "raw_rmse": 11377.38649156449,
+        "n_genes": 395
+      },
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/CITEgeist_Discrete_results.json"
+    },
+    "CITEgeist_Hybrid": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "preprocessing": "CLR",
+        "discretization": "largest_remainder"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.6537957749513578,
+            "pearson_r_std": 0.2961318662510861
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.4648853456166169,
+            "pearson_r_std": 0.17738073101362417
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.7961169062956034,
+            "pearson_r_std": 0.06180887809182909
+          },
+          "Macrophages": {
+            "pearson_r": 0.7863183049051461,
+            "pearson_r_std": 0.02148929360645498
+          },
+          "Endothelial": {
+            "pearson_r": 0.5817050379279777,
+            "pearson_r_std": 0.1694784188661607
+          },
+          "Epithelial": {
+            "pearson_r": 0.5874204542874402,
+            "pearson_r_std": 0.07738242700311902
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.5592168734996663,
+            "pearson_r_std": 0.08130862187146211
+          }
+        },
+        "overall": {
+          "pearson_r": 0.72559702996371,
+          "pearson_r_std": 0.047974311092319165,
+          "rmse": 0.10641442496631122,
+          "mae": 0.08079341302572421,
+          "jsd": 0.3698906664751049
+        }
+      },
+      "gex_metrics": {
+        "pearson_r": 0.36434484728725963,
+        "rmse_cpm": 4.50982235174471,
+        "raw_rmse": 11015.018073779172,
+        "n_genes": 395
+      },
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/CITEgeist_Hybrid_results.json"
+    },
+    "Cell2Location": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "n_cells_per_location": 30
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.21394393073678764,
+            "pearson_r_std": 0.1646360450500601
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.6260101225333217,
+            "pearson_r_std": 0.06806998946612934
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.6668140494070921,
+            "pearson_r_std": 0.08660761876849749
+          },
+          "Macrophages": {
+            "pearson_r": 0.5330598044578563,
+            "pearson_r_std": 0.06289573710068007
+          },
+          "Endothelial": {
+            "pearson_r": 0.7647189944786134,
+            "pearson_r_std": 0.04470736605432332
+          },
+          "Epithelial": {
+            "pearson_r": 0.5993710211692445,
+            "pearson_r_std": 0.07819203679397492
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.09522504625581632,
+            "pearson_r_std": 0.20459479672530162
+          }
+        },
+        "overall": {
+          "pearson_r": 0.4938159507454694,
+          "pearson_r_std": 0.09334688547250099,
+          "rmse": 0.16674222395153906,
+          "mae": 0.10634263008538056,
+          "jsd": 0.40422981480241243
+        }
+      },
+      "gex_metrics": {
+        "pearson_r": 0.36275550832032266,
+        "rmse_cpm": 4.993900462064689,
+        "raw_rmse": 23516.03233420043,
+        "n_genes": 180
+      },
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/Cell2Location_results.json"
+    },
+    "RCTD": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "mode": "full"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.22057808608686136,
+            "pearson_r_std": 0.2454932851736179
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.6027016371322487,
+            "pearson_r_std": 0.1116316002448722
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.5117561695400219,
+            "pearson_r_std": 0.028440180240089742
+          },
+          "Macrophages": {
+            "pearson_r": 0.7092908163228726,
+            "pearson_r_std": 0.06835957776058811
+          },
+          "Endothelial": {
+            "pearson_r": 0.7930977073622703,
+            "pearson_r_std": 0.025677194169545347
+          },
+          "Epithelial": {
+            "pearson_r": 0.5941289242840634,
+            "pearson_r_std": 0.11794643842700664
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.11811573276470233,
+            "pearson_r_std": 0.08934959774132213
+          }
+        },
+        "overall": {
+          "pearson_r": 0.48274357955945374,
+          "pearson_r_std": 0.07220176723848515,
+          "rmse": 0.17537133716585768,
+          "mae": 0.11194142065067554,
+          "jsd": 0.4317387228123247
+        }
+      },
+      "gex_metrics": null,
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/RCTD_results.json"
+    },
+    "Seurat": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "method": "label_transfer"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "CD4+ T cells": {
+            "pearson_r": 0.39481958782786786,
+            "pearson_r_std": 0.2356361182677142
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.5390568669763327,
+            "pearson_r_std": 0.07714465128701944
+          },
+          "Macrophages": {
+            "pearson_r": 0.5931697864976133,
+            "pearson_r_std": 0.06791841962755715
+          },
+          "Endothelial": {
+            "pearson_r": 0.3014802904397965,
+            "pearson_r_std": 0.13520476765444409
+          },
+          "Epithelial": {
+            "pearson_r": 0.5280176656961622,
+            "pearson_r_std": 0.11303323540242012
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.3324782251702282,
+            "pearson_r_std": 0.058213341072518035
+          }
+        },
+        "overall": {
+          "pearson_r": 0.18158443523615506,
+          "pearson_r_std": 0.039337827229341996,
+          "rmse": 0.2541011408188874,
+          "mae": 0.14480741740363356,
+          "jsd": 0.5364191932016167
+        }
+      },
+      "gex_metrics": null,
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/Seurat_results.json"
+    },
+    "Tangram": {
+      "version": "6f83ffcdf91b",
+      "run_date": "2026-02-20",
+      "settings": {
+        "mode": "cells"
+      },
+      "proportion_metrics": {
+        "per_celltype": {
+          "B cells": {
+            "pearson_r": 0.16605012316602974,
+            "pearson_r_std": 0.06422816054914654
+          },
+          "CD4+ T cells": {
+            "pearson_r": 0.5192104590091494,
+            "pearson_r_std": 0.0967734774230249
+          },
+          "CD8+ T cells": {
+            "pearson_r": 0.5407673722607564,
+            "pearson_r_std": 0.03592869099928058
+          },
+          "Macrophages": {
+            "pearson_r": 0.4991368658957015,
+            "pearson_r_std": 0.054562832019910544
+          },
+          "Endothelial": {
+            "pearson_r": 0.6403629761995051,
+            "pearson_r_std": 0.03120415858827059
+          },
+          "Epithelial": {
+            "pearson_r": 0.25245023437964514,
+            "pearson_r_std": 0.10420657646975294
+          },
+          "Fibroblasts": {
+            "pearson_r": 0.08929110101115738,
+            "pearson_r_std": 0.03213874946617953
+          }
+        },
+        "overall": {
+          "pearson_r": 0.11125319161339726,
+          "pearson_r_std": 0.041395190429762196,
+          "rmse": 0.19084782124891556,
+          "mae": 0.13437258745286884,
+          "jsd": 0.506693331653854
+        }
+      },
+      "gex_metrics": {
+        "pearson_r": 0.20898729940100255,
+        "rmse_cpm": 4.3249996704318,
+        "raw_rmse": 12328.761032512879,
+        "n_genes": 374
+      },
+      "source_file": "xenium_benchmarking/evaluation/results/method_comparison/Tangram_results.json"
+    }
+  }
+}
