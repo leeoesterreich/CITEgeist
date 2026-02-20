@@ -1,21 +1,20 @@
 # Protein vs RNA Cell Type Concordance Analysis
 
-**Date**: 2026-02-19
+**Date**: 2026-02-20
 
 ## Summary
 
-Overall cell-level concordance: **48.1%**
+Overall cell-level concordance: **56.7%**
 
 ## Per-Cell-Type Concordance
 
 | Cell Type | Concordance (%) |
 |-----------|-----------------|
 | B cells | 65.2 |
-| CD4+ T cells | 1.6 |
-| CD8+ T cells | 64.3 |
+| T cells | 68.7 |
 | Macrophages | 83.1 |
 | Endothelial | 67.4 |
-| Epithelial | 65.2 |
+| Epithelial | 67.8 |
 | Fibroblasts | 82.1 |
 | Unknown | 0.0 |
 
@@ -24,11 +23,10 @@ Overall cell-level concordance: **48.1%**
 | Cell Type | Pearson r | p-value |
 |-----------|-----------|---------|
 | B cells | 0.950 | 0.00e+00 |
-| CD4+ T cells | 0.092 | 7.18e-15 |
-| CD8+ T cells | 0.610 | 0.00e+00 |
+| T cells | 0.847 | 0.00e+00 |
 | Macrophages | 0.702 | 0.00e+00 |
 | Endothelial | 0.813 | 0.00e+00 |
-| Epithelial | 0.620 | 0.00e+00 |
+| Epithelial | 0.624 | 0.00e+00 |
 | Fibroblasts | 0.611 | 0.00e+00 |
 
 ## Interpretation
