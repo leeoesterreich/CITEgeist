@@ -76,3 +76,42 @@ def extract_nucleus_features(mask: np.ndarray) -> pd.DataFrame:
     ]
 
     return df[columns]
+
+
+def largest_remainder_discretize(proportions: np.ndarray, n_total: int) -> np.ndarray:
+    """
+    Convert proportions to integer counts using largest remainder method.
+
+    Ensures counts sum exactly to n_total while respecting proportions.
+
+    Args:
+        proportions: Array of proportions (should sum to ~1.0)
+        n_total: Total count to distribute
+
+    Returns:
+        Integer array of counts summing to n_total
+    """
+    if n_total == 0:
+        return np.zeros(len(proportions), dtype=int)
+
+    # Scale proportions to target total
+    scaled = proportions * n_total
+
+    # Take floor as initial allocation
+    counts = np.floor(scaled).astype(int)
+
+    # Compute remainders
+    remainders = scaled - counts
+
+    # Number of additional units to allocate
+    n_remaining = n_total - counts.sum()
+
+    # Allocate to types with largest remainders
+    if n_remaining > 0:
+        # Get indices sorted by remainder (descending)
+        indices = np.argsort(-remainders)
+        # Give one extra count to top n_remaining types
+        for i in range(n_remaining):
+            counts[indices[i]] += 1
+
+    return counts

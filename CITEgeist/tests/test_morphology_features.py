@@ -1,7 +1,7 @@
 """Tests for nuclear morphology feature extraction."""
 import numpy as np
 import pytest
-from CITEgeist.model.morphology_features import extract_nucleus_features
+from CITEgeist.model.morphology_features import extract_nucleus_features, largest_remainder_discretize
 
 
 def test_extract_features_single_nucleus():
@@ -67,3 +67,44 @@ def test_extract_features_elongated_nucleus():
     assert features_df['circularity'].iloc[0] < 0.7
     # And higher eccentricity
     assert features_df['eccentricity'].iloc[0] > 0.8
+
+
+# --- Largest Remainder Discretization Tests ---
+
+def test_largest_remainder_exact():
+    """Test discretization when proportions divide evenly."""
+    proportions = np.array([0.5, 0.5, 0.0])
+    n_total = 4
+    counts = largest_remainder_discretize(proportions, n_total)
+    assert list(counts) == [2, 2, 0]
+    assert counts.sum() == n_total
+
+
+def test_largest_remainder_rounding():
+    """Test discretization with remainders."""
+    proportions = np.array([0.4, 0.35, 0.25])
+    n_total = 5
+    counts = largest_remainder_discretize(proportions, n_total)
+    # 0.4*5=2.0, 0.35*5=1.75, 0.25*5=1.25
+    # Floor: [2, 1, 1] = 4, need 1 more
+    # Remainders: [0.0, 0.75, 0.25] -> give to index 1
+    assert list(counts) == [2, 2, 1]
+    assert counts.sum() == n_total
+
+
+def test_largest_remainder_single_cell():
+    """Test with single cell - assigns to highest proportion."""
+    proportions = np.array([0.4, 0.35, 0.25])
+    n_total = 1
+    counts = largest_remainder_discretize(proportions, n_total)
+    assert list(counts) == [1, 0, 0]
+    assert counts.sum() == n_total
+
+
+def test_largest_remainder_zero_total():
+    """Test with zero cells."""
+    proportions = np.array([0.5, 0.3, 0.2])
+    n_total = 0
+    counts = largest_remainder_discretize(proportions, n_total)
+    assert list(counts) == [0, 0, 0]
+    assert counts.sum() == 0
