@@ -108,3 +108,85 @@ class TestComputeExpressionProfiles:
         # For locked anchors, other types should be 0
         assert E[1, gene_0_idx] == 0  # TypeB should be 0
         assert E[2, gene_0_idx] == 0  # TypeC should be 0
+
+
+class TestRefineProportions:
+    """Test M-step: refine proportions given expression profiles."""
+
+    def test_refine_proportions_respects_constraints(self):
+        """Refined proportions should be non-negative and sum to <= 1."""
+        from CITEgeist.model.multimodal_refinement import refine_proportions
+
+        np.random.seed(42)
+        n_spots, n_genes, n_types = 30, 15, 3
+
+        # Y_protein: initial proportions from Pass 1
+        Y_protein = np.random.dirichlet([2, 2, 2], size=n_spots)
+
+        # Y_current: current estimate
+        Y_current = Y_protein.copy()
+
+        # E: expression profiles
+        E = np.abs(np.random.randn(n_types, n_genes))
+
+        # GEX: observed expression (with some noise)
+        GEX = Y_protein @ E + np.random.randn(n_spots, n_genes) * 0.1
+
+        gene_names = [f"Gene_{i}" for i in range(n_genes)]
+        cell_type_names = ["TypeA", "TypeB", "TypeC"]
+
+        anchors = {"TypeA": ["Gene_0"], "TypeB": ["Gene_1"], "TypeC": ["Gene_2"]}
+        weights = {"TypeA": {"Gene_0": 0.8}, "TypeB": {"Gene_1": 0.7}, "TypeC": {"Gene_2": 0.9}}
+
+        Y_refined = refine_proportions(
+            GEX=GEX,
+            Y_current=Y_current,
+            E=E,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            anchors=anchors,
+            weights=weights,
+            lambda_prior=1.0,
+        )
+
+        # Check shape
+        assert Y_refined.shape == (n_spots, n_types)
+
+        # Check non-negativity
+        assert np.all(Y_refined >= -1e-10)
+
+        # Check sum <= 1 (with small tolerance)
+        assert np.all(Y_refined.sum(axis=1) <= 1.0 + 1e-6)
+
+    def test_refine_proportions_stays_near_prior_with_high_lambda(self):
+        """With high lambda_prior, Y_refined should stay close to Y_protein."""
+        from CITEgeist.model.multimodal_refinement import refine_proportions
+
+        np.random.seed(42)
+        n_spots, n_genes, n_types = 20, 10, 3
+
+        Y_protein = np.random.dirichlet([2, 2, 2], size=n_spots)
+        Y_current = Y_protein.copy()
+        E = np.abs(np.random.randn(n_types, n_genes))
+        GEX = np.abs(np.random.randn(n_spots, n_genes))  # Random, doesn't match
+
+        gene_names = [f"Gene_{i}" for i in range(n_genes)]
+        cell_type_names = ["TypeA", "TypeB", "TypeC"]
+        anchors = {"TypeA": [], "TypeB": [], "TypeC": []}
+        weights = {"TypeA": {}, "TypeB": {}, "TypeC": {}}
+
+        Y_refined = refine_proportions(
+            GEX=GEX,
+            Y_current=Y_current,
+            E=E,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            anchors=anchors,
+            weights=weights,
+            lambda_prior=100.0,  # Very high prior
+        )
+
+        # Should stay very close to Y_protein
+        assert np.allclose(Y_refined, Y_protein, atol=0.1)
