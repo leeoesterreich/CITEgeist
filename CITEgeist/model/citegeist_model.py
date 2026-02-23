@@ -45,6 +45,9 @@ from .segmentation import (
     normalize_nuclei_counts_for_prior,
     save_segmentation_artifacts,
 )
+from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
+from .cell_level_gex import distribute_gex_to_cells
+from .single_cell_output import create_single_cell_adata
 
 
 RESOLUTION_DEFAULTS = {
@@ -1773,3 +1776,106 @@ class CitegeistModel:
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dict has not been loaded. Run 'load_cell_profile_dict' first.")
         assert_neighborhood_size(self.gene_expression_adata, self.cell_profile_dict, radius=radius, num_spots=5)
+
+    def run_single_cell_resolution(
+        self,
+        mask: np.ndarray,
+        nuclei_spot_map: pd.DataFrame,
+        nuclei_counts: Optional[pd.Series] = None,
+        save_output: bool = True,
+    ) -> 'ad.AnnData':
+        """
+        Run single-cell resolution pipeline (Module 3b + 3c cell mode).
+
+        Requires:
+            - run_cell_proportion_model() has been called (Module 3a)
+            - run_cell_expression_pass1() has been called (Module 3c spot mode)
+
+        Args:
+            mask: Cellpose label mask with nucleus labels
+            nuclei_spot_map: DataFrame mapping nucleus_id to spot_id
+            nuclei_counts: Optional nuclei counts per spot. If None, computed from nuclei_spot_map.
+            save_output: Whether to save output h5ad file
+
+        Returns:
+            AnnData with single-cell expression
+        """
+        import anndata as ad
+
+        # Validate prerequisites
+        if 'cell_prop' not in self.results:
+            raise RuntimeError("Must run run_cell_proportion_model() first (Module 3a)")
+        if 'gene_expression_pass1' not in self.results:
+            raise RuntimeError("Must run run_cell_expression_pass1() first (Module 3c)")
+
+        # Get proportions
+        proportions = self.results['cell_prop'].copy()
+        proportions['spot_id'] = proportions.index
+
+        # Get cell types
+        cell_types = [c for c in proportions.columns if c != 'spot_id']
+
+        # Compute nuclei counts if not provided
+        if nuclei_counts is None:
+            nuclei_counts = nuclei_spot_map.groupby('spot_id').size()
+
+        # Run Module 3b: nucleus assignment
+        logging.info("Running Module 3b: Per-nucleus assignment")
+        assignment_result = run_nucleus_assignment(
+            mask=mask,
+            nuclei_spot_map=nuclei_spot_map,
+            proportions=proportions,
+            nuclei_counts=nuclei_counts,
+            cell_types=cell_types,
+        )
+
+        # Get deconvolved GEX - need to convert from spotwise_profiles dict to DataFrame
+        spotwise_profiles = self.results['gene_expression_pass1']
+
+        # Build DataFrame with spot:::cell_type index
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary not loaded.")
+
+        cell_type_names = list(self.cell_profile_dict.keys())
+        gene_names = self.gene_expression_adata.var_names
+        spot_names = self.gene_expression_adata.obs_names
+
+        rows = []
+        indices = []
+        for spot_idx, spot_name in enumerate(spot_names):
+            if spot_idx in spotwise_profiles:
+                profile = spotwise_profiles[spot_idx]  # (T, M) array
+                for ct_idx, ct_name in enumerate(cell_type_names):
+                    indices.append(f"{spot_name}:::{ct_name}")
+                    rows.append(profile[ct_idx, :])
+
+        deconvolved_gex = pd.DataFrame(rows, index=indices, columns=gene_names)
+
+        # Run Module 3c cell mode: distribute GEX
+        logging.info("Running Module 3c: Cell-level GEX distribution")
+        cell_gex = distribute_gex_to_cells(
+            deconvolved_gex=deconvolved_gex,
+            assignments=assignment_result.assignments,
+            nucleus_spot_map=nuclei_spot_map,
+        )
+
+        # Create output AnnData
+        adata_sc = create_single_cell_adata(
+            cell_gex=cell_gex,
+            morphology_features=assignment_result.morphology_features,
+            assignments=assignment_result.assignments,
+            sample_name=self.sample_name,
+            classifier=assignment_result.classifier,
+        )
+
+        # Store result
+        self.results['single_cell_adata'] = adata_sc
+        self.results['nucleus_assignment'] = assignment_result
+
+        # Save output
+        if save_output:
+            output_path = os.path.join(self.output_folder, f"{self.sample_name}_single_cell.h5ad")
+            adata_sc.write_h5ad(output_path)
+            logging.info(f"Saved single-cell AnnData to {output_path}")
+
+        return adata_sc
