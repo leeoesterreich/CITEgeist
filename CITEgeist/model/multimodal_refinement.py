@@ -108,3 +108,77 @@ def select_anchor_genes(
         )
 
     return anchors, weights
+
+
+def compute_expression_profiles(
+    GEX: np.ndarray,
+    Y: np.ndarray,
+    gene_names: List[str],
+    cell_type_names: List[str],
+    anchors: Dict[str, List[str]],
+    weights: Dict[str, Dict[str, float]],
+) -> np.ndarray:
+    """
+    E-step: Estimate gene expression profiles per cell type.
+
+    Anchor genes are LOCKED to their assigned cell type.
+    Non-anchor genes are solved via least squares (can load on any type).
+
+    Args:
+        GEX: Gene expression matrix (N_spots × G_genes)
+        Y: Current cell type proportions (N_spots × T_types)
+        gene_names: List of gene names (length G)
+        cell_type_names: List of cell type names (length T)
+        anchors: Dict[cell_type] -> List[anchor_gene_names]
+        weights: Dict[cell_type] -> Dict[gene_name -> weight]
+
+    Returns:
+        E: Expression profiles (T_types × G_genes)
+    """
+    n_spots, n_genes = GEX.shape
+    n_types = len(cell_type_names)
+
+    # Build gene name to index mapping
+    gene_to_idx = {g: i for i, g in enumerate(gene_names)}
+    type_to_idx = {t: i for i, t in enumerate(cell_type_names)}
+
+    # Build set of anchor genes and their assignments
+    anchor_assignments = {}  # gene_name -> cell_type_name
+    for ct_name, gene_list in anchors.items():
+        for g in gene_list:
+            anchor_assignments[g] = ct_name
+
+    # Initialize E
+    E = np.zeros((n_types, n_genes))
+
+    for g_idx, g_name in enumerate(gene_names):
+        gex_g = GEX[:, g_idx]  # Expression of gene g across spots
+
+        if g_name in anchor_assignments:
+            # LOCKED: anchor gene assigned to one cell type only
+            ct_name = anchor_assignments[g_name]
+            t_idx = type_to_idx[ct_name]
+
+            # Weighted mean of expression where cell type is present
+            y_t = Y[:, t_idx]
+            if np.sum(y_t) > 1e-10:
+                E[t_idx, g_idx] = np.sum(gex_g * y_t) / np.sum(y_t)
+            else:
+                E[t_idx, g_idx] = 0.0
+
+            # Other cell types get 0 for this anchor gene
+            # (already initialized to 0)
+
+        else:
+            # FREE: non-anchor gene can load on any cell type
+            # Solve least squares: GEX[:, g] ≈ Y @ E[:, g]
+            # E[:, g] = (Y^T Y)^{-1} Y^T GEX[:, g]
+            try:
+                E[:, g_idx], _, _, _ = np.linalg.lstsq(Y, gex_g, rcond=None)
+                # Clip negative values (expression should be non-negative)
+                E[:, g_idx] = np.clip(E[:, g_idx], 0, None)
+            except np.linalg.LinAlgError:
+                # Fallback: uniform assignment
+                E[:, g_idx] = np.mean(gex_g) / n_types
+
+    return E
