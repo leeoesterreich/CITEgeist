@@ -177,6 +177,7 @@ def run_multimodal_benchmark(
     # Multimodal refinement parameters
     n_anchors: int = 20,
     min_correlation: float = 0.3,
+    min_anchors_per_type: int = 5,
     lambda_prior: float = 1.0,
     max_iterations: int = 20,
     em_tolerance: float = 1e-4,
@@ -203,8 +204,9 @@ def run_multimodal_benchmark(
         min_counts: Minimum counts filter for GEX preprocessing
         spot_diameter_um: Spot diameter in microns
         lambda_laplacian: Spatial smoothing weight for continuous model
-        n_anchors: Number of anchor genes per cell type for EM
-        min_correlation: Minimum Pearson r for anchor selection
+        n_anchors: Maximum anchor genes per cell type for EM (cap)
+        min_correlation: Initial minimum Spearman rho for anchor selection
+        min_anchors_per_type: Minimum anchors required per cell type (floor)
         lambda_prior: Trust in protein prior vs RNA in EM
         max_iterations: Maximum EM iterations
         em_tolerance: EM convergence tolerance
@@ -324,6 +326,7 @@ def run_multimodal_benchmark(
         refined_props_df = model.run_multimodal_refinement(
             n_anchors=n_anchors,
             min_correlation=min_correlation,
+            min_anchors_per_type=min_anchors_per_type,
             lambda_prior=lambda_prior,
             max_iterations=max_iterations,
             tolerance=em_tolerance,
@@ -457,6 +460,7 @@ def run_multimodal_benchmark(
         "multimodal_params": {
             "n_anchors": n_anchors,
             "min_correlation": min_correlation,
+            "min_anchors_per_type": min_anchors_per_type,
             "lambda_prior": lambda_prior,
             "max_iterations": max_iterations,
             "em_tolerance": em_tolerance,
@@ -509,7 +513,9 @@ def main():
     parser.add_argument("--n-anchors", type=int, default=20,
                         help="Number of anchor genes per cell type")
     parser.add_argument("--min-correlation", type=float, default=0.3,
-                        help="Minimum Pearson r for anchor selection")
+                        help="Initial minimum Spearman rho for anchor selection")
+    parser.add_argument("--min-anchors-per-type", type=int, default=5,
+                        help="Minimum anchors required per cell type (floor, lowers threshold if needed)")
     parser.add_argument("--lambda-prior", type=float, default=1.0,
                         help="Trust in protein prior vs RNA (higher = trust protein more)")
     parser.add_argument("--max-iterations", type=int, default=20,
@@ -537,6 +543,7 @@ def main():
         lambda_laplacian=args.lambda_laplacian,
         n_anchors=args.n_anchors,
         min_correlation=args.min_correlation,
+        min_anchors_per_type=args.min_anchors_per_type,
         lambda_prior=args.lambda_prior,
         max_iterations=args.max_iterations,
         em_tolerance=args.em_tolerance,

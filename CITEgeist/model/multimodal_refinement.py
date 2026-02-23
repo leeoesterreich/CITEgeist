@@ -10,7 +10,7 @@ import logging
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
-from scipy.stats import pearsonr
+from scipy.stats import spearmanr
 
 logger = logging.getLogger(__name__)
 
@@ -22,23 +22,32 @@ def select_anchor_genes(
     cell_type_names: List[str],
     n_anchors: int = 20,
     min_correlation: float = 0.3,
+    min_anchors_per_type: int = 5,
     min_expressing_spots: int = 20,
     sparse_aware: bool = True,
+    threshold_step: float = 0.05,
+    min_threshold: float = 0.05,
 ) -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, float]]]:
     """
-    Select top-N anchor genes per cell type based on correlation and specificity.
+    Select top-N anchor genes per cell type based on Spearman correlation and specificity.
 
     Pass 1.5: Learn gene signatures from protein-confident spots.
+
+    Uses Spearman (rank-based) correlation for robustness to outliers.
+    Adaptive thresholding ensures minimum anchor coverage per cell type.
 
     Args:
         GEX: Gene expression matrix (N_spots × G_genes)
         Y_protein: Cell type proportions from Pass 1 (N_spots × T_types)
         gene_names: List of gene names (length G)
         cell_type_names: List of cell type names (length T)
-        n_anchors: Number of anchor genes per cell type (default: 20)
-        min_correlation: Minimum Pearson r to be considered (default: 0.3)
+        n_anchors: Maximum anchor genes per cell type (default: 20, cap)
+        min_correlation: Initial minimum Spearman rho to be considered (default: 0.3)
+        min_anchors_per_type: Minimum anchors required per cell type (default: 5, floor)
         min_expressing_spots: Minimum spots with non-zero expression (default: 20)
         sparse_aware: If True, compute correlations only on expressing spots (default: True)
+        threshold_step: Amount to lower threshold when floor not met (default: 0.05)
+        min_threshold: Absolute minimum threshold to try (default: 0.05)
 
     Returns:
         anchors: Dict[cell_type] -> List[gene_names]
@@ -54,9 +63,9 @@ def select_anchor_genes(
 
     # Check sparsity
     sparsity = (GEX == 0).sum() / GEX.size
-    logger.info(f"GEX sparsity: {sparsity:.1%}, sparse_aware={sparse_aware}")
+    logger.info(f"GEX sparsity: {sparsity:.1%}, sparse_aware={sparse_aware}, using Spearman correlation")
 
-    # Compute correlation matrix (genes × cell types)
+    # Compute correlation matrix (genes × cell types) using Spearman
     correlations = np.zeros((n_genes, n_types))
     n_expressing = np.zeros(n_genes, dtype=int)  # Track expressing spots per gene
 
@@ -80,9 +89,9 @@ def select_anchor_genes(
                 y_t_subset = Y_protein[expressing_mask, t]
                 if np.std(y_t_subset) < 1e-10:
                     continue
-                r, _ = pearsonr(gex_g_subset, y_t_subset)
-                if not np.isnan(r):
-                    correlations[g, t] = r
+                rho, _ = spearmanr(gex_g_subset, y_t_subset)
+                if not np.isnan(rho):
+                    correlations[g, t] = rho
         else:
             # Original behavior: use all spots
             n_expressing[g] = n_spots
@@ -93,12 +102,24 @@ def select_anchor_genes(
                 y_t = Y_protein[:, t]
                 if np.std(y_t) < 1e-10:
                     continue
-                r, _ = pearsonr(gex_g, y_t)
-                if not np.isnan(r):
-                    correlations[g, t] = r
+                rho, _ = spearmanr(gex_g, y_t)
+                if not np.isnan(rho):
+                    correlations[g, t] = rho
 
     n_valid_genes = (n_expressing >= min_expressing_spots).sum()
-    logger.info(f"Computed correlations for {n_valid_genes}/{n_genes} genes × {n_types} cell types")
+    logger.info(f"Computed Spearman correlations for {n_valid_genes}/{n_genes} genes × {n_types} cell types")
+
+    # Log correlation statistics per cell type
+    for t, ct_name in enumerate(cell_type_names):
+        ct_corrs = correlations[:, t]
+        positive_corrs = ct_corrs[ct_corrs > 0]
+        if len(positive_corrs) > 0:
+            logger.info(
+                f"  {ct_name}: max_rho={ct_corrs.max():.3f}, "
+                f"genes with rho>0.1: {(ct_corrs > 0.1).sum()}, "
+                f"genes with rho>0.2: {(ct_corrs > 0.2).sum()}, "
+                f"genes with rho>0.3: {(ct_corrs > 0.3).sum()}"
+            )
 
     # Compute specificity: r[g,t] - max(r[g, other_types])
     specificity = np.zeros((n_genes, n_types))
@@ -111,36 +132,68 @@ def select_anchor_genes(
     # Combined score: correlation × specificity (only positive specificity)
     score = correlations * np.clip(specificity, 0, None)
 
-    # Select top-N per cell type
+    # Select anchors with adaptive thresholding
     anchors = {}
     weights = {}
 
     for t, ct_name in enumerate(cell_type_names):
-        # Filter by minimum correlation
-        valid_mask = correlations[:, t] >= min_correlation
-        valid_indices = np.where(valid_mask)[0]
+        # Start with initial threshold, lower if needed to meet floor
+        current_threshold = min_correlation
+        selected_indices = None
 
-        if len(valid_indices) == 0:
-            logger.warning(f"No genes pass min_correlation={min_correlation} for {ct_name}")
-            anchors[ct_name] = []
-            weights[ct_name] = {}
-            continue
+        while current_threshold >= min_threshold:
+            # Filter by current threshold
+            valid_mask = correlations[:, t] >= current_threshold
+            valid_indices = np.where(valid_mask)[0]
 
-        # Rank by score among valid genes
-        valid_scores = score[valid_indices, t]
-        ranked_order = np.argsort(valid_scores)[::-1]  # Descending
-        top_indices = valid_indices[ranked_order[:n_anchors]]
+            if len(valid_indices) >= min_anchors_per_type:
+                # We have enough, rank by score and take top n_anchors
+                valid_scores = score[valid_indices, t]
+                ranked_order = np.argsort(valid_scores)[::-1]  # Descending
+                selected_indices = valid_indices[ranked_order[:n_anchors]]
+
+                if current_threshold < min_correlation:
+                    logger.info(
+                        f"{ct_name}: lowered threshold to {current_threshold:.2f} "
+                        f"to get {len(selected_indices)} anchors (min={min_anchors_per_type})"
+                    )
+                break
+
+            # Not enough anchors, lower threshold
+            current_threshold -= threshold_step
+
+        # If we still don't have enough even at min_threshold, take what we can
+        if selected_indices is None:
+            valid_mask = correlations[:, t] > 0  # Any positive correlation
+            valid_indices = np.where(valid_mask)[0]
+
+            if len(valid_indices) > 0:
+                valid_scores = score[valid_indices, t]
+                ranked_order = np.argsort(valid_scores)[::-1]
+                selected_indices = valid_indices[ranked_order[:n_anchors]]
+                logger.warning(
+                    f"{ct_name}: only {len(selected_indices)} genes with positive correlation "
+                    f"(floor={min_anchors_per_type} not met)"
+                )
+            else:
+                logger.warning(f"{ct_name}: no genes with positive correlation!")
+                anchors[ct_name] = []
+                weights[ct_name] = {}
+                continue
 
         # Build output
-        anchors[ct_name] = [gene_names[i] for i in top_indices]
+        anchors[ct_name] = [gene_names[i] for i in selected_indices]
         weights[ct_name] = {
-            gene_names[i]: float(correlations[i, t]) for i in top_indices
+            gene_names[i]: float(correlations[i, t]) for i in selected_indices
         }
 
         logger.info(
-            f"{ct_name}: selected {len(anchors[ct_name])} anchors, "
-            f"top gene={anchors[ct_name][0] if anchors[ct_name] else 'None'}"
+            f"{ct_name}: selected {len(anchors[ct_name])} anchors (cap={n_anchors}, floor={min_anchors_per_type}), "
+            f"top gene={anchors[ct_name][0]} (rho={weights[ct_name][anchors[ct_name][0]]:.3f})"
         )
+
+    total_anchors = sum(len(v) for v in anchors.values())
+    logger.info(f"Total anchors selected: {total_anchors} across {n_types} cell types")
 
     return anchors, weights
 
@@ -313,6 +366,7 @@ def multimodal_em_refinement(
     cell_type_names: List[str],
     n_anchors: int = 20,
     min_correlation: float = 0.3,
+    min_anchors_per_type: int = 5,
     lambda_prior: float = 1.0,
     max_iterations: int = 20,
     tolerance: float = 1e-4,
@@ -322,7 +376,7 @@ def multimodal_em_refinement(
     """
     Full multimodal EM refinement: Pass 1.5 + Pass 2 EM.
 
-    1. Pass 1.5: Learn anchor genes from protein-confident spots
+    1. Pass 1.5: Learn anchor genes from protein-confident spots (Spearman correlation)
     2. Pass 2 EM: Iterate E-step (expression profiles) and M-step (proportions)
 
     Args:
@@ -330,8 +384,9 @@ def multimodal_em_refinement(
         Y_protein: Cell type proportions from Pass 1 (N_spots × T_types)
         gene_names: List of gene names (length G)
         cell_type_names: List of cell type names (length T)
-        n_anchors: Number of anchor genes per cell type (default: 20)
-        min_correlation: Minimum Pearson r for anchor selection (default: 0.3)
+        n_anchors: Maximum anchor genes per cell type (default: 20, cap)
+        min_correlation: Initial minimum Spearman rho for anchor selection (default: 0.3)
+        min_anchors_per_type: Minimum anchors required per cell type (default: 5, floor)
         lambda_prior: Weight of protein prior in M-step (default: 1.0)
         max_iterations: Maximum EM iterations (default: 20)
         tolerance: Convergence tolerance (default: 1e-4)
@@ -348,8 +403,8 @@ def multimodal_em_refinement(
 
     logger.info(f"Starting multimodal EM refinement: {n_spots} spots, {n_genes} genes, {n_types} types")
 
-    # Pass 1.5: Learn anchor genes
-    logger.info("Pass 1.5: Selecting anchor genes...")
+    # Pass 1.5: Learn anchor genes using Spearman correlation
+    logger.info("Pass 1.5: Selecting anchor genes (Spearman, adaptive threshold)...")
     anchors, weights = select_anchor_genes(
         GEX=GEX,
         Y_protein=Y_protein,
@@ -357,6 +412,7 @@ def multimodal_em_refinement(
         cell_type_names=cell_type_names,
         n_anchors=n_anchors,
         min_correlation=min_correlation,
+        min_anchors_per_type=min_anchors_per_type,
         min_expressing_spots=min_expressing_spots,
         sparse_aware=sparse_aware,
     )

@@ -940,6 +940,7 @@ class CitegeistModel:
         self,
         n_anchors: int = 20,
         min_correlation: float = 0.3,
+        min_anchors_per_type: int = 5,
         lambda_prior: float = 1.0,
         max_iterations: int = 20,
         tolerance: float = 1e-4,
@@ -957,8 +958,10 @@ class CitegeistModel:
             - GEX data must be preprocessed
 
         Args:
-            n_anchors: Number of anchor genes per cell type (default: 20)
-            min_correlation: Minimum Pearson r for anchor selection (default: 0.3)
+            n_anchors: Maximum anchor genes per cell type (default: 20, cap)
+            min_correlation: Initial minimum Spearman rho for anchor selection (default: 0.3)
+            min_anchors_per_type: Minimum anchors required per cell type (default: 5, floor).
+                If fewer genes pass min_correlation, threshold is lowered adaptively.
             lambda_prior: Trust in protein prior vs RNA (default: 1.0)
             max_iterations: Maximum EM iterations (default: 20)
             tolerance: Convergence tolerance (default: 1e-4)
@@ -1006,6 +1009,7 @@ class CitegeistModel:
             cell_type_names=cell_type_names,
             n_anchors=n_anchors,
             min_correlation=min_correlation,
+            min_anchors_per_type=min_anchors_per_type,
             lambda_prior=lambda_prior,
             max_iterations=max_iterations,
             tolerance=tolerance,
