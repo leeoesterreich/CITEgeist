@@ -71,6 +71,14 @@ from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignme
 from .cell_level_gex import distribute_gex_to_cells
 from .single_cell_output import create_single_cell_adata
 
+# Module 3 Enhancement: Multimodal refinement
+from .multimodal_refinement import (
+    select_anchor_genes,
+    compute_expression_profiles,
+    refine_proportions,
+    multimodal_em_refinement,
+)
+
 # Module 5: Cross-sample integration
 from .cross_sample_integration import (
     AlignedProgram,
@@ -157,6 +165,11 @@ __all__ = [
     "NucleusAssignmentResult",
     "distribute_gex_to_cells",
     "create_single_cell_adata",
+    # Module 3 Enhancement: Multimodal refinement
+    "select_anchor_genes",
+    "compute_expression_profiles",
+    "refine_proportions",
+    "multimodal_em_refinement",
     # Module 5: Cross-sample integration
     "AlignedProgram",
     "ConservedRelationship",
