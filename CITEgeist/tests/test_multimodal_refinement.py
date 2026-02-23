@@ -56,3 +56,55 @@ class TestSelectAnchorGenes:
         assert "Gene_0" in anchors["TypeA"] or "Gene_1" in anchors["TypeA"]
         assert "Gene_5" in anchors["TypeB"] or "Gene_6" in anchors["TypeB"]
         assert "Gene_10" in anchors["TypeC"] or "Gene_11" in anchors["TypeC"]
+
+
+class TestComputeExpressionProfiles:
+    """Test E-step: estimate expression profiles given proportions."""
+
+    def test_compute_expression_profiles_anchor_locked(self):
+        """Anchor genes should be assigned to their cell type only."""
+        from CITEgeist.model.multimodal_refinement import compute_expression_profiles
+
+        np.random.seed(42)
+        n_spots, n_genes, n_types = 50, 20, 3
+
+        # Y: proportions
+        Y = np.random.dirichlet([1, 1, 1], size=n_spots)
+
+        # GEX: random expression
+        GEX = np.abs(np.random.randn(n_spots, n_genes))
+
+        gene_names = [f"Gene_{i}" for i in range(n_genes)]
+        cell_type_names = ["TypeA", "TypeB", "TypeC"]
+
+        # Anchors: Gene_0,1 for TypeA, Gene_2,3 for TypeB, Gene_4,5 for TypeC
+        anchors = {
+            "TypeA": ["Gene_0", "Gene_1"],
+            "TypeB": ["Gene_2", "Gene_3"],
+            "TypeC": ["Gene_4", "Gene_5"],
+        }
+        weights = {
+            "TypeA": {"Gene_0": 0.8, "Gene_1": 0.7},
+            "TypeB": {"Gene_2": 0.75, "Gene_3": 0.65},
+            "TypeC": {"Gene_4": 0.9, "Gene_5": 0.6},
+        }
+
+        E = compute_expression_profiles(
+            GEX=GEX,
+            Y=Y,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            anchors=anchors,
+            weights=weights,
+        )
+
+        # E should be (n_types × n_genes)
+        assert E.shape == (n_types, n_genes)
+
+        # Anchor genes should have non-zero expression ONLY for their cell type
+        # Gene_0 is anchor for TypeA (index 0)
+        gene_0_idx = 0
+        assert E[0, gene_0_idx] > 0  # TypeA has expression
+        # For locked anchors, other types should be 0
+        assert E[1, gene_0_idx] == 0  # TypeB should be 0
+        assert E[2, gene_0_idx] == 0  # TypeC should be 0
