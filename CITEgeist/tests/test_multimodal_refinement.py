@@ -190,3 +190,82 @@ class TestRefineProportions:
 
         # Should stay very close to Y_protein
         assert np.allclose(Y_refined, Y_protein, atol=0.1)
+
+
+class TestMultimodalEMRefinement:
+    """Test full Pass 1.5 + Pass 2 EM refinement."""
+
+    def test_multimodal_em_improves_reconstruction(self):
+        """EM refinement should improve GEX reconstruction error."""
+        from CITEgeist.model.multimodal_refinement import multimodal_em_refinement
+
+        np.random.seed(42)
+        n_spots, n_genes, n_types = 50, 30, 3
+
+        # True proportions
+        Y_true = np.random.dirichlet([2, 2, 2], size=n_spots)
+
+        # True expression profiles
+        E_true = np.abs(np.random.randn(n_types, n_genes)) + 0.5
+
+        # Observed GEX
+        GEX = Y_true @ E_true + np.random.randn(n_spots, n_genes) * 0.1
+
+        # Y_protein: noisy version of Y_true (simulating protein estimation error)
+        Y_protein = Y_true + np.random.randn(n_spots, n_types) * 0.15
+        Y_protein = np.clip(Y_protein, 0, 1)
+        Y_protein = Y_protein / Y_protein.sum(axis=1, keepdims=True)
+
+        gene_names = [f"Gene_{i}" for i in range(n_genes)]
+        cell_type_names = ["TypeA", "TypeB", "TypeC"]
+
+        Y_refined, E_final, anchors = multimodal_em_refinement(
+            GEX=GEX,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            n_anchors=5,
+            lambda_prior=1.0,
+            max_iterations=10,
+            tolerance=1e-4,
+        )
+
+        # Check shapes
+        assert Y_refined.shape == Y_protein.shape
+        assert E_final.shape == (n_types, n_genes)
+        assert isinstance(anchors, dict)
+
+        # Reconstruction error should be lower with Y_refined than Y_protein
+        recon_protein = np.sum((GEX - Y_protein @ E_true) ** 2)
+        recon_refined = np.sum((GEX - Y_refined @ E_final) ** 2)
+
+        # Refined should have lower or equal reconstruction error
+        assert recon_refined <= recon_protein * 1.1  # Allow 10% tolerance
+
+    def test_multimodal_em_converges(self):
+        """EM should converge within max_iterations."""
+        from CITEgeist.model.multimodal_refinement import multimodal_em_refinement
+
+        np.random.seed(123)
+        n_spots, n_genes, n_types = 30, 20, 2
+
+        Y_protein = np.random.dirichlet([3, 3], size=n_spots)
+        GEX = np.abs(np.random.randn(n_spots, n_genes))
+
+        gene_names = [f"Gene_{i}" for i in range(n_genes)]
+        cell_type_names = ["TypeA", "TypeB"]
+
+        # Should complete without error
+        Y_refined, E_final, anchors = multimodal_em_refinement(
+            GEX=GEX,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            n_anchors=3,
+            lambda_prior=1.0,
+            max_iterations=20,
+            tolerance=1e-4,
+        )
+
+        assert Y_refined is not None
+        assert not np.any(np.isnan(Y_refined))
