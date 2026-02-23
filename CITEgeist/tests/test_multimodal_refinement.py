@@ -1,6 +1,7 @@
 """Tests for multimodal refinement (Pass 1.5 + Pass 2 EM)."""
 
 import numpy as np
+import pandas as pd
 import pytest
 from scipy.stats import pearsonr
 
@@ -296,3 +297,67 @@ class TestMultimodalEMRefinement:
 
         assert Y_refined is not None
         assert not np.any(np.isnan(Y_refined))
+
+
+class TestIntegrationWithCitegeistModel:
+    """Integration tests with CitegeistModel."""
+
+    def test_run_multimodal_refinement_end_to_end(self, tmp_path):
+        """Test full pipeline: Pass 1 -> Multimodal refinement."""
+        import scanpy as sc
+        from CITEgeist.model.citegeist_model import CitegeistModel
+
+        np.random.seed(42)
+        n_spots, n_genes, n_proteins, n_types = 50, 100, 10, 3
+
+        # Create synthetic GEX AnnData
+        gex_X = np.abs(np.random.randn(n_spots, n_genes))
+        gex_adata = sc.AnnData(X=gex_X)
+        gex_adata.obs_names = [f"spot_{i}" for i in range(n_spots)]
+        gex_adata.var_names = [f"Gene_{i}" for i in range(n_genes)]
+        gex_adata.obsm["spatial"] = np.random.rand(n_spots, 2) * 100
+
+        # Create synthetic protein AnnData
+        prot_X = np.abs(np.random.randn(n_spots, n_proteins))
+        prot_adata = sc.AnnData(X=prot_X)
+        prot_adata.obs_names = [f"spot_{i}" for i in range(n_spots)]
+        prot_adata.var_names = [f"Protein_{i}" for i in range(n_proteins)]
+        prot_adata.obsm["spatial"] = gex_adata.obsm["spatial"].copy()
+
+        # Initialize model
+        model = CitegeistModel(
+            sample_name="test_multimodal",
+            output_folder=str(tmp_path),
+            simulation=True,
+            gene_expression_adata=gex_adata,
+            antibody_capture_adata=prot_adata,
+        )
+
+        # Mock Pass 1 results (normally from run_cell_proportion_model)
+        cell_type_names = ["TypeA", "TypeB", "TypeC"]
+        Y_protein = np.random.dirichlet([2, 2, 2], size=n_spots)
+        cell_prop_df = pd.DataFrame(
+            Y_protein,
+            index=gex_adata.obs_names,
+            columns=cell_type_names,
+        )
+        model.cell_prop_global_results = cell_prop_df
+        model.results["cell_prop"] = cell_prop_df
+
+        # Run multimodal refinement
+        result = model.run_multimodal_refinement(
+            n_anchors=5,
+            lambda_prior=1.0,
+            max_iterations=5,
+        )
+
+        # Verify outputs
+        assert result is not None
+        assert result.shape == (n_spots, n_types)
+        assert hasattr(model, "cell_prop_refined_results")
+        assert hasattr(model, "anchor_genes")
+        assert hasattr(model, "expression_profiles")
+
+        # Check files were saved
+        assert (tmp_path / "test_multimodal_cell_prop_refined_results.csv").exists()
+        assert (tmp_path / "test_multimodal_anchor_genes.json").exists()
