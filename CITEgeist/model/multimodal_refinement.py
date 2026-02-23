@@ -182,3 +182,95 @@ def compute_expression_profiles(
                 E[:, g_idx] = np.mean(gex_g) / n_types
 
     return E
+
+
+def refine_proportions(
+    GEX: np.ndarray,
+    Y_current: np.ndarray,
+    E: np.ndarray,
+    Y_protein: np.ndarray,
+    gene_names: List[str],
+    cell_type_names: List[str],
+    anchors: Dict[str, List[str]],
+    weights: Dict[str, Dict[str, float]],
+    lambda_prior: float = 1.0,
+) -> np.ndarray:
+    """
+    M-step: Refine proportions Y given expression profiles E.
+
+    Objective per spot i:
+        minimize: Σ_g w[g] * (GEX[i,g] - Y[i,:] @ E[:,g])²
+                  + λ * ||Y[i,:] - Y_protein[i,:]||²
+
+    Constraints:
+        Y[i, :] >= 0
+        sum(Y[i, :]) <= 1
+
+    Args:
+        GEX: Gene expression matrix (N_spots × G_genes)
+        Y_current: Current proportions (N_spots × T_types)
+        E: Expression profiles (T_types × G_genes)
+        Y_protein: Original protein-based proportions (N_spots × T_types)
+        gene_names: List of gene names
+        cell_type_names: List of cell type names
+        anchors: Dict of anchor genes per cell type
+        weights: Dict of weights per anchor gene
+        lambda_prior: Weight of protein prior (default: 1.0)
+
+    Returns:
+        Y_refined: Updated proportions (N_spots × T_types)
+    """
+    from scipy.optimize import minimize, Bounds
+
+    n_spots, n_genes = GEX.shape
+    n_types = len(cell_type_names)
+
+    # Build gene weights vector
+    gene_to_idx = {g: i for i, g in enumerate(gene_names)}
+    gene_weights = np.ones(n_genes)
+    for ct_name, gene_dict in weights.items():
+        for g_name, w in gene_dict.items():
+            if g_name in gene_to_idx:
+                gene_weights[gene_to_idx[g_name]] = w
+
+    Y_refined = np.zeros((n_spots, n_types))
+
+    for i in range(n_spots):
+        gex_i = GEX[i, :]
+        y_protein_i = Y_protein[i, :]
+
+        def objective(y):
+            # Reconstruction error (weighted)
+            reconstruction = E.T @ y  # (G,)
+            recon_error = np.sum(gene_weights * (gex_i - reconstruction) ** 2)
+
+            # Prior toward protein proportions
+            prior_error = lambda_prior * np.sum((y - y_protein_i) ** 2)
+
+            return recon_error + prior_error
+
+        # Bounds: 0 <= y[t] <= 1
+        bounds = Bounds(lb=np.zeros(n_types), ub=np.ones(n_types))
+
+        # Constraint: sum(y) <= 1
+        constraints = {"type": "ineq", "fun": lambda y: 1.0 - np.sum(y)}
+
+        # Initial guess: current proportions
+        y0 = Y_current[i, :].copy()
+
+        result = minimize(
+            objective,
+            y0,
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
+            options={"maxiter": 100, "ftol": 1e-8},
+        )
+
+        if result.success:
+            Y_refined[i, :] = result.x
+        else:
+            # Fallback to current
+            Y_refined[i, :] = Y_current[i, :]
+
+    return Y_refined
