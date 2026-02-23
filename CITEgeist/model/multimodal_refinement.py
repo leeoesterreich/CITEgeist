@@ -22,6 +22,8 @@ def select_anchor_genes(
     cell_type_names: List[str],
     n_anchors: int = 20,
     min_correlation: float = 0.3,
+    min_expressing_spots: int = 20,
+    sparse_aware: bool = True,
 ) -> Tuple[Dict[str, List[str]], Dict[str, Dict[str, float]]]:
     """
     Select top-N anchor genes per cell type based on correlation and specificity.
@@ -35,6 +37,8 @@ def select_anchor_genes(
         cell_type_names: List of cell type names (length T)
         n_anchors: Number of anchor genes per cell type (default: 20)
         min_correlation: Minimum Pearson r to be considered (default: 0.3)
+        min_expressing_spots: Minimum spots with non-zero expression (default: 20)
+        sparse_aware: If True, compute correlations only on expressing spots (default: True)
 
     Returns:
         anchors: Dict[cell_type] -> List[gene_names]
@@ -48,22 +52,53 @@ def select_anchor_genes(
     if n_types != len(cell_type_names):
         raise ValueError(f"Y_protein has {n_types} types but {len(cell_type_names)} names provided")
 
+    # Check sparsity
+    sparsity = (GEX == 0).sum() / GEX.size
+    logger.info(f"GEX sparsity: {sparsity:.1%}, sparse_aware={sparse_aware}")
+
     # Compute correlation matrix (genes × cell types)
     correlations = np.zeros((n_genes, n_types))
-    for t in range(n_types):
-        y_t = Y_protein[:, t]
-        # Skip if no variance in proportions
-        if np.std(y_t) < 1e-10:
-            continue
-        for g in range(n_genes):
-            gex_g = GEX[:, g]
+    n_expressing = np.zeros(n_genes, dtype=int)  # Track expressing spots per gene
+
+    for g in range(n_genes):
+        gex_g = GEX[:, g]
+
+        if sparse_aware:
+            # Only use spots where gene is expressed (non-zero)
+            expressing_mask = gex_g > 0
+            n_expr = expressing_mask.sum()
+            n_expressing[g] = n_expr
+
+            if n_expr < min_expressing_spots:
+                continue  # Skip genes with too few expressing spots
+
+            gex_g_subset = gex_g[expressing_mask]
+            if np.std(gex_g_subset) < 1e-10:
+                continue
+
+            for t in range(n_types):
+                y_t_subset = Y_protein[expressing_mask, t]
+                if np.std(y_t_subset) < 1e-10:
+                    continue
+                r, _ = pearsonr(gex_g_subset, y_t_subset)
+                if not np.isnan(r):
+                    correlations[g, t] = r
+        else:
+            # Original behavior: use all spots
+            n_expressing[g] = n_spots
             if np.std(gex_g) < 1e-10:
                 continue
-            r, _ = pearsonr(gex_g, y_t)
-            if not np.isnan(r):
-                correlations[g, t] = r
 
-    logger.info(f"Computed correlations for {n_genes} genes × {n_types} cell types")
+            for t in range(n_types):
+                y_t = Y_protein[:, t]
+                if np.std(y_t) < 1e-10:
+                    continue
+                r, _ = pearsonr(gex_g, y_t)
+                if not np.isnan(r):
+                    correlations[g, t] = r
+
+    n_valid_genes = (n_expressing >= min_expressing_spots).sum()
+    logger.info(f"Computed correlations for {n_valid_genes}/{n_genes} genes × {n_types} cell types")
 
     # Compute specificity: r[g,t] - max(r[g, other_types])
     specificity = np.zeros((n_genes, n_types))
@@ -281,6 +316,8 @@ def multimodal_em_refinement(
     lambda_prior: float = 1.0,
     max_iterations: int = 20,
     tolerance: float = 1e-4,
+    sparse_aware: bool = True,
+    min_expressing_spots: int = 20,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, List[str]]]:
     """
     Full multimodal EM refinement: Pass 1.5 + Pass 2 EM.
@@ -298,6 +335,8 @@ def multimodal_em_refinement(
         lambda_prior: Weight of protein prior in M-step (default: 1.0)
         max_iterations: Maximum EM iterations (default: 20)
         tolerance: Convergence tolerance (default: 1e-4)
+        sparse_aware: If True, compute correlations only on expressing spots (default: True)
+        min_expressing_spots: Minimum spots with expression for anchor selection (default: 20)
 
     Returns:
         Y_refined: Refined proportions (N_spots × T_types)
@@ -318,6 +357,8 @@ def multimodal_em_refinement(
         cell_type_names=cell_type_names,
         n_anchors=n_anchors,
         min_correlation=min_correlation,
+        min_expressing_spots=min_expressing_spots,
+        sparse_aware=sparse_aware,
     )
 
     total_anchors = sum(len(v) for v in anchors.values())

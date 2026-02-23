@@ -1,0 +1,94 @@
+=== Comparing All Methods Against αSMA-Only Fibroblast GT ===
+Start time: Mon Feb  9 08:40:10 PM EST 2026
+
+============================================================
+Evaluating: CITEgeist
+============================================================
+  Overall Pearson r: 0.7369
+  Overall RMSE:     0.1077
+  Overall MAE:      0.0781
+  Overall JSD:      0.3547
+
+============================================================
+Evaluating: Cell2Location
+============================================================
+  Overall Pearson r: 0.4938
+  Overall RMSE:     0.1667
+  Overall MAE:      0.1063
+  Overall JSD:      0.4042
+
+============================================================
+Evaluating: Tangram
+============================================================
+  Overall Pearson r: -0.0101
+  Overall RMSE:     0.1869
+  Overall MAE:      0.1413
+  Overall JSD:      0.5272
+
+============================================================
+Evaluating: RCTD
+============================================================
+  Overall Pearson r: 0.4827
+  Overall RMSE:     0.1754
+  Overall MAE:      0.1119
+  Overall JSD:      0.4317
+
+============================================================
+Evaluating: Seurat
+============================================================
+  Overall Pearson r: 0.1816
+  Overall RMSE:     0.2541
+  Overall MAE:      0.1448
+  Overall JSD:      0.5364
+
+
+================================================================================
+FULL METHOD COMPARISON - Protein-Gated Ground Truth (Achievable-7)
+================================================================================
+
+--- Overall Metrics ---
+Method            Pearson r       RMSE        MAE        JSD
+--------------------------------------------------------
+CITEgeist            0.7369     0.1077     0.0781     0.3547
+Cell2Location        0.4938     0.1667     0.1063     0.4042
+RCTD                 0.4827     0.1754     0.1119     0.4317
+Seurat               0.1816     0.2541     0.1448     0.5364
+Tangram             -0.0101     0.1869     0.1413     0.5272
+
+--- Per-Cell-Type Pearson r (mean ± std across regions) ---
+Cell Type                   CITEgeist    Cell2Location             RCTD           Seurat          Tangram
+---------------------------------------------------------------------------------------------------------
+B cells                0.551±0.423   0.214±0.165   0.221±0.245     nan±nan   0.019±0.076
+CD4+ T cells           0.410±0.168   0.626±0.068   0.603±0.112   0.395±0.236   0.597±0.068
+CD8+ T cells           0.797±0.061   0.667±0.087   0.512±0.028   0.539±0.077   0.546±0.053
+Macrophages            0.802±0.019   0.533±0.063   0.709±0.068   0.593±0.068   0.416±0.043
+Endothelial            0.604±0.161   0.765±0.045   0.793±0.026   0.301±0.135   0.615±0.024
+Epithelial             0.600±0.092   0.599±0.078   0.594±0.118   0.528±0.113   0.306±0.057
+Fibroblasts            0.531±0.143   0.095±0.205   0.118±0.089   0.332±0.058  -0.009±0.091
+MEAN................   0.614         0.500         0.507           nan         0.356      
+
+--- Per-Region Overall Pearson r ---
+Region          CITEgeist  Cell2Location           RCTD         Seurat        Tangram
+-------------------------------------------------------------------------------------
+Region 0           0.7267         0.5653         0.3936         0.1055         0.0322
+Region 1           0.6840         0.5725         0.4034         0.1843         0.0674
+Region 2           0.7048         0.5718         0.5719         0.2129        -0.0390
+Region 3           0.7950         0.3707         0.5413         0.2085        -0.0457
+Region 4           0.7739         0.3887         0.5035         0.1968        -0.0652
+
+--- Category Wins (best per-cell-type r) ---
+  B cells             : CITEgeist (r=0.5511)
+  CD4+ T cells        : Cell2Location (r=0.6260)
+  CD8+ T cells        : CITEgeist (r=0.7968)
+  Macrophages         : CITEgeist (r=0.8021)
+  Endothelial         : RCTD (r=0.7931)
+  Epithelial          : CITEgeist (r=0.6003)
+  Fibroblasts         : CITEgeist (r=0.5315)
+
+Total wins: CITEgeist=5  Cell2Location=1  RCTD=1  Seurat=0  Tangram=0  
+
+Full results saved to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/full_comparison.json
+
+================================================================================
+=== Done ===
+End time: Mon Feb  9 08:40:13 PM EST 2026

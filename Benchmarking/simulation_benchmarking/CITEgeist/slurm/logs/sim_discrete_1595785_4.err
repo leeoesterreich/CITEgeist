@@ -1,0 +1,32 @@
+2026-02-13 12:07:05,756 - __main__ - INFO - ============================================================
+2026-02-13 12:07:05,756 - __main__ - INFO - BENCHMARK: replicate=4, condition=mixed, mode=dapi
+2026-02-13 12:07:05,757 - __main__ - INFO - ============================================================
+2026-02-13 12:07:06,238 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_4_cellpose.png
+2026-02-13 12:07:07,873 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-13 12:07:07,874 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-13 12:07:16,425 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-13 12:07:16,629 - cellpose.core - INFO - ** TORCH CUDA version installed and working. **
+2026-02-13 12:07:16,629 - cellpose.core - INFO - >>>> using GPU (CUDA)
+2026-02-13 12:07:17,760 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-13 12:07:18,176 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-13 12:07:18,202 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-13 12:07:55,647 - __main__ - INFO - Detected 1096 nuclei in 47.8s
+2026-02-13 12:07:55,989 - __main__ - INFO - Loaded ground truth counts: 956 spots, total 5000 cells
+2026-02-13 12:07:55,990 - __main__ - INFO - Nuclei count correlation: -0.005
+2026-02-13 12:07:55,990 - __main__ - INFO - Nuclei count RMSE: 5.15
+2026-02-13 12:07:55,992 - __main__ - INFO - Loading h5ad files...
+2026-02-13 12:07:59,728 - root - INFO - Logging initialized.
+2026-02-13 12:07:59,740 - root - INFO - Discrete antibody preprocessing complete: Row sums range [30.61, 50.79], mean=39.98, std=2.83
+2026-02-13 12:08:00,060 - root - INFO - Normalization stats:
+2026-02-13 12:08:00,061 - root - INFO - Original median total: 80712055723.50
+2026-02-13 12:08:00,076 - root - INFO - Mean scaled total: 9978.33
+2026-02-13 12:08:00,087 - root - INFO - Max scaled value: 10000.00
+2026-02-13 12:08:00,214 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 345, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 327, in main
+    results = run_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 262, in run_benchmark
+    cell_counts = model.run_discrete_cell_assignment(
+TypeError: CitegeistModel.run_discrete_cell_assignment() got an unexpected keyword argument 'max_iterations'

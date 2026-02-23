@@ -1,0 +1,4 @@
+Running replicate 2 with lambda_laplacian=0.0
+Loading replicate 2, condition=mixed
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.

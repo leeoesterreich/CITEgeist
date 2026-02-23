@@ -1,0 +1,36 @@
+[2026-02-10 16:51:59] Job started for replicate 1
+Activating CARD_env...
+R: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/bin/R
+R version: R version 4.4.3 (2025-02-28) -- "Trophy Case"
+============================================
+CARD Deconvolution - high_seg Replicate 1 (reference mode)
+============================================
+Start time: 2026-02-10 16:55:54.031482
+
+Loading spatial data...
+  Spatial data: 29733 genes x 952 spots
+
+Loading reference data from CSV...
+  Reference: 27719 genes x 38241 cells
+  Cell types: Endothelial, CAFs, PVL, Plasmablasts, T-cells, Myeloid, Cancer Epithelial, Normal Epithelial, B-cells
+
+Creating CARD object...
+## QC on scRNASeq dataset! ...
+## QC on spatially-resolved dataset! ...
+
+Running CARD deconvolution...
+## create reference matrix from scRNASeq...
+## Select Informative Genes! ...
+## Deconvolution Starts! ...
+## Deconvolution Finish! ...
+
+CARD completed in 453.4 seconds (7.6 min)
+  Proportions: 952 spots x 9 cell types
+
+Saved predictions to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CARD/high_seg/Wu_ST_1_CARD_deconv_predictions.csv
+
+============================================
+Completed CARD pipeline for replicate: Wu_ST_1
+End time: 2026-02-10 17:04:14.132026
+[2026-02-10 17:04:14] Job completed for replicate 1
+CARD_TOTAL_RUNTIME: Replicate 1 took 735 seconds (12.25 minutes)

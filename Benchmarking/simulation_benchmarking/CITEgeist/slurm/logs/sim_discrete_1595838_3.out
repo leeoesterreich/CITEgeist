@@ -1,0 +1,10 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_per_marker=True, no per-spot normalization.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+
+=== RESULTS ===
+Nuclei count correlation: 0.073
+Proportion correlation: 0.364
+Completed replicate 3, condition mixed, mode h_and_e

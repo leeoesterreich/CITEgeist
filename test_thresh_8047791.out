@@ -1,0 +1,94 @@
+======================================================================
+Testing Lower Protein Gating Thresholds
+======================================================================
+
+1. Loading data...
+   Loaded 465534 cells
+
+2. Loading RNA clusters...
+
+3. Testing threshold configurations...
+======================================================================
+
+--- Current (p50/p25/p75/p90) ---
+   Thresholds:
+      CD3E (p50): 139.0
+      CD68 (p50): 93.0
+      CD31 (p50): 27.0
+      PanCK (p25): 14.0
+      alphaSMA (p75): 50.0
+
+   Results:
+      Unknown rate: 22.0%
+      Overall concordance: 56.7%
+      Per-type concordance:
+         B cells: 65.2%
+         T cells: 68.7%
+         Macrophages: 83.1%
+         Endothelial: 67.4%
+         Epithelial: 67.8%
+         Fibroblasts: 82.1%
+
+--- Lower (p25 for main markers) ---
+   Thresholds:
+      CD3E (p25): 25.0
+      CD68 (p25): 26.0
+      CD31 (p25): 9.0
+      PanCK (p10): 5.0
+      alphaSMA (p50): 20.0
+
+   Results:
+      Unknown rate: 9.9%
+      Overall concordance: 54.6%
+      Per-type concordance:
+         B cells: 55.6%
+         T cells: 50.4%
+         Macrophages: 73.3%
+         Endothelial: 66.2%
+         Epithelial: 71.3%
+         Fibroblasts: 83.5%
+
+--- Very Low (p10 for main markers) ---
+   Thresholds:
+      CD3E (p10): 7.0
+      CD68 (p10): 7.0
+      CD31 (p10): 3.0
+      PanCK (p5): 3.0
+      alphaSMA (p25): 8.0
+
+   Results:
+      Unknown rate: 6.1%
+      Overall concordance: 49.5%
+      Per-type concordance:
+         B cells: 52.4%
+         T cells: 42.1%
+         Macrophages: 66.7%
+         Endothelial: 65.2%
+         Epithelial: 65.9%
+         Fibroblasts: 80.1%
+
+======================================================================
+SUMMARY COMPARISON
+======================================================================
+
+Config                                Unknown% Concordance%
+------------------------------------------------------------
+Current (p50/p25/p75/p90)                 22.0         56.7
+Lower (p25 for main markers)               9.9         54.6
+Very Low (p10 for main markers)            6.1         49.5
+
+======================================================================
+TRADE-OFF ANALYSIS
+======================================================================
+
+Lowering thresholds from p50 to p25:
+   Unknown rate: 22.0% → 9.9% (Δ = -12.1%)
+   Concordance:  56.7% → 54.6% (Δ = -2.1%)
+
+   Per-type changes:
+      B cells: 65.2% → 55.6% (↓ 9.7%)
+      T cells: 68.7% → 50.4% (↓ 18.3%)
+      Macrophages: 83.1% → 73.3% (↓ 9.9%)
+      Endothelial: 67.4% → 66.2% (↓ 1.2%)
+      Epithelial: 67.8% → 71.3% (↑ 3.5%)
+      Fibroblasts: 82.1% → 83.5% (↑ 1.4%)

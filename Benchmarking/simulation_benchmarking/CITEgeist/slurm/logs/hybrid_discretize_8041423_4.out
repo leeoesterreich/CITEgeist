@@ -1,0 +1,5 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"

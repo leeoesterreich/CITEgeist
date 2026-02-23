@@ -1,0 +1,23 @@
+2026-02-18 21:12:26,082 - __main__ - INFO - ======================================================================
+2026-02-18 21:12:26,082 - __main__ - INFO - HYBRID BENCHMARK: Xenium_region_1
+2026-02-18 21:12:26,082 - __main__ - INFO - ======================================================================
+2026-02-18 21:12:26,082 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:12:26,082 - __main__ - INFO - STEP 1: Loading data
+2026-02-18 21:12:26,082 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:12:26,215 - __main__ - INFO - GEX: 1417 spots x 405 genes
+2026-02-18 21:12:26,215 - __main__ - INFO - CITE: 1417 spots x 27 proteins
+2026-02-18 21:12:26,215 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:12:26,215 - __main__ - INFO - STEP 2: Cellpose nuclei segmentation
+2026-02-18 21:12:26,215 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:12:26,216 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_1/morphology.png
+2026-02-18 21:12:29,894 - __main__ - INFO - Image shape: (25883, 11529, 3), dtype: uint8
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_hybrid_cellpose.py", line 464, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_hybrid_cellpose.py", line 447, in main
+    results = run_hybrid_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_hybrid_cellpose.py", line 241, in run_hybrid_benchmark
+    spot_coords_pixel = convert_micron_to_pixel(spot_coords_micron, coord_info)
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_hybrid_cellpose.py", line 102, in convert_micron_to_pixel
+    offset_x = float(coord_info["offset_x"])
+KeyError: 'offset_x'

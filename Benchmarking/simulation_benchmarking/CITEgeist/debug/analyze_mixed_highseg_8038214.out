@@ -1,0 +1,430 @@
+======================================================================
+COMPARISON: MIXED vs HIGH_SEG SIMULATION DATASETS
+======================================================================
+
+
+Loading MIXED dataset...
+
+
+Loading HIGH_SEG dataset...
+
+============================================================
+Proportion Analysis: MIXED
+============================================================
+Number of spots: 951
+Number of cell types: 11
+Cell types: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells', 'spot_x', 'spot_y']
+
+--- Cell types per spot (threshold=0.01) ---
+Mean: 4.72
+Median: 5.00
+Min: 3
+Max: 7
+Std: 0.93
+
+Distribution of cell type counts per spot:
+  1 cell types: 0 spots (0.0%)
+  2 cell types: 0 spots (0.0%)
+  3 cell types: 75 spots (7.9%)
+  4 cell types: 324 spots (34.1%)
+  5 cell types: 370 spots (38.9%)
+  6 cell types: 155 spots (16.3%)
+  7 cell types: 27 spots (2.8%)
+  8 cell types: 0 spots (0.0%)
+  9 cell types: 0 spots (0.0%)
+  10 cell types: 0 spots (0.0%)
+  11 cell types: 0 spots (0.0%)
+
+--- Entropy analysis ---
+Mean entropy: 1.006 (max possible: 3.459)
+Mean normalized entropy: 0.291
+Median normalized entropy: 0.310
+Std normalized entropy: 0.056
+
+--- Spot purity analysis ---
+  Dominant >= 50%: 951 spots (100.0%)
+  Dominant >= 70%: 951 spots (100.0%)
+  Dominant >= 90%: 951 spots (100.0%)
+  Dominant >= 95%: 951 spots (100.0%)
+  Dominant >= 99%: 951 spots (100.0%)
+
+--- Mean proportion per cell type ---
+  B-cells: mean=0.0498, present in 208 spots (21.9%)
+  CAFs: mean=0.2975, present in 734 spots (77.2%)
+  Cancer Epithelial: mean=0.4314, present in 839 spots (88.2%)
+  Endothelial: mean=0.0083, present in 15 spots (1.6%)
+  Myeloid: mean=0.0915, present in 368 spots (38.7%)
+  Normal Epithelial: mean=0.0097, present in 17 spots (1.8%)
+  PVL: mean=0.0050, present in 8 spots (0.8%)
+  Plasmablasts: mean=0.0068, present in 14 spots (1.5%)
+  T-cells: mean=0.1000, present in 385 spots (40.5%)
+  spot_x: mean=25.8539, present in 951 spots (100.0%)
+  spot_y: mean=26.1295, present in 951 spots (100.0%)
+
+============================================================
+Proportion Analysis: HIGH_SEG
+============================================================
+Number of spots: 951
+Number of cell types: 11
+Cell types: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells', 'spot_x', 'spot_y']
+
+--- Cell types per spot (threshold=0.01) ---
+Mean: 3.69
+Median: 4.00
+Min: 3
+Max: 7
+Std: 0.78
+
+Distribution of cell type counts per spot:
+  1 cell types: 0 spots (0.0%)
+  2 cell types: 0 spots (0.0%)
+  3 cell types: 453 spots (47.6%)
+  4 cell types: 363 spots (38.2%)
+  5 cell types: 116 spots (12.2%)
+  6 cell types: 14 spots (1.5%)
+  7 cell types: 5 spots (0.5%)
+  8 cell types: 0 spots (0.0%)
+  9 cell types: 0 spots (0.0%)
+  10 cell types: 0 spots (0.0%)
+  11 cell types: 0 spots (0.0%)
+
+--- Entropy analysis ---
+Mean entropy: 0.989 (max possible: 3.459)
+Mean normalized entropy: 0.286
+Median normalized entropy: 0.306
+Std normalized entropy: 0.055
+
+--- Spot purity analysis ---
+  Dominant >= 50%: 951 spots (100.0%)
+  Dominant >= 70%: 951 spots (100.0%)
+  Dominant >= 90%: 951 spots (100.0%)
+  Dominant >= 95%: 951 spots (100.0%)
+  Dominant >= 99%: 951 spots (100.0%)
+
+--- Mean proportion per cell type ---
+  B-cells: mean=0.0400, present in 84 spots (8.8%)
+  CAFs: mean=0.0501, present in 140 spots (14.7%)
+  Cancer Epithelial: mean=0.2395, present in 359 spots (37.7%)
+  Endothelial: mean=0.0776, present in 179 spots (18.8%)
+  Myeloid: mean=0.1196, present in 218 spots (22.9%)
+  Normal Epithelial: mean=0.0557, present in 111 spots (11.7%)
+  PVL: mean=0.3267, present in 358 spots (37.6%)
+  Plasmablasts: mean=0.0052, present in 18 spots (1.9%)
+  T-cells: mean=0.0856, present in 141 spots (14.8%)
+  spot_x: mean=25.8539, present in 951 spots (100.0%)
+  spot_y: mean=26.1295, present in 951 spots (100.0%)
+
+======================================================================
+COMPARATIVE SUMMARY: Proportion Distributions
+======================================================================
+
+Metric                                          MIXED     HIGH_SEG
+----------------------------------------------------------------
+Mean cell types per spot                         4.72         3.69
+Mean normalized entropy                         0.291        0.286
+% spots with dominant >= 90%                    100.0%        100.0%
+% spots with dominant >= 50%                    100.0%        100.0%
+
+============================================================
+Marker Signal Analysis: MIXED
+============================================================
+
+Total markers: 100
+Cell types with specific markers: 9
+
+--- Raw expression statistics ---
+Expression matrix shape: (951, 100)
+Mean expression: 9.0066
+Std expression: 5.6090
+Max expression: 63.0000
+% zeros: 6.65%
+
+--- Cell-type specific marker analysis ---
+  B-cells_Protein_1 (B-cells):
+    Correlation with proportion: -0.011 (p=7.32e-01)
+    Mean expr: 2.506, Std: 4.640
+    SNR (high/low prop): 0.89
+  B-cells_Protein_2 (B-cells):
+    Correlation with proportion: -0.042 (p=1.99e-01)
+    Mean expr: 2.415, Std: 4.358
+    SNR (high/low prop): 0.81
+  CAFs_Protein_1 (CAFs):
+    Correlation with proportion: 0.001 (p=9.72e-01)
+    Mean expr: 10.592, Std: 9.767
+    SNR (high/low prop): 0.96
+  CAFs_Protein_2 (CAFs):
+    Correlation with proportion: 0.024 (p=4.56e-01)
+    Mean expr: 10.388, Std: 9.712
+    SNR (high/low prop): 1.01
+  Cancer Epithelial_Protein_1 (Cancer Epithelial):
+    Correlation with proportion: 0.014 (p=6.64e-01)
+    Mean expr: 14.742, Std: 11.433
+    SNR (high/low prop): 1.01
+  Cancer Epithelial_Protein_2 (Cancer Epithelial):
+    Correlation with proportion: -0.016 (p=6.15e-01)
+    Mean expr: 14.644, Std: 11.105
+    SNR (high/low prop): 0.97
+  Endothelial_Protein_1 (Endothelial):
+    Correlation with proportion: -0.010 (p=7.61e-01)
+    Mean expr: 1.395, Std: 3.145
+    SNR (high/low prop): 0.94
+  Endothelial_Protein_2 (Endothelial):
+    Correlation with proportion: 0.015 (p=6.49e-01)
+    Mean expr: 1.291, Std: 2.401
+    SNR (high/low prop): 1.32
+  Myeloid_Protein_1 (Myeloid):
+    Correlation with proportion: 0.021 (p=5.17e-01)
+    Mean expr: 3.683, Std: 5.554
+    SNR (high/low prop): 1.01
+  Myeloid_Protein_2 (Myeloid):
+    Correlation with proportion: 0.022 (p=4.95e-01)
+    Mean expr: 3.718, Std: 5.299
+    SNR (high/low prop): 1.05
+  Normal Epithelial_Protein_1 (Normal Epithelial):
+    Correlation with proportion: 0.003 (p=9.30e-01)
+    Mean expr: 1.335, Std: 3.421
+    SNR (high/low prop): 1.22
+  Normal Epithelial_Protein_2 (Normal Epithelial):
+    Correlation with proportion: 0.029 (p=3.67e-01)
+    Mean expr: 1.298, Std: 3.217
+    SNR (high/low prop): 1.63
+  PVL_Protein_1 (PVL):
+    Correlation with proportion: 0.005 (p=8.66e-01)
+    Mean expr: 1.179, Std: 2.643
+    SNR (high/low prop): 0.95
+  PVL_Protein_2 (PVL):
+    Correlation with proportion: 0.040 (p=2.18e-01)
+    Mean expr: 1.137, Std: 2.207
+    SNR (high/low prop): 1.66
+  Plasmablasts_Protein_1 (Plasmablasts):
+    Correlation with proportion: -0.000 (p=9.99e-01)
+    Mean expr: 1.231, Std: 2.443
+    SNR (high/low prop): 0.98
+  Plasmablasts_Protein_2 (Plasmablasts):
+    Correlation with proportion: -0.008 (p=8.10e-01)
+    Mean expr: 1.279, Std: 2.558
+    SNR (high/low prop): 0.94
+  T-cells_Protein_1 (T-cells):
+    Correlation with proportion: -0.011 (p=7.41e-01)
+    Mean expr: 3.882, Std: 5.872
+    SNR (high/low prop): 0.95
+  T-cells_Protein_2 (T-cells):
+    Correlation with proportion: 0.006 (p=8.59e-01)
+    Mean expr: 4.037, Std: 6.269
+    SNR (high/low prop): 1.12
+
+============================================================
+Marker Signal Analysis: HIGH_SEG
+============================================================
+
+Total markers: 100
+Cell types with specific markers: 9
+
+--- Raw expression statistics ---
+Expression matrix shape: (951, 100)
+Mean expression: 9.0271
+Std expression: 6.1763
+Max expression: 80.0000
+% zeros: 7.54%
+
+--- Cell-type specific marker analysis ---
+  B-cells_Protein_1 (B-cells):
+    Correlation with proportion: -0.040 (p=2.16e-01)
+    Mean expr: 2.105, Std: 5.215
+    SNR (high/low prop): 0.45
+  B-cells_Protein_2 (B-cells):
+    Correlation with proportion: -0.008 (p=8.04e-01)
+    Mean expr: 2.282, Std: 5.264
+    SNR (high/low prop): 0.93
+  CAFs_Protein_1 (CAFs):
+    Correlation with proportion: 0.014 (p=6.56e-01)
+    Mean expr: 2.515, Std: 5.740
+    SNR (high/low prop): 0.73
+  CAFs_Protein_2 (CAFs):
+    Correlation with proportion: 0.056 (p=8.23e-02)
+    Mean expr: 2.393, Std: 5.311
+    SNR (high/low prop): 1.11
+  Cancer Epithelial_Protein_1 (Cancer Epithelial):
+    Correlation with proportion: -0.054 (p=9.43e-02)
+    Mean expr: 8.461, Std: 12.462
+    SNR (high/low prop): 0.84
+  Cancer Epithelial_Protein_2 (Cancer Epithelial):
+    Correlation with proportion: -0.012 (p=7.15e-01)
+    Mean expr: 8.750, Std: 12.896
+    SNR (high/low prop): 0.96
+  Endothelial_Protein_1 (Endothelial):
+    Correlation with proportion: -0.004 (p=9.04e-01)
+    Mean expr: 3.354, Std: 6.950
+    SNR (high/low prop): 1.09
+  Endothelial_Protein_2 (Endothelial):
+    Correlation with proportion: 0.001 (p=9.76e-01)
+    Mean expr: 3.530, Std: 7.281
+    SNR (high/low prop): 1.18
+  Myeloid_Protein_1 (Myeloid):
+    Correlation with proportion: -0.019 (p=5.64e-01)
+    Mean expr: 4.937, Std: 10.069
+    SNR (high/low prop): 0.78
+  Myeloid_Protein_2 (Myeloid):
+    Correlation with proportion: -0.022 (p=5.06e-01)
+    Mean expr: 4.735, Std: 9.485
+    SNR (high/low prop): 0.82
+  Normal Epithelial_Protein_1 (Normal Epithelial):
+    Correlation with proportion: -0.054 (p=9.61e-02)
+    Mean expr: 2.921, Std: 6.774
+    SNR (high/low prop): 0.63
+  Normal Epithelial_Protein_2 (Normal Epithelial):
+    Correlation with proportion: -0.040 (p=2.20e-01)
+    Mean expr: 2.711, Std: 6.102
+    SNR (high/low prop): 0.69
+  PVL_Protein_1 (PVL):
+    Correlation with proportion: -0.000 (p=9.99e-01)
+    Mean expr: 11.681, Std: 16.954
+    SNR (high/low prop): 0.97
+  PVL_Protein_2 (PVL):
+    Correlation with proportion: -0.002 (p=9.46e-01)
+    Mean expr: 11.661, Std: 16.655
+    SNR (high/low prop): 0.95
+  Plasmablasts_Protein_1 (Plasmablasts):
+    Correlation with proportion: -0.006 (p=8.62e-01)
+    Mean expr: 1.077, Std: 1.736
+    SNR (high/low prop): 1.66
+  Plasmablasts_Protein_2 (Plasmablasts):
+    Correlation with proportion: -0.024 (p=4.51e-01)
+    Mean expr: 1.179, Std: 2.073
+    SNR (high/low prop): 0.51
+  T-cells_Protein_1 (T-cells):
+    Correlation with proportion: -0.022 (p=4.97e-01)
+    Mean expr: 3.618, Std: 8.458
+    SNR (high/low prop): 0.83
+  T-cells_Protein_2 (T-cells):
+    Correlation with proportion: -0.007 (p=8.35e-01)
+    Mean expr: 3.787, Std: 9.041
+    SNR (high/low prop): 0.90
+
+============================================================
+Marker Correlation Analysis: MIXED
+============================================================
+
+Specific markers: 18
+Nonspecific markers: 82
+
+--- Within-cell-type marker correlations ---
+  B-cells: 2 markers, mean within-type corr: 0.702
+  CAFs: 2 markers, mean within-type corr: 0.707
+  Cancer Epithelial: 2 markers, mean within-type corr: 0.688
+  Endothelial: 2 markers, mean within-type corr: 0.560
+  Myeloid: 2 markers, mean within-type corr: 0.642
+  Normal Epithelial: 2 markers, mean within-type corr: 0.504
+  PVL: 2 markers, mean within-type corr: 0.603
+  Plasmablasts: 2 markers, mean within-type corr: 0.606
+  T-cells: 2 markers, mean within-type corr: 0.683
+
+Overall within-cell-type correlation: 0.633
+
+--- Between-cell-type marker correlations ---
+Mean between-cell-type correlation: -0.052
+Std between-cell-type correlation: 0.067
+
+============================================================
+Marker Correlation Analysis: HIGH_SEG
+============================================================
+
+Specific markers: 18
+Nonspecific markers: 82
+
+--- Within-cell-type marker correlations ---
+  B-cells: 2 markers, mean within-type corr: 0.764
+  CAFs: 2 markers, mean within-type corr: 0.793
+  Cancer Epithelial: 2 markers, mean within-type corr: 0.829
+  Endothelial: 2 markers, mean within-type corr: 0.824
+  Myeloid: 2 markers, mean within-type corr: 0.881
+  Normal Epithelial: 2 markers, mean within-type corr: 0.818
+  PVL: 2 markers, mean within-type corr: 0.809
+  Plasmablasts: 2 markers, mean within-type corr: 0.361
+  T-cells: 2 markers, mean within-type corr: 0.872
+
+Overall within-cell-type correlation: 0.772
+
+--- Between-cell-type marker correlations ---
+Mean between-cell-type correlation: -0.071
+Std between-cell-type correlation: 0.088
+
+============================================================
+Integer Feasibility Analysis: MIXED
+============================================================
+
+--- n_cells = 5 ---
+  Mean absolute error: 4.7411
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1965
+
+--- n_cells = 10 ---
+  Mean absolute error: 4.7319
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1965
+
+--- n_cells = 15 ---
+  Mean absolute error: 4.7314
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1971
+
+--- n_cells = 20 ---
+  Mean absolute error: 4.7293
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1971
+
+============================================================
+Integer Feasibility Analysis: HIGH_SEG
+============================================================
+
+--- n_cells = 5 ---
+  Mean absolute error: 4.7345
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1963
+
+--- n_cells = 10 ---
+  Mean absolute error: 4.7303
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1966
+
+--- n_cells = 15 ---
+  Mean absolute error: 4.7291
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1968
+
+--- n_cells = 20 ---
+  Mean absolute error: 4.7280
+  Max error: 100.0000
+  Spots with max error > 0.1: 951 (100.0%)
+  Correlation (true vs approx): -0.1967
+
+======================================================================
+DIAGNOSTIC SUMMARY
+======================================================================
+
+Based on the analysis, the key differences between datasets are:
+
+1. CELL TYPE MIXING:
+   - HIGH_SEG: Spots tend to be dominated by single cell types (high purity)
+   - MIXED: Spots contain multiple cell types in similar proportions (low purity)
+
+2. INTEGER CONSTRAINT IMPACT:
+   - HIGH_SEG: With ~1-2 dominant cell types, integer constraints work well
+   - MIXED: With many cell types per spot, integer rounding loses information
+
+3. SIGNAL AMBIGUITY:
+   - HIGH_SEG: Clear marker signals when cell type dominates
+   - MIXED: Overlapping marker signals from multiple cell types
+
+HYPOTHESIS: The discrete IQP fails on MIXED because:
+a) Integer constraints cannot represent fractional cell type mixtures
+b) With limited cells per spot, rounding errors accumulate
+c) Multiple cell types create marker signal ambiguity that integers can't resolve
+

@@ -1,0 +1,48 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_mode=per_marker, no per-spot normalization.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_1', 'spot_2', 'spot_3', 'spot_4', 'spot_5'], dtype='object')
+Parquet spot names format: ['spot_1' 'spot_2' 'spot_3' 'spot_4' 'spot_5']
+Added layer: PVL_genes_pass1 (Shape: (951, 29733))
+Added layer: T-cells_genes_pass1 (Shape: (951, 29733))
+Added layer: Endothelial_genes_pass1 (Shape: (951, 29733))
+Added layer: B-cells_genes_pass1 (Shape: (951, 29733))
+Added layer: Normal_Epithelial_genes_pass1 (Shape: (951, 29733))
+Added layer: Plasmablasts_genes_pass1 (Shape: (951, 29733))
+Added layer: CAFs_genes_pass1 (Shape: (951, 29733))
+Added layer: Cancer_Epithelial_genes_pass1 (Shape: (951, 29733))
+Added layer: Myeloid_genes_pass1 (Shape: (951, 29733))
+RMSE, NRMSE, and MAE per cell type:
+	Myeloid: RMSE: 0.1625, NRMSE: 0.0230, MAE: 0.0154
+	T-cells: RMSE: 0.1724, NRMSE: 0.0248, MAE: 0.0159
+	CAFs: RMSE: 0.2770, NRMSE: 0.0403, MAE: 0.0461
+	Plasmablasts: RMSE: 0.0684, NRMSE: 0.0082, MAE: 0.0022
+	PVL: RMSE: 0.0706, NRMSE: 0.0101, MAE: 0.0022
+	Cancer Epithelial: RMSE: 0.3165, NRMSE: 0.0377, MAE: 0.0589
+	Normal Epithelial: RMSE: 0.0788, NRMSE: 0.0128, MAE: 0.0031
+	B-cells: RMSE: 0.1277, NRMSE: 0.0176, MAE: 0.0079
+	Endothelial: RMSE: 0.0751, NRMSE: 0.0109, MAE: 0.0024
+
+Overall RMSE statistics:
+	Average RMSE: 0.1499
+	Median RMSE:  0.1277
+
+Overall NRMSE statistics:
+	Average NRMSE: 0.0206
+	Median NRMSE:  0.0176
+
+Overall MAE statistics:
+	Average MAE: 0.0171
+	Median MAE:  0.0079
+Per-cell type metrics saved to per_celltype_metrics.csv
+
+=== RESULTS ===
+Nuclei count correlation: 0.986
+Proportion correlation: 0.440
+Completed replicate 0, condition mixed, lambda_prior=1.0

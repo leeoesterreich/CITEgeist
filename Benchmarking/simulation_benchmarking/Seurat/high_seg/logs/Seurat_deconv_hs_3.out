@@ -1,0 +1,19 @@
+[2026-02-11 00:07:45] Running Seurat deconvolution for replicate: Wu_rep_3
+[2026-02-11 00:07:50.447252] Converting h5ad to h5Seurat: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/Wu_rep_3_GEX.h5ad -> /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/Wu_rep_3_GEX.h5seurat
+[2026-02-11 00:08:22.606908] Loading converted Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/Wu_rep_3_GEX.h5seurat
+[2026-02-11 00:09:17.405786] Loading reference Seurat object: /ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat
+[2026-02-11 00:10:44.936655] Running spatial deconvolution for replicate: Wu_rep_3
+[2026-02-11 00:11:06.567167] Saved deconvolution predictions: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/high_seg/output/Wu_rep_3_Seurat_deconv_predictions.csv
+[2026-02-11 00:11:18.941495] Saved updated Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/high_seg/output/Wu_rep_3_updated_query.h5Seurat
+[2026-02-11 00:11:19.159338] Saved visualization: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/high_seg/output/Wu_rep_3_Seurat_Prediction.pdf
+[2026-02-11 00:11:19.159506] Prediction summary for Wu_rep_3:
+
+          B-cells              CAFs Cancer Epithelial       Endothelial 
+               33               131               161               118 
+          Myeloid Normal Epithelial      Plasmablasts               PVL 
+               46               114                22               272 
+          T-cells 
+               59 
+[2026-02-11 00:11:19.16112] Seurat deconvolution completed for Wu_rep_3
+[2026-02-11 00:11:19] Completed Seurat deconvolution for replicate: Wu_rep_3
+SEURAT_TOTAL_RUNTIME: Wu_rep_3 took 214 seconds (3.56 minutes)

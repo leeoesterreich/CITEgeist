@@ -126,12 +126,26 @@ def calculate_metrics(
     return metrics
 
 
+def combine_t_cells_in_df(df: pd.DataFrame) -> pd.DataFrame:
+    """Combine CD4+ and CD8+ T cells into a single 'T cells' column."""
+    df = df.copy()
+    cd4_cols = [c for c in df.columns if "CD4" in c and "T" in c]
+    cd8_cols = [c for c in df.columns if "CD8" in c and "T" in c]
+
+    if cd4_cols and cd8_cols:
+        df["T cells"] = df[cd4_cols[0]] + df[cd8_cols[0]]
+        df = df.drop(columns=cd4_cols + cd8_cols)
+
+    return df
+
+
 def evaluate_region(
     region_id: int,
     gt_dir: str,
     pred_dir: str,
     prefix: str = "Xenium",
     use_achievable_7: bool = True,
+    combine_t_cells: bool = False,
 ) -> Dict[str, any]:
     """
     Evaluate a single region.
@@ -200,6 +214,11 @@ def evaluate_region(
     }
     pred_df = pred_df.rename(columns=col_rename)
 
+    # Combine T cells if requested (for RNA GT which can't distinguish CD4/CD8)
+    if combine_t_cells:
+        pred_df = combine_t_cells_in_df(pred_df)
+        logger.info("Combined CD4+ and CD8+ T cells into 'T cells'")
+
     # Normalize to proportions if predictions are cell counts (e.g. Tangram)
     row_sums = pred_df.select_dtypes(include=[np.number]).sum(axis=1)
     if row_sums.max() > 1.5:  # Not already proportions
@@ -238,6 +257,7 @@ def evaluate_all_regions(
     output_path: Optional[str] = None,
     prefix: str = "Xenium",
     use_achievable_7: bool = True,
+    combine_t_cells: bool = False,
 ) -> Dict[str, any]:
     """
     Evaluate all regions and compute summary statistics.
@@ -248,6 +268,8 @@ def evaluate_all_regions(
         n_regions: Number of regions
         output_path: Optional path to save results JSON
         prefix: Filename prefix
+        use_achievable_7: Filter GT to achievable-7 cell types
+        combine_t_cells: Combine CD4+ and CD8+ T cells in predictions
 
     Returns:
         Dict with all metrics and summary
@@ -256,7 +278,9 @@ def evaluate_all_regions(
 
     for region_id in range(n_regions):
         try:
-            metrics = evaluate_region(region_id, gt_dir, pred_dir, prefix, use_achievable_7)
+            metrics = evaluate_region(
+                region_id, gt_dir, pred_dir, prefix, use_achievable_7, combine_t_cells
+            )
             all_metrics.append(metrics)
             logger.info(f"Region {region_id}: Pearson r = {metrics['overall_pearson_r']:.4f}")
         except Exception as e:

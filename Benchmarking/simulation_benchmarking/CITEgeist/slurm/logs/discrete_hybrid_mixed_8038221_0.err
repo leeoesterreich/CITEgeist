@@ -1,0 +1,32 @@
+2026-02-17 22:58:07,392 - __main__ - INFO - ============================================================
+2026-02-17 22:58:07,393 - __main__ - INFO - BENCHMARK: replicate=0, condition=mixed, mode=dapi
+2026-02-17 22:58:07,393 - __main__ - INFO - ============================================================
+2026-02-17 22:58:07,393 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_0_cellpose.png
+2026-02-17 22:58:08,009 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-17 22:58:08,011 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-17 22:58:11,179 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-17 22:58:11,179 - cellpose.core - INFO - >>>> using CPU
+2026-02-17 22:58:11,179 - cellpose.core - INFO - >>>> using CPU
+2026-02-17 22:58:12,128 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-17 22:58:13,699 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-17 22:58:13,714 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-17 23:06:01,907 - __main__ - INFO - Detected 4894 nuclei in 473.9s
+2026-02-17 23:06:02,359 - __main__ - INFO - Nuclei count correlation: 0.986
+2026-02-17 23:06:02,359 - __main__ - INFO - Nuclei count RMSE: 0.46
+2026-02-17 23:06:02,360 - __main__ - INFO - Loading h5ad files...
+2026-02-17 23:06:30,015 - root - INFO - Logging initialized.
+2026-02-17 23:06:30,025 - root - INFO - Discrete antibody preprocessing complete: Row sums range [28.17, 48.90], mean=39.77, std=2.90
+2026-02-17 23:06:30,201 - root - INFO - Normalization stats:
+2026-02-17 23:06:30,201 - root - INFO - Original median total: 70657598764.00
+2026-02-17 23:06:30,207 - root - INFO - Mean scaled total: 9980.12
+2026-02-17 23:06:30,212 - root - INFO - Max scaled value: 10000.00
+2026-02-17 23:06:30,286 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2026-02-17 23:06:30,286 - __main__ - INFO - Running continuous optimization first (hybrid mode)...
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 609, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 583, in main
+    results = run_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 398, in run_benchmark
+    cont_props_df = model.run_cell_proportion_model(
+TypeError: CitegeistModel.run_cell_proportion_model() got an unexpected keyword argument 'lambda_smooth'

@@ -1,0 +1,13 @@
+2026-02-18 18:09:28,970 - __main__ - INFO - ============================================================
+2026-02-18 18:09:28,970 - __main__ - INFO - BENCHMARK: replicate=4, condition=mixed, mode=dapi
+2026-02-18 18:09:28,970 - __main__ - INFO - ============================================================
+2026-02-18 18:09:28,972 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_4_cellpose.png
+2026-02-18 18:09:30,774 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-18 18:09:30,775 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-18 18:09:40,643 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-18 18:09:40,643 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 18:09:40,643 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 18:09:44,005 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-18 18:09:46,117 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-18 18:09:46,179 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+slurmstepd: error: *** JOB 8041242 ON htc-n31 CANCELLED AT 2026-02-18T18:47:22 ***

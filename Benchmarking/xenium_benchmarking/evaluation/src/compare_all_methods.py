@@ -1,8 +1,12 @@
 """
-Full method comparison against protein-gated ground truth.
+Full method comparison against ground truth.
 
 Evaluates CITEgeist, Cell2Location, Tangram, RCTD, Seurat, and CARD
-against the achievable-7 protein GT and produces a summary table.
+against either protein-gated or RNA-based ground truth.
+
+Supports:
+- --gt-dir: Specify ground truth directory (default: protein GT)
+- --combine-t-cells: Merge CD4+ and CD8+ T cells in predictions (for RNA GT)
 
 Note on CARD:
 - Uses VIM-excluded results (output_protein_gt_novim) because VIM is a pan-mesenchymal
@@ -10,6 +14,7 @@ Note on CARD:
 - CARD ref-free is not compatible with Xenium's 405-gene panel (<20 markers/cell type).
 """
 
+import argparse
 import json
 import logging
 import sys
@@ -21,6 +26,16 @@ import pandas as pd
 # Add evaluation src to path
 sys.path.insert(0, str(Path(__file__).parent))
 from evaluate_benchmark import evaluate_all_regions, ACHIEVABLE_7_CELL_TYPES
+
+# RNA GT uses 6 cell types (T cells combined)
+RNA_6_CELL_TYPES = [
+    "B cells",
+    "T cells",
+    "Macrophages",
+    "Endothelial",
+    "Epithelial",
+    "Fibroblasts",
+]
 
 logging.basicConfig(
     level=logging.INFO,
@@ -66,8 +81,63 @@ METHODS = {
 }
 
 
+def combine_t_cells_in_predictions(pred_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Combine CD4+ and CD8+ T cells into a single 'T cells' column.
+
+    Used when evaluating against RNA GT which can't distinguish T cell subtypes.
+    """
+    pred_df = pred_df.copy()
+
+    # Check for T cell columns (handle both raw and R-mangled names)
+    cd4_cols = [c for c in pred_df.columns if "CD4" in c and "T" in c]
+    cd8_cols = [c for c in pred_df.columns if "CD8" in c and "T" in c]
+
+    if cd4_cols and cd8_cols:
+        # Sum CD4+ and CD8+ T cells
+        pred_df["T cells"] = pred_df[cd4_cols[0]] + pred_df[cd8_cols[0]]
+        # Drop original columns
+        pred_df = pred_df.drop(columns=cd4_cols + cd8_cols)
+
+    return pred_df
+
+
 def main():
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description="Compare all deconvolution methods")
+    parser.add_argument(
+        "--gt-dir",
+        type=str,
+        default=str(GT_DIR),
+        help="Ground truth directory (default: protein GT)",
+    )
+    parser.add_argument(
+        "--combine-t-cells",
+        action="store_true",
+        help="Combine CD4+ and CD8+ T cells in predictions (for RNA GT)",
+    )
+    parser.add_argument(
+        "--output-suffix",
+        type=str,
+        default="",
+        help="Suffix for output files (e.g., '_rna_gt')",
+    )
+    args = parser.parse_args()
+
+    gt_dir = Path(args.gt_dir)
+    combine_t = args.combine_t_cells
+
+    # Determine cell types based on GT
+    if combine_t:
+        cell_types = RNA_6_CELL_TYPES
+        print("Using RNA 6-cell-type mode (T cells combined)")
+    else:
+        cell_types = ACHIEVABLE_7_CELL_TYPES
+        print("Using protein 7-cell-type mode")
+
+    results_dir = RESULTS_DIR
+    if args.output_suffix:
+        results_dir = RESULTS_DIR.parent / f"method_comparison{args.output_suffix}"
+    results_dir.mkdir(parents=True, exist_ok=True)
 
     all_results = {}
 
@@ -82,12 +152,13 @@ def main():
 
         try:
             results = evaluate_all_regions(
-                gt_dir=str(GT_DIR),
+                gt_dir=str(gt_dir),
                 pred_dir=str(pred_dir),
                 n_regions=5,
-                output_path=str(RESULTS_DIR / f"{method_name}_results.json"),
+                output_path=str(results_dir / f"{method_name}_results.json"),
                 prefix="Xenium",
-                use_achievable_7=True,
+                use_achievable_7=not combine_t,  # Use raw GT columns if combining T cells
+                combine_t_cells=combine_t,  # Pass flag to evaluation
             )
             all_results[method_name] = results
             print(f"  Overall Pearson r: {results['summary']['overall_mean_pearson_r']:.4f}")
@@ -151,7 +222,7 @@ def main():
     print(header)
     print("-" * (20 + 17 * len(sorted_methods)))
 
-    for ct in ACHIEVABLE_7_CELL_TYPES:
+    for ct in cell_types:
         row = f"{ct:<20}"
         for method in sorted_methods:
             s = all_results[method]["summary"]
@@ -170,7 +241,7 @@ def main():
     for method in sorted_methods:
         s = all_results[method]["summary"]
         ct_rs = []
-        for ct in ACHIEVABLE_7_CELL_TYPES:
+        for ct in cell_types:
             mean_key = f"{ct}_mean_r"
             if mean_key in s:
                 ct_rs.append(s[mean_key])
@@ -202,7 +273,7 @@ def main():
     # Wins table
     print(f"\n--- Category Wins (best per-cell-type r) ---")
     wins = {m: 0 for m in sorted_methods}
-    for ct in ACHIEVABLE_7_CELL_TYPES:
+    for ct in cell_types:
         best_method = None
         best_r = -1
         for method in sorted_methods:

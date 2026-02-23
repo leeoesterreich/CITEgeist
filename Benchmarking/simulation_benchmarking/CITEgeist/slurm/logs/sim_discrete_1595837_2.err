@@ -1,0 +1,378 @@
+2026-02-13 12:45:36,849 - __main__ - INFO - ============================================================
+2026-02-13 12:45:36,854 - __main__ - INFO - BENCHMARK: replicate=2, condition=mixed, mode=dapi
+2026-02-13 12:45:36,854 - __main__ - INFO - ============================================================
+2026-02-13 12:45:36,890 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_2_cellpose.png
+2026-02-13 12:45:37,537 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-13 12:45:37,538 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-13 12:45:48,470 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-13 12:45:48,674 - cellpose.core - INFO - ** TORCH CUDA version installed and working. **
+2026-02-13 12:45:48,675 - cellpose.core - INFO - >>>> using GPU (CUDA)
+2026-02-13 12:45:49,821 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-13 12:45:50,252 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-13 12:45:50,279 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-13 12:46:27,067 - __main__ - INFO - Detected 913 nuclei in 49.5s
+2026-02-13 12:46:27,215 - __main__ - INFO - Loaded ground truth counts: 957 spots, total 5000 cells
+2026-02-13 12:46:27,216 - __main__ - INFO - Nuclei count correlation: 0.056
+2026-02-13 12:46:27,216 - __main__ - INFO - Nuclei count RMSE: 5.20
+2026-02-13 12:46:27,231 - __main__ - INFO - Loading h5ad files...
+2026-02-13 12:46:28,771 - root - INFO - Logging initialized.
+2026-02-13 12:46:28,783 - root - INFO - Discrete antibody preprocessing complete: Row sums range [31.71, 51.95], mean=40.06, std=2.86
+2026-02-13 12:46:29,092 - root - INFO - Normalization stats:
+2026-02-13 12:46:29,092 - root - INFO - Original median total: 46399322355.00
+2026-02-13 12:46:29,107 - root - INFO - Mean scaled total: 9978.28
+2026-02-13 12:46:29,117 - root - INFO - Max scaled value: 10000.00
+2026-02-13 12:46:29,242 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2026-02-13 12:46:29,244 - root - INFO - Mapped 18 markers to 9 cell types (preserving marker-level data)
+2026-02-13 12:46:29,244 - root - INFO - Running discrete cell assignment: 957 spots, 18 markers, 9 cell types
+2026-02-13 12:46:29,244 - root - INFO - Total nuclei: 683, mean per spot: 0.71
+2026-02-13 12:46:29,244 - root - INFO - Discrete cell assignment EM: 957 spots, 18 markers, 9 cell types
+2026-02-13 12:46:29,244 - root - INFO - Total nuclei: 683, mean per spot: 0.71
+2026-02-13 12:46:29,244 - root - INFO - 
+=== EM Iteration 1/20 ===
+2026-02-13 12:46:29,253 - gurobipy - INFO - Set parameter LicenseID to value 276015
+2026-02-13 12:46:29,253 - gurobipy - INFO - Set parameter GURO_PAR_SPECIAL
+2026-02-13 12:46:29,253 - gurobipy - INFO - Set parameter TokenServer to value "license.crc.pitt.edu"
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/gurobi_impl.py:3365: RuntimeWarning: invalid value encountered in scalar divide
+  loss_change = abs(prev_loss - loss) / max(abs(prev_loss), 1e-10)
+2026-02-13 12:46:56,814 - root - INFO -   Loss: 2442.0371 (change: nan)
+2026-02-13 12:46:56,814 - root - INFO -   Beta range: [0.381, 0.617]
+2026-02-13 12:46:56,814 - root - INFO -   Max beta change: 0.619048
+2026-02-13 12:46:56,814 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:46:56,814 - root - INFO -     B-cells: 61 cells (8.9%)
+2026-02-13 12:46:56,814 - root - INFO -     CAFs: 105 cells (15.4%)
+2026-02-13 12:46:56,814 - root - INFO -     Cancer Epithelial: 118 cells (17.3%)
+2026-02-13 12:46:56,814 - root - INFO -     Endothelial: 59 cells (8.6%)
+2026-02-13 12:46:56,814 - root - INFO -     Myeloid: 82 cells (12.0%)
+2026-02-13 12:46:56,814 - root - INFO -     Normal Epithelial: 63 cells (9.2%)
+2026-02-13 12:46:56,814 - root - INFO -     PVL: 68 cells (10.0%)
+2026-02-13 12:46:56,814 - root - INFO -     Plasmablasts: 64 cells (9.4%)
+2026-02-13 12:46:56,814 - root - INFO -     T-cells: 63 cells (9.2%)
+2026-02-13 12:46:56,814 - root - INFO - 
+=== EM Iteration 2/20 ===
+2026-02-13 12:47:17,314 - root - INFO -   Loss: 2296.6089 (change: 0.059552)
+2026-02-13 12:47:17,314 - root - INFO -   Beta range: [0.307, 0.587]
+2026-02-13 12:47:17,314 - root - INFO -   Max beta change: 0.073723
+2026-02-13 12:47:17,314 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:47:17,314 - root - INFO -     B-cells: 62 cells (9.1%)
+2026-02-13 12:47:17,314 - root - INFO -     CAFs: 102 cells (14.9%)
+2026-02-13 12:47:17,314 - root - INFO -     Cancer Epithelial: 112 cells (16.4%)
+2026-02-13 12:47:17,314 - root - INFO -     Endothelial: 65 cells (9.5%)
+2026-02-13 12:47:17,314 - root - INFO -     Myeloid: 71 cells (10.4%)
+2026-02-13 12:47:17,314 - root - INFO -     Normal Epithelial: 71 cells (10.4%)
+2026-02-13 12:47:17,314 - root - INFO -     PVL: 70 cells (10.2%)
+2026-02-13 12:47:17,314 - root - INFO -     Plasmablasts: 68 cells (10.0%)
+2026-02-13 12:47:17,314 - root - INFO -     T-cells: 62 cells (9.1%)
+2026-02-13 12:47:17,314 - root - INFO - 
+=== EM Iteration 3/20 ===
+2026-02-13 12:47:35,810 - root - INFO -   Loss: 2157.7940 (change: 0.060443)
+2026-02-13 12:47:35,811 - root - INFO -   Beta range: [0.273, 0.555]
+2026-02-13 12:47:35,811 - root - INFO -   Max beta change: 0.108229
+2026-02-13 12:47:35,811 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:47:35,811 - root - INFO -     B-cells: 60 cells (8.8%)
+2026-02-13 12:47:35,811 - root - INFO -     CAFs: 105 cells (15.4%)
+2026-02-13 12:47:35,811 - root - INFO -     Cancer Epithelial: 106 cells (15.5%)
+2026-02-13 12:47:35,811 - root - INFO -     Endothelial: 74 cells (10.8%)
+2026-02-13 12:47:35,811 - root - INFO -     Myeloid: 59 cells (8.6%)
+2026-02-13 12:47:35,811 - root - INFO -     Normal Epithelial: 81 cells (11.9%)
+2026-02-13 12:47:35,811 - root - INFO -     PVL: 69 cells (10.1%)
+2026-02-13 12:47:35,811 - root - INFO -     Plasmablasts: 67 cells (9.8%)
+2026-02-13 12:47:35,811 - root - INFO -     T-cells: 62 cells (9.1%)
+2026-02-13 12:47:35,811 - root - INFO - 
+=== EM Iteration 4/20 ===
+2026-02-13 12:47:51,074 - root - INFO -   Loss: 2132.5772 (change: 0.011686)
+2026-02-13 12:47:51,074 - root - INFO -   Beta range: [0.276, 0.555]
+2026-02-13 12:47:51,074 - root - INFO -   Max beta change: 0.124485
+2026-02-13 12:47:51,074 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:47:51,074 - root - INFO -     B-cells: 60 cells (8.8%)
+2026-02-13 12:47:51,074 - root - INFO -     CAFs: 108 cells (15.8%)
+2026-02-13 12:47:51,074 - root - INFO -     Cancer Epithelial: 99 cells (14.5%)
+2026-02-13 12:47:51,074 - root - INFO -     Endothelial: 78 cells (11.4%)
+2026-02-13 12:47:51,074 - root - INFO -     Myeloid: 47 cells (6.9%)
+2026-02-13 12:47:51,074 - root - INFO -     Normal Epithelial: 92 cells (13.5%)
+2026-02-13 12:47:51,074 - root - INFO -     PVL: 71 cells (10.4%)
+2026-02-13 12:47:51,074 - root - INFO -     Plasmablasts: 69 cells (10.1%)
+2026-02-13 12:47:51,074 - root - INFO -     T-cells: 59 cells (8.6%)
+2026-02-13 12:47:51,074 - root - INFO - 
+=== EM Iteration 5/20 ===
+2026-02-13 12:48:08,756 - root - INFO -   Loss: 2167.3130 (change: 0.016288)
+2026-02-13 12:48:08,756 - root - INFO -   Beta range: [0.276, 0.549]
+2026-02-13 12:48:08,756 - root - INFO -   Max beta change: 0.107357
+2026-02-13 12:48:08,756 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:48:08,756 - root - INFO -     B-cells: 58 cells (8.5%)
+2026-02-13 12:48:08,756 - root - INFO -     CAFs: 113 cells (16.5%)
+2026-02-13 12:48:08,756 - root - INFO -     Cancer Epithelial: 92 cells (13.5%)
+2026-02-13 12:48:08,756 - root - INFO -     Endothelial: 82 cells (12.0%)
+2026-02-13 12:48:08,756 - root - INFO -     Myeloid: 40 cells (5.9%)
+2026-02-13 12:48:08,756 - root - INFO -     Normal Epithelial: 95 cells (13.9%)
+2026-02-13 12:48:08,756 - root - INFO -     PVL: 68 cells (10.0%)
+2026-02-13 12:48:08,756 - root - INFO -     Plasmablasts: 77 cells (11.3%)
+2026-02-13 12:48:08,756 - root - INFO -     T-cells: 58 cells (8.5%)
+2026-02-13 12:48:08,756 - root - WARNING - Loss increased from 2132.5772 to 2167.3130
+2026-02-13 12:48:08,756 - root - INFO - 
+=== EM Iteration 6/20 ===
+2026-02-13 12:48:28,054 - root - INFO -   Loss: 2148.2642 (change: 0.008789)
+2026-02-13 12:48:28,054 - root - INFO -   Beta range: [0.262, 0.547]
+2026-02-13 12:48:28,054 - root - INFO -   Max beta change: 0.100390
+2026-02-13 12:48:28,054 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:48:28,054 - root - INFO -     B-cells: 53 cells (7.8%)
+2026-02-13 12:48:28,054 - root - INFO -     CAFs: 113 cells (16.5%)
+2026-02-13 12:48:28,054 - root - INFO -     Cancer Epithelial: 88 cells (12.9%)
+2026-02-13 12:48:28,054 - root - INFO -     Endothelial: 87 cells (12.7%)
+2026-02-13 12:48:28,054 - root - INFO -     Myeloid: 27 cells (4.0%)
+2026-02-13 12:48:28,054 - root - INFO -     Normal Epithelial: 98 cells (14.3%)
+2026-02-13 12:48:28,054 - root - INFO -     PVL: 71 cells (10.4%)
+2026-02-13 12:48:28,054 - root - INFO -     Plasmablasts: 92 cells (13.5%)
+2026-02-13 12:48:28,054 - root - INFO -     T-cells: 54 cells (7.9%)
+2026-02-13 12:48:28,054 - root - INFO - 
+=== EM Iteration 7/20 ===
+2026-02-13 12:48:47,723 - root - INFO -   Loss: 2163.8459 (change: 0.007253)
+2026-02-13 12:48:47,723 - root - INFO -   Beta range: [0.246, 0.553]
+2026-02-13 12:48:47,723 - root - INFO -   Max beta change: 0.048895
+2026-02-13 12:48:47,723 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:48:47,723 - root - INFO -     B-cells: 44 cells (6.4%)
+2026-02-13 12:48:47,723 - root - INFO -     CAFs: 111 cells (16.3%)
+2026-02-13 12:48:47,723 - root - INFO -     Cancer Epithelial: 87 cells (12.7%)
+2026-02-13 12:48:47,723 - root - INFO -     Endothelial: 89 cells (13.0%)
+2026-02-13 12:48:47,723 - root - INFO -     Myeloid: 22 cells (3.2%)
+2026-02-13 12:48:47,723 - root - INFO -     Normal Epithelial: 104 cells (15.2%)
+2026-02-13 12:48:47,723 - root - INFO -     PVL: 80 cells (11.7%)
+2026-02-13 12:48:47,723 - root - INFO -     Plasmablasts: 96 cells (14.1%)
+2026-02-13 12:48:47,723 - root - INFO -     T-cells: 50 cells (7.3%)
+2026-02-13 12:48:47,723 - root - WARNING - Loss increased from 2148.2642 to 2163.8459
+2026-02-13 12:48:47,723 - root - INFO - 
+=== EM Iteration 8/20 ===
+2026-02-13 12:49:05,992 - root - INFO -   Loss: 2154.9445 (change: 0.004114)
+2026-02-13 12:49:05,993 - root - INFO -   Beta range: [0.231, 0.554]
+2026-02-13 12:49:05,993 - root - INFO -   Max beta change: 0.076927
+2026-02-13 12:49:05,993 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:49:05,993 - root - INFO -     B-cells: 34 cells (5.0%)
+2026-02-13 12:49:05,993 - root - INFO -     CAFs: 112 cells (16.4%)
+2026-02-13 12:49:05,993 - root - INFO -     Cancer Epithelial: 86 cells (12.6%)
+2026-02-13 12:49:05,993 - root - INFO -     Endothelial: 89 cells (13.0%)
+2026-02-13 12:49:05,993 - root - INFO -     Myeloid: 24 cells (3.5%)
+2026-02-13 12:49:05,993 - root - INFO -     Normal Epithelial: 108 cells (15.8%)
+2026-02-13 12:49:05,993 - root - INFO -     PVL: 89 cells (13.0%)
+2026-02-13 12:49:05,993 - root - INFO -     Plasmablasts: 96 cells (14.1%)
+2026-02-13 12:49:05,993 - root - INFO -     T-cells: 45 cells (6.6%)
+2026-02-13 12:49:05,993 - root - INFO - 
+=== EM Iteration 9/20 ===
+2026-02-13 12:49:23,944 - root - INFO -   Loss: 2228.9534 (change: 0.034344)
+2026-02-13 12:49:23,944 - root - INFO -   Beta range: [0.192, 0.612]
+2026-02-13 12:49:23,944 - root - INFO -   Max beta change: 0.109156
+2026-02-13 12:49:23,944 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:49:23,944 - root - INFO -     B-cells: 27 cells (4.0%)
+2026-02-13 12:49:23,944 - root - INFO -     CAFs: 116 cells (17.0%)
+2026-02-13 12:49:23,944 - root - INFO -     Cancer Epithelial: 87 cells (12.7%)
+2026-02-13 12:49:23,944 - root - INFO -     Endothelial: 87 cells (12.7%)
+2026-02-13 12:49:23,944 - root - INFO -     Myeloid: 24 cells (3.5%)
+2026-02-13 12:49:23,944 - root - INFO -     Normal Epithelial: 112 cells (16.4%)
+2026-02-13 12:49:23,944 - root - INFO -     PVL: 90 cells (13.2%)
+2026-02-13 12:49:23,944 - root - INFO -     Plasmablasts: 96 cells (14.1%)
+2026-02-13 12:49:23,944 - root - INFO -     T-cells: 44 cells (6.4%)
+2026-02-13 12:49:23,944 - root - WARNING - Loss increased from 2154.9445 to 2228.9534
+2026-02-13 12:49:23,944 - root - INFO - 
+=== EM Iteration 10/20 ===
+2026-02-13 12:49:40,019 - root - INFO -   Loss: 2207.9763 (change: 0.009411)
+2026-02-13 12:49:40,019 - root - INFO -   Beta range: [0.110, 0.645]
+2026-02-13 12:49:40,019 - root - INFO -   Max beta change: 0.088602
+2026-02-13 12:49:40,019 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:49:40,019 - root - INFO -     B-cells: 18 cells (2.6%)
+2026-02-13 12:49:40,019 - root - INFO -     CAFs: 118 cells (17.3%)
+2026-02-13 12:49:40,019 - root - INFO -     Cancer Epithelial: 95 cells (13.9%)
+2026-02-13 12:49:40,019 - root - INFO -     Endothelial: 87 cells (12.7%)
+2026-02-13 12:49:40,019 - root - INFO -     Myeloid: 23 cells (3.4%)
+2026-02-13 12:49:40,019 - root - INFO -     Normal Epithelial: 117 cells (17.1%)
+2026-02-13 12:49:40,019 - root - INFO -     PVL: 89 cells (13.0%)
+2026-02-13 12:49:40,019 - root - INFO -     Plasmablasts: 93 cells (13.6%)
+2026-02-13 12:49:40,019 - root - INFO -     T-cells: 43 cells (6.3%)
+2026-02-13 12:49:40,019 - root - INFO - 
+=== EM Iteration 11/20 ===
+2026-02-13 12:49:55,647 - root - INFO -   Loss: 2140.2274 (change: 0.030684)
+2026-02-13 12:49:55,648 - root - INFO -   Beta range: [0.100, 0.652]
+2026-02-13 12:49:55,648 - root - INFO -   Max beta change: 0.086047
+2026-02-13 12:49:55,648 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:49:55,648 - root - INFO -     B-cells: 21 cells (3.1%)
+2026-02-13 12:49:55,648 - root - INFO -     CAFs: 118 cells (17.3%)
+2026-02-13 12:49:55,648 - root - INFO -     Cancer Epithelial: 101 cells (14.8%)
+2026-02-13 12:49:55,648 - root - INFO -     Endothelial: 79 cells (11.6%)
+2026-02-13 12:49:55,648 - root - INFO -     Myeloid: 23 cells (3.4%)
+2026-02-13 12:49:55,648 - root - INFO -     Normal Epithelial: 119 cells (17.4%)
+2026-02-13 12:49:55,648 - root - INFO -     PVL: 80 cells (11.7%)
+2026-02-13 12:49:55,648 - root - INFO -     Plasmablasts: 99 cells (14.5%)
+2026-02-13 12:49:55,648 - root - INFO -     T-cells: 43 cells (6.3%)
+2026-02-13 12:49:55,648 - root - INFO - 
+=== EM Iteration 12/20 ===
+2026-02-13 12:50:10,471 - root - INFO -   Loss: 2182.5404 (change: 0.019770)
+2026-02-13 12:50:10,471 - root - INFO -   Beta range: [0.100, 0.652]
+2026-02-13 12:50:10,471 - root - INFO -   Max beta change: 0.083124
+2026-02-13 12:50:10,471 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:50:10,471 - root - INFO -     B-cells: 20 cells (2.9%)
+2026-02-13 12:50:10,471 - root - INFO -     CAFs: 118 cells (17.3%)
+2026-02-13 12:50:10,471 - root - INFO -     Cancer Epithelial: 105 cells (15.4%)
+2026-02-13 12:50:10,471 - root - INFO -     Endothelial: 71 cells (10.4%)
+2026-02-13 12:50:10,471 - root - INFO -     Myeloid: 26 cells (3.8%)
+2026-02-13 12:50:10,471 - root - INFO -     Normal Epithelial: 123 cells (18.0%)
+2026-02-13 12:50:10,471 - root - INFO -     PVL: 70 cells (10.2%)
+2026-02-13 12:50:10,471 - root - INFO -     Plasmablasts: 107 cells (15.7%)
+2026-02-13 12:50:10,472 - root - INFO -     T-cells: 43 cells (6.3%)
+2026-02-13 12:50:10,472 - root - WARNING - Loss increased from 2140.2274 to 2182.5404
+2026-02-13 12:50:10,472 - root - INFO - 
+=== EM Iteration 13/20 ===
+2026-02-13 12:50:26,997 - root - INFO -   Loss: 2151.5536 (change: 0.014198)
+2026-02-13 12:50:26,997 - root - INFO -   Beta range: [0.100, 0.652]
+2026-02-13 12:50:26,997 - root - INFO -   Max beta change: 0.084251
+2026-02-13 12:50:26,998 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:50:26,998 - root - INFO -     B-cells: 18 cells (2.6%)
+2026-02-13 12:50:26,998 - root - INFO -     CAFs: 117 cells (17.1%)
+2026-02-13 12:50:26,998 - root - INFO -     Cancer Epithelial: 105 cells (15.4%)
+2026-02-13 12:50:26,998 - root - INFO -     Endothelial: 66 cells (9.7%)
+2026-02-13 12:50:26,998 - root - INFO -     Myeloid: 24 cells (3.5%)
+2026-02-13 12:50:26,998 - root - INFO -     Normal Epithelial: 123 cells (18.0%)
+2026-02-13 12:50:26,998 - root - INFO -     PVL: 79 cells (11.6%)
+2026-02-13 12:50:26,998 - root - INFO -     Plasmablasts: 108 cells (15.8%)
+2026-02-13 12:50:26,998 - root - INFO -     T-cells: 43 cells (6.3%)
+2026-02-13 12:50:26,998 - root - INFO - 
+=== EM Iteration 14/20 ===
+2026-02-13 12:50:41,700 - root - INFO -   Loss: 2171.9602 (change: 0.009485)
+2026-02-13 12:50:41,700 - root - INFO -   Beta range: [0.100, 0.652]
+2026-02-13 12:50:41,700 - root - INFO -   Max beta change: 0.069211
+2026-02-13 12:50:41,700 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:50:41,700 - root - INFO -     B-cells: 20 cells (2.9%)
+2026-02-13 12:50:41,700 - root - INFO -     CAFs: 119 cells (17.4%)
+2026-02-13 12:50:41,700 - root - INFO -     Cancer Epithelial: 109 cells (16.0%)
+2026-02-13 12:50:41,700 - root - INFO -     Endothelial: 58 cells (8.5%)
+2026-02-13 12:50:41,700 - root - INFO -     Myeloid: 24 cells (3.5%)
+2026-02-13 12:50:41,700 - root - INFO -     Normal Epithelial: 127 cells (18.6%)
+2026-02-13 12:50:41,700 - root - INFO -     PVL: 73 cells (10.7%)
+2026-02-13 12:50:41,700 - root - INFO -     Plasmablasts: 110 cells (16.1%)
+2026-02-13 12:50:41,700 - root - INFO -     T-cells: 43 cells (6.3%)
+2026-02-13 12:50:41,700 - root - WARNING - Loss increased from 2151.5536 to 2171.9602
+2026-02-13 12:50:41,700 - root - INFO - 
+=== EM Iteration 15/20 ===
+2026-02-13 12:50:57,110 - root - INFO -   Loss: 2157.3128 (change: 0.006744)
+2026-02-13 12:50:57,110 - root - INFO -   Beta range: [0.100, 0.651]
+2026-02-13 12:50:57,110 - root - INFO -   Max beta change: 0.080025
+2026-02-13 12:50:57,110 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:50:57,111 - root - INFO -     B-cells: 16 cells (2.3%)
+2026-02-13 12:50:57,111 - root - INFO -     CAFs: 119 cells (17.4%)
+2026-02-13 12:50:57,111 - root - INFO -     Cancer Epithelial: 111 cells (16.3%)
+2026-02-13 12:50:57,111 - root - INFO -     Endothelial: 49 cells (7.2%)
+2026-02-13 12:50:57,111 - root - INFO -     Myeloid: 24 cells (3.5%)
+2026-02-13 12:50:57,111 - root - INFO -     Normal Epithelial: 135 cells (19.8%)
+2026-02-13 12:50:57,111 - root - INFO -     PVL: 75 cells (11.0%)
+2026-02-13 12:50:57,111 - root - INFO -     Plasmablasts: 110 cells (16.1%)
+2026-02-13 12:50:57,111 - root - INFO -     T-cells: 44 cells (6.4%)
+2026-02-13 12:50:57,111 - root - INFO - 
+=== EM Iteration 16/20 ===
+2026-02-13 12:51:12,585 - root - INFO -   Loss: 2196.9135 (change: 0.018356)
+2026-02-13 12:51:12,585 - root - INFO -   Beta range: [0.125, 0.652]
+2026-02-13 12:51:12,585 - root - INFO -   Max beta change: 0.075423
+2026-02-13 12:51:12,585 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:51:12,585 - root - INFO -     B-cells: 14 cells (2.0%)
+2026-02-13 12:51:12,585 - root - INFO -     CAFs: 121 cells (17.7%)
+2026-02-13 12:51:12,585 - root - INFO -     Cancer Epithelial: 117 cells (17.1%)
+2026-02-13 12:51:12,585 - root - INFO -     Endothelial: 48 cells (7.0%)
+2026-02-13 12:51:12,585 - root - INFO -     Myeloid: 25 cells (3.7%)
+2026-02-13 12:51:12,585 - root - INFO -     Normal Epithelial: 135 cells (19.8%)
+2026-02-13 12:51:12,585 - root - INFO -     PVL: 64 cells (9.4%)
+2026-02-13 12:51:12,585 - root - INFO -     Plasmablasts: 114 cells (16.7%)
+2026-02-13 12:51:12,585 - root - INFO -     T-cells: 45 cells (6.6%)
+2026-02-13 12:51:12,585 - root - WARNING - Loss increased from 2157.3128 to 2196.9135
+2026-02-13 12:51:12,585 - root - INFO - 
+=== EM Iteration 17/20 ===
+2026-02-13 12:51:27,407 - root - INFO -   Loss: 2166.2913 (change: 0.013939)
+2026-02-13 12:51:27,407 - root - INFO -   Beta range: [0.115, 0.656]
+2026-02-13 12:51:27,407 - root - INFO -   Max beta change: 0.086339
+2026-02-13 12:51:27,407 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:51:27,407 - root - INFO -     B-cells: 15 cells (2.2%)
+2026-02-13 12:51:27,407 - root - INFO -     CAFs: 119 cells (17.4%)
+2026-02-13 12:51:27,407 - root - INFO -     Cancer Epithelial: 116 cells (17.0%)
+2026-02-13 12:51:27,407 - root - INFO -     Endothelial: 43 cells (6.3%)
+2026-02-13 12:51:27,407 - root - INFO -     Myeloid: 26 cells (3.8%)
+2026-02-13 12:51:27,407 - root - INFO -     Normal Epithelial: 131 cells (19.2%)
+2026-02-13 12:51:27,407 - root - INFO -     PVL: 78 cells (11.4%)
+2026-02-13 12:51:27,407 - root - INFO -     Plasmablasts: 110 cells (16.1%)
+2026-02-13 12:51:27,407 - root - INFO -     T-cells: 45 cells (6.6%)
+2026-02-13 12:51:27,407 - root - INFO - 
+=== EM Iteration 18/20 ===
+2026-02-13 12:51:42,950 - root - INFO -   Loss: 2242.7681 (change: 0.035303)
+2026-02-13 12:51:42,950 - root - INFO -   Beta range: [0.108, 0.653]
+2026-02-13 12:51:42,950 - root - INFO -   Max beta change: 0.069092
+2026-02-13 12:51:42,950 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:51:42,950 - root - INFO -     B-cells: 14 cells (2.0%)
+2026-02-13 12:51:42,950 - root - INFO -     CAFs: 123 cells (18.0%)
+2026-02-13 12:51:42,950 - root - INFO -     Cancer Epithelial: 120 cells (17.6%)
+2026-02-13 12:51:42,950 - root - INFO -     Endothelial: 44 cells (6.4%)
+2026-02-13 12:51:42,950 - root - INFO -     Myeloid: 26 cells (3.8%)
+2026-02-13 12:51:42,950 - root - INFO -     Normal Epithelial: 128 cells (18.7%)
+2026-02-13 12:51:42,950 - root - INFO -     PVL: 68 cells (10.0%)
+2026-02-13 12:51:42,950 - root - INFO -     Plasmablasts: 114 cells (16.7%)
+2026-02-13 12:51:42,950 - root - INFO -     T-cells: 46 cells (6.7%)
+2026-02-13 12:51:42,950 - root - WARNING - Loss increased from 2166.2913 to 2242.7681
+2026-02-13 12:51:42,950 - root - INFO - 
+=== EM Iteration 19/20 ===
+2026-02-13 12:51:56,561 - root - INFO -   Loss: 2202.9642 (change: 0.017748)
+2026-02-13 12:51:56,561 - root - INFO -   Beta range: [0.111, 0.656]
+2026-02-13 12:51:56,561 - root - INFO -   Max beta change: 0.074409
+2026-02-13 12:51:56,561 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:51:56,562 - root - INFO -     B-cells: 14 cells (2.0%)
+2026-02-13 12:51:56,562 - root - INFO -     CAFs: 121 cells (17.7%)
+2026-02-13 12:51:56,562 - root - INFO -     Cancer Epithelial: 116 cells (17.0%)
+2026-02-13 12:51:56,562 - root - INFO -     Endothelial: 42 cells (6.1%)
+2026-02-13 12:51:56,562 - root - INFO -     Myeloid: 26 cells (3.8%)
+2026-02-13 12:51:56,562 - root - INFO -     Normal Epithelial: 130 cells (19.0%)
+2026-02-13 12:51:56,562 - root - INFO -     PVL: 81 cells (11.9%)
+2026-02-13 12:51:56,562 - root - INFO -     Plasmablasts: 108 cells (15.8%)
+2026-02-13 12:51:56,562 - root - INFO -     T-cells: 45 cells (6.6%)
+2026-02-13 12:51:56,562 - root - INFO - 
+=== EM Iteration 20/20 ===
+2026-02-13 12:52:12,478 - root - INFO -   Loss: 2260.0910 (change: 0.025932)
+2026-02-13 12:52:12,478 - root - INFO -   Beta range: [0.107, 0.662]
+2026-02-13 12:52:12,478 - root - INFO -   Max beta change: 0.053642
+2026-02-13 12:52:12,478 - root - INFO -   Cell count range: [0, 10]
+2026-02-13 12:52:12,478 - root - INFO -     B-cells: 16 cells (2.3%)
+2026-02-13 12:52:12,478 - root - INFO -     CAFs: 118 cells (17.3%)
+2026-02-13 12:52:12,478 - root - INFO -     Cancer Epithelial: 112 cells (16.4%)
+2026-02-13 12:52:12,478 - root - INFO -     Endothelial: 53 cells (7.8%)
+2026-02-13 12:52:12,478 - root - INFO -     Myeloid: 25 cells (3.7%)
+2026-02-13 12:52:12,478 - root - INFO -     Normal Epithelial: 122 cells (17.9%)
+2026-02-13 12:52:12,478 - root - INFO -     PVL: 88 cells (12.9%)
+2026-02-13 12:52:12,478 - root - INFO -     Plasmablasts: 107 cells (15.7%)
+2026-02-13 12:52:12,478 - root - INFO -     T-cells: 42 cells (6.1%)
+2026-02-13 12:52:12,478 - root - WARNING - Loss increased from 2202.9642 to 2260.0910
+2026-02-13 12:52:12,478 - root - INFO - 
+Final beta values:
+2026-02-13 12:52:12,478 - root - INFO -   B-cells_Protein_1: β=0.289, α=0.500
+2026-02-13 12:52:12,478 - root - INFO -   B-cells_Protein_2: β=0.156, α=0.500
+2026-02-13 12:52:12,478 - root - INFO -   CAFs_Protein_1: β=0.554, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   CAFs_Protein_2: β=0.533, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   Cancer Epithelial_Protein_1: β=0.275, α=0.207
+2026-02-13 12:52:12,479 - root - INFO -   Cancer Epithelial_Protein_2: β=0.107, α=0.481
+2026-02-13 12:52:12,479 - root - INFO -   Endothelial_Protein_1: β=0.196, α=0.275
+2026-02-13 12:52:12,479 - root - INFO -   Endothelial_Protein_2: β=0.217, α=0.313
+2026-02-13 12:52:12,479 - root - INFO -   Myeloid_Protein_1: β=0.402, α=0.500
+2026-02-13 12:52:12,479 - root - INFO -   Myeloid_Protein_2: β=0.327, α=0.500
+2026-02-13 12:52:12,479 - root - INFO -   Normal Epithelial_Protein_1: β=0.303, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   Normal Epithelial_Protein_2: β=0.185, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   PVL_Protein_1: β=0.347, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   PVL_Protein_2: β=0.323, α=0.149
+2026-02-13 12:52:12,479 - root - INFO -   Plasmablasts_Protein_1: β=0.367, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   Plasmablasts_Protein_2: β=0.328, α=0.000
+2026-02-13 12:52:12,479 - root - INFO -   T-cells_Protein_1: β=0.278, α=0.388
+2026-02-13 12:52:12,479 - root - INFO -   T-cells_Protein_2: β=0.662, α=0.000
+2026-02-13 12:52:12,542 - root - INFO - Saved discrete cell counts to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete/mixed/dapi/Wu_rep_2/Wu_rep_2_discrete_cell_counts.csv
+2026-02-13 12:52:12,558 - root - INFO - Saved derived proportions to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete/mixed/dapi/Wu_rep_2/Wu_rep_2_cell_prop_discrete.csv
+2026-02-13 12:52:12,558 - root - INFO - Cell type distribution:
+2026-02-13 12:52:12,558 - root - INFO -   B-cells: 16 cells (2.3%)
+2026-02-13 12:52:12,558 - root - INFO -   CAFs: 118 cells (17.3%)
+2026-02-13 12:52:12,558 - root - INFO -   Cancer Epithelial: 112 cells (16.4%)
+2026-02-13 12:52:12,558 - root - INFO -   Endothelial: 53 cells (7.8%)
+2026-02-13 12:52:12,558 - root - INFO -   Myeloid: 25 cells (3.7%)
+2026-02-13 12:52:12,558 - root - INFO -   Normal Epithelial: 122 cells (17.9%)
+2026-02-13 12:52:12,558 - root - INFO -   PVL: 88 cells (12.9%)
+2026-02-13 12:52:12,558 - root - INFO -   Plasmablasts: 107 cells (15.7%)
+2026-02-13 12:52:12,558 - root - INFO -   T-cells: 42 cells (6.1%)
+2026-02-13 12:52:12,607 - __main__ - INFO - Loaded ground truth proportions: 957 spots, 9 cell types
+2026-02-13 12:52:12,608 - __main__ - INFO - Proportion correlation: 0.179
+2026-02-13 12:52:12,608 - __main__ - INFO - Proportion RMSE: 0.2397
+2026-02-13 12:52:12,637 - __main__ - INFO - Results saved to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete/mixed/dapi/Wu_rep_2

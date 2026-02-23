@@ -1,0 +1,89 @@
+2026-02-09 20:40:12,186 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,193 - INFO - Region 0: 1407 spots, 7 cell types
+2026-02-09 20:40:12,215 - INFO - Region 0: Pearson r = 0.7267
+2026-02-09 20:40:12,219 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,227 - INFO - Region 1: 1417 spots, 7 cell types
+2026-02-09 20:40:12,246 - INFO - Region 1: Pearson r = 0.6840
+2026-02-09 20:40:12,250 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,256 - INFO - Region 2: 1352 spots, 7 cell types
+2026-02-09 20:40:12,274 - INFO - Region 2: Pearson r = 0.7048
+2026-02-09 20:40:12,278 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,285 - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:40:12,305 - INFO - Region 3: Pearson r = 0.7950
+2026-02-09 20:40:12,309 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,315 - INFO - Region 4: 1414 spots, 7 cell types
+2026-02-09 20:40:12,334 - INFO - Region 4: Pearson r = 0.7739
+2026-02-09 20:40:12,336 - INFO - Results saved to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/CITEgeist_results.json
+2026-02-09 20:40:12,341 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,366 - INFO - Region 0: 1407 spots, 7 cell types
+2026-02-09 20:40:12,384 - INFO - Region 0: Pearson r = 0.5653
+2026-02-09 20:40:12,388 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,413 - INFO - Region 1: 1417 spots, 7 cell types
+2026-02-09 20:40:12,432 - INFO - Region 1: Pearson r = 0.5725
+2026-02-09 20:40:12,436 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,442 - INFO - Region 2: 1352 spots, 7 cell types
+2026-02-09 20:40:12,460 - INFO - Region 2: Pearson r = 0.5718
+2026-02-09 20:40:12,465 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,471 - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:40:12,490 - INFO - Region 3: Pearson r = 0.3707
+2026-02-09 20:40:12,494 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,500 - INFO - Region 4: 1414 spots, 7 cell types
+2026-02-09 20:40:12,519 - INFO - Region 4: Pearson r = 0.3887
+2026-02-09 20:40:12,521 - INFO - Results saved to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/Cell2Location_results.json
+2026-02-09 20:40:12,525 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,551 - INFO - Normalizing predictions to proportions (detected cell counts)
+2026-02-09 20:40:12,553 - INFO - Region 0: 1407 spots, 7 cell types
+2026-02-09 20:40:12,575 - INFO - Region 0: Pearson r = 0.0322
+2026-02-09 20:40:12,580 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,586 - INFO - Normalizing predictions to proportions (detected cell counts)
+2026-02-09 20:40:12,588 - INFO - Region 1: 1417 spots, 7 cell types
+2026-02-09 20:40:12,607 - INFO - Region 1: Pearson r = 0.0674
+2026-02-09 20:40:12,611 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,645 - INFO - Normalizing predictions to proportions (detected cell counts)
+2026-02-09 20:40:12,647 - INFO - Region 2: 1352 spots, 7 cell types
+2026-02-09 20:40:12,665 - INFO - Region 2: Pearson r = -0.0390
+2026-02-09 20:40:12,669 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,675 - INFO - Normalizing predictions to proportions (detected cell counts)
+2026-02-09 20:40:12,677 - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:40:12,696 - INFO - Region 3: Pearson r = -0.0457
+2026-02-09 20:40:12,700 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,706 - INFO - Normalizing predictions to proportions (detected cell counts)
+2026-02-09 20:40:12,708 - INFO - Region 4: 1414 spots, 7 cell types
+2026-02-09 20:40:12,727 - INFO - Region 4: Pearson r = -0.0652
+2026-02-09 20:40:12,729 - INFO - Results saved to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/Tangram_results.json
+2026-02-09 20:40:12,733 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,741 - INFO - Region 0: 1406 spots, 7 cell types
+2026-02-09 20:40:12,760 - INFO - Region 0: Pearson r = 0.3936
+2026-02-09 20:40:12,764 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,771 - INFO - Region 1: 1413 spots, 7 cell types
+2026-02-09 20:40:12,790 - INFO - Region 1: Pearson r = 0.4034
+2026-02-09 20:40:12,794 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,800 - INFO - Region 2: 1352 spots, 7 cell types
+2026-02-09 20:40:12,819 - INFO - Region 2: Pearson r = 0.5719
+2026-02-09 20:40:12,823 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,836 - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:40:12,856 - INFO - Region 3: Pearson r = 0.5413
+2026-02-09 20:40:12,860 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,867 - INFO - Region 4: 1413 spots, 7 cell types
+2026-02-09 20:40:12,886 - INFO - Region 4: Pearson r = 0.5035
+2026-02-09 20:40:12,888 - INFO - Results saved to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/RCTD_results.json
+2026-02-09 20:40:12,892 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,899 - INFO - Region 0: 1407 spots, 7 cell types
+2026-02-09 20:40:12,918 - INFO - Region 0: Pearson r = 0.1055
+2026-02-09 20:40:12,922 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,929 - INFO - Region 1: 1417 spots, 7 cell types
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/src/evaluate_benchmark.py:78: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  r, p = stats.pearsonr(gt_vals, pred_vals)
+2026-02-09 20:40:12,949 - INFO - Region 1: Pearson r = 0.1843
+2026-02-09 20:40:12,953 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,960 - INFO - Region 2: 1352 spots, 7 cell types
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/src/evaluate_benchmark.py:78: ConstantInputWarning: An input array is constant; the correlation coefficient is not defined.
+  r, p = stats.pearsonr(gt_vals, pred_vals)
+2026-02-09 20:40:12,978 - INFO - Region 2: Pearson r = 0.2129
+2026-02-09 20:40:12,982 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:12,988 - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:40:13,007 - INFO - Region 3: Pearson r = 0.2085
+2026-02-09 20:40:13,011 - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:40:13,017 - INFO - Region 4: 1414 spots, 7 cell types
+2026-02-09 20:40:13,035 - INFO - Region 4: Pearson r = 0.1968
+2026-02-09 20:40:13,037 - INFO - Results saved to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/Seurat_results.json

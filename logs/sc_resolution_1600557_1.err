@@ -1,0 +1,34 @@
+2026-02-23 14:14:58,670 - __main__ - INFO - ======================================================================
+2026-02-23 14:14:58,670 - __main__ - INFO - SINGLE-CELL RESOLUTION BENCHMARK: Xenium_region_1
+2026-02-23 14:14:58,670 - __main__ - INFO - ======================================================================
+2026-02-23 14:14:58,670 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:14:58,670 - __main__ - INFO - STEP 1: Loading existing hybrid results
+2026-02-23 14:14:58,670 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:14:58,999 - __main__ - INFO - Loaded proportions: 1417 spots x 7 cell types
+2026-02-23 14:14:58,999 - __main__ - INFO - Loaded deconvolved GEX: 9919 rows x 392 genes
+2026-02-23 14:14:59,000 - __main__ - INFO - Nuclei counts: total=19875, mean=14.0/spot
+2026-02-23 14:14:59,000 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:14:59,000 - __main__ - INFO - STEP 2: Cellpose segmentation (full mask)
+2026-02-23 14:14:59,000 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:14:59,001 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_1/morphology.png
+2026-02-23 14:15:03,834 - __main__ - INFO - Image shape: (25883, 11529, 3), dtype: uint8
+2026-02-23 14:15:03,842 - __main__ - INFO - Running Cellpose (use_gpu=True, diameter=None)
+2026-02-23 14:15:05,652 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-23 14:15:05,856 - cellpose.core - INFO - ** TORCH CUDA version installed and working. **
+2026-02-23 14:15:05,856 - cellpose.core - INFO - >>>> using GPU (CUDA)
+2026-02-23 14:15:06,944 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-23 14:15:07,298 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-23 14:15:07,467 - cellpose.transforms - INFO - processing image with (25883, 11529) HW, and 3 channels
+2026-02-23 14:18:36,281 - cellpose.dynamics - WARNING - more than 65535 masks in image, masks returned as np.uint32
+2026-02-23 14:19:03,185 - __main__ - INFO - Segmented 81323 nuclei in 244.1s
+2026-02-23 14:19:03,185 - __main__ - INFO - Mask shape: (25883, 11529), centroids shape: (81323, 2)
+2026-02-23 14:19:06,175 - __main__ - INFO - Saved mask: Benchmarking/xenium_benchmarking/CITEgeist/output/single_cell_resolution/Xenium_region_1/Xenium_region_1_cellpose_mask.npy
+2026-02-23 14:19:06,177 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:19:06,177 - __main__ - INFO - STEP 3: Map nuclei to spots
+2026-02-23 14:19:06,177 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:19:06,254 - __main__ - INFO - Mapped 19875/81323 nuclei to spots (24.4%)
+2026-02-23 14:19:06,265 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:19:06,265 - __main__ - INFO - STEP 4: Module 3b nucleus assignment
+2026-02-23 14:19:06,265 - __main__ - INFO - ------------------------------------------------------------
+2026-02-23 14:19:06,267 - __main__ - INFO - Cell types for assignment: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-23 14:19:06,268 - __main__ - INFO - Spots with nuclei: 1411/1417

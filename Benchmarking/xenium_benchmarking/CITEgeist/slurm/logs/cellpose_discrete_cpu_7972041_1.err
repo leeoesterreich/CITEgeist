@@ -1,0 +1,25 @@
+2026-02-12 15:04:33,975 - __main__ - INFO - ======================================================================
+2026-02-12 15:04:33,976 - __main__ - INFO - DISCRETE CELLPOSE BENCHMARK: Xenium_region_1
+2026-02-12 15:04:33,976 - __main__ - INFO - ======================================================================
+2026-02-12 15:04:33,976 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:33,976 - __main__ - INFO - STEP 1: Loading data
+2026-02-12 15:04:33,976 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:34,044 - __main__ - INFO - GEX: 1417 spots x 405 genes
+2026-02-12 15:04:34,044 - __main__ - INFO - CITE: 1417 spots x 27 proteins
+2026-02-12 15:04:34,044 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:34,044 - __main__ - INFO - STEP 2: Loading morphology image
+2026-02-12 15:04:34,044 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:34,046 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_1/morphology.png
+2026-02-12 15:04:42,055 - __main__ - INFO - Image shape: (25883, 11529, 3), dtype: uint8
+2026-02-12 15:04:42,066 - __main__ - INFO - Coord info: pixel_size=0.2125 um/px, image_size=[11529, 25883]
+2026-02-12 15:04:42,066 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:42,066 - __main__ - INFO - STEP 3: Cellpose nuclei segmentation
+2026-02-12 15:04:42,066 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 15:04:42,066 - __main__ - INFO - Running Cellpose nuclei segmentation...
+2026-02-12 15:04:51,630 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-12 15:04:51,630 - cellpose.core - INFO - >>>> using CPU
+2026-02-12 15:04:51,630 - cellpose.core - INFO - >>>> using CPU
+2026-02-12 15:04:53,687 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-12 15:04:55,829 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-12 15:04:56,042 - cellpose.transforms - INFO - processing image with (25883, 11529) HW, and 3 channels
+slurmstepd: error: *** JOB 7972043 ON htc-n39 CANCELLED AT 2026-02-12T15:05:11 ***

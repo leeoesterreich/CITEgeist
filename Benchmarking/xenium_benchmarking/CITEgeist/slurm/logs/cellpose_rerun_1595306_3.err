@@ -1,0 +1,26 @@
+2026-02-12 16:08:42,273 - __main__ - INFO - ======================================================================
+2026-02-12 16:08:42,277 - __main__ - INFO - DISCRETE CELLPOSE BENCHMARK: Xenium_region_3
+2026-02-12 16:08:42,277 - __main__ - INFO - ======================================================================
+2026-02-12 16:08:42,277 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:42,277 - __main__ - INFO - STEP 1: Loading data
+2026-02-12 16:08:42,277 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:42,619 - __main__ - INFO - GEX: 1464 spots x 405 genes
+2026-02-12 16:08:42,619 - __main__ - INFO - CITE: 1464 spots x 27 proteins
+2026-02-12 16:08:42,619 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:42,619 - __main__ - INFO - STEP 2: Loading morphology image
+2026-02-12 16:08:42,619 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:42,661 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_3/morphology.png
+2026-02-12 16:08:50,924 - __main__ - INFO - Image shape: (27106, 11529, 3), dtype: uint8
+2026-02-12 16:08:50,936 - __main__ - INFO - Coord info: pixel_size=0.2125 um/px, image_size=[11529, 27106]
+2026-02-12 16:08:50,937 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:50,937 - __main__ - INFO - STEP 3: Cellpose nuclei segmentation
+2026-02-12 16:08:50,937 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:50,937 - __main__ - INFO - Running Cellpose nuclei segmentation...
+2026-02-12 16:09:00,600 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-12 16:09:00,607 - cellpose.core - INFO - Neither TORCH CUDA nor MPS version not installed/working.
+2026-02-12 16:09:00,607 - cellpose.core - INFO - >>>> using CPU
+2026-02-12 16:09:00,607 - cellpose.core - INFO - >>>> using CPU
+2026-02-12 16:09:01,685 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-12 16:09:02,108 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-12 16:09:02,289 - cellpose.transforms - INFO - processing image with (27106, 11529) HW, and 3 channels
+slurmstepd: error: *** JOB 1595306 ON gpu-n66 CANCELLED AT 2026-02-12T16:39:27 ***

@@ -1,0 +1,16 @@
+2026-02-09 20:25:50,219 - __main__ - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:25:50,267 - __main__ - INFO - Region 0: 1407 spots, 7 cell types
+2026-02-09 20:25:50,306 - __main__ - INFO - Region 0: Pearson r = 0.7266
+2026-02-09 20:25:50,326 - __main__ - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:25:50,336 - __main__ - INFO - Region 1: 1417 spots, 7 cell types
+2026-02-09 20:25:50,373 - __main__ - INFO - Region 1: Pearson r = 0.6825
+2026-02-09 20:25:50,398 - __main__ - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:25:50,408 - __main__ - INFO - Region 2: 1352 spots, 7 cell types
+2026-02-09 20:25:50,445 - __main__ - INFO - Region 2: Pearson r = 0.7024
+2026-02-09 20:25:50,453 - __main__ - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:25:50,483 - __main__ - INFO - Region 3: 1464 spots, 7 cell types
+2026-02-09 20:25:50,522 - __main__ - INFO - Region 3: Pearson r = 0.7947
+2026-02-09 20:25:50,551 - __main__ - INFO - Filtered GT to achievable-7: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-09 20:25:50,579 - __main__ - INFO - Region 4: 1414 spots, 7 cell types
+2026-02-09 20:25:50,616 - __main__ - INFO - Region 4: Pearson r = 0.7733
+2026-02-09 20:25:50,619 - __main__ - INFO - Results saved to Benchmarking/xenium_benchmarking/evaluation/results_asma_only_gt.json

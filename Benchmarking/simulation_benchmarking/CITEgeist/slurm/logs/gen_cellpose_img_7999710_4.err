@@ -1,0 +1,16 @@
+2026-02-13 10:11:18,825 - INFO - === Replicate 4, Condition: mixed ===
+2026-02-13 10:11:18,867 - INFO - Loaded 5000 cells from /ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/scCube_12k/replicates/mixed/ST_sim/Wu_ST_4_index.csv
+2026-02-13 10:11:18,868 - INFO -   Cancer Epithelial: 2199
+2026-02-13 10:11:18,868 - INFO -   CAFs: 1527
+2026-02-13 10:11:18,868 - INFO -   Myeloid: 486
+2026-02-13 10:11:18,868 - INFO -   T-cells: 478
+2026-02-13 10:11:18,868 - INFO -   B-cells: 238
+2026-02-13 10:11:18,868 - INFO -   Plasmablasts: 38
+2026-02-13 10:11:18,868 - INFO -   PVL: 34
+2026-02-13 10:11:18,869 - INFO - Nuclei counts: min=1, max=14, mean=5.2, total=5000
+2026-02-13 10:11:18,875 - INFO - Saved nuclei counts: Benchmarking/simulation_benchmarking/CITEgeist/mixed/nuclei_counts/Wu_rep_4_nuclei_counts.csv
+2026-02-13 10:11:18,875 - INFO - Generating dapi image...
+2026-02-13 10:11:20,656 - INFO - Saved: Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_4_cellpose.png (8000x8000)
+2026-02-13 10:11:20,656 - INFO - Generating h_and_e image...
+2026-02-13 10:11:23,113 - INFO - Saved: Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/h_and_e/Wu_rep_4_cellpose.png (8000x8000)
+2026-02-13 10:11:23,114 - INFO - Done!

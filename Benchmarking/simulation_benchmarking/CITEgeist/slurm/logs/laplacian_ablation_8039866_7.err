@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/test_laplacian_ablation.py", line 89, in <module>
+    corr = run_continuous_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/test_laplacian_ablation.py", line 59, in run_continuous_benchmark
+    model.preprocess_gene_expression()
+AttributeError: 'CitegeistModel' object has no attribute 'preprocess_gene_expression'

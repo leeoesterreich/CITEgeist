@@ -1,0 +1,32 @@
+CitegeistModel initialized successfully.
+Filtered gene expression data: 405 → 400 genes (count > 0 in at least 1.0% of spots, mean expression > 1.1 in nonzero spots). Remaining spots: 1464 Filtered spots: 1464 to 1464
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_per_marker=True, no per-spot normalization.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_69', 'spot_70', 'spot_71', 'spot_72', 'spot_73'], dtype='object')
+Parquet spot names format: ['spot_69' 'spot_70' 'spot_71' 'spot_72' 'spot_73']
+Added layer: Macrophages_genes_pass1 (Shape: (1464, 400))
+Added layer: Endothelial_genes_pass1 (Shape: (1464, 400))
+Added layer: Epithelial_genes_pass1 (Shape: (1464, 400))
+Added layer: Fibroblasts_genes_pass1 (Shape: (1464, 400))
+Added layer: CD4+_T_cells_genes_pass1 (Shape: (1464, 400))
+Added layer: B_cells_genes_pass1 (Shape: (1464, 400))
+Added layer: CD8+_T_cells_genes_pass1 (Shape: (1464, 400))
+
+============================================================
+DISCRETE BENCHMARK COMPLETE: Xenium_region_3
+============================================================
+  Spots: 1464
+  Nuclei detected: 24474
+  Cell types: 7
+  Timings:
+    Cellpose: 303.8s
+    Discrete assignment: 1538.8s
+    GEX deconvolution: 113.3s
+  Output: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose_v2/Xenium_region_3
+Completed region 3

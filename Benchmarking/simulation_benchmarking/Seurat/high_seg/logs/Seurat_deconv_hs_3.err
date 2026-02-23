@@ -1,0 +1,77 @@
+Warning: Unknown file type: h5ad
+Warning: 'assay' not set, setting to 'RNA'
+Creating h5Seurat file for version 3.1.5.9900
+Adding X as scale.data
+Adding X as data
+Adding X as counts
+Adding meta.features from var
+Adding spatial as cell embeddings for spatial
+Validating h5Seurat file
+Initializing RNA with data
+Adding counts for RNA
+Adding scale.data for RNA
+Adding feature-level metadata for RNA
+Adding reduction spatial
+Adding cell embeddings for spatial
+Adding miscellaneous information for spatial
+Adding command information
+Adding cell-level metadata
+Adding miscellaneous information
+Adding tool-specific results
+Validating h5Seurat file
+Initializing RNA with data
+Adding counts for RNA
+Adding scale.data for RNA
+Adding feature-level metadata for RNA
+Adding reduction harmony
+Adding cell embeddings for harmony
+Adding miscellaneous information for harmony
+Adding reduction pca
+Adding cell embeddings for pca
+Adding feature loadings for pca
+Adding miscellaneous information for pca
+Adding reduction umap
+Adding cell embeddings for umap
+Adding miscellaneous information for umap
+Adding command information
+Adding cell-level metadata
+Adding miscellaneous information
+Adding tool-specific results
+Calculating gene variances
+0%   10   20   30   40   50   60   70   80   90   100%
+[----|----|----|----|----|----|----|----|----|----|
+**************************************************|
+Calculating feature variances of standardized and clipped values
+0%   10   20   30   40   50   60   70   80   90   100%
+[----|----|----|----|----|----|----|----|----|----|
+**************************************************|
+Centering and scaling data matrix
+  |                                                                              |                                                                      |   0%  |                                                                              |==                                                                    |   3%  |                                                                              |=====                                                                 |   7%  |                                                                              |=======                                                               |  10%  |                                                                              |=========                                                             |  13%  |                                                                              |============                                                          |  17%  |                                                                              |==============                                                        |  20%  |                                                                              |================                                                      |  23%  |                                                                              |===================                                                   |  27%  |                                                                              |=====================                                                 |  30%  |                                                                              |=======================                                               |  33%  |                                                                              |==========================                                            |  37%  |                                                                              |============================                                          |  40%  |                                                                              |==============================                                        |  43%  |                                                                              |=================================                                     |  47%  |                                                                              |===================================                                   |  50%  |                                                                              |=====================================                                 |  53%  |                                                                              |========================================                              |  57%  |                                                                              |==========================================                            |  60%  |                                                                              |============================================                          |  63%  |                                                                              |===============================================                       |  67%  |                                                                              |=================================================                     |  70%  |                                                                              |===================================================                   |  73%  |                                                                              |======================================================                |  77%  |                                                                              |========================================================              |  80%  |                                                                              |==========================================================            |  83%  |                                                                              |=============================================================         |  87%  |                                                                              |===============================================================       |  90%  |                                                                              |=================================================================     |  93%  |                                                                              |====================================================================  |  97%  |                                                                              |======================================================================| 100%
+Performing PCA on the provided reference using 2000 features as input.
+Projecting cell embeddings
+Warning: Data is of class matrix. Coercing to dgCMatrix.
+Finding neighborhoods
+Finding anchors
+	Found 1249 anchors
+Finding integration vectors
+Finding integration vector weights
+0%   10   20   30   40   50   60   70   80   90   100%
+[----|----|----|----|----|----|----|----|----|----|
+**************************************************|
+Predicting cell labels
+Warning: Layer counts isn't present in the assay object; returning NULL
+Creating h5Seurat file for version 3.1.5.9900
+Adding counts for RNA
+Adding data for RNA
+Adding scale.data for RNA
+No variable features found for RNA
+No feature-level metadata found for RNA
+Adding data for predictions
+No variable features found for predictions
+No feature-level metadata found for predictions
+Adding cell embeddings for spatial
+No loadings for spatial
+No projected loadings for spatial
+No standard deviations for spatial
+No JackStraw data for spatial
+mv: cannot stat '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/*.h5seurat': No such file or directory

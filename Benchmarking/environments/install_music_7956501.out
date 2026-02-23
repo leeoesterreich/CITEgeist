@@ -1,0 +1,20 @@
+==============================================
+Installing MuSiC R package
+==============================================
+Start time: Tue Feb 10 04:44:17 PM EST 2026
+Node: htc-1024-n0.crc.pitt.edu
+R: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/bin/R
+
+Installing MuSiC from GitHub...
+── R CMD build ─────────────────────────────────────────────────────────────────
+* checking for file ‘/scratch/slurm-7956501/RtmpvXTjSd/remotes273b55360c3d80/xuranw-MuSiC-f21fe67/DESCRIPTION’ ... OK
+* preparing ‘MuSiC’:
+* checking DESCRIPTION meta-information ... OK
+* checking for LF line-endings in source and make files and shell scripts
+* checking for empty or unneeded directories
+Omitted ‘LazyData’ from DESCRIPTION
+* building ‘MuSiC_1.0.0.tar.gz’
+Warning: invalid uid value replaced by that for user 'nobody'
+
+
+Verifying MuSiC installation...

@@ -1,0 +1,29 @@
+======================================================================
+Consensus Ground Truth Analysis (Protein + RNA Agreement)
+======================================================================
+
+1. Loading protein expression data...
+   Loaded 465534 cells
+
+2. Loading RNA clusters...
+
+3. Classifying cells by protein...
+
+4. Finding consensus cells (both modalities agree)...
+
+   Total cells: 461,886
+   Protein Unknown: 101,622 (22.0%)
+   Consensus cells: 261,738 (56.7%)
+
+5. Per-cell-type consensus counts:
+------------------------------------------------------------
+Cell Type       Protein    RNA        Consensus  % Kept    
+------------------------------------------------------------
+B cells         37,044     25,427     24,169     65.2      %
+T cells         130,724    107,428    89,823     68.7      %
+Macrophages     96,668     157,982    80,357     83.1      %
+Endothelial     49,248     44,123     33,197     67.4      %
+Epithelial      28,392     60,787     19,260     67.8      %
+Fibroblasts     18,188     66,139     14,932     82.1      %
+
+6. Computing spot-level consensus GT proportions...

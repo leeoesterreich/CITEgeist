@@ -1,0 +1,31 @@
+[2026-02-10 16:34:22] Job started for replicate 2 (ref-free)
+Activating CARD_env...
+R: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/bin/R
+R version: R version 4.4.3 (2025-02-28) -- "Trophy Case"
+============================================
+CARD Deconvolution - mixed Replicate 2 (reference_free mode)
+============================================
+Start time: 2026-02-10 16:36:53.334734
+
+Loading spatial data...
+  Spatial data: 29733 genes x 957 spots
+
+Running CARD in reference-free mode...
+  Loaded markers for 9 cell types
+
+Creating CARDfree object...
+
+Running CARD reference-free deconvolution...
+## Number of unique marker genes: 392 for 9 cell types ...
+## Deconvolution Finish! ...
+
+CARD completed in 50.2 seconds (0.8 min)
+  Proportions: 957 spots x 9 cell types
+
+Saved predictions to: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CARD/mixed/Wu_ST_2_CARD_reffree_deconv_predictions.csv
+
+============================================
+Completed CARD pipeline for replicate: Wu_ST_2
+End time: 2026-02-10 16:38:20.489628
+[2026-02-10 16:38:21] Job completed for replicate 2 (ref-free)
+CARD_REFFREE_TOTAL_RUNTIME: Replicate 2 took 239 seconds (3.98 minutes)

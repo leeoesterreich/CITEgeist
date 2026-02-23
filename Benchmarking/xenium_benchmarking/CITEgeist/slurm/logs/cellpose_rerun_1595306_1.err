@@ -1,0 +1,407 @@
+2026-02-12 16:08:41,681 - __main__ - INFO - ======================================================================
+2026-02-12 16:08:41,683 - __main__ - INFO - DISCRETE CELLPOSE BENCHMARK: Xenium_region_1
+2026-02-12 16:08:41,683 - __main__ - INFO - ======================================================================
+2026-02-12 16:08:41,683 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:41,683 - __main__ - INFO - STEP 1: Loading data
+2026-02-12 16:08:41,683 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:41,913 - __main__ - INFO - GEX: 1417 spots x 405 genes
+2026-02-12 16:08:41,913 - __main__ - INFO - CITE: 1417 spots x 27 proteins
+2026-02-12 16:08:41,913 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:41,913 - __main__ - INFO - STEP 2: Loading morphology image
+2026-02-12 16:08:41,913 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:41,925 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_1/morphology.png
+2026-02-12 16:08:50,413 - __main__ - INFO - Image shape: (25883, 11529, 3), dtype: uint8
+2026-02-12 16:08:50,432 - __main__ - INFO - Coord info: pixel_size=0.2125 um/px, image_size=[11529, 25883]
+2026-02-12 16:08:50,432 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:50,432 - __main__ - INFO - STEP 3: Cellpose nuclei segmentation
+2026-02-12 16:08:50,432 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:08:50,432 - __main__ - INFO - Running Cellpose nuclei segmentation...
+2026-02-12 16:09:01,932 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-12 16:09:02,123 - cellpose.core - INFO - ** TORCH CUDA version installed and working. **
+2026-02-12 16:09:02,123 - cellpose.core - INFO - >>>> using GPU (CUDA)
+2026-02-12 16:09:03,263 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-12 16:09:03,631 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-12 16:09:03,803 - cellpose.transforms - INFO - processing image with (25883, 11529) HW, and 3 channels
+2026-02-12 16:12:33,114 - cellpose.dynamics - WARNING - more than 65535 masks in image, masks returned as np.uint32
+2026-02-12 16:13:00,466 - __main__ - INFO - Cellpose found 81323 nuclei in 250.0s (325.3 nuclei/sec)
+2026-02-12 16:13:00,467 - __main__ - INFO - Spot diameter: 55.0 um = 258.8 pixels (radius=129.4 px)
+2026-02-12 16:13:00,482 - __main__ - INFO - Assigned 19875/81323 nuclei to spots (24.4%)
+2026-02-12 16:13:00,482 - __main__ - INFO - Nuclei per spot: min=0, max=46, mean=14.0, median=13.0
+2026-02-12 16:13:00,545 - __main__ - INFO - Saved nuclei counts: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_nuclei_counts.csv
+2026-02-12 16:13:00,546 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,546 - __main__ - INFO - STEP 4: Initialize CITEgeist model
+2026-02-12 16:13:00,546 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,550 - root - INFO - Logging initialized.
+2026-02-12 16:13:00,550 - __main__ - INFO - Loaded ACHIEVABLE_7 profile with 7 cell types
+2026-02-12 16:13:00,550 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,550 - __main__ - INFO - STEP 5: Preprocessing
+2026-02-12 16:13:00,550 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,572 - root - INFO - Normalization stats:
+2026-02-12 16:13:00,572 - root - INFO - Original median total: 1621.00
+2026-02-12 16:13:00,573 - root - INFO - Mean scaled total: 10000.33
+2026-02-12 16:13:00,573 - root - INFO - Max scaled value: 5387.00
+2026-02-12 16:13:00,577 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2026-02-12 16:13:00,581 - root - INFO - Discrete antibody preprocessing complete: Row sums range [0.00, 22.21], mean=6.74, std=4.02
+2026-02-12 16:13:00,581 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,581 - __main__ - INFO - STEP 6: Discrete cell assignment (IQP)
+2026-02-12 16:13:00,581 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 16:13:00,581 - root - WARNING - Zero columns detected for markers: ['CD20']. Adding epsilon.
+2026-02-12 16:13:00,581 - root - INFO - Mapped 9 markers to 7 cell types (preserving marker-level data)
+2026-02-12 16:13:00,581 - root - INFO - Running discrete cell assignment: 1417 spots, 9 markers, 7 cell types
+2026-02-12 16:13:00,581 - root - INFO - Total nuclei: 19875, mean per spot: 14.03
+2026-02-12 16:13:00,581 - root - INFO - Discrete cell assignment EM: 1417 spots, 9 markers, 7 cell types
+2026-02-12 16:13:00,581 - root - INFO - Total nuclei: 19875, mean per spot: 14.03
+2026-02-12 16:13:00,582 - root - INFO - 
+=== EM Iteration 1/20 ===
+2026-02-12 16:13:00,589 - gurobipy - INFO - Set parameter LicenseID to value 276015
+2026-02-12 16:13:00,589 - gurobipy - INFO - Set parameter GURO_PAR_SPECIAL
+2026-02-12 16:13:00,589 - gurobipy - INFO - Set parameter TokenServer to value "license.crc.pitt.edu"
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/gurobi_impl.py:3365: RuntimeWarning: invalid value encountered in scalar divide
+  loss_change = abs(prev_loss - loss) / max(abs(prev_loss), 1e-10)
+2026-02-12 16:17:12,487 - root - INFO -   Loss: 914.7861 (change: nan)
+2026-02-12 16:17:12,487 - root - INFO -   Beta range: [0.100, 0.256]
+2026-02-12 16:17:12,487 - root - INFO -   Max beta change: 0.900000
+2026-02-12 16:17:12,487 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:17:12,487 - root - INFO -     B cells: 3273 cells (16.5%)
+2026-02-12 16:17:12,487 - root - INFO -     CD4+ T cells: 1241 cells (6.2%)
+2026-02-12 16:17:12,487 - root - INFO -     CD8+ T cells: 1542 cells (7.8%)
+2026-02-12 16:17:12,487 - root - INFO -     Macrophages: 2154 cells (10.8%)
+2026-02-12 16:17:12,487 - root - INFO -     Endothelial: 3940 cells (19.8%)
+2026-02-12 16:17:12,487 - root - INFO -     Epithelial: 3776 cells (19.0%)
+2026-02-12 16:17:12,487 - root - INFO -     Fibroblasts: 3949 cells (19.9%)
+2026-02-12 16:17:12,487 - root - INFO - 
+=== EM Iteration 2/20 ===
+2026-02-12 16:21:09,898 - root - INFO -   Loss: 376.7410 (change: 0.588165)
+2026-02-12 16:21:09,910 - root - INFO -   Beta range: [0.100, 0.240]
+2026-02-12 16:21:09,910 - root - INFO -   Max beta change: 0.015796
+2026-02-12 16:21:09,910 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:21:09,910 - root - INFO -     B cells: 1546 cells (7.8%)
+2026-02-12 16:21:09,910 - root - INFO -     CD4+ T cells: 1211 cells (6.1%)
+2026-02-12 16:21:09,910 - root - INFO -     CD8+ T cells: 1592 cells (8.0%)
+2026-02-12 16:21:09,910 - root - INFO -     Macrophages: 2260 cells (11.4%)
+2026-02-12 16:21:09,910 - root - INFO -     Endothelial: 4703 cells (23.7%)
+2026-02-12 16:21:09,910 - root - INFO -     Epithelial: 3967 cells (20.0%)
+2026-02-12 16:21:09,910 - root - INFO -     Fibroblasts: 4596 cells (23.1%)
+2026-02-12 16:21:09,910 - root - INFO - 
+=== EM Iteration 3/20 ===
+2026-02-12 16:25:06,953 - root - INFO -   Loss: 373.3409 (change: 0.009025)
+2026-02-12 16:25:06,957 - root - INFO -   Beta range: [0.100, 0.223]
+2026-02-12 16:25:06,957 - root - INFO -   Max beta change: 0.016697
+2026-02-12 16:25:06,957 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:25:06,957 - root - INFO -     B cells: 1530 cells (7.7%)
+2026-02-12 16:25:06,957 - root - INFO -     CD4+ T cells: 1198 cells (6.0%)
+2026-02-12 16:25:06,957 - root - INFO -     CD8+ T cells: 1716 cells (8.6%)
+2026-02-12 16:25:06,957 - root - INFO -     Macrophages: 2314 cells (11.6%)
+2026-02-12 16:25:06,957 - root - INFO -     Endothelial: 4649 cells (23.4%)
+2026-02-12 16:25:06,957 - root - INFO -     Epithelial: 3920 cells (19.7%)
+2026-02-12 16:25:06,957 - root - INFO -     Fibroblasts: 4548 cells (22.9%)
+2026-02-12 16:25:06,957 - root - INFO - 
+=== EM Iteration 4/20 ===
+2026-02-12 16:28:58,500 - root - INFO -   Loss: 370.7797 (change: 0.006860)
+2026-02-12 16:28:58,503 - root - INFO -   Beta range: [0.100, 0.211]
+2026-02-12 16:28:58,503 - root - INFO -   Max beta change: 0.012469
+2026-02-12 16:28:58,503 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:28:58,503 - root - INFO -     B cells: 1510 cells (7.6%)
+2026-02-12 16:28:58,503 - root - INFO -     CD4+ T cells: 1194 cells (6.0%)
+2026-02-12 16:28:58,503 - root - INFO -     CD8+ T cells: 1834 cells (9.2%)
+2026-02-12 16:28:58,503 - root - INFO -     Macrophages: 2349 cells (11.8%)
+2026-02-12 16:28:58,503 - root - INFO -     Endothelial: 4602 cells (23.2%)
+2026-02-12 16:28:58,503 - root - INFO -     Epithelial: 3889 cells (19.6%)
+2026-02-12 16:28:58,503 - root - INFO -     Fibroblasts: 4497 cells (22.6%)
+2026-02-12 16:28:58,503 - root - INFO - 
+=== EM Iteration 5/20 ===
+2026-02-12 16:32:47,475 - root - INFO -   Loss: 368.6505 (change: 0.005743)
+2026-02-12 16:32:47,490 - root - INFO -   Beta range: [0.100, 0.201]
+2026-02-12 16:32:47,490 - root - INFO -   Max beta change: 0.011827
+2026-02-12 16:32:47,490 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:32:47,490 - root - INFO -     B cells: 1479 cells (7.4%)
+2026-02-12 16:32:47,490 - root - INFO -     CD4+ T cells: 1176 cells (5.9%)
+2026-02-12 16:32:47,490 - root - INFO -     CD8+ T cells: 1955 cells (9.8%)
+2026-02-12 16:32:47,490 - root - INFO -     Macrophages: 2387 cells (12.0%)
+2026-02-12 16:32:47,490 - root - INFO -     Endothelial: 4560 cells (22.9%)
+2026-02-12 16:32:47,490 - root - INFO -     Epithelial: 3851 cells (19.4%)
+2026-02-12 16:32:47,491 - root - INFO -     Fibroblasts: 4467 cells (22.5%)
+2026-02-12 16:32:47,491 - root - INFO - 
+=== EM Iteration 6/20 ===
+2026-02-12 16:36:32,938 - root - INFO -   Loss: 366.8094 (change: 0.004994)
+2026-02-12 16:36:32,941 - root - INFO -   Beta range: [0.100, 0.204]
+2026-02-12 16:36:32,941 - root - INFO -   Max beta change: 0.010865
+2026-02-12 16:36:32,942 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:36:32,942 - root - INFO -     B cells: 1447 cells (7.3%)
+2026-02-12 16:36:32,942 - root - INFO -     CD4+ T cells: 1137 cells (5.7%)
+2026-02-12 16:36:32,942 - root - INFO -     CD8+ T cells: 2084 cells (10.5%)
+2026-02-12 16:36:32,942 - root - INFO -     Macrophages: 2421 cells (12.2%)
+2026-02-12 16:36:32,942 - root - INFO -     Endothelial: 4533 cells (22.8%)
+2026-02-12 16:36:32,942 - root - INFO -     Epithelial: 3824 cells (19.2%)
+2026-02-12 16:36:32,942 - root - INFO -     Fibroblasts: 4429 cells (22.3%)
+2026-02-12 16:36:32,942 - root - INFO - 
+=== EM Iteration 7/20 ===
+2026-02-12 16:40:17,459 - root - INFO -   Loss: 364.8893 (change: 0.005235)
+2026-02-12 16:40:17,461 - root - INFO -   Beta range: [0.100, 0.208]
+2026-02-12 16:40:17,461 - root - INFO -   Max beta change: 0.010363
+2026-02-12 16:40:17,461 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:40:17,461 - root - INFO -     B cells: 1418 cells (7.1%)
+2026-02-12 16:40:17,461 - root - INFO -     CD4+ T cells: 1103 cells (5.5%)
+2026-02-12 16:40:17,461 - root - INFO -     CD8+ T cells: 2221 cells (11.2%)
+2026-02-12 16:40:17,461 - root - INFO -     Macrophages: 2456 cells (12.4%)
+2026-02-12 16:40:17,461 - root - INFO -     Endothelial: 4487 cells (22.6%)
+2026-02-12 16:40:17,461 - root - INFO -     Epithelial: 3798 cells (19.1%)
+2026-02-12 16:40:17,461 - root - INFO -     Fibroblasts: 4392 cells (22.1%)
+2026-02-12 16:40:17,461 - root - INFO - 
+=== EM Iteration 8/20 ===
+2026-02-12 16:44:02,638 - root - INFO -   Loss: 363.0881 (change: 0.004936)
+2026-02-12 16:44:02,648 - root - INFO -   Beta range: [0.100, 0.212]
+2026-02-12 16:44:02,648 - root - INFO -   Max beta change: 0.009101
+2026-02-12 16:44:02,648 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:44:02,648 - root - INFO -     B cells: 1403 cells (7.1%)
+2026-02-12 16:44:02,648 - root - INFO -     CD4+ T cells: 1066 cells (5.4%)
+2026-02-12 16:44:02,648 - root - INFO -     CD8+ T cells: 2342 cells (11.8%)
+2026-02-12 16:44:02,648 - root - INFO -     Macrophages: 2485 cells (12.5%)
+2026-02-12 16:44:02,648 - root - INFO -     Endothelial: 4448 cells (22.4%)
+2026-02-12 16:44:02,648 - root - INFO -     Epithelial: 3775 cells (19.0%)
+2026-02-12 16:44:02,648 - root - INFO -     Fibroblasts: 4356 cells (21.9%)
+2026-02-12 16:44:02,648 - root - INFO - 
+=== EM Iteration 9/20 ===
+2026-02-12 16:47:43,099 - root - INFO -   Loss: 361.6972 (change: 0.003831)
+2026-02-12 16:47:43,103 - root - INFO -   Beta range: [0.100, 0.216]
+2026-02-12 16:47:43,103 - root - INFO -   Max beta change: 0.007247
+2026-02-12 16:47:43,103 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:47:43,104 - root - INFO -     B cells: 1388 cells (7.0%)
+2026-02-12 16:47:43,104 - root - INFO -     CD4+ T cells: 1030 cells (5.2%)
+2026-02-12 16:47:43,104 - root - INFO -     CD8+ T cells: 2457 cells (12.4%)
+2026-02-12 16:47:43,104 - root - INFO -     Macrophages: 2504 cells (12.6%)
+2026-02-12 16:47:43,104 - root - INFO -     Endothelial: 4420 cells (22.2%)
+2026-02-12 16:47:43,104 - root - INFO -     Epithelial: 3750 cells (18.9%)
+2026-02-12 16:47:43,104 - root - INFO -     Fibroblasts: 4326 cells (21.8%)
+2026-02-12 16:47:43,104 - root - INFO - 
+=== EM Iteration 10/20 ===
+2026-02-12 16:51:24,226 - root - INFO -   Loss: 360.6643 (change: 0.002856)
+2026-02-12 16:51:24,228 - root - INFO -   Beta range: [0.100, 0.220]
+2026-02-12 16:51:24,228 - root - INFO -   Max beta change: 0.006521
+2026-02-12 16:51:24,228 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:51:24,229 - root - INFO -     B cells: 1369 cells (6.9%)
+2026-02-12 16:51:24,229 - root - INFO -     CD4+ T cells: 997 cells (5.0%)
+2026-02-12 16:51:24,229 - root - INFO -     CD8+ T cells: 2558 cells (12.9%)
+2026-02-12 16:51:24,229 - root - INFO -     Macrophages: 2522 cells (12.7%)
+2026-02-12 16:51:24,229 - root - INFO -     Endothelial: 4401 cells (22.1%)
+2026-02-12 16:51:24,229 - root - INFO -     Epithelial: 3729 cells (18.8%)
+2026-02-12 16:51:24,229 - root - INFO -     Fibroblasts: 4299 cells (21.6%)
+2026-02-12 16:51:24,229 - root - INFO - 
+=== EM Iteration 11/20 ===
+2026-02-12 16:54:59,845 - root - INFO -   Loss: 359.4636 (change: 0.003329)
+2026-02-12 16:54:59,855 - root - INFO -   Beta range: [0.100, 0.227]
+2026-02-12 16:54:59,855 - root - INFO -   Max beta change: 0.006687
+2026-02-12 16:54:59,855 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:54:59,855 - root - INFO -     B cells: 1360 cells (6.8%)
+2026-02-12 16:54:59,855 - root - INFO -     CD4+ T cells: 964 cells (4.9%)
+2026-02-12 16:54:59,855 - root - INFO -     CD8+ T cells: 2660 cells (13.4%)
+2026-02-12 16:54:59,855 - root - INFO -     Macrophages: 2530 cells (12.7%)
+2026-02-12 16:54:59,855 - root - INFO -     Endothelial: 4374 cells (22.0%)
+2026-02-12 16:54:59,855 - root - INFO -     Epithelial: 3711 cells (18.7%)
+2026-02-12 16:54:59,855 - root - INFO -     Fibroblasts: 4276 cells (21.5%)
+2026-02-12 16:54:59,855 - root - INFO - 
+=== EM Iteration 12/20 ===
+2026-02-12 16:58:35,598 - root - INFO -   Loss: 358.2337 (change: 0.003422)
+2026-02-12 16:58:35,606 - root - INFO -   Beta range: [0.100, 0.232]
+2026-02-12 16:58:35,606 - root - INFO -   Max beta change: 0.004979
+2026-02-12 16:58:35,606 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 16:58:35,606 - root - INFO -     B cells: 1352 cells (6.8%)
+2026-02-12 16:58:35,606 - root - INFO -     CD4+ T cells: 928 cells (4.7%)
+2026-02-12 16:58:35,606 - root - INFO -     CD8+ T cells: 2751 cells (13.8%)
+2026-02-12 16:58:35,606 - root - INFO -     Macrophages: 2537 cells (12.8%)
+2026-02-12 16:58:35,606 - root - INFO -     Endothelial: 4353 cells (21.9%)
+2026-02-12 16:58:35,606 - root - INFO -     Epithelial: 3696 cells (18.6%)
+2026-02-12 16:58:35,606 - root - INFO -     Fibroblasts: 4258 cells (21.4%)
+2026-02-12 16:58:35,606 - root - INFO - 
+=== EM Iteration 13/20 ===
+2026-02-12 17:02:08,747 - root - INFO -   Loss: 357.1813 (change: 0.002938)
+2026-02-12 17:02:08,761 - root - INFO -   Beta range: [0.100, 0.235]
+2026-02-12 17:02:08,761 - root - INFO -   Max beta change: 0.004724
+2026-02-12 17:02:08,761 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:02:08,761 - root - INFO -     B cells: 1341 cells (6.7%)
+2026-02-12 17:02:08,761 - root - INFO -     CD4+ T cells: 886 cells (4.5%)
+2026-02-12 17:02:08,761 - root - INFO -     CD8+ T cells: 2849 cells (14.3%)
+2026-02-12 17:02:08,761 - root - INFO -     Macrophages: 2540 cells (12.8%)
+2026-02-12 17:02:08,761 - root - INFO -     Endothelial: 4338 cells (21.8%)
+2026-02-12 17:02:08,761 - root - INFO -     Epithelial: 3683 cells (18.5%)
+2026-02-12 17:02:08,761 - root - INFO -     Fibroblasts: 4238 cells (21.3%)
+2026-02-12 17:02:08,761 - root - INFO - 
+=== EM Iteration 14/20 ===
+2026-02-12 17:05:39,740 - root - INFO -   Loss: 356.8041 (change: 0.001056)
+2026-02-12 17:05:39,750 - root - INFO -   Beta range: [0.100, 0.236]
+2026-02-12 17:05:39,750 - root - INFO -   Max beta change: 0.004155
+2026-02-12 17:05:39,750 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:05:39,750 - root - INFO -     B cells: 1323 cells (6.7%)
+2026-02-12 17:05:39,750 - root - INFO -     CD4+ T cells: 853 cells (4.3%)
+2026-02-12 17:05:39,750 - root - INFO -     CD8+ T cells: 2944 cells (14.8%)
+2026-02-12 17:05:39,750 - root - INFO -     Macrophages: 2543 cells (12.8%)
+2026-02-12 17:05:39,750 - root - INFO -     Endothelial: 4319 cells (21.7%)
+2026-02-12 17:05:39,750 - root - INFO -     Epithelial: 3668 cells (18.5%)
+2026-02-12 17:05:39,750 - root - INFO -     Fibroblasts: 4225 cells (21.3%)
+2026-02-12 17:05:39,750 - root - INFO - 
+=== EM Iteration 15/20 ===
+2026-02-12 17:09:05,108 - root - INFO -   Loss: 355.8611 (change: 0.002643)
+2026-02-12 17:09:05,108 - root - INFO -   Beta range: [0.100, 0.239]
+2026-02-12 17:09:05,108 - root - INFO -   Max beta change: 0.004167
+2026-02-12 17:09:05,108 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:09:05,108 - root - INFO -     B cells: 1303 cells (6.6%)
+2026-02-12 17:09:05,108 - root - INFO -     CD4+ T cells: 830 cells (4.2%)
+2026-02-12 17:09:05,108 - root - INFO -     CD8+ T cells: 3036 cells (15.3%)
+2026-02-12 17:09:05,108 - root - INFO -     Macrophages: 2545 cells (12.8%)
+2026-02-12 17:09:05,108 - root - INFO -     Endothelial: 4301 cells (21.6%)
+2026-02-12 17:09:05,108 - root - INFO -     Epithelial: 3655 cells (18.4%)
+2026-02-12 17:09:05,108 - root - INFO -     Fibroblasts: 4205 cells (21.2%)
+2026-02-12 17:09:05,108 - root - INFO - 
+=== EM Iteration 16/20 ===
+2026-02-12 17:12:29,930 - root - INFO -   Loss: 355.4220 (change: 0.001234)
+2026-02-12 17:12:29,931 - root - INFO -   Beta range: [0.100, 0.241]
+2026-02-12 17:12:29,931 - root - INFO -   Max beta change: 0.003489
+2026-02-12 17:12:29,931 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:12:29,931 - root - INFO -     B cells: 1286 cells (6.5%)
+2026-02-12 17:12:29,931 - root - INFO -     CD4+ T cells: 809 cells (4.1%)
+2026-02-12 17:12:29,931 - root - INFO -     CD8+ T cells: 3122 cells (15.7%)
+2026-02-12 17:12:29,931 - root - INFO -     Macrophages: 2539 cells (12.8%)
+2026-02-12 17:12:29,931 - root - INFO -     Endothelial: 4284 cells (21.6%)
+2026-02-12 17:12:29,931 - root - INFO -     Epithelial: 3643 cells (18.3%)
+2026-02-12 17:12:29,931 - root - INFO -     Fibroblasts: 4192 cells (21.1%)
+2026-02-12 17:12:29,931 - root - INFO - 
+=== EM Iteration 17/20 ===
+2026-02-12 17:15:55,895 - root - INFO -   Loss: 354.8983 (change: 0.001473)
+2026-02-12 17:15:55,905 - root - INFO -   Beta range: [0.100, 0.246]
+2026-02-12 17:15:55,905 - root - INFO -   Max beta change: 0.004917
+2026-02-12 17:15:55,905 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:15:55,905 - root - INFO -     B cells: 1273 cells (6.4%)
+2026-02-12 17:15:55,905 - root - INFO -     CD4+ T cells: 793 cells (4.0%)
+2026-02-12 17:15:55,905 - root - INFO -     CD8+ T cells: 3197 cells (16.1%)
+2026-02-12 17:15:55,905 - root - INFO -     Macrophages: 2532 cells (12.7%)
+2026-02-12 17:15:55,905 - root - INFO -     Endothelial: 4264 cells (21.5%)
+2026-02-12 17:15:55,905 - root - INFO -     Epithelial: 3638 cells (18.3%)
+2026-02-12 17:15:55,905 - root - INFO -     Fibroblasts: 4178 cells (21.0%)
+2026-02-12 17:15:55,905 - root - INFO - 
+=== EM Iteration 18/20 ===
+2026-02-12 17:19:15,164 - root - INFO -   Loss: 354.5279 (change: 0.001044)
+2026-02-12 17:19:15,165 - root - INFO -   Beta range: [0.100, 0.257]
+2026-02-12 17:19:15,165 - root - INFO -   Max beta change: 0.010919
+2026-02-12 17:19:15,165 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:19:15,165 - root - INFO -     B cells: 1273 cells (6.4%)
+2026-02-12 17:19:15,165 - root - INFO -     CD4+ T cells: 779 cells (3.9%)
+2026-02-12 17:19:15,165 - root - INFO -     CD8+ T cells: 3241 cells (16.3%)
+2026-02-12 17:19:15,165 - root - INFO -     Macrophages: 2524 cells (12.7%)
+2026-02-12 17:19:15,165 - root - INFO -     Endothelial: 4256 cells (21.4%)
+2026-02-12 17:19:15,165 - root - INFO -     Epithelial: 3631 cells (18.3%)
+2026-02-12 17:19:15,165 - root - INFO -     Fibroblasts: 4171 cells (21.0%)
+2026-02-12 17:19:15,165 - root - INFO - 
+=== EM Iteration 19/20 ===
+2026-02-12 17:22:38,138 - root - INFO -   Loss: 354.7324 (change: 0.000577)
+2026-02-12 17:22:38,141 - root - INFO -   Beta range: [0.100, 0.266]
+2026-02-12 17:22:38,141 - root - INFO -   Max beta change: 0.008616
+2026-02-12 17:22:38,141 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:22:38,141 - root - INFO -     B cells: 1266 cells (6.4%)
+2026-02-12 17:22:38,141 - root - INFO -     CD4+ T cells: 787 cells (4.0%)
+2026-02-12 17:22:38,141 - root - INFO -     CD8+ T cells: 3278 cells (16.5%)
+2026-02-12 17:22:38,141 - root - INFO -     Macrophages: 2519 cells (12.7%)
+2026-02-12 17:22:38,141 - root - INFO -     Endothelial: 4247 cells (21.4%)
+2026-02-12 17:22:38,141 - root - INFO -     Epithelial: 3624 cells (18.2%)
+2026-02-12 17:22:38,141 - root - INFO -     Fibroblasts: 4154 cells (20.9%)
+2026-02-12 17:22:38,141 - root - WARNING - Loss increased from 354.5279 to 354.7324
+2026-02-12 17:22:38,141 - root - INFO - 
+=== EM Iteration 20/20 ===
+2026-02-12 17:26:03,504 - root - INFO -   Loss: 354.5935 (change: 0.000391)
+2026-02-12 17:26:03,515 - root - INFO -   Beta range: [0.100, 0.267]
+2026-02-12 17:26:03,515 - root - INFO -   Max beta change: 0.001487
+2026-02-12 17:26:03,516 - root - INFO -   Cell count range: [0, 46]
+2026-02-12 17:26:03,516 - root - INFO -     B cells: 1264 cells (6.4%)
+2026-02-12 17:26:03,516 - root - INFO -     CD4+ T cells: 791 cells (4.0%)
+2026-02-12 17:26:03,516 - root - INFO -     CD8+ T cells: 3297 cells (16.6%)
+2026-02-12 17:26:03,516 - root - INFO -     Macrophages: 2514 cells (12.6%)
+2026-02-12 17:26:03,516 - root - INFO -     Endothelial: 4244 cells (21.4%)
+2026-02-12 17:26:03,516 - root - INFO -     Epithelial: 3616 cells (18.2%)
+2026-02-12 17:26:03,516 - root - INFO -     Fibroblasts: 4149 cells (20.9%)
+2026-02-12 17:26:03,516 - root - INFO - 
+Final beta values:
+2026-02-12 17:26:03,516 - root - INFO -   CD20: β=0.100, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   CD3E: β=0.100, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   CD4: β=0.267, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   CD8A: β=0.120, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   CD68: β=0.175, α=0.028
+2026-02-12 17:26:03,516 - root - INFO -   CD163: β=0.157, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   CD31: β=0.100, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   PanCK: β=0.100, α=0.000
+2026-02-12 17:26:03,516 - root - INFO -   alphaSMA: β=0.100, α=0.000
+2026-02-12 17:26:03,558 - root - INFO - Saved discrete cell counts to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_discrete_cell_counts.csv
+2026-02-12 17:26:03,579 - root - INFO - Saved derived proportions to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_cell_prop_discrete.csv
+2026-02-12 17:26:03,579 - root - INFO - Cell type distribution:
+2026-02-12 17:26:03,579 - root - INFO -   B cells: 1264 cells (6.4%)
+2026-02-12 17:26:03,579 - root - INFO -   CD4+ T cells: 791 cells (4.0%)
+2026-02-12 17:26:03,579 - root - INFO -   CD8+ T cells: 3297 cells (16.6%)
+2026-02-12 17:26:03,579 - root - INFO -   Macrophages: 2514 cells (12.6%)
+2026-02-12 17:26:03,579 - root - INFO -   Endothelial: 4244 cells (21.4%)
+2026-02-12 17:26:03,579 - root - INFO -   Epithelial: 3616 cells (18.2%)
+2026-02-12 17:26:03,579 - root - INFO -   Fibroblasts: 4149 cells (20.9%)
+2026-02-12 17:26:03,579 - __main__ - INFO - Cell type distribution:
+2026-02-12 17:26:03,579 - __main__ - INFO -   B cells: 1264 cells (6.4%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   CD4+ T cells: 791 cells (4.0%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   CD8+ T cells: 3297 cells (16.6%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   Macrophages: 2514 cells (12.6%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   Endothelial: 4244 cells (21.4%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   Epithelial: 3616 cells (18.2%)
+2026-02-12 17:26:03,579 - __main__ - INFO -   Fibroblasts: 4149 cells (20.9%)
+2026-02-12 17:26:03,597 - __main__ - INFO - Saved proportions: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_deconv_predictions.csv
+2026-02-12 17:26:03,597 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 17:26:03,597 - __main__ - INFO - STEP 7: Gene expression deconvolution
+2026-02-12 17:26:03,597 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 17:26:03,599 - CITEgeist.model.utils - INFO - Detected spot spacing: 100.00 units (median of 1417 nearest-neighbor distances)
+2026-02-12 17:26:03,599 - CITEgeist.model.utils - INFO - Computed optimal radius: 305.00 (3.0 rings, spot_spacing=100.00)
+2026-02-12 17:26:03,599 - root - INFO - Auto-detected radius: 305.00 (3 rings)
+2026-02-12 17:26:03,599 - root - INFO - Starting Pass 1: Error minimization with enrichment weights...
+2026-02-12 17:26:03,599 - root - INFO - Using discrete mode: cell counts as fixed multipliers
+2026-02-12 17:26:03,599 - root - WARNING - Found 6 spots with zero cells. These will be skipped in deconvolution.
+2026-02-12 17:26:03,599 - root - WARNING - Found 6 spots with zero or negligible total cell proportions. Deconvolution for these spots may fail and their profiles will be imputed as zeros. Example spot indices: [ 2 64 76 79 80]
+2026-02-12 17:26:03,605 - root - INFO - Starting analysis for Xenium_region_1
+2026-02-12 17:26:03,605 - root - INFO - Already completed spots: 0
+2026-02-12 17:26:03,605 - root - INFO - Using enrichment weights - Global: 0.5, Local: 0.5
+2026-02-12 17:26:03,605 - root - INFO - Using 64 workers
+2026-02-12 17:26:03,605 - root - INFO - Processing 1417 remaining spots
+Deconvoluting Remaining Spots:   0%|          | 0/1417 [00:00<?, ?it/s]Deconvoluting Remaining Spots:   0%|          | 1/1417 [00:00<07:31,  3.14it/s]Deconvoluting Remaining Spots:   0%|          | 2/1417 [00:00<07:33,  3.12it/s]Deconvoluting Remaining Spots:   0%|          | 3/1417 [00:00<07:19,  3.22it/s]Deconvoluting Remaining Spots:   0%|          | 4/1417 [00:01<06:43,  3.50it/s]Deconvoluting Remaining Spots:   0%|          | 5/1417 [00:01<06:07,  3.84it/s]Deconvoluting Remaining Spots:   0%|          | 6/1417 [00:01<06:43,  3.50it/s]Deconvoluting Remaining Spots:   0%|          | 7/1417 [00:03<14:27,  1.63it/s]Deconvoluting Remaining Spots:   1%|          | 8/1417 [00:03<13:47,  1.70it/s]Deconvoluting Remaining Spots:   1%|          | 11/1417 [00:03<06:23,  3.67it/s]Deconvoluting Remaining Spots:   1%|          | 14/1417 [00:04<06:49,  3.43it/s]Deconvoluting Remaining Spots:   1%|          | 15/1417 [00:04<06:41,  3.49it/s]Deconvoluting Remaining Spots:   1%|          | 16/1417 [00:05<06:03,  3.86it/s]Deconvoluting Remaining Spots:   1%|          | 17/1417 [00:05<05:30,  4.24it/s]Deconvoluting Remaining Spots:   1%|▏         | 20/1417 [00:05<03:27,  6.72it/s]Deconvoluting Remaining Spots:   2%|▏         | 24/1417 [00:05<02:11, 10.59it/s]Deconvoluting Remaining Spots:   2%|▏         | 26/1417 [00:05<02:06, 11.01it/s]Deconvoluting Remaining Spots:   2%|▏         | 31/1417 [00:05<01:40, 13.79it/s]Deconvoluting Remaining Spots:   2%|▏         | 34/1417 [00:06<01:38, 14.10it/s]Deconvoluting Remaining Spots:   3%|▎         | 38/1417 [00:06<01:15, 18.24it/s]Deconvoluting Remaining Spots:   3%|▎         | 42/1417 [00:06<01:02, 22.13it/s]Deconvoluting Remaining Spots:   3%|▎         | 47/1417 [00:06<00:53, 25.60it/s]Deconvoluting Remaining Spots:   4%|▎         | 50/1417 [00:06<00:59, 22.95it/s]Deconvoluting Remaining Spots:   4%|▍         | 55/1417 [00:06<00:53, 25.68it/s]Deconvoluting Remaining Spots:   4%|▍         | 60/1417 [00:06<00:50, 26.61it/s]Deconvoluting Remaining Spots:   5%|▍         | 64/1417 [00:07<00:50, 26.85it/s]Deconvoluting Remaining Spots:   5%|▍         | 68/1417 [00:07<00:49, 27.26it/s]Deconvoluting Remaining Spots:   5%|▌         | 71/1417 [00:07<01:31, 14.79it/s]Deconvoluting Remaining Spots:   5%|▌         | 74/1417 [00:08<01:56, 11.58it/s]Deconvoluting Remaining Spots:   6%|▌         | 79/1417 [00:08<01:40, 13.27it/s]Deconvoluting Remaining Spots:   6%|▌         | 81/1417 [00:09<02:34,  8.65it/s]Deconvoluting Remaining Spots:   6%|▌         | 83/1417 [00:09<02:37,  8.50it/s]Deconvoluting Remaining Spots:   6%|▌         | 85/1417 [00:09<02:47,  7.94it/s]Deconvoluting Remaining Spots:   6%|▋         | 90/1417 [00:09<01:46, 12.51it/s]Deconvoluting Remaining Spots:   7%|▋         | 93/1417 [00:09<01:32, 14.30it/s]Deconvoluting Remaining Spots:   7%|▋         | 96/1417 [00:10<01:29, 14.76it/s]Deconvoluting Remaining Spots:   7%|▋         | 98/1417 [00:10<01:32, 14.29it/s]Deconvoluting Remaining Spots:   7%|▋         | 100/1417 [00:10<01:28, 14.87it/s]2026-02-12 17:26:14,933 - root - INFO - Saved checkpoint after 100 completed spots
+Deconvoluting Remaining Spots:   7%|▋         | 102/1417 [00:10<02:14,  9.81it/s]Deconvoluting Remaining Spots:   8%|▊         | 115/1417 [00:10<00:54, 24.07it/s]Deconvoluting Remaining Spots:   8%|▊         | 118/1417 [00:11<01:03, 20.44it/s]Deconvoluting Remaining Spots:   9%|▊         | 122/1417 [00:11<01:01, 21.22it/s]Deconvoluting Remaining Spots:   9%|▉         | 126/1417 [00:11<00:59, 21.62it/s]Deconvoluting Remaining Spots:   9%|▉         | 129/1417 [00:11<01:15, 17.07it/s]Deconvoluting Remaining Spots:  10%|▉         | 135/1417 [00:12<01:25, 15.07it/s]Deconvoluting Remaining Spots:  10%|▉         | 137/1417 [00:12<01:36, 13.22it/s]Deconvoluting Remaining Spots:  10%|▉         | 139/1417 [00:12<01:43, 12.32it/s]Deconvoluting Remaining Spots:  10%|█         | 143/1417 [00:12<01:20, 15.77it/s]Deconvoluting Remaining Spots:  10%|█         | 145/1417 [00:13<02:20,  9.03it/s]Deconvoluting Remaining Spots:  10%|█         | 147/1417 [00:13<02:27,  8.60it/s]Deconvoluting Remaining Spots:  11%|█         | 149/1417 [00:13<02:21,  8.99it/s]Deconvoluting Remaining Spots:  11%|█         | 151/1417 [00:14<02:02, 10.33it/s]Deconvoluting Remaining Spots:  11%|█         | 153/1417 [00:14<01:50, 11.46it/s]Deconvoluting Remaining Spots:  11%|█         | 159/1417 [00:14<01:02, 20.14it/s]Deconvoluting Remaining Spots:  11%|█▏        | 162/1417 [00:14<01:08, 18.25it/s]Deconvoluting Remaining Spots:  12%|█▏        | 165/1417 [00:14<01:33, 13.32it/s]Deconvoluting Remaining Spots:  12%|█▏        | 173/1417 [00:15<00:55, 22.32it/s]Deconvoluting Remaining Spots:  13%|█▎        | 179/1417 [00:15<00:43, 28.30it/s]Deconvoluting Remaining Spots:  13%|█▎        | 183/1417 [00:15<01:15, 16.40it/s]Deconvoluting Remaining Spots:  13%|█▎        | 186/1417 [00:15<01:14, 16.52it/s]Deconvoluting Remaining Spots:  13%|█▎        | 189/1417 [00:16<01:12, 16.89it/s]Deconvoluting Remaining Spots:  14%|█▎        | 192/1417 [00:16<01:05, 18.76it/s]Deconvoluting Remaining Spots:  14%|█▍        | 195/1417 [00:16<01:38, 12.39it/s]Deconvoluting Remaining Spots:  14%|█▍        | 199/1417 [00:16<01:26, 14.02it/s]2026-02-12 17:26:22,420 - root - INFO - Saved checkpoint after 200 completed spots
+Deconvoluting Remaining Spots:  14%|█▍        | 201/1417 [00:18<03:58,  5.09it/s]Deconvoluting Remaining Spots:  15%|█▍        | 212/1417 [00:18<01:46, 11.32it/s]Deconvoluting Remaining Spots:  15%|█▌        | 219/1417 [00:18<01:18, 15.17it/s]Deconvoluting Remaining Spots:  16%|█▌        | 223/1417 [00:18<01:14, 16.01it/s]Deconvoluting Remaining Spots:  16%|█▌        | 226/1417 [00:19<01:20, 14.84it/s]Deconvoluting Remaining Spots:  16%|█▌        | 229/1417 [00:19<01:13, 16.27it/s]Deconvoluting Remaining Spots:  16%|█▋        | 233/1417 [00:19<01:05, 18.02it/s]Deconvoluting Remaining Spots:  17%|█▋        | 236/1417 [00:19<01:02, 18.85it/s]Deconvoluting Remaining Spots:  17%|█▋        | 240/1417 [00:19<00:52, 22.54it/s]Deconvoluting Remaining Spots:  17%|█▋        | 245/1417 [00:19<00:42, 27.76it/s]Deconvoluting Remaining Spots:  18%|█▊        | 249/1417 [00:20<01:06, 17.46it/s]Deconvoluting Remaining Spots:  18%|█▊        | 252/1417 [00:20<01:32, 12.57it/s]Deconvoluting Remaining Spots:  18%|█▊        | 255/1417 [00:20<01:28, 13.08it/s]Deconvoluting Remaining Spots:  18%|█▊        | 257/1417 [00:20<01:28, 13.06it/s]Deconvoluting Remaining Spots:  18%|█▊        | 259/1417 [00:21<01:27, 13.19it/s]Deconvoluting Remaining Spots:  18%|█▊        | 261/1417 [00:21<01:23, 13.79it/s]Deconvoluting Remaining Spots:  19%|█▊        | 264/1417 [00:21<01:57,  9.81it/s]Deconvoluting Remaining Spots:  19%|█▉        | 267/1417 [00:21<01:33, 12.26it/s]Deconvoluting Remaining Spots:  19%|█▉        | 269/1417 [00:21<01:33, 12.29it/s]Deconvoluting Remaining Spots:  19%|█▉        | 272/1417 [00:22<01:18, 14.57it/s]Deconvoluting Remaining Spots:  19%|█▉        | 274/1417 [00:22<01:41, 11.29it/s]Deconvoluting Remaining Spots:  19%|█▉        | 276/1417 [00:22<01:48, 10.54it/s]Deconvoluting Remaining Spots:  20%|█▉        | 278/1417 [00:22<01:43, 10.95it/s]Deconvoluting Remaining Spots:  20%|█▉        | 280/1417 [00:23<01:53, 10.05it/s]Deconvoluting Remaining Spots:  20%|█▉        | 282/1417 [00:23<01:40, 11.26it/s]Deconvoluting Remaining Spots:  20%|██        | 290/1417 [00:23<00:48, 23.05it/s]Deconvoluting Remaining Spots:  21%|██        | 293/1417 [00:23<00:53, 20.83it/s]Deconvoluting Remaining Spots:  21%|██        | 296/1417 [00:23<00:52, 21.18it/s]Deconvoluting Remaining Spots:  21%|██        | 299/1417 [00:23<00:56, 19.64it/s]2026-02-12 17:26:29,789 - root - INFO - Saved checkpoint after 300 completed spots
+Deconvoluting Remaining Spots:  21%|██▏       | 302/1417 [00:25<03:51,  4.82it/s]Deconvoluting Remaining Spots:  23%|██▎       | 326/1417 [00:25<00:59, 18.29it/s]Deconvoluting Remaining Spots:  23%|██▎       | 332/1417 [00:26<01:13, 14.73it/s]Deconvoluting Remaining Spots:  24%|██▍       | 337/1417 [00:26<01:09, 15.51it/s]Deconvoluting Remaining Spots:  24%|██▍       | 341/1417 [00:27<01:09, 15.45it/s]Deconvoluting Remaining Spots:  24%|██▍       | 344/1417 [00:27<01:27, 12.30it/s]Deconvoluting Remaining Spots:  24%|██▍       | 347/1417 [00:27<01:22, 13.01it/s]Deconvoluting Remaining Spots:  25%|██▌       | 355/1417 [00:27<00:52, 20.06it/s]Deconvoluting Remaining Spots:  25%|██▌       | 359/1417 [00:27<00:52, 20.21it/s]Deconvoluting Remaining Spots:  26%|██▌       | 363/1417 [00:28<00:51, 20.55it/s]Deconvoluting Remaining Spots:  26%|██▌       | 366/1417 [00:28<00:52, 19.85it/s]Deconvoluting Remaining Spots:  26%|██▌       | 369/1417 [00:28<00:55, 18.97it/s]Deconvoluting Remaining Spots:  26%|██▋       | 374/1417 [00:28<00:43, 23.96it/s]Deconvoluting Remaining Spots:  27%|██▋       | 377/1417 [00:28<00:54, 19.02it/s]Deconvoluting Remaining Spots:  27%|██▋       | 380/1417 [00:29<01:55,  8.99it/s]Deconvoluting Remaining Spots:  27%|██▋       | 382/1417 [00:29<01:53,  9.16it/s]Deconvoluting Remaining Spots:  27%|██▋       | 384/1417 [00:30<02:06,  8.19it/s]Deconvoluting Remaining Spots:  27%|██▋       | 386/1417 [00:30<02:02,  8.40it/s]Deconvoluting Remaining Spots:  27%|██▋       | 389/1417 [00:30<01:33, 10.95it/s]Deconvoluting Remaining Spots:  28%|██▊       | 393/1417 [00:30<01:15, 13.50it/s]Deconvoluting Remaining Spots:  28%|██▊       | 395/1417 [00:31<01:24, 12.03it/s]Deconvoluting Remaining Spots:  28%|██▊       | 397/1417 [00:31<01:28, 11.54it/s]Deconvoluting Remaining Spots:  28%|██▊       | 399/1417 [00:31<01:20, 12.65it/s]2026-02-12 17:26:37,901 - root - INFO - Saved checkpoint after 400 completed spots
+Deconvoluting Remaining Spots:  28%|██▊       | 401/1417 [00:33<06:22,  2.66it/s]Deconvoluting Remaining Spots:  31%|███▏      | 444/1417 [00:34<00:51, 18.93it/s]Deconvoluting Remaining Spots:  32%|███▏      | 448/1417 [00:34<01:00, 16.00it/s]Deconvoluting Remaining Spots:  32%|███▏      | 451/1417 [00:35<01:03, 15.22it/s]Deconvoluting Remaining Spots:  32%|███▏      | 454/1417 [00:35<01:00, 16.02it/s]Deconvoluting Remaining Spots:  32%|███▏      | 459/1417 [00:35<00:56, 16.85it/s]Deconvoluting Remaining Spots:  33%|███▎      | 462/1417 [00:35<00:54, 17.67it/s]Deconvoluting Remaining Spots:  33%|███▎      | 465/1417 [00:35<01:00, 15.65it/s]Deconvoluting Remaining Spots:  33%|███▎      | 467/1417 [00:36<01:00, 15.73it/s]Deconvoluting Remaining Spots:  33%|███▎      | 472/1417 [00:36<00:46, 20.39it/s]Deconvoluting Remaining Spots:  34%|███▎      | 477/1417 [00:36<00:37, 25.10it/s]Deconvoluting Remaining Spots:  34%|███▍      | 482/1417 [00:36<00:31, 29.62it/s]Deconvoluting Remaining Spots:  34%|███▍      | 487/1417 [00:36<00:42, 21.98it/s]Deconvoluting Remaining Spots:  35%|███▍      | 494/1417 [00:36<00:32, 28.26it/s]Deconvoluting Remaining Spots:  35%|███▌      | 498/1417 [00:37<00:51, 17.84it/s]2026-02-12 17:26:44,468 - root - INFO - Saved checkpoint after 500 completed spots
+Deconvoluting Remaining Spots:  35%|███▌      | 501/1417 [00:40<03:44,  4.08it/s]Deconvoluting Remaining Spots:  37%|███▋      | 531/1417 [00:40<00:58, 15.22it/s]Deconvoluting Remaining Spots:  38%|███▊      | 540/1417 [00:40<00:49, 17.89it/s]Deconvoluting Remaining Spots:  39%|███▊      | 547/1417 [00:40<00:43, 20.08it/s]Deconvoluting Remaining Spots:  39%|███▉      | 553/1417 [00:41<00:39, 22.06it/s]Deconvoluting Remaining Spots:  39%|███▉      | 559/1417 [00:41<00:42, 20.10it/s]Deconvoluting Remaining Spots:  40%|███▉      | 564/1417 [00:41<00:54, 15.78it/s]Deconvoluting Remaining Spots:  40%|████      | 568/1417 [00:42<01:09, 12.28it/s]Deconvoluting Remaining Spots:  40%|████      | 571/1417 [00:43<01:36,  8.74it/s]Deconvoluting Remaining Spots:  40%|████      | 573/1417 [00:43<01:31,  9.26it/s]Deconvoluting Remaining Spots:  41%|████      | 575/1417 [00:43<01:28,  9.47it/s]Deconvoluting Remaining Spots:  41%|████      | 577/1417 [00:43<01:20, 10.42it/s]Deconvoluting Remaining Spots:  41%|████      | 582/1417 [00:44<01:06, 12.57it/s]Deconvoluting Remaining Spots:  41%|████      | 584/1417 [00:44<01:01, 13.48it/s]Deconvoluting Remaining Spots:  41%|████▏     | 586/1417 [00:44<01:00, 13.68it/s]Deconvoluting Remaining Spots:  42%|████▏     | 589/1417 [00:44<00:59, 13.83it/s]Deconvoluting Remaining Spots:  42%|████▏     | 594/1417 [00:44<00:41, 19.90it/s]Deconvoluting Remaining Spots:  42%|████▏     | 597/1417 [00:44<00:38, 21.21it/s]Deconvoluting Remaining Spots:  42%|████▏     | 600/1417 [00:45<00:41, 19.53it/s]2026-02-12 17:26:52,777 - root - INFO - Saved checkpoint after 600 completed spots
+Deconvoluting Remaining Spots:  43%|████▎     | 603/1417 [00:48<05:08,  2.64it/s]Deconvoluting Remaining Spots:  46%|████▌     | 650/1417 [00:48<00:41, 18.27it/s]Deconvoluting Remaining Spots:  47%|████▋     | 660/1417 [00:49<00:40, 18.57it/s]Deconvoluting Remaining Spots:  47%|████▋     | 668/1417 [00:49<00:37, 20.02it/s]Deconvoluting Remaining Spots:  48%|████▊     | 674/1417 [00:49<00:37, 19.90it/s]Deconvoluting Remaining Spots:  48%|████▊     | 679/1417 [00:50<00:34, 21.46it/s]Deconvoluting Remaining Spots:  48%|████▊     | 684/1417 [00:50<00:38, 18.95it/s]Deconvoluting Remaining Spots:  49%|████▊     | 688/1417 [00:50<00:40, 18.00it/s]Deconvoluting Remaining Spots:  49%|████▉     | 691/1417 [00:50<00:41, 17.65it/s]Deconvoluting Remaining Spots:  49%|████▉     | 696/1417 [00:51<00:58, 12.29it/s]Deconvoluting Remaining Spots:  49%|████▉     | 698/1417 [00:52<01:20,  8.92it/s]2026-02-12 17:27:00,407 - root - INFO - Saved checkpoint after 700 completed spots
+Deconvoluting Remaining Spots:  49%|████▉     | 701/1417 [00:56<04:42,  2.54it/s]Deconvoluting Remaining Spots:  54%|█████▎    | 760/1417 [00:56<00:37, 17.69it/s]Deconvoluting Remaining Spots:  54%|█████▍    | 769/1417 [00:57<00:37, 17.10it/s]Deconvoluting Remaining Spots:  55%|█████▍    | 776/1417 [00:57<00:37, 17.20it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 782/1417 [00:57<00:35, 18.13it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 787/1417 [00:57<00:33, 18.55it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 791/1417 [00:58<00:33, 18.81it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 795/1417 [00:58<00:35, 17.35it/s]Deconvoluting Remaining Spots:  56%|█████▋    | 799/1417 [00:58<00:32, 19.09it/s]2026-02-12 17:27:07,589 - root - INFO - Saved checkpoint after 800 completed spots
+Deconvoluting Remaining Spots:  57%|█████▋    | 802/1417 [01:03<03:23,  3.03it/s]Deconvoluting Remaining Spots:  61%|██████▏   | 871/1417 [01:03<00:27, 19.92it/s]Deconvoluting Remaining Spots:  63%|██████▎   | 886/1417 [01:04<00:28, 18.33it/s]Deconvoluting Remaining Spots:  63%|██████▎   | 897/1417 [01:05<00:33, 15.42it/s]2026-02-12 17:27:15,699 - root - INFO - Saved checkpoint after 900 completed spots
+Deconvoluting Remaining Spots:  64%|██████▍   | 905/1417 [01:11<01:25,  6.02it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 991/1417 [01:11<00:21, 19.76it/s]2026-02-12 17:27:22,701 - root - INFO - Saved checkpoint after 1000 completed spots
+Deconvoluting Remaining Spots:  71%|███████   | 1006/1417 [01:18<00:45,  9.05it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 1086/1417 [01:18<00:17, 18.98it/s]2026-02-12 17:27:29,987 - root - INFO - Saved checkpoint after 1100 completed spots
+Deconvoluting Remaining Spots:  78%|███████▊  | 1108/1417 [01:25<00:30, 10.04it/s]Deconvoluting Remaining Spots:  84%|████████▎ | 1186/1417 [01:26<00:12, 18.28it/s]2026-02-12 17:27:37,895 - root - INFO - Saved checkpoint after 1200 completed spots
+Deconvoluting Remaining Spots:  85%|████████▌ | 1206/1417 [01:33<00:21,  9.76it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 1299/1417 [01:33<00:06, 18.96it/s]2026-02-12 17:27:43,686 - root - INFO - Saved checkpoint after 1300 completed spots
+Deconvoluting Remaining Spots:  94%|█████████▍| 1329/1417 [01:39<00:06, 12.85it/s]Deconvoluting Remaining Spots:  99%|█████████▊| 1399/1417 [01:39<00:00, 20.52it/s]2026-02-12 17:27:44,506 - root - INFO - Saved checkpoint after 1400 completed spots
+Deconvoluting Remaining Spots: 100%|██████████| 1417/1417 [01:40<00:00, 14.12it/s]
+2026-02-12 17:27:45,515 - root - INFO - Saved final results with 1417 completed spots
+2026-02-12 17:27:46,075 - root - INFO - Saved profiles to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_gene_expression_pass1.parquet with cell types: ['B cells', 'CD4+ T cells', 'CD8+ T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-12 17:27:46,483 - root - INFO - Successfully added layer: Endothelial_genes_pass1
+2026-02-12 17:27:46,510 - root - INFO - Successfully added layer: CD4+_T_cells_genes_pass1
+2026-02-12 17:27:46,533 - root - INFO - Successfully added layer: Epithelial_genes_pass1
+2026-02-12 17:27:46,556 - root - INFO - Successfully added layer: B_cells_genes_pass1
+2026-02-12 17:27:46,578 - root - INFO - Successfully added layer: CD8+_T_cells_genes_pass1
+2026-02-12 17:27:46,601 - root - INFO - Successfully added layer: Fibroblasts_genes_pass1
+2026-02-12 17:27:46,624 - root - INFO - Successfully added layer: Macrophages_genes_pass1
+2026-02-12 17:27:46,890 - root - INFO - Exported layer 'Endothelial_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Endothelial_layer_pass1.csv'
+2026-02-12 17:27:47,136 - root - INFO - Exported layer 'CD4+_T_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/CD4+_T_cells_layer_pass1.csv'
+2026-02-12 17:27:47,379 - root - INFO - Exported layer 'Epithelial_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Epithelial_layer_pass1.csv'
+2026-02-12 17:27:47,657 - root - INFO - Exported layer 'B_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/B_cells_layer_pass1.csv'
+2026-02-12 17:27:47,979 - root - INFO - Exported layer 'CD8+_T_cells_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/CD8+_T_cells_layer_pass1.csv'
+2026-02-12 17:27:48,322 - root - INFO - Exported layer 'Fibroblasts_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Fibroblasts_layer_pass1.csv'
+2026-02-12 17:27:48,593 - root - INFO - Exported layer 'Macrophages_genes_pass1' to '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/Xenium_region_1_pass1/layers/pass1/Macrophages_layer_pass1.csv'
+2026-02-12 17:27:48,593 - __main__ - INFO - GEX deconvolution completed in 105.0s
+2026-02-12 17:27:48,594 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 17:27:48,594 - __main__ - INFO - STEP 8: Saving summary
+2026-02-12 17:27:48,594 - __main__ - INFO - ------------------------------------------------------------
+2026-02-12 17:27:48,608 - __main__ - INFO - Saved summary: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/CITEgeist/output_discrete_cellpose/Xenium_region_1/benchmark_summary.json
+2026-02-12 17:27:48,608 - __main__ - INFO - ======================================================================
+2026-02-12 17:27:48,608 - __main__ - INFO - BENCHMARK COMPLETE
+2026-02-12 17:27:48,608 - __main__ - INFO -   Total nuclei: 19875
+2026-02-12 17:27:48,608 - __main__ - INFO -   Cellpose time: 250.1s
+2026-02-12 17:27:48,608 - __main__ - INFO -   Discrete assignment time: 4383.0s
+2026-02-12 17:27:48,608 - __main__ - INFO -   GEX deconvolution time: 105.0s
+2026-02-12 17:27:48,608 - __main__ - INFO - ======================================================================

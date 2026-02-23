@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_mixed_vs_highseg.py", line 528, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_mixed_vs_highseg.py", line 467, in main
+    mixed_inferred = analyze_proportion_granularity(mixed_props, "MIXED")
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_mixed_vs_highseg.py", line 437, in analyze_proportion_granularity
+    return inferred_totals if inferred_totals else []
+ValueError: The truth value of an array with more than one element is ambiguous. Use a.any() or a.all()

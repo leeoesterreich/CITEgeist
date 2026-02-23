@@ -1,0 +1,388 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x6b9ea52f
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-07, 2e+00]
+  QObjective range [2e+00, 2e+00]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 3602.5
+
+Presolve removed 1879 rows and 8604 columns (presolve time = 7s) ...
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 6.82s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 2897.2604600
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 6.82 seconds (0.26 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 2897.26 3602.5 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.897260460016e+03, best bound 2.892482682665e+03, gap 0.1649%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x45d22e53
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 8e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 447.339
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.98s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 283.7737826
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.98 seconds (0.11 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 283.774 447.339 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.837737825691e+02, best bound 2.820786548953e+02, gap 0.5974%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x4ae7c68f
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 7e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 273.956
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.80s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 265.0711466
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.80 seconds (0.10 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 265.071 273.956 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.650711466371e+02, best bound 2.634836916665e+02, gap 0.5989%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0xb97341ab
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 6e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 255.791
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.28s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 253.0174809
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.28 seconds (0.09 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 253.017 255.791 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.530174809444e+02, best bound 2.515398480344e+02, gap 0.5840%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0xea52801c
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 5e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 249.909
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.53s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 248.9432977
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.53 seconds (0.09 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 248.943 249.909 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.489432977361e+02, best bound 2.475020708658e+02, gap 0.5789%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x23a6d61a
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 5e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 245.763
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.79s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 245.3279551
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.79 seconds (0.09 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 245.328 245.763 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.453279550589e+02, best bound 2.439041148788e+02, gap 0.5804%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x4a2a620b
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 5e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 242.049
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.76s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 241.7229078
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.77 seconds (0.08 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 241.723 242.049 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.417229077959e+02, best bound 2.403074615388e+02, gap 0.5856%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0xd44a99f4
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 1e+00]
+  QObjective range [2e-02, 5e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 240.268
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.49s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 239.7334645
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.50 seconds (0.08 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 239.733 240.268 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.397334645233e+02, best bound 2.382791788854e+02, gap 0.6066%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0x12a3b7b3
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 9e-01]
+  QObjective range [2e-02, 5e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 237.537
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.26s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 236.8947749
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.26 seconds (0.08 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 236.895 237.537 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.368947748899e+02, best bound 2.354123195830e+02, gap 0.6258%
+Set parameter TimeLimit to value 600
+Set parameter MIPGap to value 0.05
+Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+
+CPU model: AMD EPYC 9374F 32-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+Thread count: 64 physical cores, 64 logical processors, using up to 32 threads
+
+Optimize a model with 1880 rows, 8613 columns and 16920 nonzeros
+Model fingerprint: 0xdd306282
+Model has 8613 quadratic objective terms
+Variable types: 0 continuous, 8613 integer (0 binary)
+Coefficient statistics:
+  Matrix range     [1e+00, 1e+00]
+  Objective range  [1e-08, 9e-01]
+  QObjective range [2e-02, 4e-01]
+  Bounds range     [1e+00, 2e+01]
+  RHS range        [1e+00, 2e+01]
+
+Loaded user MIP start with objective 236.108
+
+Presolve removed 1879 rows and 8604 columns
+Presolve time: 2.57s
+Presolved: 1 rows, 9 columns, 9 nonzeros
+Presolved model has 9 quadratic objective terms
+Found heuristic solution: objective 235.5716475
+Variable types: 0 continuous, 9 integer (0 binary)
+
+Explored 0 nodes (0 simplex iterations) in 2.57 seconds (0.08 work units)
+Thread count was 32 (of 64 available processors)
+
+Solution count 2: 235.572 236.108 
+
+Optimal solution found (tolerance 5.00e-02)
+Best objective 2.355716475005e+02, best bound 2.340604213576e+02, gap 0.6415%
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_1', 'spot_2', 'spot_3', 'spot_4', 'spot_5'], dtype='object')
+Parquet spot names format: ['spot_1' 'spot_2' 'spot_3' 'spot_4' 'spot_5']
+Added layer: Cancer_Epithelial_genes_pass1 (Shape: (957, 29733))
+Added layer: Plasmablasts_genes_pass1 (Shape: (957, 29733))
+Added layer: Myeloid_genes_pass1 (Shape: (957, 29733))
+Added layer: Endothelial_genes_pass1 (Shape: (957, 29733))
+Added layer: PVL_genes_pass1 (Shape: (957, 29733))
+Added layer: CAFs_genes_pass1 (Shape: (957, 29733))
+Added layer: B-cells_genes_pass1 (Shape: (957, 29733))
+Added layer: T-cells_genes_pass1 (Shape: (957, 29733))
+Added layer: Normal_Epithelial_genes_pass1 (Shape: (957, 29733))
+RMSE, NRMSE, and MAE per cell type:
+	CAFs: RMSE: 0.2786, NRMSE: 0.0398, MAE: 0.0466
+	Endothelial: RMSE: 0.0771, NRMSE: 0.0110, MAE: 0.0023
+	Normal Epithelial: RMSE: 0.0624, NRMSE: nan, MAE: 0.0016
+	Cancer Epithelial: RMSE: 0.3171, NRMSE: 0.0372, MAE: 0.0597
+	B-cells: RMSE: 0.1287, NRMSE: 0.0177, MAE: 0.0080
+	T-cells: RMSE: 0.1734, NRMSE: 0.0231, MAE: 0.0158
+	Plasmablasts: RMSE: 0.0656, NRMSE: 0.0075, MAE: 0.0018
+	PVL: RMSE: 0.0598, NRMSE: nan, MAE: 0.0013
+	Myeloid: RMSE: 0.1626, NRMSE: 0.0230, MAE: 0.0153
+
+Overall RMSE statistics:
+	Average RMSE: 0.1473
+	Median RMSE:  0.1287
+
+Overall NRMSE statistics:
+	Average NRMSE: 0.0227
+	Median NRMSE:  0.0230
+
+Overall MAE statistics:
+	Average MAE: 0.0169
+	Median MAE:  0.0080
+Per-cell type metrics saved to per_celltype_metrics.csv
+
+=== RESULTS ===
+Nuclei count correlation: 0.986
+Proportion correlation: 0.623

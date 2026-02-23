@@ -1,0 +1,14 @@
+Running replicate 1 with lambda_laplacian=0.1
+Loading replicate 1, condition=mixed
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.
+Running continuous model with lambda_laplacian=0.1
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+
+=== RESULT ===
+Condition: mixed
+Replicate: 1
+lambda_laplacian: 0.1
+Proportion correlation: 0.9133

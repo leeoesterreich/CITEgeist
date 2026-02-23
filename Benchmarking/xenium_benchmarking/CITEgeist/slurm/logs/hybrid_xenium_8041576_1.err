@@ -1,0 +1,21 @@
+2026-02-18 21:16:16,837 - __main__ - INFO - ======================================================================
+2026-02-18 21:16:16,837 - __main__ - INFO - HYBRID BENCHMARK: Xenium_region_1
+2026-02-18 21:16:16,838 - __main__ - INFO - ======================================================================
+2026-02-18 21:16:16,838 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:16:16,838 - __main__ - INFO - STEP 1: Loading data
+2026-02-18 21:16:16,838 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:16:16,865 - __main__ - INFO - GEX: 1417 spots x 405 genes
+2026-02-18 21:16:16,865 - __main__ - INFO - CITE: 1417 spots x 27 proteins
+2026-02-18 21:16:16,865 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:16:16,865 - __main__ - INFO - STEP 2: Cellpose nuclei segmentation
+2026-02-18 21:16:16,865 - __main__ - INFO - ------------------------------------------------------------
+2026-02-18 21:16:16,866 - __main__ - INFO - Loading morphology image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires/Xenium_region_1/morphology.png
+2026-02-18 21:16:20,462 - __main__ - INFO - Image shape: (25883, 11529, 3), dtype: uint8
+2026-02-18 21:16:20,466 - __main__ - INFO - Running Cellpose segmentation (use_gpu=False, diameter=None)
+2026-02-18 21:16:22,734 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-18 21:16:22,734 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 21:16:22,734 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 21:16:24,291 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-18 21:16:24,526 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-18 21:16:24,665 - cellpose.transforms - INFO - processing image with (25883, 11529) HW, and 3 channels
+slurmstepd: error: *** JOB 8041578 ON htc-n66 CANCELLED AT 2026-02-18T21:44:10 ***

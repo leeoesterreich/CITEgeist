@@ -1,0 +1,55 @@
+'getOption("repos")' replaces Bioconductor standard repositories, see
+'help("repositories", package = "BiocManager")' for details.
+Replacement repositories:
+    CRAN: https://cloud.r-project.org
+Bioconductor version 3.20 (BiocManager 1.30.27), R 4.4.3 (2025-02-28)
+Installing package(s) 'BiocVersion', 'SingleCellExperiment'
+trying URL 'https://bioconductor.org/packages/3.20/bioc/src/contrib/BiocVersion_3.20.0.tar.gz'
+Content type 'application/gzip' length 983 bytes
+==================================================
+downloaded 983 bytes
+
+trying URL 'https://bioconductor.org/packages/3.20/bioc/src/contrib/SingleCellExperiment_1.28.1.tar.gz'
+Content type 'application/gzip' length 985694 bytes (962 KB)
+==================================================
+downloaded 962 KB
+
+* installing *source* package ‘BiocVersion’ ...
+** using staged installation
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (BiocVersion)
+* installing *source* package ‘SingleCellExperiment’ ...
+** using staged installation
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (SingleCellExperiment)
+
+The downloaded source packages are in
+	‘/scratch/slurm-7956501/RtmpvXTjSd/downloaded_packages’
+Updating HTML index of packages in '.Library'
+Making 'packages.html' ... done
+Warning message:
+package(s) not installed when version(s) same as or greater than current; use
+  `force = TRUE` to re-install: 'Biobase' 'SummarizedExperiment' 
+Using GitHub PAT from the git credential store.
+Downloading GitHub repo xuranw/MuSiC@HEAD
+ERROR: dependency ‘TOAST’ is not available for package ‘MuSiC’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/MuSiC’
+Warning message:
+In i.p(...) :
+  installation of package ‘/scratch/slurm-7956501/RtmpvXTjSd/file273b557c81a01f/MuSiC_1.0.0.tar.gz’ had non-zero exit status
+Error in library(MuSiC) : there is no package called ‘MuSiC’
+Execution halted

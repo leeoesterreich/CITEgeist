@@ -1,0 +1,21 @@
+CitegeistModel initialized successfully.
+Filtered gene expression data: 405 → 400 genes (count > 0 in at least 1.0% of spots, mean expression > 1.1 in nonzero spots). Remaining spots: 1464 Filtered spots: 1464 to 1464
+Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_69', 'spot_70', 'spot_71', 'spot_72', 'spot_73'], dtype='object')
+Parquet spot names format: ['spot_69' 'spot_70' 'spot_71' 'spot_72' 'spot_73']
+Added layer: CD8+_T_cells_genes_pass1 (Shape: (1464, 400))
+Added layer: Fibroblasts_genes_pass1 (Shape: (1464, 400))
+Added layer: B_cells_genes_pass1 (Shape: (1464, 400))
+Added layer: Macrophages_genes_pass1 (Shape: (1464, 400))
+Added layer: CD4+_T_cells_genes_pass1 (Shape: (1464, 400))
+Added layer: Epithelial_genes_pass1 (Shape: (1464, 400))
+Added layer: Endothelial_genes_pass1 (Shape: (1464, 400))
+
+Benchmark complete. Results saved to: Benchmarking/xenium_benchmarking/CITEgeist/output/multimodal_cellpose/Xenium_region_3

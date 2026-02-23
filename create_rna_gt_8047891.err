@@ -1,0 +1,51 @@
+2026-02-20 18:00:36,581 - INFO - ============================================================
+2026-02-20 18:00:36,581 - INFO - Creating RNA-Based Ground Truth
+2026-02-20 18:00:36,581 - INFO - ============================================================
+2026-02-20 18:00:36,581 - INFO - Loading RNA k-means clusters...
+2026-02-20 18:00:39,493 - INFO - Loaded 461886 cells with 10 clusters
+2026-02-20 18:00:39,543 - INFO - Cell type distribution:
+Cluster
+Macrophages    157982
+T cells        107428
+Fibroblasts     66139
+Epithelial      60787
+Endothelial     44123
+B cells         25427
+Name: count, dtype: int64
+2026-02-20 18:00:39,543 - INFO - Loaded 461886 cell type assignments
+2026-02-20 18:00:39,543 - INFO - 
+RNA-based cell type distribution:
+2026-02-20 18:00:39,555 - INFO -   Macrophages: 157,982 (34.2%)
+2026-02-20 18:00:39,555 - INFO -   T cells: 107,428 (23.3%)
+2026-02-20 18:00:39,555 - INFO -   Fibroblasts: 66,139 (14.3%)
+2026-02-20 18:00:39,555 - INFO -   Epithelial: 60,787 (13.2%)
+2026-02-20 18:00:39,555 - INFO -   Endothelial: 44,123 (9.6%)
+2026-02-20 18:00:39,555 - INFO -   B cells: 25,427 (5.5%)
+2026-02-20 18:00:40,542 - INFO - 
+Loading cell-to-spot mapping...
+2026-02-20 18:00:40,927 - INFO - Loaded mapping for 465534 cells
+2026-02-20 18:00:41,720 - INFO - 
+Calculating spot-level proportions per region...
+2026-02-20 18:00:41,720 - INFO - 
+--- Region 0 ---
+2026-02-20 18:00:41,721 - WARNING - h5ad not found: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_0.h5ad, skipping region
+2026-02-20 18:00:41,721 - INFO - 
+--- Region 1 ---
+2026-02-20 18:00:41,721 - WARNING - h5ad not found: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_1.h5ad, skipping region
+2026-02-20 18:00:41,721 - INFO - 
+--- Region 2 ---
+2026-02-20 18:00:41,722 - WARNING - h5ad not found: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_2.h5ad, skipping region
+2026-02-20 18:00:41,722 - INFO - 
+--- Region 3 ---
+2026-02-20 18:00:41,722 - WARNING - h5ad not found: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_3.h5ad, skipping region
+2026-02-20 18:00:41,722 - INFO - 
+--- Region 4 ---
+2026-02-20 18:00:41,722 - WARNING - h5ad not found: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_4.h5ad, skipping region
+2026-02-20 18:00:41,724 - INFO - 
+============================================================
+2026-02-20 18:00:41,724 - INFO - RNA Ground Truth Creation Complete
+2026-02-20 18:00:41,724 - INFO - ============================================================
+2026-02-20 18:00:41,724 - INFO - Output: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/data_rna_gt
+2026-02-20 18:00:41,724 - INFO - Cell types: ['B cells', 'T cells', 'Macrophages', 'Endothelial', 'Epithelial', 'Fibroblasts']
+2026-02-20 18:00:41,724 - INFO - Total cells: 461,886
+2026-02-20 18:00:41,724 - INFO - Unknown rate: 0% (RNA assigns all cells)

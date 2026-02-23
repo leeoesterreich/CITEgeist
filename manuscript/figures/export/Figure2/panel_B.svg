@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 11px; }
+      .label { font-family: Arial, sans-serif; font-size: 10px; }
+      .small { font-family: Arial, sans-serif; font-size: 9px; }
+      .italic { font-style: italic; }
+      .bold { font-weight: bold; }
+      .white { fill: white; }
+      .neutral { fill: #7f8c8d; }
+    </style>
+  </defs>
+  <text x="200" y="25" class="title" text-anchor="middle">Module 2: Profile Discovery</text>
+  <rect x="20" y="55" width="100" height="55" rx="5" fill="#3498db" stroke="#2980b9" stroke-width="1.5" opacity="1"/>
+  <text x="70" y="75" class="small bold white" text-anchor="middle">2a: Colocalization</text>
+  <text x="70" y="92" class="small white" text-anchor="middle">Same-spot, Adjacent</text>
+  <line x1="125" y1="82" x2="155" y2="82" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="155,82 148.0717967697245,86.0 148.0717967697245,78.0" fill="#2c3e50"/>
+  <rect x="160" y="55" width="100" height="55" rx="5" fill="#9b59b6" stroke="#7d3c98" stroke-width="1.5" opacity="1"/>
+  <text x="210" y="75" class="small bold white" text-anchor="middle">2b: Profile Graph</text>
+  <text x="210" y="92" class="small white" text-anchor="middle">Clustering</text>
+  <line x1="265" y1="82" x2="295" y2="82" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="295,82 288.0717967697245,86.0 288.0717967697245,78.0" fill="#2c3e50"/>
+  <rect x="300" y="55" width="95" height="55" rx="5" fill="#27ae60" stroke="#1e8449" stroke-width="1.5" opacity="1"/>
+  <text x="347" y="75" class="small bold white" text-anchor="middle">2c: Selection</text>
+  <text x="347" y="92" class="small white" text-anchor="middle">Reconstruction</text>
+  <text x="200" y="140" class="label bold" text-anchor="middle">Discovered Profiles:</text>
+  <rect x="30" y="160" width="85" height="60" rx="5" fill="#27ae60" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="72" y="178" class="small bold white" text-anchor="middle">Epithelial</text>
+  <text x="72" y="195" class="small white" text-anchor="middle">PanCK</text>
+  <text x="72" y="210" class="small white" text-anchor="middle">EPCAM</text>
+  <rect x="125" y="160" width="85" height="60" rx="5" fill="#9b59b6" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="167" y="178" class="small bold white" text-anchor="middle">Macrophage</text>
+  <text x="167" y="195" class="small white" text-anchor="middle">CD68</text>
+  <text x="167" y="210" class="small white" text-anchor="middle">CD163</text>
+  <rect x="220" y="160" width="85" height="60" rx="5" fill="#e74c3c" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="262" y="178" class="small bold white" text-anchor="middle">T cells</text>
+  <text x="262" y="195" class="small white" text-anchor="middle">CD3E</text>
+  <text x="262" y="210" class="small white" text-anchor="middle">CD4/8</text>
+  <rect x="315" y="160" width="85" height="60" rx="5" fill="#3498db" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="357" y="178" class="small bold white" text-anchor="middle">Fibroblast</text>
+  <text x="357" y="195" class="small white" text-anchor="middle">aSMA</text>
+  <text x="357" y="210" class="small white" text-anchor="middle">VIM</text>
+  <text x="200" y="250" class="small italic neutral" text-anchor="middle">Automatic marker-to-cell-type profile assembly</text>
+</svg>

@@ -1,0 +1,456 @@
+
+
+==> WARNING: A newer version of conda exists. <==
+    current version: 25.7.0
+    latest version: 26.1.0
+
+Please update conda by running
+
+    $ conda update -n base -c conda-forge conda
+
+
+
+SafetyError: The package for r-base located at /ix1/alee/LO_LAB/Personal/Alexander_Chang/miniconda3/pkgs/r-base-4.4.3-h835929b_7
+appears to be corrupted. The path 'lib/R/doc/html/packages.html'
+has an incorrect size.
+  reported size: 3423 bytes
+  actual size: 80786 bytes
+
+
+Using GitHub PAT from the git credential store.
+Downloading GitHub repo xuranw/MuSiC@HEAD
+Skipping 3 packages not available: SingleCellExperiment, Biobase, TOAST
+Installing 2 packages: TOAST, nnls
+trying URL 'https://cloud.r-project.org/src/contrib/nnls_1.6.tar.gz'
+Content type 'application/x-gzip' length 11745 bytes (11 KB)
+==================================================
+downloaded 11 KB
+
+* installing *source* package ‘nnls’ ...
+** package ‘nnls’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using Fortran compiler: ‘GNU Fortran (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-nnls/00new/nnls/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (nnls)
+
+The downloaded source packages are in
+	‘/scratch/slurm-7955105/RtmpPv0JPj/downloaded_packages’
+Updating HTML index of packages in '.Library'
+Making 'packages.html' ... done
+ERROR: dependency ‘TOAST’ is not available for package ‘MuSiC’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/MuSiC’
+Warning messages:
+1: package ‘TOAST’ is not available for this version of R
+
+A version of this package for your version of R might be available elsewhere,
+see the ideas at
+https://cran.r-project.org/doc/manuals/r-patched/R-admin.html#Installing-packages 
+2: In i.p(...) :
+  installation of package ‘/scratch/slurm-7955105/RtmpPv0JPj/file30938878e9818b/MuSiC_1.0.0.tar.gz’ had non-zero exit status
+Using GitHub PAT from the git credential store.
+Downloading GitHub repo YingMa0107/CARD@HEAD
+Skipping 3 packages not available: Biobase, SummarizedExperiment, SingleCellExperiment
+Installing 18 packages: wk, units, s2, DBI, classInt, dotCall64, BiocManager, sf, V8, maps, spam, gtools, NMF, pbmcapply, sp, concaveman, wrMisc, fields
+trying URL 'https://cloud.r-project.org/src/contrib/wk_0.9.5.tar.gz'
+Content type 'application/x-gzip' length 1041465 bytes (1017 KB)
+==================================================
+downloaded 1017 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/units_1.0-0.tar.gz'
+Content type 'application/x-gzip' length 367179 bytes (358 KB)
+==================================================
+downloaded 358 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/s2_1.1.9.tar.gz'
+Content type 'application/x-gzip' length 2967364 bytes (2.8 MB)
+==================================================
+downloaded 2.8 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/DBI_1.2.3.tar.gz'
+Content type 'application/x-gzip' length 1137307 bytes (1.1 MB)
+==================================================
+downloaded 1.1 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/classInt_0.4-11.tar.gz'
+Content type 'application/x-gzip' length 440406 bytes (430 KB)
+==================================================
+downloaded 430 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/dotCall64_1.2.tar.gz'
+Content type 'application/x-gzip' length 20362 bytes (19 KB)
+==================================================
+downloaded 19 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/BiocManager_1.30.27.tar.gz'
+Content type 'application/x-gzip' length 752490 bytes (734 KB)
+==================================================
+downloaded 734 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/sf_1.0-24.tar.gz'
+Content type 'application/x-gzip' length 9876893 bytes (9.4 MB)
+==================================================
+downloaded 9.4 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/V8_8.0.1.tar.gz'
+Content type 'application/x-gzip' length 670950 bytes (655 KB)
+==================================================
+downloaded 655 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/maps_3.4.3.tar.gz'
+Content type 'application/x-gzip' length 2276142 bytes (2.2 MB)
+==================================================
+downloaded 2.2 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/spam_2.11-3.tar.gz'
+Content type 'application/x-gzip' length 979865 bytes (956 KB)
+==================================================
+downloaded 956 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/gtools_3.9.5.tar.gz'
+Content type 'application/x-gzip' length 242029 bytes (236 KB)
+==================================================
+downloaded 236 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/NMF_0.28.tar.gz'
+Content type 'application/x-gzip' length 1678046 bytes (1.6 MB)
+==================================================
+downloaded 1.6 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/pbmcapply_1.5.1.tar.gz'
+Content type 'application/x-gzip' length 8090 bytes
+==================================================
+downloaded 8090 bytes
+
+trying URL 'https://cloud.r-project.org/src/contrib/sp_2.2-0.tar.gz'
+Content type 'application/x-gzip' length 4474033 bytes (4.3 MB)
+==================================================
+downloaded 4.3 MB
+
+trying URL 'https://cloud.r-project.org/src/contrib/concaveman_1.2.0.tar.gz'
+Content type 'application/x-gzip' length 124746 bytes (121 KB)
+==================================================
+downloaded 121 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/wrMisc_1.15.4.tar.gz'
+Content type 'application/x-gzip' length 768962 bytes (750 KB)
+==================================================
+downloaded 750 KB
+
+trying URL 'https://cloud.r-project.org/src/contrib/fields_17.1.tar.gz'
+Content type 'application/x-gzip' length 4049945 bytes (3.9 MB)
+==================================================
+downloaded 3.9 MB
+
+* installing *source* package ‘wk’ ...
+** package ‘wk’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using C++ compiler: ‘x86_64-conda-linux-gnu-c++ (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-wk/00new/wk/libs
+** R
+** data
+*** moving datasets to lazyload DB
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (wk)
+* installing *source* package ‘units’ ...
+** package ‘units’ successfully unpacked and MD5 sums checked
+** using staged installation
+configure: error: in '/scratch/slurm-7955105/RtmpW35m09/R.INSTALL309564bf4f49f/units':
+configure: error: 
+--------------------------------------------------------------------------------
+  Configuration failed because libudunits2.so was not found. Try installing:
+    * deb: libudunits2-dev (Debian, Ubuntu, ...)
+    * rpm: udunits2-devel (Fedora, EPEL, ...)
+    * brew: udunits (OSX)
+  If udunits2 is already installed in a non-standard location, use:
+    --configure-args='--with-udunits2-lib=/usr/local/lib'
+  if the library was not found, and/or:
+    --configure-args='--with-udunits2-include=/usr/include/udunits2'
+  if the header was not found, replacing paths with appropriate values.
+  You can alternatively set UDUNITS2_INCLUDE and UDUNITS2_LIBS manually.
+--------------------------------------------------------------------------------
+
+See 'config.log' for more details
+ERROR: configuration failed for package ‘units’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/units’
+* installing *source* package ‘DBI’ ...
+** package ‘DBI’ successfully unpacked and MD5 sums checked
+** using staged installation
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (DBI)
+* installing *source* package ‘classInt’ ...
+** package ‘classInt’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using Fortran compiler: ‘GNU Fortran (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-classInt/00new/classInt/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (classInt)
+* installing *source* package ‘dotCall64’ ...
+** package ‘dotCall64’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using Fortran compiler: ‘GNU Fortran (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-dotCall64/00new/dotCall64/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (dotCall64)
+* installing *source* package ‘BiocManager’ ...
+** package ‘BiocManager’ successfully unpacked and MD5 sums checked
+** using staged installation
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (BiocManager)
+* installing *source* package ‘V8’ ...
+** package ‘V8’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C++ compiler: ‘x86_64-conda-linux-gnu-c++ (conda-forge gcc 15.2.0-17) 15.2.0’
+using C++17
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-V8/00new/V8/libs
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (V8)
+* installing *source* package ‘maps’ ...
+** package ‘maps’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-maps/00new/maps/libs
+** R
+** data
+*** moving datasets to lazyload DB
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (maps)
+* installing *source* package ‘gtools’ ...
+** package ‘gtools’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-gtools/00new/gtools/libs
+** R
+** data
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (gtools)
+* installing *source* package ‘pbmcapply’ ...
+** package ‘pbmcapply’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-pbmcapply/00new/pbmcapply/libs
+** R
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (pbmcapply)
+* installing *source* package ‘sp’ ...
+** package ‘sp’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-sp/00new/sp/libs
+** R
+** data
+** demo
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (sp)
+* installing *source* package ‘wrMisc’ ...
+** package ‘wrMisc’ successfully unpacked and MD5 sums checked
+** using staged installation
+** R
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (wrMisc)
+* installing *source* package ‘s2’ ...
+** package ‘s2’ successfully unpacked and MD5 sums checked
+** using staged installation
+ERROR: configuration failed for package ‘s2’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/s2’
+* installing *source* package ‘spam’ ...
+** package ‘spam’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using Fortran compiler: ‘GNU Fortran (conda-forge gcc 15.2.0-17) 15.2.0’
+using C++ compiler: ‘x86_64-conda-linux-gnu-c++ (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-spam/00new/spam/libs
+** R
+** data
+*** moving datasets to lazyload DB
+** demo
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+*** copying figures
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (spam)
+* installing *source* package ‘NMF’ ...
+** package ‘NMF’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using C++ compiler: ‘x86_64-conda-linux-gnu-c++ (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-NMF/00new/NMF/libs
+** R
+** data
+** demo
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** installing vignettes
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (NMF)
+ERROR: dependencies ‘s2’, ‘units’ are not available for package ‘sf’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/sf’
+* installing *source* package ‘fields’ ...
+** package ‘fields’ successfully unpacked and MD5 sums checked
+** using staged installation
+** libs
+using C compiler: ‘x86_64-conda-linux-gnu-cc (conda-forge gcc 15.2.0-17) 15.2.0’
+using Fortran compiler: ‘GNU Fortran (conda-forge gcc 15.2.0-17) 15.2.0’
+installing to /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/00LOCK-fields/00new/fields/libs
+** R
+** data
+** inst
+** byte-compile and prepare package for lazy loading
+** help
+*** installing help indices
+** building package indices
+** testing if installed package can be loaded from temporary location
+** checking absolute paths in shared objects and dynamic libraries
+** testing if installed package can be loaded from final location
+** testing if installed package keeps a record of temporary installation path
+* DONE (fields)
+ERROR: dependency ‘sf’ is not available for package ‘concaveman’
+* removing ‘/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CARD_env/lib/R/library/concaveman’
+
+The downloaded source packages are in
+	‘/scratch/slurm-7955105/RtmpSkxLks/downloaded_packages’
+Updating HTML index of packages in '.Library'
+Making 'packages.html' ... done
+Error: Failed to install 'CARD' from GitHub:
+  ! System command 'R' failed
+In addition: Warning messages:
+1: In i.p(...) : installation of package ‘units’ had non-zero exit status
+2: In i.p(...) : installation of package ‘s2’ had non-zero exit status
+3: In i.p(...) : installation of package ‘sf’ had non-zero exit status
+4: In i.p(...) :
+  installation of package ‘concaveman’ had non-zero exit status
+Execution halted

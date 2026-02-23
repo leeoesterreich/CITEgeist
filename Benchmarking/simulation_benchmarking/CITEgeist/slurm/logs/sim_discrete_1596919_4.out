@@ -1,0 +1,48 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_per_marker=True, no per-spot normalization.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"
+Parquet file for pass 1 loaded successfully.
+Spot and CellType successfully split (using ::: delimiter).
+
+Spot name formats:
+AnnData spot names format: Index(['spot_1', 'spot_2', 'spot_3', 'spot_4', 'spot_5'], dtype='object')
+Parquet spot names format: ['spot_1' 'spot_2' 'spot_3' 'spot_4' 'spot_5']
+Added layer: CAFs_genes_pass1 (Shape: (956, 29733))
+Added layer: Endothelial_genes_pass1 (Shape: (956, 29733))
+Added layer: T-cells_genes_pass1 (Shape: (956, 29733))
+Added layer: Normal_Epithelial_genes_pass1 (Shape: (956, 29733))
+Added layer: Plasmablasts_genes_pass1 (Shape: (956, 29733))
+Added layer: Cancer_Epithelial_genes_pass1 (Shape: (956, 29733))
+Added layer: PVL_genes_pass1 (Shape: (956, 29733))
+Added layer: Myeloid_genes_pass1 (Shape: (956, 29733))
+Added layer: B-cells_genes_pass1 (Shape: (956, 29733))
+RMSE, NRMSE, and MAE per cell type:
+	Endothelial: RMSE: 0.1851, NRMSE: 0.0262, MAE: 0.0180
+	T-cells: RMSE: 0.2011, NRMSE: 0.0245, MAE: 0.0206
+	Myeloid: RMSE: 0.1397, NRMSE: 0.0182, MAE: 0.0102
+	PVL: RMSE: 0.2669, NRMSE: 0.0333, MAE: 0.0372
+	Cancer Epithelial: RMSE: 0.1811, NRMSE: 0.0239, MAE: 0.0178
+	Plasmablasts: RMSE: 0.0959, NRMSE: 0.0097, MAE: 0.0042
+	Normal Epithelial: RMSE: 0.1187, NRMSE: 0.0185, MAE: 0.0075
+	B-cells: RMSE: 0.1236, NRMSE: 0.0156, MAE: 0.0068
+	CAFs: RMSE: 0.1089, NRMSE: 0.0167, MAE: 0.0062
+
+Overall RMSE statistics:
+	Average RMSE: 0.1579
+	Median RMSE:  0.1397
+
+Overall NRMSE statistics:
+	Average NRMSE: 0.0207
+	Median NRMSE:  0.0185
+
+Overall MAE statistics:
+	Average MAE: 0.0143
+	Median MAE:  0.0102
+Per-cell type metrics saved to per_celltype_metrics.csv
+
+=== RESULTS ===
+Nuclei count correlation: 0.091
+Proportion correlation: 0.837
+Completed replicate 4, condition high_seg, mode h_and_e

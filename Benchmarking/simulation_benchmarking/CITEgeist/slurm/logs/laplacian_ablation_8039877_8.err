@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/test_laplacian_ablation.py", line 89, in <module>
+    corr = run_continuous_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/test_laplacian_ablation.py", line 60, in run_continuous_benchmark
+    model.load_cell_profile_dict(SIMULATION_CELL_PROFILE_DICT)
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/citegeist_model.py", line 271, in load_cell_profile_dict
+    raise ValueError("Invalid cell_profile_dict format.")
+ValueError: Invalid cell_profile_dict format.

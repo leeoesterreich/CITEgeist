@@ -1,0 +1,8 @@
+Protein-gated,B cells,T cells,Macrophages,Endothelial,Epithelial,Fibroblasts,Unknown
+B cells,24169,7099,4309,451,62,954,0
+T cells,503,89823,32281,1538,1700,4879,0
+Macrophages,295,1426,80357,2401,6246,5943,0
+Endothelial,22,987,3815,33197,386,10841,0
+Epithelial,13,558,5649,294,19260,2618,0
+Fibroblasts,6,502,2293,309,146,14932,0
+Unknown,419,7033,29278,5933,32987,25972,0

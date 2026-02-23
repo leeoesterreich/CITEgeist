@@ -1,0 +1,658 @@
+2026-02-17 21:30:03,293 - __main__ - INFO - ============================================================
+2026-02-17 21:30:03,293 - __main__ - INFO - BENCHMARK: replicate=4, condition=mixed, mode=dapi
+2026-02-17 21:30:03,293 - __main__ - INFO - ============================================================
+2026-02-17 21:30:03,294 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_4_cellpose.png
+2026-02-17 21:30:04,245 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-17 21:30:04,247 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-17 21:30:06,805 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-17 21:30:06,806 - cellpose.core - INFO - >>>> using CPU
+2026-02-17 21:30:06,806 - cellpose.core - INFO - >>>> using CPU
+2026-02-17 21:30:08,571 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-17 21:30:10,329 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-17 21:30:10,388 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-17 22:17:58,367 - __main__ - INFO - Detected 4894 nuclei in 2874.1s
+2026-02-17 22:17:58,439 - __main__ - INFO - Nuclei count correlation: 0.986
+2026-02-17 22:17:58,439 - __main__ - INFO - Nuclei count RMSE: 0.44
+2026-02-17 22:17:58,440 - __main__ - INFO - Loading h5ad files...
+2026-02-17 22:17:59,157 - root - INFO - Logging initialized.
+2026-02-17 22:17:59,178 - root - INFO - Discrete antibody preprocessing complete: Row sums range [30.61, 50.79], mean=39.98, std=2.83
+2026-02-17 22:17:59,612 - root - INFO - Normalization stats:
+2026-02-17 22:17:59,612 - root - INFO - Original median total: 80712055723.50
+2026-02-17 22:17:59,628 - root - INFO - Mean scaled total: 9978.33
+2026-02-17 22:17:59,644 - root - INFO - Max scaled value: 10000.00
+2026-02-17 22:17:59,992 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2026-02-17 22:17:59,994 - root - INFO - Mapped 18 markers to 9 cell types (preserving marker-level data)
+2026-02-17 22:17:59,994 - root - INFO - Running discrete cell assignment: 956 spots, 18 markers, 9 cell types
+2026-02-17 22:17:59,994 - root - INFO - Total nuclei: 4894, mean per spot: 5.12
+2026-02-17 22:17:59,994 - root - INFO - Discrete cell assignment EM: 956 spots, 18 markers, 9 cell types
+2026-02-17 22:17:59,994 - root - INFO - Total nuclei: 4894, mean per spot: 5.12
+2026-02-17 22:17:59,995 - root - INFO - 
+=== EM Iteration 1/10 ===
+2026-02-17 22:17:59,995 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:17:59,996 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:00,025 - gurobipy - INFO - Set parameter LicenseID to value 276015
+2026-02-17 22:18:00,025 - gurobipy - INFO - Set parameter GURO_PAR_SPECIAL
+2026-02-17 22:18:00,025 - gurobipy - INFO - Set parameter TokenServer to value "license.crc.pitt.edu"
+2026-02-17 22:18:00,040 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:00,040 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:01,670 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:01,671 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:01,671 - gurobipy - INFO - 
+2026-02-17 22:18:01,671 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:01,671 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:01,671 - gurobipy - INFO - 
+2026-02-17 22:18:01,671 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:01,672 - gurobipy - INFO - Model fingerprint: 0x27e7a113
+2026-02-17 22:18:01,672 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:01,672 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:01,672 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:01,672 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:01,672 - gurobipy - INFO -   Objective range  [6e-02, 4e+00]
+2026-02-17 22:18:01,672 - gurobipy - INFO -   QObjective range [4e+00, 4e+00]
+2026-02-17 22:18:01,672 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:01,672 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:01,673 - gurobipy - INFO - 
+2026-02-17 22:18:01,673 - gurobipy - INFO - Loaded user MIP start with objective 7527.58
+2026-02-17 22:18:01,673 - gurobipy - INFO - 
+2026-02-17 22:18:14,239 - gurobipy - INFO - Presolve removed 933 rows and 8550 columns (presolve time = 13s) ...
+2026-02-17 22:18:14,239 - gurobipy - INFO - Presolve removed 933 rows and 8550 columns
+2026-02-17 22:18:14,239 - gurobipy - INFO - Presolve time: 12.57s
+2026-02-17 22:18:14,240 - gurobipy - INFO - Presolved: 6 rows, 54 columns, 54 nonzeros
+2026-02-17 22:18:14,240 - gurobipy - INFO - Presolved model has 54 quadratic objective terms
+2026-02-17 22:18:14,240 - gurobipy - INFO - Found heuristic solution: objective 5391.9950443
+2026-02-17 22:18:14,240 - gurobipy - INFO - Variable types: 0 continuous, 54 integer (0 binary)
+2026-02-17 22:18:14,240 - gurobipy - INFO - 
+2026-02-17 22:18:14,241 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 12.57 seconds (0.22 work units)
+2026-02-17 22:18:14,241 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:14,241 - gurobipy - INFO - 
+2026-02-17 22:18:14,241 - gurobipy - INFO - Solution count 2: 5392 7527.58 
+2026-02-17 22:18:14,241 - gurobipy - INFO - 
+2026-02-17 22:18:14,241 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:14,241 - gurobipy - INFO - Best objective 5.391995044261e+03, best bound 5.334091212780e+03, gap 1.0739%
+2026-02-17 22:18:14,260 - root - INFO - Global IQP solved: status=2, gap=1.07%, time=12.6s
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/gurobi_impl.py:3692: RuntimeWarning: invalid value encountered in scalar divide
+  loss_change = abs(prev_loss - loss) / max(abs(prev_loss), 1e-10)
+2026-02-17 22:18:14,304 - root - INFO -   Loss: 1309.0722 (change: nan)
+2026-02-17 22:18:14,304 - root - INFO -   Beta range: [0.284, 0.460]
+2026-02-17 22:18:14,304 - root - INFO -   Max beta change: 0.715888
+2026-02-17 22:18:14,305 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:14,305 - root - INFO -     B-cells: 429 cells (8.8%)
+2026-02-17 22:18:14,305 - root - INFO -     CAFs: 646 cells (13.2%)
+2026-02-17 22:18:14,305 - root - INFO -     Cancer Epithelial: 732 cells (15.0%)
+2026-02-17 22:18:14,305 - root - INFO -     Endothelial: 548 cells (11.2%)
+2026-02-17 22:18:14,305 - root - INFO -     Myeloid: 496 cells (10.1%)
+2026-02-17 22:18:14,305 - root - INFO -     Normal Epithelial: 514 cells (10.5%)
+2026-02-17 22:18:14,305 - root - INFO -     PVL: 535 cells (10.9%)
+2026-02-17 22:18:14,305 - root - INFO -     Plasmablasts: 519 cells (10.6%)
+2026-02-17 22:18:14,305 - root - INFO -     T-cells: 475 cells (9.7%)
+2026-02-17 22:18:14,305 - root - INFO - 
+=== EM Iteration 2/10 ===
+2026-02-17 22:18:14,305 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:14,305 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:14,305 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:14,305 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:15,631 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:15,632 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:15,632 - gurobipy - INFO - 
+2026-02-17 22:18:15,632 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:15,632 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:15,632 - gurobipy - INFO - 
+2026-02-17 22:18:15,632 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:15,633 - gurobipy - INFO - Model fingerprint: 0x05e5e28a
+2026-02-17 22:18:15,633 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:15,633 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:15,633 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:15,633 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:15,633 - gurobipy - INFO -   Objective range  [3e-02, 2e+00]
+2026-02-17 22:18:15,633 - gurobipy - INFO -   QObjective range [4e-01, 8e-01]
+2026-02-17 22:18:15,633 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:15,633 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:15,633 - gurobipy - INFO - 
+2026-02-17 22:18:15,633 - gurobipy - INFO - Loaded user MIP start with objective 1309.07
+2026-02-17 22:18:15,633 - gurobipy - INFO - 
+2026-02-17 22:18:20,892 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 5s) ...
+2026-02-17 22:18:20,893 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:20,893 - gurobipy - INFO - Presolve time: 5.26s
+2026-02-17 22:18:20,893 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:20,893 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:20,893 - gurobipy - INFO - Found heuristic solution: objective 1021.6503660
+2026-02-17 22:18:20,894 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:20,894 - gurobipy - INFO - 
+2026-02-17 22:18:20,900 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.26 seconds (0.12 work units)
+2026-02-17 22:18:20,900 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:20,900 - gurobipy - INFO - 
+2026-02-17 22:18:20,900 - gurobipy - INFO - Solution count 2: 1021.65 1309.07 
+2026-02-17 22:18:20,900 - gurobipy - INFO - 
+2026-02-17 22:18:20,900 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:20,900 - gurobipy - INFO - Best objective 1.021650365981e+03, best bound 1.018701957770e+03, gap 0.2886%
+2026-02-17 22:18:20,918 - root - INFO - Global IQP solved: status=2, gap=0.29%, time=5.3s
+2026-02-17 22:18:20,957 - root - INFO -   Loss: 1013.4490 (change: 0.225827)
+2026-02-17 22:18:20,957 - root - INFO -   Beta range: [0.248, 0.438]
+2026-02-17 22:18:20,957 - root - INFO -   Max beta change: 0.036004
+2026-02-17 22:18:20,957 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:20,957 - root - INFO -     B-cells: 456 cells (9.3%)
+2026-02-17 22:18:20,957 - root - INFO -     CAFs: 647 cells (13.2%)
+2026-02-17 22:18:20,957 - root - INFO -     Cancer Epithelial: 726 cells (14.8%)
+2026-02-17 22:18:20,957 - root - INFO -     Endothelial: 545 cells (11.1%)
+2026-02-17 22:18:20,957 - root - INFO -     Myeloid: 474 cells (9.7%)
+2026-02-17 22:18:20,957 - root - INFO -     Normal Epithelial: 485 cells (9.9%)
+2026-02-17 22:18:20,957 - root - INFO -     PVL: 542 cells (11.1%)
+2026-02-17 22:18:20,957 - root - INFO -     Plasmablasts: 530 cells (10.8%)
+2026-02-17 22:18:20,957 - root - INFO -     T-cells: 489 cells (10.0%)
+2026-02-17 22:18:20,957 - root - INFO - 
+=== EM Iteration 3/10 ===
+2026-02-17 22:18:20,957 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:20,957 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:20,957 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:20,958 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:22,479 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:22,480 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:22,480 - gurobipy - INFO - 
+2026-02-17 22:18:22,480 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:22,480 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:22,480 - gurobipy - INFO - 
+2026-02-17 22:18:22,480 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:22,481 - gurobipy - INFO - Model fingerprint: 0x56a4c6e0
+2026-02-17 22:18:22,481 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:22,481 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:22,481 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:22,481 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:22,481 - gurobipy - INFO -   Objective range  [3e-02, 2e+00]
+2026-02-17 22:18:22,481 - gurobipy - INFO -   QObjective range [3e-01, 8e-01]
+2026-02-17 22:18:22,481 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:22,481 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:22,481 - gurobipy - INFO - 
+2026-02-17 22:18:22,481 - gurobipy - INFO - Loaded user MIP start with objective 1013.45
+2026-02-17 22:18:22,481 - gurobipy - INFO - 
+2026-02-17 22:18:27,574 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 5s) ...
+2026-02-17 22:18:27,575 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:27,575 - gurobipy - INFO - Presolve time: 5.09s
+2026-02-17 22:18:27,575 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:27,575 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:27,575 - gurobipy - INFO - Found heuristic solution: objective 1011.2063284
+2026-02-17 22:18:27,575 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:27,576 - gurobipy - INFO - 
+2026-02-17 22:18:27,576 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.10 seconds (0.11 work units)
+2026-02-17 22:18:27,576 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:27,576 - gurobipy - INFO - 
+2026-02-17 22:18:27,576 - gurobipy - INFO - Solution count 2: 1011.21 1013.45 
+2026-02-17 22:18:27,576 - gurobipy - INFO - 
+2026-02-17 22:18:27,576 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:27,576 - gurobipy - INFO - Best objective 1.011206328448e+03, best bound 1.008327543086e+03, gap 0.2847%
+2026-02-17 22:18:27,594 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=5.1s
+2026-02-17 22:18:27,632 - root - INFO -   Loss: 1007.5810 (change: 0.005790)
+2026-02-17 22:18:27,632 - root - INFO -   Beta range: [0.235, 0.429]
+2026-02-17 22:18:27,632 - root - INFO -   Max beta change: 0.013248
+2026-02-17 22:18:27,632 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:27,632 - root - INFO -     B-cells: 444 cells (9.1%)
+2026-02-17 22:18:27,632 - root - INFO -     CAFs: 658 cells (13.4%)
+2026-02-17 22:18:27,632 - root - INFO -     Cancer Epithelial: 738 cells (15.1%)
+2026-02-17 22:18:27,632 - root - INFO -     Endothelial: 539 cells (11.0%)
+2026-02-17 22:18:27,632 - root - INFO -     Myeloid: 459 cells (9.4%)
+2026-02-17 22:18:27,632 - root - INFO -     Normal Epithelial: 486 cells (9.9%)
+2026-02-17 22:18:27,632 - root - INFO -     PVL: 543 cells (11.1%)
+2026-02-17 22:18:27,632 - root - INFO -     Plasmablasts: 540 cells (11.0%)
+2026-02-17 22:18:27,632 - root - INFO -     T-cells: 487 cells (10.0%)
+2026-02-17 22:18:27,632 - root - INFO - 
+=== EM Iteration 4/10 ===
+2026-02-17 22:18:27,632 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:27,632 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:27,632 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:27,632 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:29,197 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:29,198 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:29,198 - gurobipy - INFO - 
+2026-02-17 22:18:29,198 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:29,198 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:29,198 - gurobipy - INFO - 
+2026-02-17 22:18:29,198 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:29,199 - gurobipy - INFO - Model fingerprint: 0xef7ba6ce
+2026-02-17 22:18:29,199 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:29,199 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:29,199 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:29,199 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:29,199 - gurobipy - INFO -   Objective range  [1e-03, 2e+00]
+2026-02-17 22:18:29,199 - gurobipy - INFO -   QObjective range [3e-01, 7e-01]
+2026-02-17 22:18:29,199 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:29,199 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:29,199 - gurobipy - INFO - 
+2026-02-17 22:18:29,199 - gurobipy - INFO - Loaded user MIP start with objective 1007.58
+2026-02-17 22:18:29,199 - gurobipy - INFO - 
+2026-02-17 22:18:35,360 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 6s) ...
+2026-02-17 22:18:35,361 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:35,361 - gurobipy - INFO - Presolve time: 6.16s
+2026-02-17 22:18:35,361 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:35,361 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:35,362 - gurobipy - INFO - Found heuristic solution: objective 1006.8485571
+2026-02-17 22:18:35,362 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:35,362 - gurobipy - INFO - 
+2026-02-17 22:18:35,362 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 6.16 seconds (0.11 work units)
+2026-02-17 22:18:35,362 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:35,362 - gurobipy - INFO - 
+2026-02-17 22:18:35,363 - gurobipy - INFO - Solution count 2: 1006.85 1007.58 
+2026-02-17 22:18:35,363 - gurobipy - INFO - 
+2026-02-17 22:18:35,363 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:35,363 - gurobipy - INFO - Best objective 1.006848557085e+03, best bound 1.003993292131e+03, gap 0.2836%
+2026-02-17 22:18:35,384 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=6.2s
+2026-02-17 22:18:35,439 - root - INFO -   Loss: 1001.2115 (change: 0.006322)
+2026-02-17 22:18:35,439 - root - INFO -   Beta range: [0.231, 0.416]
+2026-02-17 22:18:35,439 - root - INFO -   Max beta change: 0.015093
+2026-02-17 22:18:35,439 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:35,439 - root - INFO -     B-cells: 433 cells (8.8%)
+2026-02-17 22:18:35,439 - root - INFO -     CAFs: 670 cells (13.7%)
+2026-02-17 22:18:35,439 - root - INFO -     Cancer Epithelial: 747 cells (15.3%)
+2026-02-17 22:18:35,439 - root - INFO -     Endothelial: 539 cells (11.0%)
+2026-02-17 22:18:35,439 - root - INFO -     Myeloid: 439 cells (9.0%)
+2026-02-17 22:18:35,439 - root - INFO -     Normal Epithelial: 491 cells (10.0%)
+2026-02-17 22:18:35,439 - root - INFO -     PVL: 550 cells (11.2%)
+2026-02-17 22:18:35,439 - root - INFO -     Plasmablasts: 544 cells (11.1%)
+2026-02-17 22:18:35,439 - root - INFO -     T-cells: 481 cells (9.8%)
+2026-02-17 22:18:35,439 - root - INFO - 
+=== EM Iteration 5/10 ===
+2026-02-17 22:18:35,439 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:35,439 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:35,439 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:35,439 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:37,357 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:37,358 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:37,358 - gurobipy - INFO - 
+2026-02-17 22:18:37,358 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:37,358 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:37,358 - gurobipy - INFO - 
+2026-02-17 22:18:37,358 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:37,358 - gurobipy - INFO - Model fingerprint: 0x0bf8eb49
+2026-02-17 22:18:37,358 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:37,358 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:37,359 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:37,359 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:37,359 - gurobipy - INFO -   Objective range  [4e-03, 2e+00]
+2026-02-17 22:18:37,359 - gurobipy - INFO -   QObjective range [3e-01, 7e-01]
+2026-02-17 22:18:37,359 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:37,359 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:37,359 - gurobipy - INFO - 
+2026-02-17 22:18:37,359 - gurobipy - INFO - Loaded user MIP start with objective 1001.21
+2026-02-17 22:18:37,359 - gurobipy - INFO - 
+2026-02-17 22:18:44,139 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 7s) ...
+2026-02-17 22:18:44,140 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:44,140 - gurobipy - INFO - Presolve time: 6.78s
+2026-02-17 22:18:44,140 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:44,140 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:44,140 - gurobipy - INFO - Found heuristic solution: objective 1000.5828864
+2026-02-17 22:18:44,140 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:44,141 - gurobipy - INFO - 
+2026-02-17 22:18:44,141 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 6.78 seconds (0.11 work units)
+2026-02-17 22:18:44,141 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:44,141 - gurobipy - INFO - 
+2026-02-17 22:18:44,141 - gurobipy - INFO - Solution count 2: 1000.58 1001.21 
+2026-02-17 22:18:44,141 - gurobipy - INFO - 
+2026-02-17 22:18:44,141 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:44,141 - gurobipy - INFO - Best objective 1.000582886443e+03, best bound 9.977402959818e+02, gap 0.2841%
+2026-02-17 22:18:44,163 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=6.8s
+2026-02-17 22:18:44,218 - root - INFO -   Loss: 995.6975 (change: 0.005507)
+2026-02-17 22:18:44,218 - root - INFO -   Beta range: [0.230, 0.402]
+2026-02-17 22:18:44,218 - root - INFO -   Max beta change: 0.015090
+2026-02-17 22:18:44,219 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:44,219 - root - INFO -     B-cells: 425 cells (8.7%)
+2026-02-17 22:18:44,219 - root - INFO -     CAFs: 685 cells (14.0%)
+2026-02-17 22:18:44,219 - root - INFO -     Cancer Epithelial: 749 cells (15.3%)
+2026-02-17 22:18:44,219 - root - INFO -     Endothelial: 541 cells (11.1%)
+2026-02-17 22:18:44,219 - root - INFO -     Myeloid: 416 cells (8.5%)
+2026-02-17 22:18:44,219 - root - INFO -     Normal Epithelial: 497 cells (10.2%)
+2026-02-17 22:18:44,219 - root - INFO -     PVL: 551 cells (11.3%)
+2026-02-17 22:18:44,219 - root - INFO -     Plasmablasts: 545 cells (11.1%)
+2026-02-17 22:18:44,219 - root - INFO -     T-cells: 485 cells (9.9%)
+2026-02-17 22:18:44,219 - root - INFO - 
+=== EM Iteration 6/10 ===
+2026-02-17 22:18:44,219 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:44,219 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:44,219 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:44,219 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:45,544 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:45,545 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:45,545 - gurobipy - INFO - 
+2026-02-17 22:18:45,545 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:45,545 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:45,545 - gurobipy - INFO - 
+2026-02-17 22:18:45,545 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:45,545 - gurobipy - INFO - Model fingerprint: 0x8393d563
+2026-02-17 22:18:45,545 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:45,545 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:45,545 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:45,545 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:45,545 - gurobipy - INFO -   Objective range  [4e-03, 2e+00]
+2026-02-17 22:18:45,545 - gurobipy - INFO -   QObjective range [3e-01, 6e-01]
+2026-02-17 22:18:45,545 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:45,546 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:45,546 - gurobipy - INFO - 
+2026-02-17 22:18:45,546 - gurobipy - INFO - Loaded user MIP start with objective 995.697
+2026-02-17 22:18:45,546 - gurobipy - INFO - 
+2026-02-17 22:18:50,981 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 5s) ...
+2026-02-17 22:18:50,982 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:50,982 - gurobipy - INFO - Presolve time: 5.44s
+2026-02-17 22:18:50,982 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:50,982 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:50,982 - gurobipy - INFO - Found heuristic solution: objective 995.3135285
+2026-02-17 22:18:50,982 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:50,983 - gurobipy - INFO - 
+2026-02-17 22:18:50,983 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.44 seconds (0.11 work units)
+2026-02-17 22:18:50,983 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:50,983 - gurobipy - INFO - 
+2026-02-17 22:18:50,983 - gurobipy - INFO - Solution count 2: 995.314 995.697 
+2026-02-17 22:18:50,983 - gurobipy - INFO - 
+2026-02-17 22:18:50,983 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:50,983 - gurobipy - INFO - Best objective 9.953135285220e+02, best bound 9.924738924901e+02, gap 0.2853%
+2026-02-17 22:18:51,005 - root - INFO - Global IQP solved: status=2, gap=0.29%, time=5.4s
+2026-02-17 22:18:51,054 - root - INFO -   Loss: 992.2124 (change: 0.003500)
+2026-02-17 22:18:51,054 - root - INFO -   Beta range: [0.228, 0.391]
+2026-02-17 22:18:51,054 - root - INFO -   Max beta change: 0.038837
+2026-02-17 22:18:51,054 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:51,054 - root - INFO -     B-cells: 416 cells (8.5%)
+2026-02-17 22:18:51,054 - root - INFO -     CAFs: 695 cells (14.2%)
+2026-02-17 22:18:51,055 - root - INFO -     Cancer Epithelial: 751 cells (15.3%)
+2026-02-17 22:18:51,055 - root - INFO -     Endothelial: 543 cells (11.1%)
+2026-02-17 22:18:51,055 - root - INFO -     Myeloid: 401 cells (8.2%)
+2026-02-17 22:18:51,055 - root - INFO -     Normal Epithelial: 502 cells (10.3%)
+2026-02-17 22:18:51,055 - root - INFO -     PVL: 553 cells (11.3%)
+2026-02-17 22:18:51,055 - root - INFO -     Plasmablasts: 550 cells (11.2%)
+2026-02-17 22:18:51,055 - root - INFO -     T-cells: 483 cells (9.9%)
+2026-02-17 22:18:51,055 - root - INFO - 
+=== EM Iteration 7/10 ===
+2026-02-17 22:18:51,055 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:51,055 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:51,055 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:51,055 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:52,599 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:52,599 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:52,599 - gurobipy - INFO - 
+2026-02-17 22:18:52,599 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:52,599 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:52,599 - gurobipy - INFO - 
+2026-02-17 22:18:52,599 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:52,600 - gurobipy - INFO - Model fingerprint: 0xf542c674
+2026-02-17 22:18:52,600 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:52,600 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:52,600 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:52,600 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:52,600 - gurobipy - INFO -   Objective range  [1e-04, 1e+00]
+2026-02-17 22:18:52,600 - gurobipy - INFO -   QObjective range [3e-01, 6e-01]
+2026-02-17 22:18:52,600 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:52,600 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:52,600 - gurobipy - INFO - 
+2026-02-17 22:18:52,600 - gurobipy - INFO - Loaded user MIP start with objective 992.212
+2026-02-17 22:18:52,600 - gurobipy - INFO - 
+2026-02-17 22:18:58,133 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns (presolve time = 6s) ...
+2026-02-17 22:18:58,134 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:18:58,134 - gurobipy - INFO - Presolve time: 5.53s
+2026-02-17 22:18:58,134 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:18:58,134 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:18:58,134 - gurobipy - INFO - Found heuristic solution: objective 991.5207204
+2026-02-17 22:18:58,134 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:18:58,135 - gurobipy - INFO - 
+2026-02-17 22:18:58,135 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.54 seconds (0.11 work units)
+2026-02-17 22:18:58,135 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:18:58,135 - gurobipy - INFO - 
+2026-02-17 22:18:58,135 - gurobipy - INFO - Solution count 2: 991.521 992.212 
+2026-02-17 22:18:58,135 - gurobipy - INFO - 
+2026-02-17 22:18:58,135 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:18:58,135 - gurobipy - INFO - Best objective 9.915207204326e+02, best bound 9.886860241020e+02, gap 0.2859%
+2026-02-17 22:18:58,159 - root - INFO - Global IQP solved: status=2, gap=0.29%, time=5.5s
+2026-02-17 22:18:58,211 - root - INFO -   Loss: 994.9057 (change: 0.002714)
+2026-02-17 22:18:58,211 - root - INFO -   Beta range: [0.228, 0.387]
+2026-02-17 22:18:58,211 - root - INFO -   Max beta change: 0.016583
+2026-02-17 22:18:58,211 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:18:58,211 - root - INFO -     B-cells: 411 cells (8.4%)
+2026-02-17 22:18:58,211 - root - INFO -     CAFs: 705 cells (14.4%)
+2026-02-17 22:18:58,212 - root - INFO -     Cancer Epithelial: 759 cells (15.5%)
+2026-02-17 22:18:58,212 - root - INFO -     Endothelial: 547 cells (11.2%)
+2026-02-17 22:18:58,212 - root - INFO -     Myeloid: 375 cells (7.7%)
+2026-02-17 22:18:58,212 - root - INFO -     Normal Epithelial: 509 cells (10.4%)
+2026-02-17 22:18:58,212 - root - INFO -     PVL: 549 cells (11.2%)
+2026-02-17 22:18:58,212 - root - INFO -     Plasmablasts: 553 cells (11.3%)
+2026-02-17 22:18:58,212 - root - INFO -     T-cells: 486 cells (9.9%)
+2026-02-17 22:18:58,212 - root - WARNING - Loss increased from 992.2124 to 994.9057
+2026-02-17 22:18:58,212 - root - INFO - 
+=== EM Iteration 8/10 ===
+2026-02-17 22:18:58,212 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:18:58,212 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:18:58,212 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:18:58,212 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:18:59,777 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:18:59,778 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:18:59,778 - gurobipy - INFO - 
+2026-02-17 22:18:59,778 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:18:59,778 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:18:59,778 - gurobipy - INFO - 
+2026-02-17 22:18:59,778 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:18:59,778 - gurobipy - INFO - Model fingerprint: 0xf737ca14
+2026-02-17 22:18:59,778 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:18:59,778 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:18:59,779 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:18:59,779 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:18:59,779 - gurobipy - INFO -   Objective range  [2e-03, 1e+00]
+2026-02-17 22:18:59,779 - gurobipy - INFO -   QObjective range [3e-01, 6e-01]
+2026-02-17 22:18:59,779 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:18:59,779 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:18:59,779 - gurobipy - INFO - 
+2026-02-17 22:18:59,779 - gurobipy - INFO - Loaded user MIP start with objective 994.906
+2026-02-17 22:18:59,779 - gurobipy - INFO - 
+2026-02-17 22:19:04,498 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:19:04,498 - gurobipy - INFO - Presolve time: 4.72s
+2026-02-17 22:19:04,498 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:19:04,498 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:19:04,499 - gurobipy - INFO - Found heuristic solution: objective 994.2003165
+2026-02-17 22:19:04,499 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:19:04,499 - gurobipy - INFO - 
+2026-02-17 22:19:04,500 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.72 seconds (0.10 work units)
+2026-02-17 22:19:04,500 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:19:04,500 - gurobipy - INFO - 
+2026-02-17 22:19:04,500 - gurobipy - INFO - Solution count 2: 994.2 994.906 
+2026-02-17 22:19:04,500 - gurobipy - INFO - 
+2026-02-17 22:19:04,500 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:19:04,500 - gurobipy - INFO - Best objective 9.942003164920e+02, best bound 9.913900871216e+02, gap 0.2827%
+2026-02-17 22:19:04,524 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=4.7s
+2026-02-17 22:19:04,573 - root - INFO -   Loss: 1006.1336 (change: 0.011285)
+2026-02-17 22:19:04,573 - root - INFO -   Beta range: [0.227, 0.383]
+2026-02-17 22:19:04,573 - root - INFO -   Max beta change: 0.041730
+2026-02-17 22:19:04,573 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:19:04,573 - root - INFO -     B-cells: 411 cells (8.4%)
+2026-02-17 22:19:04,573 - root - INFO -     CAFs: 707 cells (14.4%)
+2026-02-17 22:19:04,573 - root - INFO -     Cancer Epithelial: 780 cells (15.9%)
+2026-02-17 22:19:04,574 - root - INFO -     Endothelial: 545 cells (11.1%)
+2026-02-17 22:19:04,574 - root - INFO -     Myeloid: 351 cells (7.2%)
+2026-02-17 22:19:04,574 - root - INFO -     Normal Epithelial: 517 cells (10.6%)
+2026-02-17 22:19:04,574 - root - INFO -     PVL: 542 cells (11.1%)
+2026-02-17 22:19:04,574 - root - INFO -     Plasmablasts: 553 cells (11.3%)
+2026-02-17 22:19:04,574 - root - INFO -     T-cells: 488 cells (10.0%)
+2026-02-17 22:19:04,574 - root - WARNING - Loss increased from 994.9057 to 1006.1336
+2026-02-17 22:19:04,574 - root - INFO - 
+=== EM Iteration 9/10 ===
+2026-02-17 22:19:04,574 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:19:04,574 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:19:04,574 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:19:04,574 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:19:06,147 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:19:06,147 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:19:06,147 - gurobipy - INFO - 
+2026-02-17 22:19:06,148 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:19:06,148 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:19:06,148 - gurobipy - INFO - 
+2026-02-17 22:19:06,148 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:19:06,148 - gurobipy - INFO - Model fingerprint: 0x16935fd1
+2026-02-17 22:19:06,148 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:19:06,148 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:19:06,148 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:19:06,148 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:19:06,148 - gurobipy - INFO -   Objective range  [8e-04, 1e+00]
+2026-02-17 22:19:06,148 - gurobipy - INFO -   QObjective range [3e-01, 6e-01]
+2026-02-17 22:19:06,148 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:19:06,148 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:19:06,148 - gurobipy - INFO - 
+2026-02-17 22:19:06,148 - gurobipy - INFO - Loaded user MIP start with objective 1006.13
+2026-02-17 22:19:06,149 - gurobipy - INFO - 
+2026-02-17 22:19:10,880 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:19:10,880 - gurobipy - INFO - Presolve time: 4.73s
+2026-02-17 22:19:10,880 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:19:10,880 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:19:10,880 - gurobipy - INFO - Found heuristic solution: objective 1005.3851917
+2026-02-17 22:19:10,880 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:19:10,881 - gurobipy - INFO - 
+2026-02-17 22:19:10,881 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.73 seconds (0.10 work units)
+2026-02-17 22:19:10,881 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:19:10,881 - gurobipy - INFO - 
+2026-02-17 22:19:10,881 - gurobipy - INFO - Solution count 2: 1005.39 1006.13 
+2026-02-17 22:19:10,881 - gurobipy - INFO - 
+2026-02-17 22:19:10,881 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:19:10,881 - gurobipy - INFO - Best objective 1.005385191695e+03, best bound 1.002579679164e+03, gap 0.2790%
+2026-02-17 22:19:10,902 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=4.7s
+2026-02-17 22:19:10,947 - root - INFO -   Loss: 1013.6079 (change: 0.007429)
+2026-02-17 22:19:10,947 - root - INFO -   Beta range: [0.224, 0.374]
+2026-02-17 22:19:10,948 - root - INFO -   Max beta change: 0.035340
+2026-02-17 22:19:10,948 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:19:10,948 - root - INFO -     B-cells: 410 cells (8.4%)
+2026-02-17 22:19:10,948 - root - INFO -     CAFs: 709 cells (14.5%)
+2026-02-17 22:19:10,948 - root - INFO -     Cancer Epithelial: 793 cells (16.2%)
+2026-02-17 22:19:10,948 - root - INFO -     Endothelial: 546 cells (11.2%)
+2026-02-17 22:19:10,948 - root - INFO -     Myeloid: 321 cells (6.6%)
+2026-02-17 22:19:10,948 - root - INFO -     Normal Epithelial: 526 cells (10.7%)
+2026-02-17 22:19:10,948 - root - INFO -     PVL: 538 cells (11.0%)
+2026-02-17 22:19:10,948 - root - INFO -     Plasmablasts: 562 cells (11.5%)
+2026-02-17 22:19:10,948 - root - INFO -     T-cells: 489 cells (10.0%)
+2026-02-17 22:19:10,948 - root - WARNING - Loss increased from 1006.1336 to 1013.6079
+2026-02-17 22:19:10,948 - root - INFO - 
+=== EM Iteration 10/10 ===
+2026-02-17 22:19:10,948 - root - INFO - Global IQP: 956 spots x 9 cell types = 8604 integer variables
+2026-02-17 22:19:10,948 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-17 22:19:10,948 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-17 22:19:10,948 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-17 22:19:12,508 - root - INFO - Starting global IQP optimization...
+2026-02-17 22:19:12,509 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-17 22:19:12,509 - gurobipy - INFO - 
+2026-02-17 22:19:12,509 - gurobipy - INFO - CPU model: Intel(R) Xeon(R) Gold 6248R CPU @ 3.00GHz, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-17 22:19:12,509 - gurobipy - INFO - Thread count: 48 physical cores, 48 logical processors, using up to 32 threads
+2026-02-17 22:19:12,509 - gurobipy - INFO - 
+2026-02-17 22:19:12,509 - gurobipy - INFO - Optimize a model with 939 rows, 8604 columns and 8451 nonzeros
+2026-02-17 22:19:12,509 - gurobipy - INFO - Model fingerprint: 0x13c7b08b
+2026-02-17 22:19:12,509 - gurobipy - INFO - Model has 8604 quadratic objective terms
+2026-02-17 22:19:12,509 - gurobipy - INFO - Variable types: 0 continuous, 8604 integer (0 binary)
+2026-02-17 22:19:12,509 - gurobipy - INFO - Coefficient statistics:
+2026-02-17 22:19:12,509 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-17 22:19:12,509 - gurobipy - INFO -   Objective range  [1e-03, 1e+00]
+2026-02-17 22:19:12,509 - gurobipy - INFO -   QObjective range [3e-01, 5e-01]
+2026-02-17 22:19:12,509 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-17 22:19:12,509 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-17 22:19:12,510 - gurobipy - INFO - 
+2026-02-17 22:19:12,510 - gurobipy - INFO - Loaded user MIP start with objective 1013.61
+2026-02-17 22:19:12,510 - gurobipy - INFO - 
+2026-02-17 22:19:17,293 - gurobipy - INFO - Presolve removed 938 rows and 8595 columns
+2026-02-17 22:19:17,293 - gurobipy - INFO - Presolve time: 4.78s
+2026-02-17 22:19:17,293 - gurobipy - INFO - Presolved: 1 rows, 9 columns, 9 nonzeros
+2026-02-17 22:19:17,293 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-17 22:19:17,294 - gurobipy - INFO - Found heuristic solution: objective 1012.3824977
+2026-02-17 22:19:17,294 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-17 22:19:17,294 - gurobipy - INFO - 
+2026-02-17 22:19:17,294 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.79 seconds (0.10 work units)
+2026-02-17 22:19:17,294 - gurobipy - INFO - Thread count was 32 (of 48 available processors)
+2026-02-17 22:19:17,294 - gurobipy - INFO - 
+2026-02-17 22:19:17,294 - gurobipy - INFO - Solution count 2: 1012.38 1013.61 
+2026-02-17 22:19:17,294 - gurobipy - INFO - 
+2026-02-17 22:19:17,294 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-17 22:19:17,295 - gurobipy - INFO - Best objective 1.012382497707e+03, best bound 1.009584329919e+03, gap 0.2764%
+2026-02-17 22:19:17,316 - root - INFO - Global IQP solved: status=2, gap=0.28%, time=4.8s
+2026-02-17 22:19:17,382 - root - INFO -   Loss: 1015.3439 (change: 0.001713)
+2026-02-17 22:19:17,382 - root - INFO -   Beta range: [0.222, 0.362]
+2026-02-17 22:19:17,382 - root - INFO -   Max beta change: 0.012490
+2026-02-17 22:19:17,383 - root - INFO -   Cell count range: [0, 15]
+2026-02-17 22:19:17,383 - root - INFO -     B-cells: 407 cells (8.3%)
+2026-02-17 22:19:17,383 - root - INFO -     CAFs: 712 cells (14.5%)
+2026-02-17 22:19:17,383 - root - INFO -     Cancer Epithelial: 804 cells (16.4%)
+2026-02-17 22:19:17,383 - root - INFO -     Endothelial: 540 cells (11.0%)
+2026-02-17 22:19:17,383 - root - INFO -     Myeloid: 289 cells (5.9%)
+2026-02-17 22:19:17,383 - root - INFO -     Normal Epithelial: 539 cells (11.0%)
+2026-02-17 22:19:17,383 - root - INFO -     PVL: 541 cells (11.1%)
+2026-02-17 22:19:17,383 - root - INFO -     Plasmablasts: 573 cells (11.7%)
+2026-02-17 22:19:17,383 - root - INFO -     T-cells: 489 cells (10.0%)
+2026-02-17 22:19:17,383 - root - WARNING - Loss increased from 1013.6079 to 1015.3439
+2026-02-17 22:19:17,383 - root - INFO - 
+Final beta values:
+2026-02-17 22:19:17,383 - root - INFO -   B-cells_Protein_1: β=0.321, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   B-cells_Protein_2: β=0.345, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   CAFs_Protein_1: β=0.358, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   CAFs_Protein_2: β=0.360, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Cancer Epithelial_Protein_1: β=0.362, α=0.034
+2026-02-17 22:19:17,383 - root - INFO -   Cancer Epithelial_Protein_2: β=0.354, α=0.044
+2026-02-17 22:19:17,383 - root - INFO -   Endothelial_Protein_1: β=0.313, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Endothelial_Protein_2: β=0.274, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Myeloid_Protein_1: β=0.328, α=0.160
+2026-02-17 22:19:17,383 - root - INFO -   Myeloid_Protein_2: β=0.234, α=0.336
+2026-02-17 22:19:17,383 - root - INFO -   Normal Epithelial_Protein_1: β=0.298, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Normal Epithelial_Protein_2: β=0.274, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   PVL_Protein_1: β=0.300, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   PVL_Protein_2: β=0.294, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Plasmablasts_Protein_1: β=0.222, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   Plasmablasts_Protein_2: β=0.332, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   T-cells_Protein_1: β=0.316, α=0.000
+2026-02-17 22:19:17,383 - root - INFO -   T-cells_Protein_2: β=0.359, α=0.000
+2026-02-17 22:19:17,391 - root - INFO - Saved discrete cell counts to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_discrete_cell_counts.csv
+2026-02-17 22:19:17,399 - root - INFO - Saved derived proportions to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_cell_prop_discrete.csv
+2026-02-17 22:19:17,399 - root - INFO - Cell type distribution:
+2026-02-17 22:19:17,399 - root - INFO -   B-cells: 407 cells (8.3%)
+2026-02-17 22:19:17,399 - root - INFO -   CAFs: 712 cells (14.5%)
+2026-02-17 22:19:17,399 - root - INFO -   Cancer Epithelial: 804 cells (16.4%)
+2026-02-17 22:19:17,399 - root - INFO -   Endothelial: 540 cells (11.0%)
+2026-02-17 22:19:17,399 - root - INFO -   Myeloid: 289 cells (5.9%)
+2026-02-17 22:19:17,399 - root - INFO -   Normal Epithelial: 539 cells (11.0%)
+2026-02-17 22:19:17,399 - root - INFO -   PVL: 541 cells (11.1%)
+2026-02-17 22:19:17,399 - root - INFO -   Plasmablasts: 573 cells (11.7%)
+2026-02-17 22:19:17,399 - root - INFO -   T-cells: 489 cells (10.0%)
+2026-02-17 22:19:17,407 - __main__ - INFO - Loaded ground truth proportions: 956 spots, 9 cell types
+2026-02-17 22:19:17,410 - __main__ - INFO - Proportion correlation: 0.484
+2026-02-17 22:19:17,410 - __main__ - INFO - Proportion RMSE: 0.1883
+2026-02-17 22:19:17,410 - __main__ - INFO - Running GEX deconvolution...
+2026-02-17 22:19:17,412 - CITEgeist.model.utils - INFO - Detected spot spacing: 1.61 units (median of 956 nearest-neighbor distances)
+2026-02-17 22:19:17,412 - CITEgeist.model.utils - INFO - Computed optimal radius: 4.92 (3.0 rings, spot_spacing=1.61)
+2026-02-17 22:19:17,412 - root - INFO - Auto-detected radius: 4.92 (3 rings)
+2026-02-17 22:19:17,412 - root - INFO - Starting Pass 1: Error minimization with enrichment weights...
+2026-02-17 22:19:17,412 - root - INFO - Using discrete mode: cell counts as fixed multipliers
+2026-02-17 22:19:17,412 - root - WARNING - Found 17 spots with zero cells. These will be skipped in deconvolution.
+2026-02-17 22:19:17,412 - root - WARNING - Found 17 spots with zero or negligible total cell proportions. Deconvolution for these spots may fail and their profiles will be imputed as zeros. Example spot indices: [ 26  78 102 122 278]
+2026-02-17 22:19:17,413 - root - INFO - Starting analysis for Wu_rep_4
+2026-02-17 22:19:17,413 - root - INFO - Already completed spots: 0
+2026-02-17 22:19:17,413 - root - INFO - Using enrichment weights - Global: 0.5, Local: 0.5
+2026-02-17 22:19:17,413 - root - INFO - Using 48 workers
+2026-02-17 22:19:17,413 - root - INFO - Processing 956 remaining spots
+Deconvoluting Remaining Spots:   0%|          | 0/956 [00:00<?, ?it/s]Deconvoluting Remaining Spots:   0%|          | 1/956 [00:07<2:04:43,  7.84s/it]Deconvoluting Remaining Spots:   0%|          | 2/956 [00:08<56:34,  3.56s/it]  Deconvoluting Remaining Spots:   0%|          | 3/956 [00:08<32:13,  2.03s/it]Deconvoluting Remaining Spots:   0%|          | 4/956 [00:09<22:16,  1.40s/it]Deconvoluting Remaining Spots:   1%|          | 5/956 [00:09<17:07,  1.08s/it]Deconvoluting Remaining Spots:   1%|          | 6/956 [00:10<14:54,  1.06it/s]Deconvoluting Remaining Spots:   1%|          | 7/956 [00:10<12:46,  1.24it/s]Deconvoluting Remaining Spots:   1%|          | 8/956 [00:11<11:28,  1.38it/s]Deconvoluting Remaining Spots:   1%|          | 9/956 [00:11<11:12,  1.41it/s]Deconvoluting Remaining Spots:   1%|          | 10/956 [00:12<10:39,  1.48it/s]Deconvoluting Remaining Spots:   1%|          | 11/956 [00:13<10:51,  1.45it/s]Deconvoluting Remaining Spots:   1%|▏         | 12/956 [00:14<11:10,  1.41it/s]Deconvoluting Remaining Spots:   1%|▏         | 13/956 [00:14<10:35,  1.48it/s]Deconvoluting Remaining Spots:   1%|▏         | 14/956 [00:15<10:15,  1.53it/s]Deconvoluting Remaining Spots:   2%|▏         | 15/956 [00:15<10:00,  1.57it/s]Deconvoluting Remaining Spots:   2%|▏         | 16/956 [00:16<10:16,  1.52it/s]Deconvoluting Remaining Spots:   2%|▏         | 17/956 [00:17<09:32,  1.64it/s]Deconvoluting Remaining Spots:   2%|▏         | 18/956 [00:17<09:34,  1.63it/s]Deconvoluting Remaining Spots:   2%|▏         | 19/956 [00:18<09:14,  1.69it/s]Deconvoluting Remaining Spots:   2%|▏         | 20/956 [00:18<08:46,  1.78it/s]Deconvoluting Remaining Spots:   2%|▏         | 21/956 [00:19<08:50,  1.76it/s]Deconvoluting Remaining Spots:   2%|▏         | 22/956 [00:19<08:44,  1.78it/s]Deconvoluting Remaining Spots:   2%|▏         | 23/956 [00:20<08:51,  1.76it/s]Deconvoluting Remaining Spots:   3%|▎         | 24/956 [00:21<08:53,  1.75it/s]Deconvoluting Remaining Spots:   3%|▎         | 25/956 [00:21<08:49,  1.76it/s]Deconvoluting Remaining Spots:   3%|▎         | 26/956 [00:22<08:49,  1.76it/s]Deconvoluting Remaining Spots:   3%|▎         | 27/956 [00:22<07:55,  1.95it/s]Deconvoluting Remaining Spots:   3%|▎         | 28/956 [00:23<09:03,  1.71it/s]Deconvoluting Remaining Spots:   3%|▎         | 29/956 [00:23<08:54,  1.73it/s]Deconvoluting Remaining Spots:   3%|▎         | 30/956 [00:24<08:46,  1.76it/s]Deconvoluting Remaining Spots:   3%|▎         | 31/956 [00:24<08:49,  1.75it/s]Deconvoluting Remaining Spots:   3%|▎         | 32/956 [00:25<09:06,  1.69it/s]Deconvoluting Remaining Spots:   3%|▎         | 33/956 [00:26<09:28,  1.62it/s]Deconvoluting Remaining Spots:   4%|▎         | 34/956 [00:26<08:35,  1.79it/s]Deconvoluting Remaining Spots:   4%|▎         | 35/956 [00:27<08:57,  1.71it/s]Deconvoluting Remaining Spots:   4%|▍         | 36/956 [00:27<08:44,  1.75it/s]Deconvoluting Remaining Spots:   4%|▍         | 37/956 [00:28<08:23,  1.83it/s]Deconvoluting Remaining Spots:   4%|▍         | 38/956 [00:29<08:59,  1.70it/s]Deconvoluting Remaining Spots:   4%|▍         | 39/956 [00:29<08:46,  1.74it/s]Deconvoluting Remaining Spots:   4%|▍         | 40/956 [00:30<09:30,  1.61it/s]Deconvoluting Remaining Spots:   4%|▍         | 41/956 [00:30<09:01,  1.69it/s]Deconvoluting Remaining Spots:   4%|▍         | 42/956 [00:31<08:39,  1.76it/s]Deconvoluting Remaining Spots:   4%|▍         | 43/956 [00:32<09:13,  1.65it/s]Deconvoluting Remaining Spots:   5%|▍         | 44/956 [00:32<08:29,  1.79it/s]Deconvoluting Remaining Spots:   5%|▍         | 45/956 [00:33<08:40,  1.75it/s]Deconvoluting Remaining Spots:   5%|▍         | 46/956 [00:33<08:50,  1.72it/s]Deconvoluting Remaining Spots:   5%|▍         | 47/956 [00:34<08:41,  1.74it/s]Deconvoluting Remaining Spots:   5%|▌         | 48/956 [00:34<08:33,  1.77it/s]Deconvoluting Remaining Spots:   5%|▌         | 49/956 [00:35<08:04,  1.87it/s]Deconvoluting Remaining Spots:   5%|▌         | 50/956 [00:35<08:20,  1.81it/s]Deconvoluting Remaining Spots:   5%|▌         | 51/956 [00:37<11:52,  1.27it/s]Deconvoluting Remaining Spots:   5%|▌         | 52/956 [00:37<09:53,  1.52it/s]Deconvoluting Remaining Spots:   6%|▌         | 53/956 [00:37<08:15,  1.82it/s]Deconvoluting Remaining Spots:   6%|▌         | 54/956 [00:38<08:04,  1.86it/s]Deconvoluting Remaining Spots:   6%|▌         | 55/956 [00:38<08:21,  1.80it/s]Deconvoluting Remaining Spots:   6%|▌         | 56/956 [00:39<06:50,  2.19it/s]Deconvoluting Remaining Spots:   6%|▌         | 57/956 [00:40<08:44,  1.71it/s]Deconvoluting Remaining Spots:   6%|▌         | 59/956 [00:40<07:29,  2.00it/s]Deconvoluting Remaining Spots:   6%|▋         | 60/956 [00:41<07:31,  1.99it/s]Deconvoluting Remaining Spots:   6%|▋         | 61/956 [00:41<07:21,  2.03it/s]Deconvoluting Remaining Spots:   6%|▋         | 62/956 [00:42<07:32,  1.97it/s]Deconvoluting Remaining Spots:   7%|▋         | 63/956 [00:42<07:40,  1.94it/s]Deconvoluting Remaining Spots:   7%|▋         | 64/956 [00:43<08:30,  1.75it/s]Deconvoluting Remaining Spots:   7%|▋         | 65/956 [00:44<08:15,  1.80it/s]Deconvoluting Remaining Spots:   7%|▋         | 66/956 [00:44<08:02,  1.85it/s]Deconvoluting Remaining Spots:   7%|▋         | 67/956 [00:45<08:08,  1.82it/s]Deconvoluting Remaining Spots:   7%|▋         | 68/956 [00:45<08:00,  1.85it/s]Deconvoluting Remaining Spots:   7%|▋         | 69/956 [00:46<08:06,  1.82it/s]Deconvoluting Remaining Spots:   7%|▋         | 70/956 [00:47<08:46,  1.68it/s]Deconvoluting Remaining Spots:   7%|▋         | 71/956 [00:47<07:16,  2.03it/s]Deconvoluting Remaining Spots:   8%|▊         | 72/956 [00:47<07:48,  1.89it/s]Deconvoluting Remaining Spots:   8%|▊         | 73/956 [00:48<08:55,  1.65it/s]Deconvoluting Remaining Spots:   8%|▊         | 74/956 [00:49<08:36,  1.71it/s]Deconvoluting Remaining Spots:   8%|▊         | 75/956 [00:49<08:45,  1.68it/s]Deconvoluting Remaining Spots:   8%|▊         | 76/956 [00:50<07:42,  1.90it/s]Deconvoluting Remaining Spots:   8%|▊         | 77/956 [00:50<07:47,  1.88it/s]Deconvoluting Remaining Spots:   8%|▊         | 78/956 [00:51<07:27,  1.96it/s]Deconvoluting Remaining Spots:   8%|▊         | 79/956 [00:51<08:08,  1.80it/s]Deconvoluting Remaining Spots:   8%|▊         | 80/956 [00:52<08:30,  1.72it/s]Deconvoluting Remaining Spots:   9%|▊         | 82/956 [00:53<06:22,  2.28it/s]Deconvoluting Remaining Spots:   9%|▊         | 83/956 [00:53<06:59,  2.08it/s]Deconvoluting Remaining Spots:   9%|▉         | 84/956 [00:54<07:01,  2.07it/s]Deconvoluting Remaining Spots:   9%|▉         | 85/956 [00:54<07:03,  2.06it/s]Deconvoluting Remaining Spots:   9%|▉         | 86/956 [00:55<07:00,  2.07it/s]Deconvoluting Remaining Spots:   9%|▉         | 87/956 [00:55<07:33,  1.91it/s]Deconvoluting Remaining Spots:   9%|▉         | 88/956 [00:56<07:47,  1.86it/s]Deconvoluting Remaining Spots:   9%|▉         | 89/956 [00:56<06:37,  2.18it/s]Deconvoluting Remaining Spots:   9%|▉         | 90/956 [00:57<06:55,  2.08it/s]Deconvoluting Remaining Spots:  10%|▉         | 91/956 [00:57<08:14,  1.75it/s]Deconvoluting Remaining Spots:  10%|▉         | 92/956 [00:58<06:46,  2.12it/s]Deconvoluting Remaining Spots:  10%|▉         | 93/956 [00:58<07:01,  2.05it/s]Deconvoluting Remaining Spots:  10%|▉         | 94/956 [00:59<07:43,  1.86it/s]Deconvoluting Remaining Spots:  10%|▉         | 95/956 [00:59<07:48,  1.84it/s]Deconvoluting Remaining Spots:  10%|█         | 96/956 [01:00<07:13,  1.98it/s]Deconvoluting Remaining Spots:  10%|█         | 97/956 [01:00<07:11,  1.99it/s]Deconvoluting Remaining Spots:  10%|█         | 98/956 [01:01<07:23,  1.93it/s]Deconvoluting Remaining Spots:  10%|█         | 99/956 [01:02<08:08,  1.76it/s]Deconvoluting Remaining Spots:  10%|█         | 100/956 [01:02<06:50,  2.09it/s]2026-02-17 22:20:22,439 - root - INFO - Saved checkpoint after 100 completed spots
+Deconvoluting Remaining Spots:  11%|█         | 101/956 [01:03<11:31,  1.24it/s]Deconvoluting Remaining Spots:  11%|█         | 103/956 [01:04<06:33,  2.17it/s]Deconvoluting Remaining Spots:  11%|█         | 104/956 [01:04<06:45,  2.10it/s]Deconvoluting Remaining Spots:  11%|█         | 105/956 [01:05<07:19,  1.94it/s]Deconvoluting Remaining Spots:  11%|█         | 106/956 [01:05<07:43,  1.83it/s]Deconvoluting Remaining Spots:  11%|█         | 107/956 [01:06<06:56,  2.04it/s]Deconvoluting Remaining Spots:  11%|█▏        | 108/956 [01:06<08:10,  1.73it/s]Deconvoluting Remaining Spots:  11%|█▏        | 109/956 [01:07<07:55,  1.78it/s]Deconvoluting Remaining Spots:  12%|█▏        | 110/956 [01:07<07:43,  1.82it/s]Deconvoluting Remaining Spots:  12%|█▏        | 111/956 [01:08<07:28,  1.89it/s]Deconvoluting Remaining Spots:  12%|█▏        | 112/956 [01:09<07:34,  1.86it/s]Deconvoluting Remaining Spots:  12%|█▏        | 113/956 [01:09<07:48,  1.80it/s]Deconvoluting Remaining Spots:  12%|█▏        | 114/956 [01:10<07:49,  1.79it/s]Deconvoluting Remaining Spots:  12%|█▏        | 115/956 [01:10<06:14,  2.25it/s]Deconvoluting Remaining Spots:  12%|█▏        | 116/956 [01:10<06:51,  2.04it/s]Deconvoluting Remaining Spots:  12%|█▏        | 117/956 [01:11<05:56,  2.35it/s]Deconvoluting Remaining Spots:  12%|█▏        | 118/956 [01:11<06:23,  2.19it/s]Deconvoluting Remaining Spots:  12%|█▏        | 119/956 [01:12<07:39,  1.82it/s]Deconvoluting Remaining Spots:  13%|█▎        | 120/956 [01:13<07:25,  1.88it/s]Deconvoluting Remaining Spots:  13%|█▎        | 121/956 [01:13<07:18,  1.90it/s]Deconvoluting Remaining Spots:  13%|█▎        | 122/956 [01:13<06:01,  2.31it/s]Deconvoluting Remaining Spots:  13%|█▎        | 123/956 [01:14<06:37,  2.10it/s]Deconvoluting Remaining Spots:  13%|█▎        | 124/956 [01:14<06:39,  2.08it/s]Deconvoluting Remaining Spots:  13%|█▎        | 125/956 [01:15<06:43,  2.06it/s]Deconvoluting Remaining Spots:  13%|█▎        | 126/956 [01:15<07:09,  1.93it/s]Deconvoluting Remaining Spots:  13%|█▎        | 127/956 [01:16<07:12,  1.92it/s]Deconvoluting Remaining Spots:  13%|█▎        | 128/956 [01:16<07:20,  1.88it/s]Deconvoluting Remaining Spots:  13%|█▎        | 129/956 [01:17<06:54,  2.00it/s]Deconvoluting Remaining Spots:  14%|█▎        | 130/956 [01:18<08:16,  1.67it/s]Deconvoluting Remaining Spots:  14%|█▎        | 131/956 [01:18<06:17,  2.19it/s]Deconvoluting Remaining Spots:  14%|█▍        | 132/956 [01:19<07:21,  1.87it/s]Deconvoluting Remaining Spots:  14%|█▍        | 133/956 [01:19<06:26,  2.13it/s]Deconvoluting Remaining Spots:  14%|█▍        | 134/956 [01:19<06:19,  2.17it/s]Deconvoluting Remaining Spots:  14%|█▍        | 135/956 [01:20<06:39,  2.05it/s]Deconvoluting Remaining Spots:  14%|█▍        | 136/956 [01:20<06:53,  1.99it/s]Deconvoluting Remaining Spots:  14%|█▍        | 137/956 [01:21<07:07,  1.92it/s]Deconvoluting Remaining Spots:  14%|█▍        | 138/956 [01:22<07:09,  1.90it/s]Deconvoluting Remaining Spots:  15%|█▍        | 139/956 [01:22<07:15,  1.88it/s]Deconvoluting Remaining Spots:  15%|█▍        | 140/956 [01:23<06:48,  2.00it/s]Deconvoluting Remaining Spots:  15%|█▍        | 141/956 [01:23<07:38,  1.78it/s]Deconvoluting Remaining Spots:  15%|█▍        | 142/956 [01:24<07:20,  1.85it/s]Deconvoluting Remaining Spots:  15%|█▍        | 143/956 [01:24<07:22,  1.84it/s]Deconvoluting Remaining Spots:  15%|█▌        | 144/956 [01:25<07:06,  1.90it/s]Deconvoluting Remaining Spots:  15%|█▌        | 145/956 [01:25<06:31,  2.07it/s]Deconvoluting Remaining Spots:  15%|█▌        | 146/956 [01:26<07:17,  1.85it/s]Deconvoluting Remaining Spots:  15%|█▌        | 147/956 [01:26<06:20,  2.13it/s]Deconvoluting Remaining Spots:  15%|█▌        | 148/956 [01:27<06:58,  1.93it/s]Deconvoluting Remaining Spots:  16%|█▌        | 149/956 [01:28<08:24,  1.60it/s]Deconvoluting Remaining Spots:  16%|█▌        | 150/956 [01:28<07:47,  1.72it/s]Deconvoluting Remaining Spots:  16%|█▌        | 151/956 [01:28<06:33,  2.05it/s]Deconvoluting Remaining Spots:  16%|█▌        | 152/956 [01:29<07:25,  1.80it/s]Deconvoluting Remaining Spots:  16%|█▌        | 153/956 [01:30<07:20,  1.82it/s]Deconvoluting Remaining Spots:  16%|█▌        | 154/956 [01:30<05:53,  2.27it/s]Deconvoluting Remaining Spots:  16%|█▌        | 155/956 [01:30<06:06,  2.18it/s]Deconvoluting Remaining Spots:  16%|█▋        | 156/956 [01:31<06:19,  2.11it/s]Deconvoluting Remaining Spots:  16%|█▋        | 157/956 [01:31<06:33,  2.03it/s]Deconvoluting Remaining Spots:  17%|█▋        | 158/956 [01:32<06:25,  2.07it/s]Deconvoluting Remaining Spots:  17%|█▋        | 159/956 [01:32<06:58,  1.91it/s]Deconvoluting Remaining Spots:  17%|█▋        | 160/956 [01:33<07:46,  1.71it/s]Deconvoluting Remaining Spots:  17%|█▋        | 161/956 [01:33<06:22,  2.08it/s]Deconvoluting Remaining Spots:  17%|█▋        | 162/956 [01:34<06:26,  2.06it/s]Deconvoluting Remaining Spots:  17%|█▋        | 163/956 [01:35<07:20,  1.80it/s]Deconvoluting Remaining Spots:  17%|█▋        | 164/956 [01:35<06:10,  2.14it/s]Deconvoluting Remaining Spots:  17%|█▋        | 165/956 [01:35<06:19,  2.09it/s]Deconvoluting Remaining Spots:  17%|█▋        | 166/956 [01:36<07:36,  1.73it/s]Deconvoluting Remaining Spots:  17%|█▋        | 167/956 [01:37<07:13,  1.82it/s]Deconvoluting Remaining Spots:  18%|█▊        | 168/956 [01:37<06:51,  1.91it/s]Deconvoluting Remaining Spots:  18%|█▊        | 169/956 [01:38<06:57,  1.88it/s]Deconvoluting Remaining Spots:  18%|█▊        | 170/956 [01:38<06:50,  1.92it/s]Deconvoluting Remaining Spots:  18%|█▊        | 171/956 [01:39<06:43,  1.95it/s]Deconvoluting Remaining Spots:  18%|█▊        | 172/956 [01:39<06:52,  1.90it/s]Deconvoluting Remaining Spots:  18%|█▊        | 173/956 [01:40<06:54,  1.89it/s]Deconvoluting Remaining Spots:  18%|█▊        | 174/956 [01:40<07:07,  1.83it/s]Deconvoluting Remaining Spots:  18%|█▊        | 175/956 [01:41<07:59,  1.63it/s]Deconvoluting Remaining Spots:  18%|█▊        | 176/956 [01:41<06:29,  2.00it/s]Deconvoluting Remaining Spots:  19%|█▊        | 177/956 [01:42<05:39,  2.30it/s]Deconvoluting Remaining Spots:  19%|█▊        | 178/956 [01:42<06:28,  2.00it/s]Deconvoluting Remaining Spots:  19%|█▊        | 179/956 [01:43<05:36,  2.31it/s]Deconvoluting Remaining Spots:  19%|█▉        | 180/956 [01:43<06:49,  1.90it/s]Deconvoluting Remaining Spots:  19%|█▉        | 181/956 [01:44<05:49,  2.22it/s]Deconvoluting Remaining Spots:  19%|█▉        | 182/956 [01:44<07:28,  1.73it/s]Deconvoluting Remaining Spots:  19%|█▉        | 183/956 [01:45<06:25,  2.01it/s]Deconvoluting Remaining Spots:  19%|█▉        | 184/956 [01:45<05:58,  2.15it/s]Deconvoluting Remaining Spots:  19%|█▉        | 185/956 [01:46<06:06,  2.10it/s]Deconvoluting Remaining Spots:  19%|█▉        | 186/956 [01:46<05:34,  2.30it/s]Deconvoluting Remaining Spots:  20%|█▉        | 187/956 [01:47<05:55,  2.17it/s]Deconvoluting Remaining Spots:  20%|█▉        | 188/956 [01:47<06:51,  1.87it/s]Deconvoluting Remaining Spots:  20%|█▉        | 189/956 [01:48<06:46,  1.89it/s]Deconvoluting Remaining Spots:  20%|█▉        | 190/956 [01:48<06:49,  1.87it/s]Deconvoluting Remaining Spots:  20%|█▉        | 191/956 [01:49<06:46,  1.88it/s]Deconvoluting Remaining Spots:  20%|██        | 192/956 [01:49<06:31,  1.95it/s]Deconvoluting Remaining Spots:  20%|██        | 193/956 [01:50<05:35,  2.27it/s]Deconvoluting Remaining Spots:  20%|██        | 194/956 [01:50<06:46,  1.87it/s]Deconvoluting Remaining Spots:  20%|██        | 195/956 [01:51<06:40,  1.90it/s]Deconvoluting Remaining Spots:  21%|██        | 196/956 [01:51<06:40,  1.90it/s]Deconvoluting Remaining Spots:  21%|██        | 197/956 [01:52<07:29,  1.69it/s]Deconvoluting Remaining Spots:  21%|██        | 198/956 [01:53<08:01,  1.57it/s]Deconvoluting Remaining Spots:  21%|██        | 199/956 [01:53<06:35,  1.92it/s]Deconvoluting Remaining Spots:  21%|██        | 200/956 [01:54<06:25,  1.96it/s]2026-02-17 22:21:15,976 - root - INFO - Saved checkpoint after 200 completed spots
+Deconvoluting Remaining Spots:  21%|██        | 201/956 [01:57<17:14,  1.37s/it]Deconvoluting Remaining Spots:  22%|██▏       | 207/956 [01:57<05:16,  2.37it/s]Deconvoluting Remaining Spots:  22%|██▏       | 208/956 [01:58<05:16,  2.36it/s]Deconvoluting Remaining Spots:  22%|██▏       | 209/956 [01:58<05:32,  2.25it/s]Deconvoluting Remaining Spots:  22%|██▏       | 210/956 [01:59<05:30,  2.26it/s]Deconvoluting Remaining Spots:  22%|██▏       | 211/956 [01:59<06:04,  2.04it/s]Deconvoluting Remaining Spots:  22%|██▏       | 212/956 [02:00<06:52,  1.80it/s]Deconvoluting Remaining Spots:  22%|██▏       | 213/956 [02:01<06:35,  1.88it/s]Deconvoluting Remaining Spots:  22%|██▏       | 214/956 [02:01<05:45,  2.15it/s]Deconvoluting Remaining Spots:  22%|██▏       | 215/956 [02:01<05:47,  2.13it/s]Deconvoluting Remaining Spots:  23%|██▎       | 216/956 [02:02<07:06,  1.73it/s]Deconvoluting Remaining Spots:  23%|██▎       | 217/956 [02:02<06:14,  1.97it/s]Deconvoluting Remaining Spots:  23%|██▎       | 218/956 [02:03<07:00,  1.75it/s]Deconvoluting Remaining Spots:  23%|██▎       | 219/956 [02:04<07:12,  1.70it/s]Deconvoluting Remaining Spots:  23%|██▎       | 220/956 [02:04<07:04,  1.73it/s]Deconvoluting Remaining Spots:  23%|██▎       | 221/956 [02:05<07:09,  1.71it/s]Deconvoluting Remaining Spots:  23%|██▎       | 222/956 [02:05<06:47,  1.80it/s]Deconvoluting Remaining Spots:  23%|██▎       | 223/956 [02:06<06:38,  1.84it/s]Deconvoluting Remaining Spots:  23%|██▎       | 224/956 [02:07<06:40,  1.83it/s]Deconvoluting Remaining Spots:  24%|██▎       | 225/956 [02:07<06:11,  1.97it/s]Deconvoluting Remaining Spots:  24%|██▎       | 226/956 [02:08<06:55,  1.76it/s]Deconvoluting Remaining Spots:  24%|██▎       | 227/956 [02:08<05:43,  2.12it/s]Deconvoluting Remaining Spots:  24%|██▍       | 228/956 [02:09<06:42,  1.81it/s]Deconvoluting Remaining Spots:  24%|██▍       | 229/956 [02:09<05:46,  2.10it/s]Deconvoluting Remaining Spots:  24%|██▍       | 230/956 [02:10<05:59,  2.02it/s]Deconvoluting Remaining Spots:  24%|██▍       | 231/956 [02:10<06:43,  1.80it/s]Deconvoluting Remaining Spots:  24%|██▍       | 232/956 [02:11<06:28,  1.86it/s]Deconvoluting Remaining Spots:  24%|██▍       | 233/956 [02:11<06:54,  1.74it/s]Deconvoluting Remaining Spots:  24%|██▍       | 234/956 [02:12<07:19,  1.64it/s]Deconvoluting Remaining Spots:  25%|██▍       | 235/956 [02:13<06:52,  1.75it/s]Deconvoluting Remaining Spots:  25%|██▍       | 236/956 [02:13<06:35,  1.82it/s]Deconvoluting Remaining Spots:  25%|██▍       | 237/956 [02:13<06:09,  1.95it/s]Deconvoluting Remaining Spots:  25%|██▍       | 238/956 [02:14<06:05,  1.96it/s]Deconvoluting Remaining Spots:  25%|██▌       | 239/956 [02:14<05:26,  2.20it/s]Deconvoluting Remaining Spots:  25%|██▌       | 240/956 [02:15<05:43,  2.09it/s]Deconvoluting Remaining Spots:  25%|██▌       | 241/956 [02:15<05:34,  2.14it/s]Deconvoluting Remaining Spots:  25%|██▌       | 242/956 [02:16<06:38,  1.79it/s]Deconvoluting Remaining Spots:  25%|██▌       | 243/956 [02:17<06:45,  1.76it/s]Deconvoluting Remaining Spots:  26%|██▌       | 244/956 [02:17<06:34,  1.81it/s]Deconvoluting Remaining Spots:  26%|██▌       | 245/956 [02:18<06:18,  1.88it/s]Deconvoluting Remaining Spots:  26%|██▌       | 246/956 [02:18<06:09,  1.92it/s]Deconvoluting Remaining Spots:  26%|██▌       | 247/956 [02:19<06:16,  1.88it/s]Deconvoluting Remaining Spots:  26%|██▌       | 248/956 [02:19<06:38,  1.78it/s]Deconvoluting Remaining Spots:  26%|██▌       | 249/956 [02:20<07:13,  1.63it/s]Deconvoluting Remaining Spots:  26%|██▌       | 250/956 [02:21<06:49,  1.73it/s]Deconvoluting Remaining Spots:  26%|██▋       | 251/956 [02:21<06:36,  1.78it/s]Deconvoluting Remaining Spots:  26%|██▋       | 252/956 [02:22<06:32,  1.79it/s]Deconvoluting Remaining Spots:  26%|██▋       | 253/956 [02:22<05:34,  2.10it/s]Deconvoluting Remaining Spots:  27%|██▋       | 254/956 [02:23<06:30,  1.80it/s]Deconvoluting Remaining Spots:  27%|██▋       | 255/956 [02:23<05:33,  2.10it/s]Deconvoluting Remaining Spots:  27%|██▋       | 256/956 [02:24<06:24,  1.82it/s]Deconvoluting Remaining Spots:  27%|██▋       | 257/956 [02:24<06:29,  1.80it/s]Deconvoluting Remaining Spots:  27%|██▋       | 258/956 [02:25<06:21,  1.83it/s]Deconvoluting Remaining Spots:  27%|██▋       | 259/956 [02:25<05:19,  2.18it/s]Deconvoluting Remaining Spots:  27%|██▋       | 260/956 [02:25<05:04,  2.29it/s]Deconvoluting Remaining Spots:  27%|██▋       | 261/956 [02:26<05:27,  2.12it/s]Deconvoluting Remaining Spots:  27%|██▋       | 262/956 [02:26<05:20,  2.16it/s]Deconvoluting Remaining Spots:  28%|██▊       | 263/956 [02:27<06:02,  1.91it/s]Deconvoluting Remaining Spots:  28%|██▊       | 264/956 [02:28<06:04,  1.90it/s]Deconvoluting Remaining Spots:  28%|██▊       | 265/956 [02:28<06:32,  1.76it/s]Deconvoluting Remaining Spots:  28%|██▊       | 266/956 [02:28<05:15,  2.19it/s]Deconvoluting Remaining Spots:  28%|██▊       | 267/956 [02:29<05:26,  2.11it/s]Deconvoluting Remaining Spots:  28%|██▊       | 268/956 [02:30<05:59,  1.91it/s]Deconvoluting Remaining Spots:  28%|██▊       | 269/956 [02:30<06:01,  1.90it/s]Deconvoluting Remaining Spots:  28%|██▊       | 270/956 [02:31<05:49,  1.96it/s]Deconvoluting Remaining Spots:  28%|██▊       | 271/956 [02:31<05:35,  2.04it/s]Deconvoluting Remaining Spots:  28%|██▊       | 272/956 [02:32<06:04,  1.88it/s]Deconvoluting Remaining Spots:  29%|██▊       | 273/956 [02:32<06:27,  1.76it/s]Deconvoluting Remaining Spots:  29%|██▊       | 274/956 [02:33<05:53,  1.93it/s]Deconvoluting Remaining Spots:  29%|██▉       | 275/956 [02:33<05:43,  1.98it/s]Deconvoluting Remaining Spots:  29%|██▉       | 276/956 [02:34<05:40,  2.00it/s]Deconvoluting Remaining Spots:  29%|██▉       | 277/956 [02:34<05:35,  2.03it/s]Deconvoluting Remaining Spots:  29%|██▉       | 278/956 [02:35<05:49,  1.94it/s]Deconvoluting Remaining Spots:  29%|██▉       | 279/956 [02:35<06:02,  1.87it/s]Deconvoluting Remaining Spots:  29%|██▉       | 280/956 [02:36<06:37,  1.70it/s]Deconvoluting Remaining Spots:  29%|██▉       | 281/956 [02:36<05:59,  1.88it/s]Deconvoluting Remaining Spots:  29%|██▉       | 282/956 [02:37<06:00,  1.87it/s]Deconvoluting Remaining Spots:  30%|██▉       | 283/956 [02:38<06:00,  1.87it/s]Deconvoluting Remaining Spots:  30%|██▉       | 284/956 [02:38<05:47,  1.94it/s]Deconvoluting Remaining Spots:  30%|██▉       | 285/956 [02:38<05:43,  1.95it/s]Deconvoluting Remaining Spots:  30%|██▉       | 286/956 [02:39<05:40,  1.97it/s]Deconvoluting Remaining Spots:  30%|███       | 287/956 [02:40<06:04,  1.84it/s]Deconvoluting Remaining Spots:  30%|███       | 288/956 [02:40<05:38,  1.97it/s]Deconvoluting Remaining Spots:  30%|███       | 289/956 [02:41<05:44,  1.93it/s]Deconvoluting Remaining Spots:  30%|███       | 290/956 [02:41<05:44,  1.94it/s]Deconvoluting Remaining Spots:  30%|███       | 291/956 [02:42<05:39,  1.96it/s]Deconvoluting Remaining Spots:  31%|███       | 292/956 [02:42<05:40,  1.95it/s]Deconvoluting Remaining Spots:  31%|███       | 293/956 [02:43<06:28,  1.71it/s]Deconvoluting Remaining Spots:  31%|███       | 294/956 [02:44<06:54,  1.60it/s]Deconvoluting Remaining Spots:  31%|███       | 295/956 [02:44<05:41,  1.94it/s]Deconvoluting Remaining Spots:  31%|███       | 296/956 [02:44<05:58,  1.84it/s]Deconvoluting Remaining Spots:  31%|███       | 297/956 [02:45<05:35,  1.96it/s]Deconvoluting Remaining Spots:  31%|███       | 298/956 [02:45<05:52,  1.87it/s]Deconvoluting Remaining Spots:  31%|███▏      | 299/956 [02:46<05:55,  1.85it/s]Deconvoluting Remaining Spots:  31%|███▏      | 300/956 [02:46<05:31,  1.98it/s]2026-02-17 22:22:10,538 - root - INFO - Saved checkpoint after 300 completed spots
+Deconvoluting Remaining Spots:  31%|███▏      | 301/956 [02:51<20:22,  1.87s/it]Deconvoluting Remaining Spots:  32%|███▏      | 310/956 [02:52<04:21,  2.47it/s]Deconvoluting Remaining Spots:  33%|███▎      | 312/956 [02:53<04:38,  2.31it/s]Deconvoluting Remaining Spots:  33%|███▎      | 313/956 [02:53<04:57,  2.16it/s]Deconvoluting Remaining Spots:  33%|███▎      | 314/956 [02:54<04:50,  2.21it/s]Deconvoluting Remaining Spots:  33%|███▎      | 315/956 [02:55<05:16,  2.03it/s]Deconvoluting Remaining Spots:  33%|███▎      | 316/956 [02:55<04:43,  2.26it/s]Deconvoluting Remaining Spots:  33%|███▎      | 317/956 [02:55<04:51,  2.19it/s]Deconvoluting Remaining Spots:  33%|███▎      | 318/956 [02:56<05:36,  1.90it/s]Deconvoluting Remaining Spots:  33%|███▎      | 319/956 [02:56<05:18,  2.00it/s]Deconvoluting Remaining Spots:  33%|███▎      | 320/956 [02:57<05:50,  1.81it/s]Deconvoluting Remaining Spots:  34%|███▎      | 321/956 [02:57<05:05,  2.08it/s]Deconvoluting Remaining Spots:  34%|███▎      | 322/956 [02:58<05:31,  1.91it/s]Deconvoluting Remaining Spots:  34%|███▍      | 323/956 [02:59<05:32,  1.90it/s]Deconvoluting Remaining Spots:  34%|███▍      | 324/956 [02:59<05:38,  1.86it/s]Deconvoluting Remaining Spots:  34%|███▍      | 325/956 [03:00<06:02,  1.74it/s]Deconvoluting Remaining Spots:  34%|███▍      | 326/956 [03:00<05:38,  1.86it/s]Deconvoluting Remaining Spots:  34%|███▍      | 327/956 [03:01<05:18,  1.98it/s]Deconvoluting Remaining Spots:  34%|███▍      | 328/956 [03:01<05:39,  1.85it/s]Deconvoluting Remaining Spots:  34%|███▍      | 329/956 [03:02<05:22,  1.94it/s]Deconvoluting Remaining Spots:  35%|███▍      | 330/956 [03:03<06:59,  1.49it/s]Deconvoluting Remaining Spots:  35%|███▍      | 332/956 [03:03<04:55,  2.11it/s]Deconvoluting Remaining Spots:  35%|███▍      | 333/956 [03:04<04:28,  2.32it/s]Deconvoluting Remaining Spots:  35%|███▍      | 334/956 [03:04<04:31,  2.29it/s]Deconvoluting Remaining Spots:  35%|███▌      | 335/956 [03:05<04:58,  2.08it/s]Deconvoluting Remaining Spots:  35%|███▌      | 336/956 [03:05<05:33,  1.86it/s]Deconvoluting Remaining Spots:  35%|███▌      | 337/956 [03:07<07:25,  1.39it/s]Deconvoluting Remaining Spots:  35%|███▌      | 338/956 [03:07<06:47,  1.52it/s]Deconvoluting Remaining Spots:  36%|███▌      | 340/956 [03:08<04:57,  2.07it/s]Deconvoluting Remaining Spots:  36%|███▌      | 341/956 [03:08<05:29,  1.86it/s]Deconvoluting Remaining Spots:  36%|███▌      | 342/956 [03:09<06:50,  1.50it/s]Deconvoluting Remaining Spots:  36%|███▌      | 343/956 [03:10<05:48,  1.76it/s]Deconvoluting Remaining Spots:  36%|███▌      | 344/956 [03:10<04:49,  2.12it/s]Deconvoluting Remaining Spots:  36%|███▌      | 345/956 [03:10<04:14,  2.40it/s]Deconvoluting Remaining Spots:  36%|███▌      | 346/956 [03:11<05:12,  1.95it/s]Deconvoluting Remaining Spots:  36%|███▋      | 347/956 [03:11<05:19,  1.91it/s]Deconvoluting Remaining Spots:  36%|███▋      | 348/956 [03:12<05:32,  1.83it/s]Deconvoluting Remaining Spots:  37%|███▋      | 349/956 [03:12<05:09,  1.96it/s]Deconvoluting Remaining Spots:  37%|███▋      | 350/956 [03:14<06:51,  1.47it/s]Deconvoluting Remaining Spots:  37%|███▋      | 351/956 [03:14<06:09,  1.64it/s]Deconvoluting Remaining Spots:  37%|███▋      | 352/956 [03:15<05:51,  1.72it/s]Deconvoluting Remaining Spots:  37%|███▋      | 353/956 [03:15<06:02,  1.66it/s]Deconvoluting Remaining Spots:  37%|███▋      | 354/956 [03:16<06:09,  1.63it/s]Deconvoluting Remaining Spots:  37%|███▋      | 355/956 [03:16<06:02,  1.66it/s]Deconvoluting Remaining Spots:  37%|███▋      | 356/956 [03:17<06:56,  1.44it/s]Deconvoluting Remaining Spots:  37%|███▋      | 357/956 [03:17<05:10,  1.93it/s]Deconvoluting Remaining Spots:  37%|███▋      | 358/956 [03:18<05:16,  1.89it/s]Deconvoluting Remaining Spots:  38%|███▊      | 359/956 [03:18<04:54,  2.03it/s]Deconvoluting Remaining Spots:  38%|███▊      | 360/956 [03:19<05:18,  1.87it/s]Deconvoluting Remaining Spots:  38%|███▊      | 361/956 [03:20<05:12,  1.90it/s]Deconvoluting Remaining Spots:  38%|███▊      | 362/956 [03:20<04:46,  2.08it/s]Deconvoluting Remaining Spots:  38%|███▊      | 363/956 [03:20<04:54,  2.02it/s]Deconvoluting Remaining Spots:  38%|███▊      | 364/956 [03:21<04:58,  1.98it/s]Deconvoluting Remaining Spots:  38%|███▊      | 365/956 [03:21<05:09,  1.91it/s]Deconvoluting Remaining Spots:  38%|███▊      | 366/956 [03:22<04:49,  2.04it/s]Deconvoluting Remaining Spots:  38%|███▊      | 367/956 [03:22<05:04,  1.93it/s]Deconvoluting Remaining Spots:  38%|███▊      | 368/956 [03:23<04:59,  1.96it/s]Deconvoluting Remaining Spots:  39%|███▊      | 369/956 [03:24<05:15,  1.86it/s]Deconvoluting Remaining Spots:  39%|███▊      | 370/956 [03:24<05:18,  1.84it/s]Deconvoluting Remaining Spots:  39%|███▉      | 371/956 [03:25<06:06,  1.60it/s]Deconvoluting Remaining Spots:  39%|███▉      | 372/956 [03:25<05:40,  1.72it/s]Deconvoluting Remaining Spots:  39%|███▉      | 373/956 [03:26<05:29,  1.77it/s]Deconvoluting Remaining Spots:  39%|███▉      | 374/956 [03:27<05:26,  1.78it/s]Deconvoluting Remaining Spots:  39%|███▉      | 375/956 [03:27<04:41,  2.06it/s]Deconvoluting Remaining Spots:  39%|███▉      | 376/956 [03:27<04:37,  2.09it/s]Deconvoluting Remaining Spots:  39%|███▉      | 377/956 [03:28<04:47,  2.02it/s]Deconvoluting Remaining Spots:  40%|███▉      | 378/956 [03:28<04:52,  1.98it/s]Deconvoluting Remaining Spots:  40%|███▉      | 379/956 [03:29<05:03,  1.90it/s]Deconvoluting Remaining Spots:  40%|███▉      | 380/956 [03:29<04:36,  2.09it/s]Deconvoluting Remaining Spots:  40%|███▉      | 381/956 [03:30<04:56,  1.94it/s]Deconvoluting Remaining Spots:  40%|███▉      | 382/956 [03:30<04:40,  2.04it/s]Deconvoluting Remaining Spots:  40%|████      | 383/956 [03:31<04:44,  2.01it/s]Deconvoluting Remaining Spots:  40%|████      | 384/956 [03:31<04:40,  2.04it/s]Deconvoluting Remaining Spots:  40%|████      | 385/956 [03:32<04:54,  1.94it/s]Deconvoluting Remaining Spots:  40%|████      | 386/956 [03:33<07:59,  1.19it/s]Deconvoluting Remaining Spots:  41%|████      | 389/956 [03:34<04:33,  2.07it/s]Deconvoluting Remaining Spots:  41%|████      | 390/956 [03:34<04:21,  2.17it/s]Deconvoluting Remaining Spots:  41%|████      | 391/956 [03:35<04:42,  2.00it/s]Deconvoluting Remaining Spots:  41%|████      | 392/956 [03:36<05:23,  1.74it/s]Deconvoluting Remaining Spots:  41%|████      | 393/956 [03:36<04:38,  2.02it/s]Deconvoluting Remaining Spots:  41%|████      | 394/956 [03:37<05:11,  1.80it/s]Deconvoluting Remaining Spots:  41%|████▏     | 395/956 [03:37<04:23,  2.13it/s]Deconvoluting Remaining Spots:  41%|████▏     | 396/956 [03:38<05:08,  1.81it/s]Deconvoluting Remaining Spots:  42%|████▏     | 397/956 [03:38<04:18,  2.17it/s]Deconvoluting Remaining Spots:  42%|████▏     | 398/956 [03:39<04:33,  2.04it/s]Deconvoluting Remaining Spots:  42%|████▏     | 399/956 [03:39<04:29,  2.07it/s]Deconvoluting Remaining Spots:  42%|████▏     | 400/956 [03:40<04:54,  1.89it/s]2026-02-17 22:23:05,666 - root - INFO - Saved checkpoint after 400 completed spots
+Deconvoluting Remaining Spots:  42%|████▏     | 401/956 [03:47<22:11,  2.40s/it]Deconvoluting Remaining Spots:  43%|████▎     | 414/956 [03:47<03:24,  2.65it/s]Deconvoluting Remaining Spots:  44%|████▎     | 417/956 [03:49<04:03,  2.21it/s]Deconvoluting Remaining Spots:  44%|████▍     | 419/956 [03:50<04:09,  2.15it/s]Deconvoluting Remaining Spots:  44%|████▍     | 421/956 [03:51<04:03,  2.19it/s]Deconvoluting Remaining Spots:  44%|████▍     | 423/956 [03:52<04:02,  2.20it/s]Deconvoluting Remaining Spots:  44%|████▍     | 424/956 [03:52<04:14,  2.09it/s]Deconvoluting Remaining Spots:  44%|████▍     | 425/956 [03:53<04:35,  1.93it/s]Deconvoluting Remaining Spots:  45%|████▍     | 426/956 [03:54<04:58,  1.77it/s]Deconvoluting Remaining Spots:  45%|████▍     | 427/956 [03:54<04:21,  2.02it/s]Deconvoluting Remaining Spots:  45%|████▍     | 428/956 [03:55<04:50,  1.82it/s]Deconvoluting Remaining Spots:  45%|████▍     | 429/956 [03:55<04:40,  1.88it/s]Deconvoluting Remaining Spots:  45%|████▍     | 430/956 [03:56<04:36,  1.90it/s]Deconvoluting Remaining Spots:  45%|████▌     | 431/956 [03:56<04:33,  1.92it/s]Deconvoluting Remaining Spots:  45%|████▌     | 432/956 [03:57<04:36,  1.90it/s]Deconvoluting Remaining Spots:  45%|████▌     | 433/956 [03:58<04:59,  1.75it/s]Deconvoluting Remaining Spots:  45%|████▌     | 434/956 [03:58<04:57,  1.75it/s]Deconvoluting Remaining Spots:  46%|████▌     | 435/956 [03:59<05:22,  1.61it/s]Deconvoluting Remaining Spots:  46%|████▌     | 436/956 [03:59<05:11,  1.67it/s]Deconvoluting Remaining Spots:  46%|████▌     | 437/956 [04:00<04:58,  1.74it/s]Deconvoluting Remaining Spots:  46%|████▌     | 438/956 [04:00<04:05,  2.11it/s]Deconvoluting Remaining Spots:  46%|████▌     | 439/956 [04:01<03:57,  2.18it/s]Deconvoluting Remaining Spots:  46%|████▌     | 440/956 [04:01<04:17,  2.01it/s]Deconvoluting Remaining Spots:  46%|████▌     | 441/956 [04:02<04:19,  1.98it/s]Deconvoluting Remaining Spots:  46%|████▌     | 442/956 [04:02<04:25,  1.94it/s]Deconvoluting Remaining Spots:  46%|████▋     | 443/956 [04:03<04:15,  2.01it/s]Deconvoluting Remaining Spots:  46%|████▋     | 444/956 [04:03<04:45,  1.79it/s]Deconvoluting Remaining Spots:  47%|████▋     | 445/956 [04:04<04:03,  2.09it/s]Deconvoluting Remaining Spots:  47%|████▋     | 446/956 [04:04<04:09,  2.05it/s]Deconvoluting Remaining Spots:  47%|████▋     | 447/956 [04:05<03:54,  2.17it/s]Deconvoluting Remaining Spots:  47%|████▋     | 448/956 [04:05<04:18,  1.96it/s]Deconvoluting Remaining Spots:  47%|████▋     | 449/956 [04:06<04:20,  1.95it/s]Deconvoluting Remaining Spots:  47%|████▋     | 450/956 [04:06<04:25,  1.90it/s]Deconvoluting Remaining Spots:  47%|████▋     | 451/956 [04:07<04:18,  1.96it/s]Deconvoluting Remaining Spots:  47%|████▋     | 452/956 [04:07<04:14,  1.98it/s]Deconvoluting Remaining Spots:  47%|████▋     | 453/956 [04:08<04:13,  1.98it/s]Deconvoluting Remaining Spots:  47%|████▋     | 454/956 [04:08<04:32,  1.84it/s]Deconvoluting Remaining Spots:  48%|████▊     | 455/956 [04:09<05:11,  1.61it/s]Deconvoluting Remaining Spots:  48%|████▊     | 456/956 [04:09<04:12,  1.98it/s]Deconvoluting Remaining Spots:  48%|████▊     | 457/956 [04:10<04:03,  2.05it/s]Deconvoluting Remaining Spots:  48%|████▊     | 458/956 [04:10<04:11,  1.98it/s]Deconvoluting Remaining Spots:  48%|████▊     | 459/956 [04:11<03:43,  2.23it/s]Deconvoluting Remaining Spots:  48%|████▊     | 460/956 [04:11<04:27,  1.86it/s]Deconvoluting Remaining Spots:  48%|████▊     | 461/956 [04:12<03:40,  2.24it/s]Deconvoluting Remaining Spots:  48%|████▊     | 462/956 [04:12<03:54,  2.10it/s]Deconvoluting Remaining Spots:  48%|████▊     | 463/956 [04:13<03:56,  2.08it/s]Deconvoluting Remaining Spots:  49%|████▊     | 464/956 [04:13<04:12,  1.94it/s]Deconvoluting Remaining Spots:  49%|████▊     | 465/956 [04:14<04:22,  1.87it/s]Deconvoluting Remaining Spots:  49%|████▊     | 466/956 [04:14<04:09,  1.96it/s]Deconvoluting Remaining Spots:  49%|████▉     | 467/956 [04:15<03:57,  2.06it/s]Deconvoluting Remaining Spots:  49%|████▉     | 468/956 [04:15<04:10,  1.95it/s]Deconvoluting Remaining Spots:  49%|████▉     | 469/956 [04:16<03:53,  2.09it/s]Deconvoluting Remaining Spots:  49%|████▉     | 470/956 [04:16<03:55,  2.07it/s]Deconvoluting Remaining Spots:  49%|████▉     | 471/956 [04:17<03:46,  2.14it/s]Deconvoluting Remaining Spots:  49%|████▉     | 472/956 [04:17<03:50,  2.10it/s]Deconvoluting Remaining Spots:  49%|████▉     | 473/956 [04:18<04:02,  1.99it/s]Deconvoluting Remaining Spots:  50%|████▉     | 474/956 [04:18<04:06,  1.96it/s]Deconvoluting Remaining Spots:  50%|████▉     | 475/956 [04:19<04:17,  1.86it/s]Deconvoluting Remaining Spots:  50%|████▉     | 476/956 [04:20<04:37,  1.73it/s]Deconvoluting Remaining Spots:  50%|████▉     | 477/956 [04:20<04:53,  1.63it/s]Deconvoluting Remaining Spots:  50%|█████     | 478/956 [04:21<04:02,  1.97it/s]Deconvoluting Remaining Spots:  50%|█████     | 479/956 [04:21<04:07,  1.93it/s]Deconvoluting Remaining Spots:  50%|█████     | 480/956 [04:22<04:03,  1.95it/s]Deconvoluting Remaining Spots:  50%|█████     | 481/956 [04:22<03:52,  2.05it/s]Deconvoluting Remaining Spots:  50%|█████     | 482/956 [04:23<04:08,  1.91it/s]Deconvoluting Remaining Spots:  51%|█████     | 483/956 [04:23<03:44,  2.11it/s]Deconvoluting Remaining Spots:  51%|█████     | 484/956 [04:24<04:04,  1.93it/s]Deconvoluting Remaining Spots:  51%|█████     | 485/956 [04:24<03:52,  2.03it/s]Deconvoluting Remaining Spots:  51%|█████     | 486/956 [04:24<03:36,  2.17it/s]Deconvoluting Remaining Spots:  51%|█████     | 487/956 [04:25<03:58,  1.97it/s]Deconvoluting Remaining Spots:  51%|█████     | 488/956 [04:26<04:03,  1.92it/s]Deconvoluting Remaining Spots:  51%|█████     | 489/956 [04:26<04:30,  1.73it/s]Deconvoluting Remaining Spots:  51%|█████▏    | 490/956 [04:27<04:27,  1.74it/s]Deconvoluting Remaining Spots:  51%|█████▏    | 491/956 [04:27<04:07,  1.88it/s]Deconvoluting Remaining Spots:  51%|█████▏    | 492/956 [04:28<04:03,  1.91it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 493/956 [04:28<03:26,  2.24it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 494/956 [04:29<03:37,  2.12it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 495/956 [04:29<04:17,  1.79it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 496/956 [04:30<04:16,  1.80it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 497/956 [04:30<04:12,  1.82it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 498/956 [04:31<04:12,  1.82it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 499/956 [04:31<03:41,  2.07it/s]Deconvoluting Remaining Spots:  52%|█████▏    | 500/956 [04:32<03:13,  2.36it/s]2026-02-17 22:23:58,612 - root - INFO - Saved checkpoint after 500 completed spots
+Deconvoluting Remaining Spots:  52%|█████▏    | 501/956 [04:40<20:24,  2.69s/it]Deconvoluting Remaining Spots:  54%|█████▍    | 516/956 [04:40<02:51,  2.56it/s]Deconvoluting Remaining Spots:  54%|█████▍    | 518/956 [04:41<03:00,  2.42it/s]Deconvoluting Remaining Spots:  54%|█████▍    | 519/956 [04:42<03:03,  2.38it/s]Deconvoluting Remaining Spots:  54%|█████▍    | 520/956 [04:42<03:16,  2.22it/s]Deconvoluting Remaining Spots:  54%|█████▍    | 521/956 [04:43<03:40,  1.97it/s]Deconvoluting Remaining Spots:  55%|█████▍    | 522/956 [04:44<03:41,  1.96it/s]Deconvoluting Remaining Spots:  55%|█████▍    | 523/956 [04:44<03:20,  2.16it/s]Deconvoluting Remaining Spots:  55%|█████▍    | 524/956 [04:44<03:04,  2.35it/s]Deconvoluting Remaining Spots:  55%|█████▍    | 525/956 [04:45<03:19,  2.17it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 526/956 [04:45<03:38,  1.97it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 527/956 [04:46<03:48,  1.88it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 528/956 [04:47<03:44,  1.91it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 529/956 [04:47<03:30,  2.03it/s]Deconvoluting Remaining Spots:  55%|█████▌    | 530/956 [04:47<03:21,  2.11it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 531/956 [04:48<03:15,  2.17it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 532/956 [04:48<03:26,  2.05it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 533/956 [04:49<03:38,  1.94it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 534/956 [04:49<03:24,  2.07it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 535/956 [04:50<03:32,  1.98it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 536/956 [04:51<03:45,  1.86it/s]Deconvoluting Remaining Spots:  56%|█████▌    | 537/956 [04:51<03:34,  1.96it/s]Deconvoluting Remaining Spots:  56%|█████▋    | 538/956 [04:52<04:07,  1.69it/s]Deconvoluting Remaining Spots:  56%|█████▋    | 539/956 [04:52<03:52,  1.79it/s]Deconvoluting Remaining Spots:  56%|█████▋    | 540/956 [04:53<03:42,  1.87it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 541/956 [04:53<03:38,  1.90it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 542/956 [04:54<03:42,  1.86it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 543/956 [04:54<03:25,  2.01it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 544/956 [04:55<03:40,  1.87it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 545/956 [04:56<04:09,  1.65it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 547/956 [04:56<03:25,  1.99it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 548/956 [04:57<02:58,  2.29it/s]Deconvoluting Remaining Spots:  57%|█████▋    | 549/956 [04:57<03:08,  2.16it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 550/956 [04:58<03:40,  1.84it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 551/956 [04:58<03:32,  1.91it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 552/956 [04:59<04:26,  1.52it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 553/956 [05:00<04:06,  1.63it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 555/956 [05:00<02:27,  2.72it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 556/956 [05:01<02:41,  2.47it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 557/956 [05:01<03:00,  2.21it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 558/956 [05:02<03:12,  2.06it/s]Deconvoluting Remaining Spots:  58%|█████▊    | 559/956 [05:03<04:06,  1.61it/s]Deconvoluting Remaining Spots:  59%|█████▊    | 560/956 [05:03<04:00,  1.65it/s]Deconvoluting Remaining Spots:  59%|█████▊    | 561/956 [05:04<03:46,  1.74it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 563/956 [05:04<02:35,  2.52it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 564/956 [05:05<03:09,  2.07it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 565/956 [05:05<02:59,  2.17it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 566/956 [05:06<03:13,  2.02it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 567/956 [05:06<03:13,  2.01it/s]Deconvoluting Remaining Spots:  59%|█████▉    | 568/956 [05:07<03:16,  1.98it/s]Deconvoluting Remaining Spots:  60%|█████▉    | 569/956 [05:07<03:16,  1.97it/s]Deconvoluting Remaining Spots:  60%|█████▉    | 570/956 [05:08<03:22,  1.90it/s]Deconvoluting Remaining Spots:  60%|█████▉    | 571/956 [05:08<03:02,  2.11it/s]Deconvoluting Remaining Spots:  60%|█████▉    | 572/956 [05:09<03:27,  1.85it/s]Deconvoluting Remaining Spots:  60%|█████▉    | 573/956 [05:09<03:20,  1.91it/s]Deconvoluting Remaining Spots:  60%|██████    | 574/956 [05:10<03:20,  1.90it/s]Deconvoluting Remaining Spots:  60%|██████    | 575/956 [05:11<03:29,  1.82it/s]Deconvoluting Remaining Spots:  60%|██████    | 576/956 [05:11<03:26,  1.84it/s]Deconvoluting Remaining Spots:  60%|██████    | 577/956 [05:12<03:15,  1.94it/s]Deconvoluting Remaining Spots:  60%|██████    | 578/956 [05:12<03:28,  1.82it/s]Deconvoluting Remaining Spots:  61%|██████    | 579/956 [05:13<03:00,  2.09it/s]Deconvoluting Remaining Spots:  61%|██████    | 580/956 [05:13<03:30,  1.78it/s]Deconvoluting Remaining Spots:  61%|██████    | 581/956 [05:14<03:23,  1.85it/s]Deconvoluting Remaining Spots:  61%|██████    | 582/956 [05:14<03:33,  1.75it/s]Deconvoluting Remaining Spots:  61%|██████    | 583/956 [05:15<03:24,  1.82it/s]Deconvoluting Remaining Spots:  61%|██████    | 584/956 [05:15<03:24,  1.82it/s]Deconvoluting Remaining Spots:  61%|██████    | 585/956 [05:16<03:14,  1.90it/s]Deconvoluting Remaining Spots:  61%|██████▏   | 586/956 [05:16<02:48,  2.19it/s]Deconvoluting Remaining Spots:  61%|██████▏   | 587/956 [05:17<03:10,  1.94it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 588/956 [05:17<03:04,  1.99it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 589/956 [05:18<03:22,  1.82it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 590/956 [05:19<03:24,  1.79it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 591/956 [05:19<03:37,  1.68it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 592/956 [05:20<03:18,  1.84it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 593/956 [05:20<03:37,  1.67it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 594/956 [05:21<02:52,  2.09it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 595/956 [05:21<03:14,  1.86it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 596/956 [05:22<03:07,  1.92it/s]Deconvoluting Remaining Spots:  62%|██████▏   | 597/956 [05:22<03:13,  1.86it/s]Deconvoluting Remaining Spots:  63%|██████▎   | 598/956 [05:23<03:04,  1.94it/s]Deconvoluting Remaining Spots:  63%|██████▎   | 599/956 [05:23<03:00,  1.97it/s]Deconvoluting Remaining Spots:  63%|██████▎   | 600/956 [05:24<03:03,  1.94it/s]2026-02-17 22:24:53,642 - root - INFO - Saved checkpoint after 600 completed spots
+Deconvoluting Remaining Spots:  63%|██████▎   | 601/956 [05:35<21:11,  3.58s/it]Deconvoluting Remaining Spots:  65%|██████▍   | 620/956 [05:35<02:14,  2.50it/s]Deconvoluting Remaining Spots:  65%|██████▌   | 624/956 [05:37<02:24,  2.29it/s]Deconvoluting Remaining Spots:  66%|██████▌   | 627/956 [05:39<02:43,  2.02it/s]Deconvoluting Remaining Spots:  66%|██████▌   | 629/956 [05:40<02:43,  2.00it/s]Deconvoluting Remaining Spots:  66%|██████▌   | 631/956 [05:41<02:37,  2.06it/s]Deconvoluting Remaining Spots:  66%|██████▌   | 632/956 [05:42<02:41,  2.00it/s]Deconvoluting Remaining Spots:  66%|██████▌   | 633/956 [05:43<02:49,  1.90it/s]Deconvoluting Remaining Spots:  66%|██████▋   | 634/956 [05:43<02:41,  1.99it/s]Deconvoluting Remaining Spots:  66%|██████▋   | 635/956 [05:44<03:00,  1.78it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 636/956 [05:44<02:49,  1.89it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 637/956 [05:45<02:45,  1.92it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 638/956 [05:45<02:25,  2.19it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 639/956 [05:45<02:21,  2.23it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 640/956 [05:46<02:35,  2.03it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 641/956 [05:46<02:26,  2.15it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 642/956 [05:47<02:36,  2.01it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 643/956 [05:48<02:56,  1.78it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 644/956 [05:48<02:51,  1.82it/s]Deconvoluting Remaining Spots:  67%|██████▋   | 645/956 [05:49<02:48,  1.84it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 646/956 [05:49<02:35,  1.99it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 647/956 [05:50<02:33,  2.02it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 648/956 [05:51<03:22,  1.52it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 649/956 [05:51<02:44,  1.87it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 650/956 [05:52<03:10,  1.61it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 651/956 [05:52<03:03,  1.66it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 652/956 [05:53<02:39,  1.91it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 653/956 [05:53<02:53,  1.75it/s]Deconvoluting Remaining Spots:  68%|██████▊   | 654/956 [05:53<02:21,  2.13it/s]Deconvoluting Remaining Spots:  69%|██████▊   | 655/956 [05:54<02:27,  2.05it/s]Deconvoluting Remaining Spots:  69%|██████▊   | 656/956 [05:55<02:46,  1.81it/s]Deconvoluting Remaining Spots:  69%|██████▊   | 657/956 [05:55<02:25,  2.05it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 658/956 [05:56<02:38,  1.88it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 659/956 [05:56<02:18,  2.14it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 660/956 [05:57<02:21,  2.09it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 661/956 [05:57<02:34,  1.90it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 662/956 [05:58<02:20,  2.09it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 663/956 [05:58<02:16,  2.15it/s]Deconvoluting Remaining Spots:  69%|██████▉   | 664/956 [05:59<02:37,  1.85it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 665/956 [05:59<02:35,  1.88it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 666/956 [06:00<02:27,  1.97it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 667/956 [06:00<02:29,  1.93it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 668/956 [06:01<02:28,  1.94it/s]Deconvoluting Remaining Spots:  70%|██████▉   | 669/956 [06:01<02:31,  1.90it/s]Deconvoluting Remaining Spots:  70%|███████   | 670/956 [06:02<02:14,  2.13it/s]Deconvoluting Remaining Spots:  70%|███████   | 671/956 [06:02<02:31,  1.89it/s]Deconvoluting Remaining Spots:  70%|███████   | 672/956 [06:03<02:30,  1.89it/s]Deconvoluting Remaining Spots:  70%|███████   | 673/956 [06:03<02:25,  1.95it/s]Deconvoluting Remaining Spots:  71%|███████   | 674/956 [06:04<02:25,  1.94it/s]Deconvoluting Remaining Spots:  71%|███████   | 675/956 [06:04<02:35,  1.80it/s]Deconvoluting Remaining Spots:  71%|███████   | 676/956 [06:05<02:17,  2.03it/s]Deconvoluting Remaining Spots:  71%|███████   | 677/956 [06:05<02:24,  1.93it/s]Deconvoluting Remaining Spots:  71%|███████   | 678/956 [06:06<02:14,  2.06it/s]Deconvoluting Remaining Spots:  71%|███████   | 679/956 [06:06<02:22,  1.94it/s]Deconvoluting Remaining Spots:  71%|███████   | 680/956 [06:07<02:44,  1.68it/s]Deconvoluting Remaining Spots:  71%|███████   | 681/956 [06:07<02:23,  1.92it/s]Deconvoluting Remaining Spots:  71%|███████▏  | 682/956 [06:08<02:40,  1.71it/s]Deconvoluting Remaining Spots:  71%|███████▏  | 683/956 [06:09<02:35,  1.75it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 684/956 [06:09<02:26,  1.85it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 685/956 [06:10<02:29,  1.81it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 686/956 [06:10<02:31,  1.79it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 687/956 [06:11<02:27,  1.82it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 688/956 [06:11<02:07,  2.09it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 689/956 [06:12<02:00,  2.22it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 690/956 [06:12<02:10,  2.04it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 691/956 [06:13<02:27,  1.80it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 692/956 [06:13<02:06,  2.09it/s]Deconvoluting Remaining Spots:  72%|███████▏  | 693/956 [06:14<02:34,  1.71it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 694/956 [06:14<02:09,  2.03it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 695/956 [06:15<02:06,  2.06it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 696/956 [06:16<02:30,  1.73it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 697/956 [06:16<02:23,  1.81it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 698/956 [06:17<02:29,  1.73it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 699/956 [06:17<02:28,  1.73it/s]Deconvoluting Remaining Spots:  73%|███████▎  | 700/956 [06:18<02:17,  1.86it/s]2026-02-17 22:25:48,487 - root - INFO - Saved checkpoint after 700 completed spots
+Deconvoluting Remaining Spots:  73%|███████▎  | 701/956 [06:29<16:35,  3.91s/it]Deconvoluting Remaining Spots:  76%|███████▌  | 722/956 [06:30<01:36,  2.44it/s]Deconvoluting Remaining Spots:  76%|███████▌  | 724/956 [06:31<01:39,  2.33it/s]Deconvoluting Remaining Spots:  76%|███████▌  | 726/956 [06:32<01:36,  2.38it/s]Deconvoluting Remaining Spots:  76%|███████▌  | 727/956 [06:32<01:36,  2.38it/s]Deconvoluting Remaining Spots:  76%|███████▌  | 728/956 [06:33<01:41,  2.25it/s]Deconvoluting Remaining Spots:  76%|███████▋  | 729/956 [06:33<01:41,  2.23it/s]Deconvoluting Remaining Spots:  76%|███████▋  | 730/956 [06:34<01:46,  2.13it/s]Deconvoluting Remaining Spots:  76%|███████▋  | 731/956 [06:35<01:50,  2.04it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 732/956 [06:35<01:49,  2.05it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 733/956 [06:36<02:10,  1.70it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 734/956 [06:36<02:08,  1.72it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 735/956 [06:37<02:08,  1.72it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 736/956 [06:38<02:06,  1.75it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 737/956 [06:38<02:01,  1.81it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 738/956 [06:39<02:11,  1.66it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 739/956 [06:39<02:00,  1.80it/s]Deconvoluting Remaining Spots:  77%|███████▋  | 740/956 [06:39<01:37,  2.20it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 741/956 [06:40<01:47,  2.00it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 742/956 [06:41<01:50,  1.93it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 743/956 [06:41<01:47,  1.99it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 744/956 [06:42<02:07,  1.67it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 745/956 [06:42<01:59,  1.76it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 746/956 [06:43<02:12,  1.58it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 747/956 [06:43<01:50,  1.89it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 748/956 [06:44<01:59,  1.74it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 749/956 [06:45<01:45,  1.96it/s]Deconvoluting Remaining Spots:  78%|███████▊  | 750/956 [06:45<01:51,  1.84it/s]Deconvoluting Remaining Spots:  79%|███████▊  | 751/956 [06:46<01:50,  1.86it/s]Deconvoluting Remaining Spots:  79%|███████▊  | 752/956 [06:46<02:04,  1.64it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 753/956 [06:47<01:46,  1.91it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 754/956 [06:48<02:02,  1.65it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 755/956 [06:48<01:33,  2.15it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 756/956 [06:48<01:50,  1.81it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 757/956 [06:49<02:08,  1.54it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 758/956 [06:50<01:42,  1.92it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 759/956 [06:50<01:25,  2.31it/s]Deconvoluting Remaining Spots:  79%|███████▉  | 760/956 [06:50<01:26,  2.26it/s]Deconvoluting Remaining Spots:  80%|███████▉  | 761/956 [06:51<01:28,  2.20it/s]Deconvoluting Remaining Spots:  80%|███████▉  | 762/956 [06:51<01:38,  1.96it/s]Deconvoluting Remaining Spots:  80%|███████▉  | 763/956 [06:52<01:31,  2.12it/s]Deconvoluting Remaining Spots:  80%|███████▉  | 764/956 [06:52<01:43,  1.86it/s]Deconvoluting Remaining Spots:  80%|████████  | 765/956 [06:53<01:57,  1.62it/s]Deconvoluting Remaining Spots:  80%|████████  | 766/956 [06:54<02:06,  1.50it/s]Deconvoluting Remaining Spots:  80%|████████  | 767/956 [06:54<01:48,  1.75it/s]Deconvoluting Remaining Spots:  80%|████████  | 768/956 [06:55<02:06,  1.49it/s]Deconvoluting Remaining Spots:  80%|████████  | 769/956 [06:55<01:35,  1.96it/s]Deconvoluting Remaining Spots:  81%|████████  | 770/956 [06:56<01:33,  1.98it/s]Deconvoluting Remaining Spots:  81%|████████  | 771/956 [06:56<01:32,  1.99it/s]Deconvoluting Remaining Spots:  81%|████████  | 772/956 [06:57<01:35,  1.93it/s]Deconvoluting Remaining Spots:  81%|████████  | 773/956 [06:58<01:38,  1.85it/s]Deconvoluting Remaining Spots:  81%|████████  | 774/956 [06:58<01:37,  1.86it/s]Deconvoluting Remaining Spots:  81%|████████  | 775/956 [06:59<01:36,  1.88it/s]Deconvoluting Remaining Spots:  81%|████████  | 776/956 [06:59<01:36,  1.87it/s]Deconvoluting Remaining Spots:  81%|████████▏ | 777/956 [07:00<01:38,  1.82it/s]Deconvoluting Remaining Spots:  81%|████████▏ | 778/956 [07:00<01:32,  1.92it/s]Deconvoluting Remaining Spots:  81%|████████▏ | 779/956 [07:01<01:34,  1.87it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 780/956 [07:01<01:34,  1.87it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 781/956 [07:02<01:31,  1.92it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 782/956 [07:03<01:43,  1.68it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 783/956 [07:03<01:19,  2.19it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 784/956 [07:03<01:29,  1.92it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 785/956 [07:04<01:31,  1.86it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 786/956 [07:04<01:32,  1.83it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 787/956 [07:05<01:42,  1.66it/s]Deconvoluting Remaining Spots:  82%|████████▏ | 788/956 [07:06<01:27,  1.93it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 789/956 [07:06<01:37,  1.71it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 790/956 [07:07<01:29,  1.86it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 791/956 [07:07<01:18,  2.10it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 792/956 [07:08<01:39,  1.64it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 794/956 [07:09<01:18,  2.06it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 795/956 [07:09<01:24,  1.91it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 796/956 [07:10<01:22,  1.93it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 797/956 [07:10<01:27,  1.82it/s]Deconvoluting Remaining Spots:  83%|████████▎ | 798/956 [07:11<01:22,  1.91it/s]Deconvoluting Remaining Spots:  84%|████████▎ | 799/956 [07:11<01:23,  1.87it/s]Deconvoluting Remaining Spots:  84%|████████▎ | 800/956 [07:12<01:26,  1.81it/s]2026-02-17 22:26:47,260 - root - INFO - Saved checkpoint after 800 completed spots
+Deconvoluting Remaining Spots:  84%|████████▍ | 801/956 [07:28<13:14,  5.13s/it]Deconvoluting Remaining Spots:  87%|████████▋ | 827/956 [07:29<00:58,  2.22it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 829/956 [07:30<00:58,  2.17it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 831/956 [07:31<00:59,  2.10it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 832/956 [07:32<01:06,  1.88it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 833/956 [07:32<01:00,  2.04it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 834/956 [07:34<01:14,  1.64it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 835/956 [07:35<01:14,  1.63it/s]Deconvoluting Remaining Spots:  87%|████████▋ | 836/956 [07:35<01:14,  1.62it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 837/956 [07:36<01:08,  1.73it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 838/956 [07:36<01:16,  1.55it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 839/956 [07:37<01:03,  1.85it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 840/956 [07:37<01:03,  1.83it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 841/956 [07:38<01:01,  1.87it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 842/956 [07:38<01:01,  1.84it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 843/956 [07:39<00:58,  1.92it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 844/956 [07:39<00:57,  1.93it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 845/956 [07:40<00:54,  2.03it/s]Deconvoluting Remaining Spots:  88%|████████▊ | 846/956 [07:41<01:14,  1.47it/s]Deconvoluting Remaining Spots:  89%|████████▊ | 847/956 [07:41<00:59,  1.84it/s]Deconvoluting Remaining Spots:  89%|████████▊ | 848/956 [07:41<00:50,  2.12it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 849/956 [07:42<00:51,  2.09it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 850/956 [07:44<01:34,  1.12it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 851/956 [07:44<01:13,  1.43it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 853/956 [07:45<00:53,  1.93it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 854/956 [07:45<01:02,  1.64it/s]Deconvoluting Remaining Spots:  89%|████████▉ | 855/956 [07:46<00:50,  2.00it/s]Deconvoluting Remaining Spots:  90%|████████▉ | 856/956 [07:46<00:51,  1.95it/s]Deconvoluting Remaining Spots:  90%|████████▉ | 857/956 [07:47<01:06,  1.49it/s]Deconvoluting Remaining Spots:  90%|████████▉ | 858/956 [07:48<00:59,  1.65it/s]Deconvoluting Remaining Spots:  90%|████████▉ | 859/956 [07:48<00:54,  1.79it/s]Deconvoluting Remaining Spots:  90%|████████▉ | 860/956 [07:49<00:52,  1.82it/s]Deconvoluting Remaining Spots:  90%|█████████ | 861/956 [07:49<00:57,  1.65it/s]Deconvoluting Remaining Spots:  90%|█████████ | 862/956 [07:50<00:47,  1.97it/s]Deconvoluting Remaining Spots:  90%|█████████ | 863/956 [07:50<00:47,  1.95it/s]Deconvoluting Remaining Spots:  90%|█████████ | 864/956 [07:51<00:47,  1.95it/s]Deconvoluting Remaining Spots:  90%|█████████ | 865/956 [07:51<00:48,  1.88it/s]Deconvoluting Remaining Spots:  91%|█████████ | 866/956 [07:52<00:50,  1.78it/s]Deconvoluting Remaining Spots:  91%|█████████ | 867/956 [07:52<00:47,  1.86it/s]Deconvoluting Remaining Spots:  91%|█████████ | 868/956 [07:53<00:44,  1.98it/s]Deconvoluting Remaining Spots:  91%|█████████ | 869/956 [07:53<00:44,  1.96it/s]Deconvoluting Remaining Spots:  91%|█████████ | 870/956 [07:54<00:44,  1.93it/s]Deconvoluting Remaining Spots:  91%|█████████ | 871/956 [07:55<00:49,  1.72it/s]Deconvoluting Remaining Spots:  91%|█████████ | 872/956 [07:55<00:44,  1.90it/s]Deconvoluting Remaining Spots:  91%|█████████▏| 873/956 [07:56<00:43,  1.90it/s]Deconvoluting Remaining Spots:  91%|█████████▏| 874/956 [07:56<00:42,  1.91it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 875/956 [07:57<00:44,  1.80it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 876/956 [07:57<00:43,  1.82it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 877/956 [07:58<00:42,  1.86it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 878/956 [07:58<00:43,  1.80it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 879/956 [07:59<00:36,  2.09it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 880/956 [07:59<00:36,  2.07it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 881/956 [08:00<00:44,  1.70it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 882/956 [08:00<00:34,  2.14it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 883/956 [08:01<00:37,  1.92it/s]Deconvoluting Remaining Spots:  92%|█████████▏| 884/956 [08:01<00:36,  1.97it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 885/956 [08:02<00:36,  1.93it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 886/956 [08:02<00:37,  1.87it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 887/956 [08:03<00:42,  1.64it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 888/956 [08:04<00:38,  1.77it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 889/956 [08:04<00:36,  1.83it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 890/956 [08:05<00:35,  1.84it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 891/956 [08:05<00:33,  1.94it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 892/956 [08:06<00:33,  1.91it/s]Deconvoluting Remaining Spots:  93%|█████████▎| 893/956 [08:06<00:32,  1.92it/s]Deconvoluting Remaining Spots:  94%|█████████▎| 894/956 [08:07<00:32,  1.92it/s]Deconvoluting Remaining Spots:  94%|█████████▎| 895/956 [08:07<00:33,  1.84it/s]Deconvoluting Remaining Spots:  94%|█████████▎| 896/956 [08:08<00:34,  1.76it/s]Deconvoluting Remaining Spots:  94%|█████████▍| 897/956 [08:08<00:32,  1.82it/s]Deconvoluting Remaining Spots:  94%|█████████▍| 898/956 [08:09<00:31,  1.82it/s]Deconvoluting Remaining Spots:  94%|█████████▍| 899/956 [08:10<00:30,  1.84it/s]Deconvoluting Remaining Spots:  94%|█████████▍| 900/956 [08:10<00:29,  1.90it/s]2026-02-17 22:27:44,149 - root - INFO - Saved checkpoint after 900 completed spots
+Deconvoluting Remaining Spots:  94%|█████████▍| 901/956 [08:25<04:29,  4.90s/it]Deconvoluting Remaining Spots:  97%|█████████▋| 929/956 [08:26<00:10,  2.50it/s]Deconvoluting Remaining Spots:  97%|█████████▋| 931/956 [08:27<00:10,  2.41it/s]Deconvoluting Remaining Spots:  97%|█████████▋| 932/956 [08:27<00:10,  2.39it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 933/956 [08:28<00:09,  2.40it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 934/956 [08:28<00:09,  2.35it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 935/956 [08:29<00:09,  2.31it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 936/956 [08:29<00:09,  2.17it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 937/956 [08:30<00:08,  2.11it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 938/956 [08:31<00:09,  1.97it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 939/956 [08:31<00:08,  1.91it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 940/956 [08:32<00:07,  2.03it/s]Deconvoluting Remaining Spots:  98%|█████████▊| 941/956 [08:32<00:07,  1.94it/s]Deconvoluting Remaining Spots:  99%|█████████▊| 942/956 [08:33<00:06,  2.09it/s]Deconvoluting Remaining Spots:  99%|█████████▊| 943/956 [08:33<00:06,  2.08it/s]Deconvoluting Remaining Spots:  99%|█████████▊| 944/956 [08:34<00:06,  1.97it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 945/956 [08:34<00:05,  1.96it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 946/956 [08:35<00:05,  1.87it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 947/956 [08:35<00:04,  2.04it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 948/956 [08:36<00:04,  1.95it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 949/956 [08:36<00:03,  1.94it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 950/956 [08:37<00:03,  1.88it/s]Deconvoluting Remaining Spots:  99%|█████████▉| 951/956 [08:37<00:02,  1.80it/s]Deconvoluting Remaining Spots: 100%|█████████▉| 952/956 [08:38<00:02,  1.96it/s]Deconvoluting Remaining Spots: 100%|█████████▉| 953/956 [08:38<00:01,  2.03it/s]Deconvoluting Remaining Spots: 100%|█████████▉| 954/956 [08:39<00:00,  2.01it/s]Deconvoluting Remaining Spots: 100%|█████████▉| 955/956 [08:39<00:00,  1.99it/s]Deconvoluting Remaining Spots: 100%|██████████| 956/956 [08:40<00:00,  2.01it/s]Deconvoluting Remaining Spots: 100%|██████████| 956/956 [08:40<00:00,  1.84it/s]
+2026-02-17 22:28:10,496 - root - INFO - Saved final results with 956 completed spots
+2026-02-17 22:28:21,469 - root - INFO - Saved profiles to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_gene_expression_pass1.parquet with cell types: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells']
+2026-02-17 22:28:25,727 - root - INFO - Successfully added layer: Normal_Epithelial_genes_pass1
+2026-02-17 22:28:26,321 - root - INFO - Successfully added layer: B-cells_genes_pass1
+2026-02-17 22:28:26,918 - root - INFO - Successfully added layer: Plasmablasts_genes_pass1
+2026-02-17 22:28:27,513 - root - INFO - Successfully added layer: PVL_genes_pass1
+2026-02-17 22:28:28,110 - root - INFO - Successfully added layer: T-cells_genes_pass1
+2026-02-17 22:28:28,707 - root - INFO - Successfully added layer: Endothelial_genes_pass1
+2026-02-17 22:28:29,302 - root - INFO - Successfully added layer: CAFs_genes_pass1
+2026-02-17 22:28:29,899 - root - INFO - Successfully added layer: Myeloid_genes_pass1
+2026-02-17 22:28:30,495 - root - INFO - Successfully added layer: Cancer_Epithelial_genes_pass1
+2026-02-17 22:28:52,751 - root - INFO - Exported layer 'Normal_Epithelial_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/Normal_Epithelial_layer_pass1.csv'
+2026-02-17 22:29:14,907 - root - INFO - Exported layer 'B-cells_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/B-cells_layer_pass1.csv'
+2026-02-17 22:29:37,063 - root - INFO - Exported layer 'Plasmablasts_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/Plasmablasts_layer_pass1.csv'
+2026-02-17 22:29:59,234 - root - INFO - Exported layer 'PVL_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/PVL_layer_pass1.csv'
+2026-02-17 22:30:21,355 - root - INFO - Exported layer 'T-cells_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/T-cells_layer_pass1.csv'
+2026-02-17 22:30:43,466 - root - INFO - Exported layer 'Endothelial_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/Endothelial_layer_pass1.csv'
+2026-02-17 22:31:05,572 - root - INFO - Exported layer 'CAFs_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/CAFs_layer_pass1.csv'
+2026-02-17 22:31:27,625 - root - INFO - Exported layer 'Myeloid_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/Myeloid_layer_pass1.csv'
+2026-02-17 22:31:49,726 - root - INFO - Exported layer 'Cancer_Epithelial_genes_pass1' to 'Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/Wu_rep_4_pass1/layers/pass1/Cancer_Epithelial_layer_pass1.csv'
+2026-02-17 22:31:49,726 - __main__ - INFO - GEX deconvolution completed in 752.3s
+2026-02-17 22:35:10,566 - __main__ - INFO - Exported 9 cell type layers to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4/layers
+2026-02-17 22:35:10,574 - __main__ - INFO - Comparing against ground truth GEX: /ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/scCube_12k/replicates/mixed/ST_GEX_sim/sample_4/layers
+2026-02-17 22:37:09,920 - __main__ - INFO - GEX Average RMSE: 0.1480
+2026-02-17 22:37:09,921 - __main__ - INFO - GEX Average NRMSE: 0.0231
+2026-02-17 22:37:09,939 - __main__ - INFO - Results saved to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_global/mixed/dapi/mixed/dapi/Wu_rep_4

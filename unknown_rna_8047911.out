@@ -1,0 +1,64 @@
+======================================================================
+Analyzing RNA Distribution of Protein-Unknown Cells
+======================================================================
+
+1. Loading protein expression data...
+   Loaded 465534 cells
+
+2. Loading RNA clusters...
+
+3. Classifying cells by protein...
+
+4. Cell counts:
+   Total cells: 461,886
+   Protein-classified: 360,264 (78.0%)
+   Protein-Unknown: 101,622 (22.0%)
+
+======================================================================
+5. RNA cell type distribution of PROTEIN-UNKNOWN cells
+======================================================================
+
+   RNA Cell Type             Count    % of Unknown   % of RNA Type
+   ------------------------------------------------------------
+   B cells                     419            0.4%            1.6%
+   T cells                   7,033            6.9%            6.5%
+   Macrophages              29,278           28.8%           18.5%
+   Endothelial               5,933            5.8%           13.4%
+   Epithelial               32,987           32.5%           54.3%
+   Fibroblasts              25,972           25.6%           39.3%
+
+======================================================================
+6. What fraction of each RNA type is protein-Unknown?
+   (High % = RNA method can see them, CITEgeist can't)
+======================================================================
+
+   RNA Cell Type             Total    Unknown Classified  % Unknown
+   ------------------------------------------------------------
+   B cells                  25,427        419     25,008       1.6%
+   T cells                 107,428      7,033    100,395       6.5%
+   Macrophages             157,982     29,278    128,704      18.5%
+   Endothelial              44,123      5,933     38,190      13.4%
+   Epithelial               60,787     32,987     27,800      54.3%
+   Fibroblasts              66,139     25,972     40,167      39.3%
+
+======================================================================
+7. Correlation with CITEgeist performance gap
+======================================================================
+
+   Cell Type             % Unknown  Prot GT r   RNA GT r        Δ r
+   ------------------------------------------------------------
+   B cells                    1.6%       0.70       0.64      -0.06
+   T cells                    6.5%       0.65       0.69      +0.04
+   Macrophages               18.5%       0.75       0.66      -0.09
+   Endothelial               13.4%       0.65       0.50      -0.15
+   Epithelial                54.3%       0.60       0.54      -0.06
+   Fibroblasts               39.3%       0.50       0.43      -0.07
+
+======================================================================
+CONCLUSION
+======================================================================
+
+If high '% Unknown' correlates with negative Δr (CITEgeist worse on RNA GT),
+this confirms the hypothesis: cells that are protein-low but RNA-classifiable
+create a disadvantage for CITEgeist when evaluated against RNA GT.
+

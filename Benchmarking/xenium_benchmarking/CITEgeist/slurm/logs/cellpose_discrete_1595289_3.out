@@ -1,0 +1,6 @@
+CitegeistModel initialized successfully.
+Filtered gene expression data: 405 → 400 genes (count > 0 in at least 1.0% of spots, mean expression > 1.1 in nonzero spots). Remaining spots: 1464 Filtered spots: 1464 to 1464
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_per_marker=True, no per-spot normalization.
+Set parameter LicenseID to value 276015
+Set parameter GURO_PAR_SPECIAL
+Set parameter TokenServer to value "license.crc.pitt.edu"

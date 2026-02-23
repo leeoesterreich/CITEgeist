@@ -1,0 +1,39 @@
+2026-02-12 17:42:52,622 - __main__ - INFO - ============================================================
+2026-02-12 17:42:52,622 - __main__ - INFO - BENCHMARK: replicate=4, condition=mixed, mode=dapi
+2026-02-12 17:42:52,622 - __main__ - INFO - ============================================================
+2026-02-12 17:42:52,624 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_4_cellpose.png
+2026-02-12 17:42:53,271 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-12 17:42:53,272 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-12 17:42:58,328 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-12 17:42:58,533 - cellpose.core - INFO - ** TORCH CUDA version installed and working. **
+2026-02-12 17:42:58,533 - cellpose.core - INFO - >>>> using GPU (CUDA)
+2026-02-12 17:42:59,673 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-12 17:43:00,093 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-12 17:43:00,119 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-12 17:43:28,310 - cellpose.dynamics - INFO - No cell pixels found.
+2026-02-12 17:43:31,805 - __main__ - INFO - Detected 0 nuclei in 38.5s
+2026-02-12 17:43:31,873 - __main__ - INFO - Loaded ground truth counts: 956 spots, total 5000 cells
+/ihome/alee/alc376/alc376_bgfs/envs/CITEgeist_env/lib/python3.10/site-packages/numpy/lib/function_base.py:2897: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/ihome/alee/alc376/alc376_bgfs/envs/CITEgeist_env/lib/python3.10/site-packages/numpy/lib/function_base.py:2898: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+2026-02-12 17:43:31,878 - __main__ - INFO - Nuclei count correlation: nan
+2026-02-12 17:43:31,879 - __main__ - INFO - Nuclei count RMSE: 5.67
+2026-02-12 17:43:31,883 - __main__ - INFO - Loading h5ad files...
+2026-02-12 17:43:34,213 - root - INFO - Logging initialized.
+2026-02-12 17:43:34,225 - root - INFO - Discrete antibody preprocessing complete: Row sums range [30.61, 50.79], mean=39.98, std=2.83
+2026-02-12 17:43:34,543 - root - INFO - Normalization stats:
+2026-02-12 17:43:34,543 - root - INFO - Original median total: 80712055723.50
+2026-02-12 17:43:34,559 - root - INFO - Mean scaled total: 9978.33
+2026-02-12 17:43:34,570 - root - INFO - Max scaled value: 10000.00
+2026-02-12 17:43:34,697 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+Traceback (most recent call last):
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 344, in <module>
+    main()
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 326, in main
+    results = run_benchmark(
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py", line 257, in run_benchmark
+    model.load_cell_profile_dict(SIMULATION_CELL_PROFILE_DICT)
+  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/citegeist_model.py", line 271, in load_cell_profile_dict
+    raise ValueError("Invalid cell_profile_dict format.")
+ValueError: Invalid cell_profile_dict format.

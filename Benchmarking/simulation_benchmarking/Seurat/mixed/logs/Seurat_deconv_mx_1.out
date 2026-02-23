@@ -1,0 +1,19 @@
+[2026-02-11 00:08:11] Running Seurat deconvolution for replicate: Wu_rep_1
+[2026-02-11 00:08:15.387] Converting h5ad to h5Seurat: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_1_GEX.h5ad -> /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_1_GEX.h5seurat
+[2026-02-11 00:08:21.158315] Loading converted Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_1_GEX.h5seurat
+[2026-02-11 00:08:27.558517] Loading reference Seurat object: /ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat
+[2026-02-11 00:08:52.456689] Running spatial deconvolution for replicate: Wu_rep_1
+[2026-02-11 00:09:09.778647] Saved deconvolution predictions: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_1_Seurat_deconv_predictions.csv
+[2026-02-11 00:09:13.678854] Saved updated Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_1_updated_query.h5Seurat
+[2026-02-11 00:09:14.3715] Saved visualization: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_1_Seurat_Prediction.pdf
+[2026-02-11 00:09:14.371615] Prediction summary for Wu_rep_1:
+
+          B-cells              CAFs Cancer Epithelial       Endothelial 
+                7               517               258                12 
+          Myeloid Normal Epithelial      Plasmablasts               PVL 
+               97                 7                 2                 9 
+          T-cells 
+               43 
+[2026-02-11 00:09:14.372855] Seurat deconvolution completed for Wu_rep_1
+[2026-02-11 00:09:14] Completed Seurat deconvolution for replicate: Wu_rep_1
+SEURAT_TOTAL_RUNTIME: Wu_rep_1 took 63 seconds (1.05 minutes)

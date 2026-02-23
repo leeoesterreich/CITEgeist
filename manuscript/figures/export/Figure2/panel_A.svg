@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="280" viewBox="0 0 480 280">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 11px; }
+      .label { font-family: Arial, sans-serif; font-size: 10px; }
+      .small { font-family: Arial, sans-serif; font-size: 9px; }
+      .italic { font-style: italic; }
+      .bold { font-weight: bold; }
+      .white { fill: white; }
+      .neutral { fill: #7f8c8d; }
+    </style>
+  </defs>
+  <text x="240.0" y="25" class="title" text-anchor="middle">Module 1: Marker Interest Detection</text>
+  <rect x="20" y="55" width="80" height="50" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5" opacity="1"/>
+  <text x="60" y="75" class="small bold" text-anchor="middle">Raw</text>
+  <text x="60" y="90" class="small" text-anchor="middle">Antibodies</text>
+  <line x1="105" y1="80" x2="135" y2="80" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="135,80 128.0717967697245,84.0 128.0717967697245,76.0" fill="#2c3e50"/>
+  <rect x="140" y="60" width="90" height="40" rx="5" fill="#3498db" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="185" y="78" class="label bold white" text-anchor="middle">Kurtosis</text>
+  <text x="185" y="92" class="small white" text-anchor="middle">≥ 2.0 = peaked</text>
+  <rect x="140" y="115" width="90" height="40" rx="5" fill="#9b59b6" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="185" y="133" class="label bold white" text-anchor="middle">GMM</text>
+  <text x="185" y="147" class="small white" text-anchor="middle">2-comp SNR</text>
+  <rect x="140" y="170" width="90" height="40" rx="5" fill="#27ae60" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="185" y="188" class="label bold white" text-anchor="middle">Moran's I</text>
+  <text x="185" y="202" class="small white" text-anchor="middle">Spatial clustering</text>
+  <line x1="235" y1="80" x2="265" y2="80" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="265,80 258.0717967697245,84.0 258.0717967697245,76.0" fill="#2c3e50"/>
+  <line x1="235" y1="135" x2="265" y2="135" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="265,135 258.0717967697245,139.0 258.0717967697245,131.0" fill="#2c3e50"/>
+  <line x1="235" y1="190" x2="265" y2="190" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="265,190 258.0717967697245,194.0 258.0717967697245,186.0" fill="#2c3e50"/>
+  <rect x="270" y="90" width="85" height="65" rx="5" fill="#fff2cc" stroke="#d6b656" stroke-width="2" opacity="1"/>
+  <text x="312" y="110" class="label bold" text-anchor="middle">Decision</text>
+  <text x="312" y="125" class="small" text-anchor="middle">Kurtosis OR</text>
+  <text x="312" y="140" class="small" text-anchor="middle">Moran's I</text>
+  <line x1="360" y1="110" x2="390" y2="90" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="390,90 386.4541872479178,97.17127686867346 382.016585678116,90.51487451397071" fill="#2c3e50"/>
+  <line x1="360" y1="135" x2="390" y2="155" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="390,155 382.016585678116,154.4851254860293 386.4541872479178,147.82872313132654" fill="#2c3e50"/>
+  <rect x="395" y="70" width="70" height="35" rx="5" fill="#27ae60" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="430" y="92" class="small bold white" text-anchor="middle">Interesting</text>
+  <rect x="395" y="135" width="70" height="35" rx="5" fill="#7f8c8d" stroke="black" stroke-width="1.5" opacity="1"/>
+  <text x="430" y="157" class="small bold white" text-anchor="middle">Boring</text>
+  <text x="240.0" y="250" class="small italic neutral" text-anchor="middle">Automatic identification of spatially-variable protein markers</text>
+</svg>

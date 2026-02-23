@@ -1,0 +1,3 @@
+CitegeistModel initialized successfully.
+Antibody capture data preprocessing completed for discrete mode: Winsorized [5%, 95%], scale_per_marker=True, no per-spot normalization.
+Completed replicate 3, condition mixed, mode dapi

@@ -1,0 +1,158 @@
+======================================================================
+COMPARISON: MIXED vs HIGH_SEG SIMULATION DATASETS
+======================================================================
+
+
+Loading MIXED dataset...
+
+
+Loading HIGH_SEG dataset...
+
+
+Loading nuclei counts...
+
+============================================================
+Proportion Analysis: MIXED
+============================================================
+Number of spots: 951
+Number of cell types: 9
+Cell types: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells']
+
+--- Cell types per spot (threshold=0.01) ---
+Mean: 2.72
+Median: 3.00
+Min: 1
+Max: 5
+Std: 0.93
+
+Distribution of cell type counts per spot:
+  1 cell types: 75 spots (7.9%)
+  2 cell types: 324 spots (34.1%)
+  3 cell types: 370 spots (38.9%)
+  4 cell types: 155 spots (16.3%)
+  5 cell types: 27 spots (2.8%)
+  6 cell types: 0 spots (0.0%)
+  7 cell types: 0 spots (0.0%)
+  8 cell types: 0 spots (0.0%)
+  9 cell types: 0 spots (0.0%)
+
+--- Entropy analysis ---
+Mean entropy: 1.223 (max possible: 3.170)
+Mean normalized entropy: 0.386
+Median normalized entropy: 0.432
+Std normalized entropy: 0.164
+
+--- Spot purity analysis ---
+  Dominant >= 50%: 706 spots (74.2%)
+  Dominant >= 70%: 194 spots (20.4%)
+  Dominant >= 90%: 76 spots (8.0%)
+  Dominant >= 95%: 75 spots (7.9%)
+  Dominant >= 99%: 75 spots (7.9%)
+
+--- Mean proportion per cell type ---
+  B-cells: mean=0.0498, present in 208 spots (21.9%)
+  CAFs: mean=0.2975, present in 734 spots (77.2%)
+  Cancer Epithelial: mean=0.4314, present in 839 spots (88.2%)
+  Endothelial: mean=0.0083, present in 15 spots (1.6%)
+  Myeloid: mean=0.0915, present in 368 spots (38.7%)
+  Normal Epithelial: mean=0.0097, present in 17 spots (1.8%)
+  PVL: mean=0.0050, present in 8 spots (0.8%)
+  Plasmablasts: mean=0.0068, present in 14 spots (1.5%)
+  T-cells: mean=0.1000, present in 385 spots (40.5%)
+
+============================================================
+Proportion Analysis: HIGH_SEG
+============================================================
+Number of spots: 951
+Number of cell types: 9
+Cell types: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells']
+
+--- Cell types per spot (threshold=0.01) ---
+Mean: 1.69
+Median: 2.00
+Min: 1
+Max: 5
+Std: 0.78
+
+Distribution of cell type counts per spot:
+  1 cell types: 453 spots (47.6%)
+  2 cell types: 363 spots (38.2%)
+  3 cell types: 116 spots (12.2%)
+  4 cell types: 14 spots (1.5%)
+  5 cell types: 5 spots (0.5%)
+  6 cell types: 0 spots (0.0%)
+  7 cell types: 0 spots (0.0%)
+  8 cell types: 0 spots (0.0%)
+  9 cell types: 0 spots (0.0%)
+
+--- Entropy analysis ---
+Mean entropy: 0.532 (max possible: 3.170)
+Mean normalized entropy: 0.168
+Median normalized entropy: 0.187
+Std normalized entropy: 0.177
+
+--- Spot purity analysis ---
+  Dominant >= 50%: 911 spots (95.8%)
+  Dominant >= 70%: 628 spots (66.0%)
+  Dominant >= 90%: 457 spots (48.1%)
+  Dominant >= 95%: 453 spots (47.6%)
+  Dominant >= 99%: 453 spots (47.6%)
+
+--- Mean proportion per cell type ---
+  B-cells: mean=0.0400, present in 84 spots (8.8%)
+  CAFs: mean=0.0501, present in 140 spots (14.7%)
+  Cancer Epithelial: mean=0.2395, present in 359 spots (37.7%)
+  Endothelial: mean=0.0776, present in 179 spots (18.8%)
+  Myeloid: mean=0.1196, present in 218 spots (22.9%)
+  Normal Epithelial: mean=0.0557, present in 111 spots (11.7%)
+  PVL: mean=0.3267, present in 358 spots (37.6%)
+  Plasmablasts: mean=0.0052, present in 18 spots (1.9%)
+  T-cells: mean=0.0856, present in 141 spots (14.8%)
+
+
+======================================================================
+PROPORTION GRANULARITY ANALYSIS
+======================================================================
+
+============================================================
+Proportion Granularity Analysis: MIXED
+============================================================
+Total proportion values: 8559
+Non-zero proportions: 2588
+
+--- Common proportion values ---
+  0.3333: 350 occurrences
+  0.5000: 319 occurrences
+  0.2500: 280 occurrences
+  0.1667: 225 occurrences
+  0.2000: 196 occurrences
+  0.1429: 150 occurrences
+  0.4000: 128 occurrences
+  0.6667: 124 occurrences
+  0.2857: 97 occurrences
+  0.1250: 91 occurrences
+  1.0000: 75 occurrences
+  0.6000: 69 occurrences
+  0.4286: 61 occurrences
+  0.7500: 57 occurrences
+  0.1111: 46 occurrences
+  0.3750: 45 occurrences
+  0.5714: 40 occurrences
+  0.2222: 23 occurrences
+  0.4444: 23 occurrences
+  0.1000: 22 occurrences
+
+--- Inferred total cells per spot ---
+Mean inferred total cells: 4.95
+Median inferred total cells: 5.00
+Min: 1, Max: 12
+  1 cells: 75 spots (7.9%)
+  2 cells: 80 spots (8.4%)
+  3 cells: 137 spots (14.4%)
+  4 cells: 138 spots (14.5%)
+  5 cells: 142 spots (14.9%)
+  6 cells: 126 spots (13.2%)
+  7 cells: 113 spots (11.9%)
+  8 cells: 66 spots (6.9%)
+  9 cells: 40 spots (4.2%)
+  10 cells: 16 spots (1.7%)

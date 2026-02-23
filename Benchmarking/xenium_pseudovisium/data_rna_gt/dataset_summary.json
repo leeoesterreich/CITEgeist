@@ -1,0 +1,81 @@
+{
+  "description": "RNA-based ground truth using k-means clustering",
+  "cell_types": [
+    "B cells",
+    "T cells",
+    "Macrophages",
+    "Endothelial",
+    "Epithelial",
+    "Fibroblasts"
+  ],
+  "n_cell_types": 6,
+  "total_cells": 461886,
+  "unknown_rate": 0.0,
+  "regions": [
+    {
+      "region_id": 0,
+      "n_spots": 1407,
+      "n_cells": 23824,
+      "mean_cells_per_spot": 16.932480454868514,
+      "prop_sum_mean": 1.0,
+      "B cells_mean": 0.022075363997651195,
+      "T cells_mean": 0.1169223195053515,
+      "Macrophages_mean": 0.3432327414951986,
+      "Endothelial_mean": 0.11576599388441566,
+      "Epithelial_mean": 0.2093481396427279,
+      "Fibroblasts_mean": 0.1926554414746552
+    },
+    {
+      "region_id": 1,
+      "n_spots": 1417,
+      "n_cells": 22735,
+      "mean_cells_per_spot": 16.044460127028934,
+      "prop_sum_mean": 1.0,
+      "B cells_mean": 0.0008465005170861746,
+      "T cells_mean": 0.09992573766695437,
+      "Macrophages_mean": 0.3808853182227688,
+      "Endothelial_mean": 0.11452877555884772,
+      "Epithelial_mean": 0.21015896661788483,
+      "Fibroblasts_mean": 0.19365470141645813
+    },
+    {
+      "region_id": 2,
+      "n_spots": 1352,
+      "n_cells": 24874,
+      "mean_cells_per_spot": 18.39792899408284,
+      "prop_sum_mean": 1.0,
+      "B cells_mean": 0.010017430196652128,
+      "T cells_mean": 0.21100766120031392,
+      "Macrophages_mean": 0.3649837369270253,
+      "Endothelial_mean": 0.10408127594337399,
+      "Epithelial_mean": 0.1576917716738236,
+      "Fibroblasts_mean": 0.152218124058811
+    },
+    {
+      "region_id": 3,
+      "n_spots": 1464,
+      "n_cells": 26044,
+      "mean_cells_per_spot": 17.7896174863388,
+      "prop_sum_mean": 1.0,
+      "B cells_mean": 0.035896941902722246,
+      "T cells_mean": 0.208985867568558,
+      "Macrophages_mean": 0.34406532248598104,
+      "Endothelial_mean": 0.07133126467531534,
+      "Epithelial_mean": 0.23940393517698094,
+      "Fibroblasts_mean": 0.10031666819044242
+    },
+    {
+      "region_id": 4,
+      "n_spots": 1414,
+      "n_cells": 29375,
+      "mean_cells_per_spot": 20.774398868458274,
+      "prop_sum_mean": 1.0,
+      "B cells_mean": 0.04441646515508366,
+      "T cells_mean": 0.24203016094145546,
+      "Macrophages_mean": 0.3472584502180196,
+      "Endothelial_mean": 0.07663104432424576,
+      "Epithelial_mean": 0.19015322688467778,
+      "Fibroblasts_mean": 0.0995106524765177
+    }
+  ]
+}

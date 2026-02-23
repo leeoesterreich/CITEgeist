@@ -943,6 +943,8 @@ class CitegeistModel:
         lambda_prior: float = 1.0,
         max_iterations: int = 20,
         tolerance: float = 1e-4,
+        sparse_aware: bool = True,
+        min_expressing_spots: int = 20,
     ) -> pd.DataFrame:
         """
         Run Pass 1.5 + Pass 2 EM multimodal refinement.
@@ -960,6 +962,8 @@ class CitegeistModel:
             lambda_prior: Trust in protein prior vs RNA (default: 1.0)
             max_iterations: Maximum EM iterations (default: 20)
             tolerance: Convergence tolerance (default: 1e-4)
+            sparse_aware: If True, compute correlations only on expressing spots (default: True)
+            min_expressing_spots: Minimum spots with expression for anchor selection (default: 20)
 
         Returns:
             DataFrame with refined cell type proportions
@@ -1005,6 +1009,8 @@ class CitegeistModel:
             lambda_prior=lambda_prior,
             max_iterations=max_iterations,
             tolerance=tolerance,
+            sparse_aware=sparse_aware,
+            min_expressing_spots=min_expressing_spots,
         )
 
         # Store results

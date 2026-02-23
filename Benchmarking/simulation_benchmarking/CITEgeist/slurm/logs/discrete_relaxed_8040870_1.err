@@ -1,0 +1,654 @@
+2026-02-18 16:19:11,084 - __main__ - INFO - ============================================================
+2026-02-18 16:19:11,084 - __main__ - INFO - BENCHMARK: replicate=1, condition=mixed, mode=dapi
+2026-02-18 16:19:11,084 - __main__ - INFO - ============================================================
+2026-02-18 16:19:11,084 - __main__ - INFO - Loading image: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/mixed/images/dapi/Wu_rep_1_cellpose.png
+2026-02-18 16:19:11,646 - __main__ - INFO - Image shape: (8000, 8000, 3)
+2026-02-18 16:19:11,647 - __main__ - INFO - Running Cellpose with model_type=nuclei
+2026-02-18 16:19:15,479 - cellpose.models - WARNING - model_type argument is not used in v4.0.1+. Ignoring this argument...
+2026-02-18 16:19:15,479 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 16:19:15,479 - cellpose.core - INFO - >>>> using CPU
+2026-02-18 16:19:16,154 - cellpose.models - INFO - >>>> loading model /ihome/alee/alc376/.cellpose/models/cpsam
+2026-02-18 16:19:16,376 - cellpose.models - WARNING - channels deprecated in v4.0.1+. If data contain more than 3 channels, only the first 3 channels will be used
+2026-02-18 16:19:16,385 - cellpose.transforms - INFO - processing image with (8000, 8000) HW, and 3 channels
+2026-02-18 16:25:10,878 - __main__ - INFO - Detected 4906 nuclei in 359.2s
+2026-02-18 16:25:10,985 - __main__ - INFO - Nuclei count correlation: 0.987
+2026-02-18 16:25:10,986 - __main__ - INFO - Nuclei count RMSE: 0.43
+2026-02-18 16:25:10,993 - __main__ - INFO - Loading h5ad files...
+2026-02-18 16:25:11,698 - root - INFO - Logging initialized.
+2026-02-18 16:25:11,698 - __main__ - INFO - Using CLR preprocessing (continuous model style)
+2026-02-18 16:25:11,816 - root - INFO - Normalization stats:
+2026-02-18 16:25:11,816 - root - INFO - Original median total: 62868220197.00
+2026-02-18 16:25:11,821 - root - INFO - Mean scaled total: 9979.39
+2026-02-18 16:25:11,825 - root - INFO - Max scaled value: 10000.00
+2026-02-18 16:25:11,884 - root - INFO - Gene expression data normalized to 10000 counts per spot and validated for discrete count analysis.
+2026-02-18 16:25:11,885 - root - INFO - Mapped 18 markers to 9 cell types (preserving marker-level data)
+2026-02-18 16:25:11,885 - __main__ - INFO - Discrete cell type order: ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial', 'Myeloid', 'Normal Epithelial', 'PVL', 'Plasmablasts', 'T-cells']
+2026-02-18 16:25:11,886 - root - INFO - Mapped 18 markers to 9 cell types (preserving marker-level data)
+2026-02-18 16:25:11,886 - root - INFO - Running discrete cell assignment: 952 spots, 18 markers, 9 cell types
+2026-02-18 16:25:11,886 - root - INFO - Total nuclei: 4906, mean per spot: 5.15
+2026-02-18 16:25:11,886 - root - INFO - Discrete cell assignment EM: 952 spots, 18 markers, 9 cell types
+2026-02-18 16:25:11,886 - root - INFO - Total nuclei: 4906, mean per spot: 5.15
+2026-02-18 16:25:11,887 - root - INFO - 
+=== EM Iteration 1/10 ===
+2026-02-18 16:25:11,887 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:11,887 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:11,887 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:11,887 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:11,887 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:11,922 - gurobipy - INFO - Set parameter LicenseID to value 276015
+2026-02-18 16:25:11,922 - gurobipy - INFO - Set parameter GURO_PAR_SPECIAL
+2026-02-18 16:25:11,922 - gurobipy - INFO - Set parameter TokenServer to value "license.crc.pitt.edu"
+2026-02-18 16:25:11,936 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:11,936 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:12,870 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:12,871 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:12,871 - gurobipy - INFO - 
+2026-02-18 16:25:12,871 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:12,871 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:12,871 - gurobipy - INFO - 
+2026-02-18 16:25:12,871 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:12,871 - gurobipy - INFO - Model fingerprint: 0x6cc5ab49
+2026-02-18 16:25:12,871 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:12,871 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:12,871 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:12,871 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:12,871 - gurobipy - INFO -   Objective range  [8e-08, 2e+00]
+2026-02-18 16:25:12,871 - gurobipy - INFO -   QObjective range [2e+00, 3e+00]
+2026-02-18 16:25:12,871 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:12,871 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:12,872 - gurobipy - INFO - 
+2026-02-18 16:25:12,873 - gurobipy - INFO - Loaded user MIP start with objective 4270.43
+2026-02-18 16:25:12,873 - gurobipy - INFO - 
+2026-02-18 16:25:19,757 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns (presolve time = 7s) ...
+2026-02-18 16:25:19,757 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:19,757 - gurobipy - INFO - Presolve time: 6.88s
+2026-02-18 16:25:19,757 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:19,757 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:19,757 - gurobipy - INFO - Found heuristic solution: objective 2707.0687356
+2026-02-18 16:25:19,757 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:19,758 - gurobipy - INFO - 
+2026-02-18 16:25:19,758 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 6.89 seconds (0.27 work units)
+2026-02-18 16:25:19,758 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:19,758 - gurobipy - INFO - 
+2026-02-18 16:25:19,758 - gurobipy - INFO - Solution count 2: 2707.07 4270.43 
+2026-02-18 16:25:19,758 - gurobipy - INFO - 
+2026-02-18 16:25:19,758 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:19,758 - gurobipy - INFO - Best objective 2.707068735584e+03, best bound 2.702377763763e+03, gap 0.1733%
+2026-02-18 16:25:19,772 - root - INFO - Global IQP solved: status=2, gap=0.17%, time=6.9s
+/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist/model/gurobi_impl.py:3800: RuntimeWarning: invalid value encountered in scalar divide
+  loss_change = abs(prev_loss - loss) / max(abs(prev_loss), 1e-10)
+2026-02-18 16:25:19,822 - root - INFO -   Loss: 870.1036 (change: nan)
+2026-02-18 16:25:19,822 - root - INFO -   Beta range: [0.108, 0.675]
+2026-02-18 16:25:19,822 - root - INFO -   Max beta change: 0.892167
+2026-02-18 16:25:19,822 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:19,822 - root - INFO -     B-cells: 381 cells (9.5%)
+2026-02-18 16:25:19,822 - root - INFO -     CAFs: 707 cells (17.6%)
+2026-02-18 16:25:19,822 - root - INFO -     Cancer Epithelial: 827 cells (20.6%)
+2026-02-18 16:25:19,822 - root - INFO -     Endothelial: 314 cells (7.8%)
+2026-02-18 16:25:19,822 - root - INFO -     Myeloid: 469 cells (11.7%)
+2026-02-18 16:25:19,822 - root - INFO -     Normal Epithelial: 265 cells (6.6%)
+2026-02-18 16:25:19,822 - root - INFO -     PVL: 282 cells (7.0%)
+2026-02-18 16:25:19,822 - root - INFO -     Plasmablasts: 285 cells (7.1%)
+2026-02-18 16:25:19,822 - root - INFO -     T-cells: 482 cells (12.0%)
+2026-02-18 16:25:19,822 - root - INFO - 
+=== EM Iteration 2/10 ===
+2026-02-18 16:25:19,822 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:19,822 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:19,822 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:19,822 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:19,822 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:19,822 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:19,822 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:20,931 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:20,931 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:20,931 - gurobipy - INFO - 
+2026-02-18 16:25:20,932 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:20,932 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:20,932 - gurobipy - INFO - 
+2026-02-18 16:25:20,932 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:20,932 - gurobipy - INFO - Model fingerprint: 0x5c751b30
+2026-02-18 16:25:20,932 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:20,932 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:20,932 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:20,932 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:20,932 - gurobipy - INFO -   Objective range  [1e-08, 1e+00]
+2026-02-18 16:25:20,932 - gurobipy - INFO -   QObjective range [3e-02, 2e+00]
+2026-02-18 16:25:20,932 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:20,932 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:20,932 - gurobipy - INFO - 
+2026-02-18 16:25:20,932 - gurobipy - INFO - Loaded user MIP start with objective 864.519
+2026-02-18 16:25:20,932 - gurobipy - INFO - 
+2026-02-18 16:25:26,048 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns (presolve time = 5s) ...
+2026-02-18 16:25:26,048 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:26,048 - gurobipy - INFO - Presolve time: 5.12s
+2026-02-18 16:25:26,048 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:26,048 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:26,048 - gurobipy - INFO - Found heuristic solution: objective 742.3481533
+2026-02-18 16:25:26,048 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:26,048 - gurobipy - INFO - 
+2026-02-18 16:25:26,048 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.12 seconds (0.18 work units)
+2026-02-18 16:25:26,048 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:26,048 - gurobipy - INFO - 
+2026-02-18 16:25:26,048 - gurobipy - INFO - Solution count 2: 742.348 864.519 
+2026-02-18 16:25:26,048 - gurobipy - INFO - 
+2026-02-18 16:25:26,048 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:26,048 - gurobipy - INFO - Best objective 7.423481533313e+02, best bound 7.406185452784e+02, gap 0.2330%
+2026-02-18 16:25:26,057 - root - INFO - Global IQP solved: status=2, gap=0.23%, time=5.1s
+2026-02-18 16:25:26,103 - root - INFO -   Loss: 550.2759 (change: 0.367574)
+2026-02-18 16:25:26,103 - root - INFO -   Beta range: [0.100, 0.547]
+2026-02-18 16:25:26,103 - root - INFO -   Max beta change: 0.131327
+2026-02-18 16:25:26,103 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:26,103 - root - INFO -     B-cells: 314 cells (7.8%)
+2026-02-18 16:25:26,103 - root - INFO -     CAFs: 693 cells (17.2%)
+2026-02-18 16:25:26,103 - root - INFO -     Cancer Epithelial: 709 cells (17.6%)
+2026-02-18 16:25:26,103 - root - INFO -     Endothelial: 399 cells (9.9%)
+2026-02-18 16:25:26,103 - root - INFO -     Myeloid: 387 cells (9.6%)
+2026-02-18 16:25:26,103 - root - INFO -     Normal Epithelial: 394 cells (9.8%)
+2026-02-18 16:25:26,103 - root - INFO -     PVL: 391 cells (9.7%)
+2026-02-18 16:25:26,103 - root - INFO -     Plasmablasts: 355 cells (8.8%)
+2026-02-18 16:25:26,103 - root - INFO -     T-cells: 384 cells (9.5%)
+2026-02-18 16:25:26,103 - root - INFO - 
+=== EM Iteration 3/10 ===
+2026-02-18 16:25:26,103 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:26,103 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:26,103 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:26,103 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:26,103 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:26,103 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:26,103 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:26,993 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:26,994 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:26,994 - gurobipy - INFO - 
+2026-02-18 16:25:26,994 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:26,994 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:26,994 - gurobipy - INFO - 
+2026-02-18 16:25:26,994 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:26,994 - gurobipy - INFO - Model fingerprint: 0xca48443e
+2026-02-18 16:25:26,994 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:26,994 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:26,994 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:26,994 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:26,994 - gurobipy - INFO -   Objective range  [1e-08, 1e+00]
+2026-02-18 16:25:26,994 - gurobipy - INFO -   QObjective range [2e-02, 2e+00]
+2026-02-18 16:25:26,994 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:26,994 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:26,994 - gurobipy - INFO - 
+2026-02-18 16:25:26,994 - gurobipy - INFO - Loaded user MIP start with objective 724.317
+2026-02-18 16:25:26,994 - gurobipy - INFO - 
+2026-02-18 16:25:32,154 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns (presolve time = 5s) ...
+2026-02-18 16:25:32,154 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:32,154 - gurobipy - INFO - Presolve time: 5.16s
+2026-02-18 16:25:32,154 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:32,154 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:32,154 - gurobipy - INFO - Found heuristic solution: objective 701.2650659
+2026-02-18 16:25:32,154 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:32,154 - gurobipy - INFO - 
+2026-02-18 16:25:32,154 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 5.16 seconds (0.17 work units)
+2026-02-18 16:25:32,154 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:32,154 - gurobipy - INFO - 
+2026-02-18 16:25:32,154 - gurobipy - INFO - Solution count 2: 701.265 724.317 
+2026-02-18 16:25:32,154 - gurobipy - INFO - 
+2026-02-18 16:25:32,154 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:32,155 - gurobipy - INFO - Best objective 7.012650658805e+02, best bound 6.994996929635e+02, gap 0.2517%
+2026-02-18 16:25:32,165 - root - INFO - Global IQP solved: status=2, gap=0.25%, time=5.2s
+2026-02-18 16:25:32,217 - root - INFO -   Loss: 524.4808 (change: 0.046877)
+2026-02-18 16:25:32,217 - root - INFO -   Beta range: [0.100, 0.533]
+2026-02-18 16:25:32,217 - root - INFO -   Max beta change: 0.161829
+2026-02-18 16:25:32,217 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:32,217 - root - INFO -     B-cells: 277 cells (6.9%)
+2026-02-18 16:25:32,217 - root - INFO -     CAFs: 717 cells (17.8%)
+2026-02-18 16:25:32,217 - root - INFO -     Cancer Epithelial: 591 cells (14.7%)
+2026-02-18 16:25:32,217 - root - INFO -     Endothelial: 440 cells (11.0%)
+2026-02-18 16:25:32,217 - root - INFO -     Myeloid: 348 cells (8.7%)
+2026-02-18 16:25:32,217 - root - INFO -     Normal Epithelial: 454 cells (11.3%)
+2026-02-18 16:25:32,217 - root - INFO -     PVL: 448 cells (11.1%)
+2026-02-18 16:25:32,217 - root - INFO -     Plasmablasts: 423 cells (10.5%)
+2026-02-18 16:25:32,217 - root - INFO -     T-cells: 320 cells (8.0%)
+2026-02-18 16:25:32,217 - root - INFO - 
+=== EM Iteration 4/10 ===
+2026-02-18 16:25:32,217 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:32,217 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:32,217 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:32,217 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:32,217 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:32,217 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:32,217 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:33,109 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:33,109 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:33,109 - gurobipy - INFO - 
+2026-02-18 16:25:33,110 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:33,110 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:33,110 - gurobipy - INFO - 
+2026-02-18 16:25:33,110 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:33,110 - gurobipy - INFO - Model fingerprint: 0x65e5a536
+2026-02-18 16:25:33,110 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:33,110 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:33,110 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:33,110 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:33,110 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:33,110 - gurobipy - INFO -   QObjective range [2e-02, 2e+00]
+2026-02-18 16:25:33,110 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:33,110 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:33,110 - gurobipy - INFO - 
+2026-02-18 16:25:33,110 - gurobipy - INFO - Loaded user MIP start with objective 709.09
+2026-02-18 16:25:33,110 - gurobipy - INFO - 
+2026-02-18 16:25:37,439 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:37,439 - gurobipy - INFO - Presolve time: 4.33s
+2026-02-18 16:25:37,439 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:37,439 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:37,439 - gurobipy - INFO - Found heuristic solution: objective 687.2993613
+2026-02-18 16:25:37,439 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:37,439 - gurobipy - INFO - 
+2026-02-18 16:25:37,439 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.33 seconds (0.15 work units)
+2026-02-18 16:25:37,439 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:37,439 - gurobipy - INFO - 
+2026-02-18 16:25:37,439 - gurobipy - INFO - Solution count 2: 687.299 709.09 
+2026-02-18 16:25:37,439 - gurobipy - INFO - 
+2026-02-18 16:25:37,439 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:37,439 - gurobipy - INFO - Best objective 6.872993613180e+02, best bound 6.855507335925e+02, gap 0.2544%
+2026-02-18 16:25:37,449 - root - INFO - Global IQP solved: status=2, gap=0.25%, time=4.3s
+2026-02-18 16:25:37,495 - root - INFO -   Loss: 500.7167 (change: 0.045310)
+2026-02-18 16:25:37,495 - root - INFO -   Beta range: [0.100, 0.517]
+2026-02-18 16:25:37,495 - root - INFO -   Max beta change: 0.025890
+2026-02-18 16:25:37,495 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:37,495 - root - INFO -     B-cells: 245 cells (6.1%)
+2026-02-18 16:25:37,495 - root - INFO -     CAFs: 756 cells (18.9%)
+2026-02-18 16:25:37,495 - root - INFO -     Cancer Epithelial: 453 cells (11.3%)
+2026-02-18 16:25:37,495 - root - INFO -     Endothelial: 489 cells (12.2%)
+2026-02-18 16:25:37,495 - root - INFO -     Myeloid: 318 cells (7.9%)
+2026-02-18 16:25:37,495 - root - INFO -     Normal Epithelial: 490 cells (12.2%)
+2026-02-18 16:25:37,495 - root - INFO -     PVL: 486 cells (12.1%)
+2026-02-18 16:25:37,495 - root - INFO -     Plasmablasts: 476 cells (11.9%)
+2026-02-18 16:25:37,495 - root - INFO -     T-cells: 291 cells (7.3%)
+2026-02-18 16:25:37,495 - root - INFO - 
+=== EM Iteration 5/10 ===
+2026-02-18 16:25:37,495 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:37,495 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:37,495 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:37,495 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:37,495 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:37,495 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:37,495 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:38,584 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:38,585 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:38,585 - gurobipy - INFO - 
+2026-02-18 16:25:38,585 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:38,585 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:38,585 - gurobipy - INFO - 
+2026-02-18 16:25:38,585 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:38,585 - gurobipy - INFO - Model fingerprint: 0x66f1da19
+2026-02-18 16:25:38,585 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:38,585 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:38,585 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:38,585 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:38,585 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:38,585 - gurobipy - INFO -   QObjective range [2e-02, 2e+00]
+2026-02-18 16:25:38,585 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:38,585 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:38,585 - gurobipy - INFO - 
+2026-02-18 16:25:38,585 - gurobipy - INFO - Loaded user MIP start with objective 693.687
+2026-02-18 16:25:38,585 - gurobipy - INFO - 
+2026-02-18 16:25:42,587 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:42,587 - gurobipy - INFO - Presolve time: 4.00s
+2026-02-18 16:25:42,587 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:42,587 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:42,587 - gurobipy - INFO - Found heuristic solution: objective 683.0037415
+2026-02-18 16:25:42,587 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:42,587 - gurobipy - INFO - 
+2026-02-18 16:25:42,587 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.00 seconds (0.14 work units)
+2026-02-18 16:25:42,587 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:42,587 - gurobipy - INFO - 
+2026-02-18 16:25:42,587 - gurobipy - INFO - Solution count 2: 683.004 693.687 
+2026-02-18 16:25:42,587 - gurobipy - INFO - 
+2026-02-18 16:25:42,587 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:42,588 - gurobipy - INFO - Best objective 6.830037414563e+02, best bound 6.811998208143e+02, gap 0.2641%
+2026-02-18 16:25:42,597 - root - INFO - Global IQP solved: status=2, gap=0.26%, time=4.0s
+2026-02-18 16:25:42,643 - root - INFO -   Loss: 499.9599 (change: 0.001511)
+2026-02-18 16:25:42,643 - root - INFO -   Beta range: [0.100, 0.507]
+2026-02-18 16:25:42,643 - root - INFO -   Max beta change: 0.027281
+2026-02-18 16:25:42,643 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:42,643 - root - INFO -     B-cells: 204 cells (5.1%)
+2026-02-18 16:25:42,643 - root - INFO -     CAFs: 779 cells (19.5%)
+2026-02-18 16:25:42,643 - root - INFO -     Cancer Epithelial: 415 cells (10.4%)
+2026-02-18 16:25:42,643 - root - INFO -     Endothelial: 508 cells (12.7%)
+2026-02-18 16:25:42,643 - root - INFO -     Myeloid: 292 cells (7.3%)
+2026-02-18 16:25:42,643 - root - INFO -     Normal Epithelial: 517 cells (12.9%)
+2026-02-18 16:25:42,643 - root - INFO -     PVL: 519 cells (13.0%)
+2026-02-18 16:25:42,643 - root - INFO -     Plasmablasts: 500 cells (12.5%)
+2026-02-18 16:25:42,643 - root - INFO -     T-cells: 268 cells (6.7%)
+2026-02-18 16:25:42,643 - root - INFO - 
+=== EM Iteration 6/10 ===
+2026-02-18 16:25:42,643 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:42,643 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:42,643 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:42,643 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:42,643 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:42,643 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:42,643 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:43,542 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:43,543 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:43,543 - gurobipy - INFO - 
+2026-02-18 16:25:43,543 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:43,543 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:43,543 - gurobipy - INFO - 
+2026-02-18 16:25:43,543 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:43,543 - gurobipy - INFO - Model fingerprint: 0x7e41b903
+2026-02-18 16:25:43,543 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:43,543 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:43,543 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:43,543 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:43,543 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:43,543 - gurobipy - INFO -   QObjective range [2e-02, 2e+00]
+2026-02-18 16:25:43,543 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:43,543 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:43,543 - gurobipy - INFO - 
+2026-02-18 16:25:43,543 - gurobipy - INFO - Loaded user MIP start with objective 692.797
+2026-02-18 16:25:43,543 - gurobipy - INFO - 
+2026-02-18 16:25:47,390 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:47,390 - gurobipy - INFO - Presolve time: 3.85s
+2026-02-18 16:25:47,390 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:47,390 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:47,390 - gurobipy - INFO - Found heuristic solution: objective 683.6012380
+2026-02-18 16:25:47,390 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:47,391 - gurobipy - INFO - 
+2026-02-18 16:25:47,391 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 3.85 seconds (0.14 work units)
+2026-02-18 16:25:47,391 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:47,391 - gurobipy - INFO - 
+2026-02-18 16:25:47,391 - gurobipy - INFO - Solution count 2: 683.601 692.797 
+2026-02-18 16:25:47,391 - gurobipy - INFO - 
+2026-02-18 16:25:47,391 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:47,391 - gurobipy - INFO - Best objective 6.836012379820e+02, best bound 6.818024944544e+02, gap 0.2631%
+2026-02-18 16:25:47,400 - root - INFO - Global IQP solved: status=2, gap=0.26%, time=3.8s
+2026-02-18 16:25:47,445 - root - INFO -   Loss: 501.6004 (change: 0.003281)
+2026-02-18 16:25:47,446 - root - INFO -   Beta range: [0.100, 0.500]
+2026-02-18 16:25:47,446 - root - INFO -   Max beta change: 0.021033
+2026-02-18 16:25:47,446 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:47,446 - root - INFO -     B-cells: 181 cells (4.5%)
+2026-02-18 16:25:47,446 - root - INFO -     CAFs: 799 cells (20.0%)
+2026-02-18 16:25:47,446 - root - INFO -     Cancer Epithelial: 407 cells (10.2%)
+2026-02-18 16:25:47,446 - root - INFO -     Endothelial: 522 cells (13.0%)
+2026-02-18 16:25:47,446 - root - INFO -     Myeloid: 285 cells (7.1%)
+2026-02-18 16:25:47,446 - root - INFO -     Normal Epithelial: 525 cells (13.1%)
+2026-02-18 16:25:47,446 - root - INFO -     PVL: 535 cells (13.4%)
+2026-02-18 16:25:47,446 - root - INFO -     Plasmablasts: 512 cells (12.8%)
+2026-02-18 16:25:47,446 - root - INFO -     T-cells: 235 cells (5.9%)
+2026-02-18 16:25:47,446 - root - WARNING - Loss increased from 499.9599 to 501.6004
+2026-02-18 16:25:47,446 - root - INFO - 
+=== EM Iteration 7/10 ===
+2026-02-18 16:25:47,446 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:47,446 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:47,446 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:47,446 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:47,446 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:47,446 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:47,446 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:48,335 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:48,336 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:48,336 - gurobipy - INFO - 
+2026-02-18 16:25:48,336 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:48,336 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:48,336 - gurobipy - INFO - 
+2026-02-18 16:25:48,336 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:48,336 - gurobipy - INFO - Model fingerprint: 0xb7552f31
+2026-02-18 16:25:48,336 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:48,336 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:48,336 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:48,336 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:48,336 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:48,336 - gurobipy - INFO -   QObjective range [2e-02, 1e+00]
+2026-02-18 16:25:48,336 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:48,336 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:48,336 - gurobipy - INFO - 
+2026-02-18 16:25:48,336 - gurobipy - INFO - Loaded user MIP start with objective 693.53
+2026-02-18 16:25:48,336 - gurobipy - INFO - 
+2026-02-18 16:25:52,299 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:52,300 - gurobipy - INFO - Presolve time: 3.96s
+2026-02-18 16:25:52,300 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:52,300 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:52,300 - gurobipy - INFO - Found heuristic solution: objective 684.9920245
+2026-02-18 16:25:52,300 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:52,300 - gurobipy - INFO - 
+2026-02-18 16:25:52,300 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 3.96 seconds (0.13 work units)
+2026-02-18 16:25:52,300 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:52,300 - gurobipy - INFO - 
+2026-02-18 16:25:52,300 - gurobipy - INFO - Solution count 2: 684.992 693.53 
+2026-02-18 16:25:52,300 - gurobipy - INFO - 
+2026-02-18 16:25:52,300 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:52,300 - gurobipy - INFO - Best objective 6.849920245123e+02, best bound 6.831958319225e+02, gap 0.2622%
+2026-02-18 16:25:52,311 - root - INFO - Global IQP solved: status=2, gap=0.26%, time=4.0s
+2026-02-18 16:25:52,358 - root - INFO -   Loss: 508.3223 (change: 0.013401)
+2026-02-18 16:25:52,358 - root - INFO -   Beta range: [0.100, 0.498]
+2026-02-18 16:25:52,358 - root - INFO -   Max beta change: 0.024782
+2026-02-18 16:25:52,358 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:52,358 - root - INFO -     B-cells: 167 cells (4.2%)
+2026-02-18 16:25:52,358 - root - INFO -     CAFs: 802 cells (20.0%)
+2026-02-18 16:25:52,358 - root - INFO -     Cancer Epithelial: 406 cells (10.1%)
+2026-02-18 16:25:52,358 - root - INFO -     Endothelial: 531 cells (13.3%)
+2026-02-18 16:25:52,358 - root - INFO -     Myeloid: 282 cells (7.0%)
+2026-02-18 16:25:52,358 - root - INFO -     Normal Epithelial: 535 cells (13.4%)
+2026-02-18 16:25:52,358 - root - INFO -     PVL: 536 cells (13.4%)
+2026-02-18 16:25:52,358 - root - INFO -     Plasmablasts: 529 cells (13.2%)
+2026-02-18 16:25:52,358 - root - INFO -     T-cells: 213 cells (5.3%)
+2026-02-18 16:25:52,358 - root - WARNING - Loss increased from 501.6004 to 508.3223
+2026-02-18 16:25:52,358 - root - INFO - 
+=== EM Iteration 8/10 ===
+2026-02-18 16:25:52,359 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:52,359 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:52,359 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:52,359 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:52,359 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:52,359 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:52,359 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:53,458 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:53,458 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:53,458 - gurobipy - INFO - 
+2026-02-18 16:25:53,458 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:53,458 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:53,458 - gurobipy - INFO - 
+2026-02-18 16:25:53,458 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:53,459 - gurobipy - INFO - Model fingerprint: 0x889285df
+2026-02-18 16:25:53,459 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:53,459 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:53,459 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:53,459 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:53,459 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:53,459 - gurobipy - INFO -   QObjective range [2e-02, 1e+00]
+2026-02-18 16:25:53,459 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:53,459 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:53,459 - gurobipy - INFO - 
+2026-02-18 16:25:53,459 - gurobipy - INFO - Loaded user MIP start with objective 696.713
+2026-02-18 16:25:53,459 - gurobipy - INFO - 
+2026-02-18 16:25:57,098 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:25:57,098 - gurobipy - INFO - Presolve time: 3.64s
+2026-02-18 16:25:57,098 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:25:57,098 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:25:57,098 - gurobipy - INFO - Found heuristic solution: objective 688.0825259
+2026-02-18 16:25:57,098 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:25:57,098 - gurobipy - INFO - 
+2026-02-18 16:25:57,098 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 3.64 seconds (0.14 work units)
+2026-02-18 16:25:57,098 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:25:57,098 - gurobipy - INFO - 
+2026-02-18 16:25:57,098 - gurobipy - INFO - Solution count 2: 688.083 696.713 
+2026-02-18 16:25:57,098 - gurobipy - INFO - 
+2026-02-18 16:25:57,098 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:25:57,098 - gurobipy - INFO - Best objective 6.880825259277e+02, best bound 6.863098653619e+02, gap 0.2576%
+2026-02-18 16:25:57,108 - root - INFO - Global IQP solved: status=2, gap=0.26%, time=3.6s
+2026-02-18 16:25:57,155 - root - INFO -   Loss: 512.8955 (change: 0.008997)
+2026-02-18 16:25:57,155 - root - INFO -   Beta range: [0.100, 0.495]
+2026-02-18 16:25:57,155 - root - INFO -   Max beta change: 0.025692
+2026-02-18 16:25:57,155 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:25:57,155 - root - INFO -     B-cells: 169 cells (4.2%)
+2026-02-18 16:25:57,155 - root - INFO -     CAFs: 801 cells (20.0%)
+2026-02-18 16:25:57,155 - root - INFO -     Cancer Epithelial: 408 cells (10.2%)
+2026-02-18 16:25:57,155 - root - INFO -     Endothelial: 532 cells (13.3%)
+2026-02-18 16:25:57,155 - root - INFO -     Myeloid: 292 cells (7.3%)
+2026-02-18 16:25:57,155 - root - INFO -     Normal Epithelial: 535 cells (13.4%)
+2026-02-18 16:25:57,155 - root - INFO -     PVL: 539 cells (13.5%)
+2026-02-18 16:25:57,155 - root - INFO -     Plasmablasts: 526 cells (13.1%)
+2026-02-18 16:25:57,155 - root - INFO -     T-cells: 199 cells (5.0%)
+2026-02-18 16:25:57,155 - root - WARNING - Loss increased from 508.3223 to 512.8955
+2026-02-18 16:25:57,155 - root - INFO - 
+=== EM Iteration 9/10 ===
+2026-02-18 16:25:57,155 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:25:57,155 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:25:57,155 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:25:57,155 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:25:57,155 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:25:57,155 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:25:57,155 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:25:58,011 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:25:58,012 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:25:58,012 - gurobipy - INFO - 
+2026-02-18 16:25:58,012 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:25:58,012 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:25:58,012 - gurobipy - INFO - 
+2026-02-18 16:25:58,012 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:25:58,012 - gurobipy - INFO - Model fingerprint: 0x7e572244
+2026-02-18 16:25:58,012 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:25:58,012 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:25:58,012 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:25:58,012 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:25:58,012 - gurobipy - INFO -   Objective range  [6e-09, 1e+00]
+2026-02-18 16:25:58,012 - gurobipy - INFO -   QObjective range [2e-02, 1e+00]
+2026-02-18 16:25:58,012 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:25:58,012 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:25:58,012 - gurobipy - INFO - 
+2026-02-18 16:25:58,012 - gurobipy - INFO - Loaded user MIP start with objective 698.779
+2026-02-18 16:25:58,012 - gurobipy - INFO - 
+2026-02-18 16:26:02,072 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:26:02,072 - gurobipy - INFO - Presolve time: 4.06s
+2026-02-18 16:26:02,072 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:26:02,072 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:26:02,072 - gurobipy - INFO - Found heuristic solution: objective 690.3551542
+2026-02-18 16:26:02,072 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:26:02,072 - gurobipy - INFO - 
+2026-02-18 16:26:02,072 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.06 seconds (0.14 work units)
+2026-02-18 16:26:02,072 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:26:02,072 - gurobipy - INFO - 
+2026-02-18 16:26:02,072 - gurobipy - INFO - Solution count 2: 690.355 698.779 
+2026-02-18 16:26:02,073 - gurobipy - INFO - 
+2026-02-18 16:26:02,073 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:26:02,073 - gurobipy - INFO - Best objective 6.903551542477e+02, best bound 6.885895203821e+02, gap 0.2558%
+2026-02-18 16:26:02,082 - root - INFO - Global IQP solved: status=2, gap=0.26%, time=4.1s
+2026-02-18 16:26:02,125 - root - INFO -   Loss: 515.5339 (change: 0.005144)
+2026-02-18 16:26:02,125 - root - INFO -   Beta range: [0.100, 0.494]
+2026-02-18 16:26:02,125 - root - INFO -   Max beta change: 0.026210
+2026-02-18 16:26:02,125 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:26:02,125 - root - INFO -     B-cells: 172 cells (4.3%)
+2026-02-18 16:26:02,125 - root - INFO -     CAFs: 793 cells (19.8%)
+2026-02-18 16:26:02,125 - root - INFO -     Cancer Epithelial: 408 cells (10.2%)
+2026-02-18 16:26:02,125 - root - INFO -     Endothelial: 535 cells (13.4%)
+2026-02-18 16:26:02,125 - root - INFO -     Myeloid: 299 cells (7.5%)
+2026-02-18 16:26:02,125 - root - INFO -     Normal Epithelial: 534 cells (13.3%)
+2026-02-18 16:26:02,125 - root - INFO -     PVL: 538 cells (13.4%)
+2026-02-18 16:26:02,125 - root - INFO -     Plasmablasts: 529 cells (13.2%)
+2026-02-18 16:26:02,125 - root - INFO -     T-cells: 193 cells (4.8%)
+2026-02-18 16:26:02,125 - root - WARNING - Loss increased from 512.8955 to 515.5339
+2026-02-18 16:26:02,125 - root - INFO - 
+=== EM Iteration 10/10 ===
+2026-02-18 16:26:02,125 - root - INFO - Marker weighting enabled: weights range [0.500, 0.500]
+2026-02-18 16:26:02,125 - root - INFO - Global IQP: 952 spots x 9 cell types = 8568 integer variables
+2026-02-18 16:26:02,125 - root - INFO - Time limit: 600.0s, MIP gap: 5.0%
+2026-02-18 16:26:02,125 - root - INFO - Constraint slack: ±1 cells
+2026-02-18 16:26:02,125 - root - INFO - Elastic net: lambda=1.00, alpha=0.50
+2026-02-18 16:26:02,125 - gurobipy - INFO - Set parameter TimeLimit to value 600
+2026-02-18 16:26:02,125 - gurobipy - INFO - Set parameter MIPGap to value 0.05
+2026-02-18 16:26:03,005 - root - INFO - Starting global IQP optimization...
+2026-02-18 16:26:03,006 - gurobipy - INFO - Gurobi Optimizer version 11.0.2 build v11.0.2rc0 (linux64 - "Red Hat Enterprise Linux 9.6 (Plow)")
+2026-02-18 16:26:03,006 - gurobipy - INFO - 
+2026-02-18 16:26:03,006 - gurobipy - INFO - CPU model: AMD EPYC 9575F 64-Core Processor, instruction set [SSE2|AVX|AVX2|AVX512]
+2026-02-18 16:26:03,006 - gurobipy - INFO - Thread count: 128 physical cores, 128 logical processors, using up to 32 threads
+2026-02-18 16:26:03,006 - gurobipy - INFO - 
+2026-02-18 16:26:03,006 - gurobipy - INFO - Optimize a model with 1862 rows, 8568 columns and 16758 nonzeros
+2026-02-18 16:26:03,006 - gurobipy - INFO - Model fingerprint: 0xc6f528a5
+2026-02-18 16:26:03,006 - gurobipy - INFO - Model has 8568 quadratic objective terms
+2026-02-18 16:26:03,006 - gurobipy - INFO - Variable types: 0 continuous, 8568 integer (0 binary)
+2026-02-18 16:26:03,006 - gurobipy - INFO - Coefficient statistics:
+2026-02-18 16:26:03,006 - gurobipy - INFO -   Matrix range     [1e+00, 1e+00]
+2026-02-18 16:26:03,006 - gurobipy - INFO -   Objective range  [6e-09, 9e-01]
+2026-02-18 16:26:03,006 - gurobipy - INFO -   QObjective range [2e-02, 1e+00]
+2026-02-18 16:26:03,006 - gurobipy - INFO -   Bounds range     [1e+00, 2e+01]
+2026-02-18 16:26:03,006 - gurobipy - INFO -   RHS range        [1e+00, 2e+01]
+2026-02-18 16:26:03,006 - gurobipy - INFO - 
+2026-02-18 16:26:03,006 - gurobipy - INFO - Loaded user MIP start with objective 699.966
+2026-02-18 16:26:03,006 - gurobipy - INFO - 
+2026-02-18 16:26:07,320 - gurobipy - INFO - Presolve removed 1860 rows and 8559 columns
+2026-02-18 16:26:07,320 - gurobipy - INFO - Presolve time: 4.31s
+2026-02-18 16:26:07,320 - gurobipy - INFO - Presolved: 2 rows, 9 columns, 18 nonzeros
+2026-02-18 16:26:07,320 - gurobipy - INFO - Presolved model has 9 quadratic objective terms
+2026-02-18 16:26:07,320 - gurobipy - INFO - Found heuristic solution: objective 691.8348725
+2026-02-18 16:26:07,320 - gurobipy - INFO - Variable types: 0 continuous, 9 integer (0 binary)
+2026-02-18 16:26:07,320 - gurobipy - INFO - 
+2026-02-18 16:26:07,320 - gurobipy - INFO - Explored 0 nodes (0 simplex iterations) in 4.31 seconds (0.14 work units)
+2026-02-18 16:26:07,320 - gurobipy - INFO - Thread count was 32 (of 128 available processors)
+2026-02-18 16:26:07,320 - gurobipy - INFO - 
+2026-02-18 16:26:07,320 - gurobipy - INFO - Solution count 2: 691.835 699.966 
+2026-02-18 16:26:07,320 - gurobipy - INFO - 
+2026-02-18 16:26:07,320 - gurobipy - INFO - Optimal solution found (tolerance 5.00e-02)
+2026-02-18 16:26:07,320 - gurobipy - INFO - Best objective 6.918348725119e+02, best bound 6.900808014561e+02, gap 0.2535%
+2026-02-18 16:26:07,331 - root - INFO - Global IQP solved: status=2, gap=0.25%, time=4.3s
+2026-02-18 16:26:07,379 - root - INFO -   Loss: 517.8171 (change: 0.004429)
+2026-02-18 16:26:07,379 - root - INFO -   Beta range: [0.100, 0.495]
+2026-02-18 16:26:07,379 - root - INFO -   Max beta change: 0.019434
+2026-02-18 16:26:07,379 - root - INFO -   Cell count range: [0, 18]
+2026-02-18 16:26:07,379 - root - INFO -     B-cells: 171 cells (4.3%)
+2026-02-18 16:26:07,379 - root - INFO -     CAFs: 785 cells (19.6%)
+2026-02-18 16:26:07,379 - root - INFO -     Cancer Epithelial: 408 cells (10.2%)
+2026-02-18 16:26:07,379 - root - INFO -     Endothelial: 536 cells (13.4%)
+2026-02-18 16:26:07,379 - root - INFO -     Myeloid: 299 cells (7.5%)
+2026-02-18 16:26:07,379 - root - INFO -     Normal Epithelial: 537 cells (13.4%)
+2026-02-18 16:26:07,379 - root - INFO -     PVL: 543 cells (13.6%)
+2026-02-18 16:26:07,379 - root - INFO -     Plasmablasts: 532 cells (13.3%)
+2026-02-18 16:26:07,379 - root - INFO -     T-cells: 190 cells (4.7%)
+2026-02-18 16:26:07,379 - root - WARNING - Loss increased from 515.5339 to 517.8171
+2026-02-18 16:26:07,379 - root - INFO - 
+Final beta values:
+2026-02-18 16:26:07,379 - root - INFO -   B-cells_Protein_1: β=0.388, α=0.042
+2026-02-18 16:26:07,379 - root - INFO -   B-cells_Protein_2: β=0.364, α=0.042
+2026-02-18 16:26:07,379 - root - INFO -   CAFs_Protein_1: β=0.495, α=0.012
+2026-02-18 16:26:07,379 - root - INFO -   CAFs_Protein_2: β=0.460, α=0.059
+2026-02-18 16:26:07,379 - root - INFO -   Cancer Epithelial_Protein_1: β=0.435, α=0.500
+2026-02-18 16:26:07,379 - root - INFO -   Cancer Epithelial_Protein_2: β=0.429, α=0.500
+2026-02-18 16:26:07,379 - root - INFO -   Endothelial_Protein_1: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Endothelial_Protein_2: β=0.102, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Myeloid_Protein_1: β=0.403, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Myeloid_Protein_2: β=0.425, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Normal Epithelial_Protein_1: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Normal Epithelial_Protein_2: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   PVL_Protein_1: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   PVL_Protein_2: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Plasmablasts_Protein_1: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   Plasmablasts_Protein_2: β=0.100, α=0.000
+2026-02-18 16:26:07,379 - root - INFO -   T-cells_Protein_1: β=0.405, α=0.166
+2026-02-18 16:26:07,379 - root - INFO -   T-cells_Protein_2: β=0.326, α=0.266
+2026-02-18 16:26:07,384 - root - INFO - Saved discrete cell counts to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_relaxed/mixed/dapi/mixed/dapi/Wu_rep_1/Wu_rep_1_discrete_cell_counts.csv
+2026-02-18 16:26:07,387 - root - INFO - Saved derived proportions to Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_relaxed/mixed/dapi/mixed/dapi/Wu_rep_1/Wu_rep_1_cell_prop_discrete.csv
+2026-02-18 16:26:07,387 - root - INFO - Cell type distribution:
+2026-02-18 16:26:07,387 - root - INFO -   B-cells: 171 cells (4.3%)
+2026-02-18 16:26:07,387 - root - INFO -   CAFs: 785 cells (19.6%)
+2026-02-18 16:26:07,387 - root - INFO -   Cancer Epithelial: 408 cells (10.2%)
+2026-02-18 16:26:07,387 - root - INFO -   Endothelial: 536 cells (13.4%)
+2026-02-18 16:26:07,387 - root - INFO -   Myeloid: 299 cells (7.5%)
+2026-02-18 16:26:07,387 - root - INFO -   Normal Epithelial: 537 cells (13.4%)
+2026-02-18 16:26:07,387 - root - INFO -   PVL: 543 cells (13.6%)
+2026-02-18 16:26:07,387 - root - INFO -   Plasmablasts: 532 cells (13.3%)
+2026-02-18 16:26:07,387 - root - INFO -   T-cells: 190 cells (4.7%)
+2026-02-18 16:26:07,391 - __main__ - INFO - Loaded ground truth proportions: 952 spots, 9 cell types
+2026-02-18 16:26:07,394 - __main__ - INFO - Proportion correlation: 0.459
+2026-02-18 16:26:07,394 - __main__ - INFO - Proportion RMSE: 0.2006
+2026-02-18 16:26:07,394 - __main__ - INFO - Running GEX deconvolution...
+2026-02-18 16:26:07,395 - CITEgeist.model.utils - INFO - Detected spot spacing: 1.61 units (median of 952 nearest-neighbor distances)
+2026-02-18 16:26:07,395 - CITEgeist.model.utils - INFO - Computed optimal radius: 4.92 (3.0 rings, spot_spacing=1.61)
+2026-02-18 16:26:07,395 - root - INFO - Auto-detected radius: 4.92 (3 rings)
+2026-02-18 16:26:07,395 - root - INFO - Starting Pass 1: Error minimization with enrichment weights...
+2026-02-18 16:26:07,395 - root - INFO - Using discrete mode: cell counts as fixed multipliers
+2026-02-18 16:26:07,395 - root - WARNING - Found 27 spots with zero cells. These will be skipped in deconvolution.
+2026-02-18 16:26:07,395 - root - WARNING - Found 27 spots with zero or negligible total cell proportions. Deconvolution for these spots may fail and their profiles will be imputed as zeros. Example spot indices: [ 11 113 256 271 308]
+2026-02-18 16:26:07,396 - root - INFO - Starting analysis for Wu_rep_1
+2026-02-18 16:26:07,396 - root - INFO - Already completed spots: 0
+2026-02-18 16:26:07,396 - root - INFO - Using enrichment weights - Global: 0.5, Local: 0.5
+2026-02-18 16:26:07,396 - root - INFO - Using 128 workers
+2026-02-18 16:26:07,396 - root - INFO - Processing 952 remaining spots
+Deconvoluting Remaining Spots:   0%|          | 0/952 [00:00<?, ?it/s]Deconvoluting Remaining Spots:   0%|          | 1/952 [00:02<40:02,  2.53s/it]Deconvoluting Remaining Spots:   0%|          | 2/952 [00:02<18:24,  1.16s/it]Deconvoluting Remaining Spots:   0%|          | 3/952 [00:03<12:28,  1.27it/s]Deconvoluting Remaining Spots:   1%|          | 5/952 [00:03<06:46,  2.33it/s]Deconvoluting Remaining Spots:   1%|          | 6/952 [00:03<05:40,  2.78it/s]Deconvoluting Remaining Spots:   1%|          | 7/952 [00:03<05:03,  3.12it/s]Deconvoluting Remaining Spots:   1%|          | 8/952 [00:03<04:15,  3.69it/s]Deconvoluting Remaining Spots:   1%|          | 9/952 [00:04<03:58,  3.95it/s]Deconvoluting Remaining Spots:   1%|          | 10/952 [00:04<03:42,  4.24it/s]Deconvoluting Remaining Spots:   1%|          | 11/952 [00:04<03:35,  4.37it/s]Deconvoluting Remaining Spots:   1%|▏         | 12/952 [00:04<03:31,  4.44it/s]Deconvoluting Remaining Spots:   1%|▏         | 13/952 [00:05<03:32,  4.42it/s]Deconvoluting Remaining Spots:   1%|▏         | 14/952 [00:05<03:25,  4.57it/s]Deconvoluting Remaining Spots:   2%|▏         | 15/952 [00:05<03:18,  4.72it/s]Deconvoluting Remaining Spots:   2%|▏         | 16/952 [00:05<03:18,  4.72it/s]Deconvoluting Remaining Spots:   2%|▏         | 17/952 [00:05<03:17,  4.73it/s]Deconvoluting Remaining Spots:   2%|▏         | 18/952 [00:06<03:17,  4.73it/s]Deconvoluting Remaining Spots:   2%|▏         | 19/952 [00:06<03:19,  4.67it/s]Deconvoluting Remaining Spots:   2%|▏         | 20/952 [00:06<03:18,  4.69it/s]Deconvoluting Remaining Spots:   2%|▏         | 21/952 [00:06<03:22,  4.60it/s]Deconvoluting Remaining Spots:   2%|▏         | 22/952 [00:06<03:28,  4.45it/s]Deconvoluting Remaining Spots:   2%|▏         | 23/952 [00:07<03:11,  4.85it/s]Deconvoluting Remaining Spots:   3%|▎         | 24/952 [00:07<03:09,  4.89it/s]Deconvoluting Remaining Spots:   3%|▎         | 25/952 [00:07<03:05,  5.00it/s]Deconvoluting Remaining Spots:   3%|▎         | 26/952 [00:07<03:23,  4.54it/s]Deconvoluting Remaining Spots:   3%|▎         | 27/952 [00:07<03:02,  5.08it/s]Deconvoluting Remaining Spots:   3%|▎         | 28/952 [00:08<03:12,  4.80it/s]Deconvoluting Remaining Spots:   3%|▎         | 29/952 [00:08<02:59,  5.14it/s]Deconvoluting Remaining Spots:   3%|▎         | 30/952 [00:08<03:10,  4.84it/s]Deconvoluting Remaining Spots:   3%|▎         | 31/952 [00:08<03:09,  4.86it/s]Deconvoluting Remaining Spots:   3%|▎         | 32/952 [00:08<03:21,  4.56it/s]Deconvoluting Remaining Spots:   3%|▎         | 33/952 [00:09<03:23,  4.52it/s]Deconvoluting Remaining Spots:   4%|▎         | 34/952 [00:09<03:17,  4.65it/s]Deconvoluting Remaining Spots:   4%|▎         | 35/952 [00:09<04:03,  3.77it/s]Deconvoluting Remaining Spots:   4%|▍         | 36/952 [00:09<03:37,  4.20it/s]Deconvoluting Remaining Spots:   4%|▍         | 38/952 [00:10<02:48,  5.42it/s]Deconvoluting Remaining Spots:   4%|▍         | 39/952 [00:10<02:55,  5.21it/s]Deconvoluting Remaining Spots:   4%|▍         | 40/952 [00:10<03:03,  4.96it/s]Deconvoluting Remaining Spots:   4%|▍         | 41/952 [00:10<03:01,  5.01it/s]Deconvoluting Remaining Spots:   4%|▍         | 42/952 [00:11<03:01,  5.01it/s]Deconvoluting Remaining Spots:   5%|▍         | 43/952 [00:11<03:07,  4.84it/s]Deconvoluting Remaining Spots:   5%|▍         | 44/952 [00:11<03:14,  4.66it/s]Deconvoluting Remaining Spots:   5%|▍         | 45/952 [00:11<03:14,  4.67it/s]Deconvoluting Remaining Spots:   5%|▍         | 46/952 [00:11<03:09,  4.79it/s]Deconvoluting Remaining Spots:   5%|▍         | 47/952 [00:12<03:11,  4.71it/s]Deconvoluting Remaining Spots:   5%|▌         | 48/952 [00:12<03:17,  4.59it/s]Deconvoluting Remaining Spots:   5%|▌         | 49/952 [00:12<03:12,  4.70it/s]Deconvoluting Remaining Spots:   5%|▌         | 50/952 [00:12<03:15,  4.61it/s]Deconvoluting Remaining Spots:   5%|▌         | 51/952 [00:13<03:19,  4.52it/s]Deconvoluting Remaining Spots:   5%|▌         | 52/952 [00:13<03:10,  4.71it/s]Deconvoluting Remaining Spots:   6%|▌         | 53/952 [00:13<04:10,  3.58it/s]Deconvoluting Remaining Spots:   6%|▌         | 54/952 [00:13<03:43,  4.02it/s]Deconvoluting Remaining Spots:   6%|▌         | 56/952 [00:14<02:40,  5.57it/s]Deconvoluting Remaining Spots:   6%|▌         | 57/952 [00:14<02:47,  5.35it/s]Deconvoluting Remaining Spots:   6%|▌         | 58/952 [00:14<02:54,  5.14it/s]Deconvoluting Remaining Spots:   6%|▌         | 59/952 [00:14<02:58,  5.01it/s]Deconvoluting Remaining Spots:   6%|▋         | 60/952 [00:14<02:59,  4.98it/s]Deconvoluting Remaining Spots:   6%|▋         | 61/952 [00:15<03:02,  4.88it/s]Deconvoluting Remaining Spots:   7%|▋         | 62/952 [00:15<02:57,  5.00it/s]Deconvoluting Remaining Spots:   7%|▋         | 63/952 [00:15<03:04,  4.82it/s]Deconvoluting Remaining Spots:   7%|▋         | 64/952 [00:15<03:12,  4.61it/s]Deconvoluting Remaining Spots:   7%|▋         | 65/952 [00:16<03:23,  4.36it/s]Deconvoluting Remaining Spots:   7%|▋         | 66/952 [00:16<03:15,  4.53it/s]Deconvoluting Remaining Spots:   7%|▋         | 67/952 [00:16<03:07,  4.73it/s]Deconvoluting Remaining Spots:   7%|▋         | 68/952 [00:16<03:01,  4.87it/s]Deconvoluting Remaining Spots:   7%|▋         | 69/952 [00:16<02:59,  4.93it/s]Deconvoluting Remaining Spots:   7%|▋         | 70/952 [00:16<02:57,  4.98it/s]Deconvoluting Remaining Spots:   7%|▋         | 71/952 [00:17<02:58,  4.93it/s]Deconvoluting Remaining Spots:   8%|▊         | 72/952 [00:17<03:01,  4.84it/s]Deconvoluting Remaining Spots:   8%|▊         | 73/952 [00:17<03:01,  4.84it/s]Deconvoluting Remaining Spots:   8%|▊         | 74/952 [00:17<03:05,  4.72it/s]Deconvoluting Remaining Spots:   8%|▊         | 75/952 [00:18<03:02,  4.81it/s]Deconvoluting Remaining Spots:   8%|▊         | 76/952 [00:18<03:07,  4.66it/s]Deconvoluting Remaining Spots:   8%|▊         | 77/952 [00:18<03:08,  4.64it/s]Deconvoluting Remaining Spots:   8%|▊         | 78/952 [00:18<03:04,  4.73it/s]Deconvoluting Remaining Spots:   8%|▊         | 79/952 [00:19<03:36,  4.03it/s]Deconvoluting Remaining Spots:   9%|▊         | 81/952 [00:19<02:55,  4.96it/s]Deconvoluting Remaining Spots:   9%|▊         | 82/952 [00:19<03:10,  4.57it/s]Deconvoluting Remaining Spots:   9%|▊         | 83/952 [00:19<03:02,  4.77it/s]Deconvoluting Remaining Spots:   9%|▉         | 84/952 [00:19<03:00,  4.80it/s]Deconvoluting Remaining Spots:   9%|▉         | 85/952 [00:20<03:07,  4.63it/s]Deconvoluting Remaining Spots:   9%|▉         | 86/952 [00:20<02:52,  5.02it/s]Deconvoluting Remaining Spots:   9%|▉         | 87/952 [00:20<03:07,  4.61it/s]Deconvoluting Remaining Spots:   9%|▉         | 88/952 [00:20<03:02,  4.73it/s]Deconvoluting Remaining Spots:   9%|▉         | 89/952 [00:21<03:01,  4.75it/s]Deconvoluting Remaining Spots:   9%|▉         | 90/952 [00:21<03:01,  4.75it/s]Deconvoluting Remaining Spots:  10%|▉         | 91/952 [00:21<02:44,  5.23it/s]Deconvoluting Remaining Spots:  10%|▉         | 92/952 [00:21<02:52,  5.00it/s]Deconvoluting Remaining Spots:  10%|▉         | 93/952 [00:21<03:04,  4.65it/s]Deconvoluting Remaining Spots:  10%|▉         | 94/952 [00:22<03:00,  4.76it/s]Deconvoluting Remaining Spots:  10%|▉         | 95/952 [00:22<03:11,  4.47it/s]Deconvoluting Remaining Spots:  10%|█         | 96/952 [00:22<03:16,  4.37it/s]Deconvoluting Remaining Spots:  10%|█         | 97/952 [00:22<02:56,  4.85it/s]Deconvoluting Remaining Spots:  10%|█         | 98/952 [00:22<02:58,  4.79it/s]Deconvoluting Remaining Spots:  10%|█         | 99/952 [00:23<03:11,  4.46it/s]Deconvoluting Remaining Spots:  11%|█         | 100/952 [00:23<02:51,  4.96it/s]2026-02-18 16:26:32,699 - root - INFO - Saved checkpoint after 100 completed spots
+Deconvoluting Remaining Spots:  11%|█         | 101/952 [00:23<04:14,  3.34it/s]Deconvoluting Remaining Spots:  11%|█         | 104/952 [00:24<02:39,  5.33it/s]Deconvoluting Remaining Spots:  11%|█         | 105/952 [00:24<02:48,  5.03it/s]Deconvoluting Remaining Spots:  11%|█         | 106/952 [00:24<02:48,  5.02it/s]Deconvoluting Remaining Spots:  11%|█         | 107/952 [00:24<02:52,  4.90it/s]Deconvoluting Remaining Spots:  11%|█▏        | 108/952 [00:25<02:52,  4.89it/s]Deconvoluting Remaining Spots:  11%|█▏        | 109/952 [00:25<03:09,  4.45it/s]Deconvoluting Remaining Spots:  12%|█▏        | 110/952 [00:25<02:54,  4.83it/s]Deconvoluting Remaining Spots:  12%|█▏        | 111/952 [00:25<02:55,  4.79it/s]Deconvoluting Remaining Spots:  12%|█▏        | 112/952 [00:25<03:05,  4.52it/s]Deconvoluting Remaining Spots:  12%|█▏        | 113/952 [00:26<03:04,  4.55it/s]Deconvoluting Remaining Spots:  12%|█▏        | 114/952 [00:26<03:48,  3.66it/s]Deconvoluting Remaining Spots:  12%|█▏        | 115/952 [00:26<03:32,  3.93it/s]Deconvoluting Remaining Spots:  12%|█▏        | 117/952 [00:26<02:34,  5.39it/s]Deconvoluting Remaining Spots:  12%|█▏        | 118/952 [00:27<02:39,  5.21it/s]Deconvoluting Remaining Spots:  12%|█▎        | 119/952 [00:27<03:13,  4.30it/s]Deconvoluting Remaining Spots:  13%|█▎        | 120/952 [00:27<02:44,  5.05it/s]Deconvoluting Remaining Spots:  13%|█▎        | 121/952 [00:27<02:40,  5.18it/s]Deconvoluting Remaining Spots:  13%|█▎        | 122/952 [00:27<02:35,  5.35it/s]Deconvoluting Remaining Spots:  13%|█▎        | 123/952 [00:28<02:54,  4.75it/s]Deconvoluting Remaining Spots:  13%|█▎        | 124/952 [00:28<02:52,  4.81it/s]Deconvoluting Remaining Spots:  13%|█▎        | 125/952 [00:28<03:00,  4.59it/s]Deconvoluting Remaining Spots:  13%|█▎        | 126/952 [00:28<02:53,  4.75it/s]Deconvoluting Remaining Spots:  13%|█▎        | 127/952 [00:29<03:06,  4.42it/s]Deconvoluting Remaining Spots:  13%|█▎        | 128/952 [00:29<04:04,  3.37it/s]Deconvoluting Remaining Spots:  14%|█▎        | 130/952 [00:29<02:32,  5.38it/s]Deconvoluting Remaining Spots:  14%|█▍        | 132/952 [00:29<02:05,  6.53it/s]Deconvoluting Remaining Spots:  14%|█▍        | 133/952 [00:30<02:04,  6.57it/s]Deconvoluting Remaining Spots:  14%|█▍        | 134/952 [00:30<02:05,  6.54it/s]Deconvoluting Remaining Spots:  14%|█▍        | 135/952 [00:30<02:10,  6.24it/s]Deconvoluting Remaining Spots:  14%|█▍        | 136/952 [00:30<02:13,  6.10it/s]Deconvoluting Remaining Spots:  14%|█▍        | 138/952 [00:30<02:13,  6.12it/s]Deconvoluting Remaining Spots:  15%|█▍        | 139/952 [00:31<02:04,  6.54it/s]Deconvoluting Remaining Spots:  15%|█▍        | 140/952 [00:31<02:01,  6.68it/s]Deconvoluting Remaining Spots:  15%|█▍        | 141/952 [00:31<02:05,  6.44it/s]Deconvoluting Remaining Spots:  15%|█▍        | 142/952 [00:31<02:45,  4.88it/s]Deconvoluting Remaining Spots:  15%|█▌        | 143/952 [00:31<02:47,  4.84it/s]Deconvoluting Remaining Spots:  15%|█▌        | 144/952 [00:32<03:02,  4.43it/s]Deconvoluting Remaining Spots:  15%|█▌        | 145/952 [00:32<02:40,  5.04it/s]Deconvoluting Remaining Spots:  15%|█▌        | 146/952 [00:32<02:24,  5.59it/s]Deconvoluting Remaining Spots:  15%|█▌        | 147/952 [00:32<02:09,  6.22it/s]Deconvoluting Remaining Spots:  16%|█▌        | 149/952 [00:32<01:58,  6.77it/s]Deconvoluting Remaining Spots:  16%|█▌        | 150/952 [00:32<02:05,  6.41it/s]Deconvoluting Remaining Spots:  16%|█▌        | 151/952 [00:33<02:02,  6.54it/s]Deconvoluting Remaining Spots:  16%|█▌        | 152/952 [00:33<01:55,  6.91it/s]Deconvoluting Remaining Spots:  16%|█▌        | 153/952 [00:33<02:06,  6.30it/s]Deconvoluting Remaining Spots:  16%|█▌        | 154/952 [00:33<02:03,  6.47it/s]/var/spool/slurmd/job8040872/slurm_script: line 38: 2942295 Killed                  python Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py --replicate-id ${SLURM_ARRAY_TASK_ID} --condition mixed --mode dapi --output-dir Benchmarking/simulation_benchmarking/CITEgeist/output_discrete_relaxed/mixed/dapi --use-clr-preprocessing --constraint-slack 1 --lambda-reg 1.0 --alpha-elastic 0.5 --use-marker-weighting --global-solve --global-time-limit 600 --global-mip-gap 0.05 --max-em-iterations 10
+slurmstepd: error: Detected 1 oom_kill event in StepId=8040872.batch. Some of the step tasks have been OOM Killed.

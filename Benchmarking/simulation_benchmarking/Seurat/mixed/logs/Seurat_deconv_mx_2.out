@@ -1,0 +1,17 @@
+[2026-02-11 00:08:11] Running Seurat deconvolution for replicate: Wu_rep_2
+[2026-02-11 00:08:16.087228] Converting h5ad to h5Seurat: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_2_GEX.h5ad -> /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_2_GEX.h5seurat
+[2026-02-11 00:08:33.72326] Loading converted Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/mixed/h5ad_objects/Wu_rep_2_GEX.h5seurat
+[2026-02-11 00:08:55.08516] Loading reference Seurat object: /ix1/alee/LO_LAB/Personal/Brent_Schlegel/bts76/Projects/CITEgeist/Wu_Visium/Simulations/models/Wu_scRNA_ref_ERpos.h5seurat
+[2026-02-11 00:09:41.710282] Running spatial deconvolution for replicate: Wu_rep_2
+[2026-02-11 00:10:02.202456] Saved deconvolution predictions: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_2_Seurat_deconv_predictions.csv
+[2026-02-11 00:10:07.070664] Saved updated Seurat object: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_2_updated_query.h5Seurat
+[2026-02-11 00:10:07.284643] Saved visualization: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/Seurat/mixed/output/Wu_rep_2_Seurat_Prediction.pdf
+[2026-02-11 00:10:07.284775] Prediction summary for Wu_rep_2:
+
+          B-cells              CAFs Cancer Epithelial       Endothelial 
+               20               514               272                 9 
+          Myeloid      Plasmablasts               PVL           T-cells 
+              104                 1                 2                35 
+[2026-02-11 00:10:07.286098] Seurat deconvolution completed for Wu_rep_2
+[2026-02-11 00:10:07] Completed Seurat deconvolution for replicate: Wu_rep_2
+SEURAT_TOTAL_RUNTIME: Wu_rep_2 took 116 seconds (1.93 minutes)

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="280" viewBox="0 0 800 280">
+  <defs>
+    <style>
+      .title { font-family: Arial, sans-serif; font-size: 14px; font-weight: bold; }
+      .subtitle { font-family: Arial, sans-serif; font-size: 11px; }
+      .label { font-family: Arial, sans-serif; font-size: 10px; }
+      .small { font-family: Arial, sans-serif; font-size: 9px; }
+      .italic { font-style: italic; }
+      .bold { font-weight: bold; }
+      .white { fill: white; }
+      .neutral { fill: #7f8c8d; }
+    </style>
+  </defs>
+  <text x="400" y="25" class="title" text-anchor="middle">CITEgeist Modular Pipeline</text>
+  <rect x="95" y="70" width="110" height="120" rx="8" fill="#3498db" stroke="#2c3e50" stroke-width="2" opacity="1"/>
+  <circle cx="115" cy="90" r="15" fill="white" stroke="#3498db" stroke-width="2"/>
+  <text x="115" y="95" class="label bold" text-anchor="middle" fill="#3498db">1</text>
+  <text x="150.0" y="125" class="label bold white" text-anchor="middle">Marker</text>
+  <text x="150.0" y="140" class="label bold white" text-anchor="middle">Interest</text>
+  <text x="150.0" y="175" class="small italic white" text-anchor="middle">Kurtosis/GMM/Moran's I</text>
+  <line x1="210" y1="130.0" x2="225" y2="130.0" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="225,130.0 218.0717967697245,134.0 218.0717967697245,126.0" fill="#2c3e50"/>
+  <rect x="230" y="70" width="110" height="120" rx="8" fill="#9b59b6" stroke="#2c3e50" stroke-width="2" opacity="1"/>
+  <circle cx="250" cy="90" r="15" fill="white" stroke="#9b59b6" stroke-width="2"/>
+  <text x="250" y="95" class="label bold" text-anchor="middle" fill="#9b59b6">2</text>
+  <text x="285.0" y="125" class="label bold white" text-anchor="middle">Profile</text>
+  <text x="285.0" y="140" class="label bold white" text-anchor="middle">Discovery</text>
+  <text x="285.0" y="175" class="small italic white" text-anchor="middle">Colocalization + Clustering</text>
+  <line x1="345" y1="130.0" x2="360" y2="130.0" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="360,130.0 353.0717967697245,134.0 353.0717967697245,126.0" fill="#2c3e50"/>
+  <rect x="365" y="70" width="110" height="120" rx="8" fill="#27ae60" stroke="#2c3e50" stroke-width="2" opacity="1"/>
+  <circle cx="385" cy="90" r="15" fill="white" stroke="#27ae60" stroke-width="2"/>
+  <text x="385" y="95" class="label bold" text-anchor="middle" fill="#27ae60">3</text>
+  <text x="420.0" y="132" class="label bold white" text-anchor="middle">Deconvolution</text>
+  <text x="420.0" y="175" class="small italic white" text-anchor="middle">Proportions + GEX</text>
+  <line x1="480" y1="130.0" x2="495" y2="130.0" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="495,130.0 488.0717967697245,134.0 488.0717967697245,126.0" fill="#2c3e50"/>
+  <rect x="500" y="70" width="110" height="120" rx="8" fill="#e67e22" stroke="#2c3e50" stroke-width="2" opacity="1"/>
+  <circle cx="520" cy="90" r="15" fill="white" stroke="#e67e22" stroke-width="2"/>
+  <text x="520" y="95" class="label bold" text-anchor="middle" fill="#e67e22">4</text>
+  <text x="555.0" y="125" class="label bold white" text-anchor="middle">Program</text>
+  <text x="555.0" y="140" class="label bold white" text-anchor="middle">Discovery</text>
+  <text x="555.0" y="175" class="small italic white" text-anchor="middle">NMF + Spatial Coherence</text>
+  <line x1="615" y1="130.0" x2="630" y2="130.0" stroke="#2c3e50" stroke-width="2"/>
+  <polygon points="630,130.0 623.0717967697245,134.0 623.0717967697245,126.0" fill="#2c3e50"/>
+  <rect x="635" y="70" width="110" height="120" rx="8" fill="#e91e63" stroke="#2c3e50" stroke-width="2" opacity="1"/>
+  <circle cx="655" cy="90" r="15" fill="white" stroke="#e91e63" stroke-width="2"/>
+  <text x="655" y="95" class="label bold" text-anchor="middle" fill="#e91e63">5</text>
+  <text x="690.0" y="132" class="label bold white" text-anchor="middle">Integration</text>
+  <text x="690.0" y="175" class="small italic white" text-anchor="middle">Cross-sample Alignment</text>
+  <rect x="10" y="100" width="70" height="60" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5" opacity="1"/>
+  <text x="45" y="122" class="small" text-anchor="middle">Spatial</text>
+  <text x="45" y="135" class="small" text-anchor="middle">Transcriptomics</text>
+  <text x="45" y="148" class="small" text-anchor="middle">+ CITE-seq</text>
+  <rect x="720" y="100" width="70" height="60" rx="5" fill="#f8f9fa" stroke="#dee2e6" stroke-width="1.5" opacity="1"/>
+  <text x="755" y="122" class="small" text-anchor="middle">Spatial</text>
+  <text x="755" y="135" class="small" text-anchor="middle">Programs +</text>
+  <text x="755" y="148" class="small" text-anchor="middle">Relationships</text>
+  <text x="400" y="220" class="subtitle italic neutral" text-anchor="middle">Protein-anchored deconvolution with automatic profile discovery</text>
+</svg>
