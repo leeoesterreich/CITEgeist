@@ -48,6 +48,7 @@ from .segmentation import (
 from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
 from .cell_level_gex import distribute_gex_to_cells
 from .single_cell_output import create_single_cell_adata
+from .multimodal_refinement import multimodal_em_refinement
 
 
 RESOLUTION_DEFAULTS = {
@@ -934,6 +935,111 @@ class CitegeistModel:
         self.results["cell_prop"] = finetuned_cell_type_proportions_df
 
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
+
+    def run_multimodal_refinement(
+        self,
+        n_anchors: int = 20,
+        min_correlation: float = 0.3,
+        lambda_prior: float = 1.0,
+        max_iterations: int = 20,
+        tolerance: float = 1e-4,
+    ) -> pd.DataFrame:
+        """
+        Run Pass 1.5 + Pass 2 EM multimodal refinement.
+
+        Uses RNA expression to refine protein-based proportions, addressing
+        cells with RNA signal but low protein expression.
+
+        Prerequisites:
+            - run_cell_proportion_model() must be called first (Pass 1)
+            - GEX data must be preprocessed
+
+        Args:
+            n_anchors: Number of anchor genes per cell type (default: 20)
+            min_correlation: Minimum Pearson r for anchor selection (default: 0.3)
+            lambda_prior: Trust in protein prior vs RNA (default: 1.0)
+            max_iterations: Maximum EM iterations (default: 20)
+            tolerance: Convergence tolerance (default: 1e-4)
+
+        Returns:
+            DataFrame with refined cell type proportions
+        """
+        if not hasattr(self, "cell_prop_global_results") and "cell_prop" not in self.results:
+            raise ValueError("Must run run_cell_proportion_model() first (Pass 1)")
+
+        if self.gene_expression_adata is None:
+            raise ValueError("Gene expression data not loaded")
+
+        logging.info("=" * 60)
+        logging.info("Running Multimodal Refinement (Pass 1.5 + Pass 2 EM)")
+        logging.info("=" * 60)
+
+        # Get GEX matrix
+        GEX = self.gene_expression_adata.X
+        if hasattr(GEX, "toarray"):
+            GEX = GEX.toarray()
+        GEX = np.array(GEX, dtype=np.float64)
+
+        gene_names = list(self.gene_expression_adata.var_names)
+        spot_names = list(self.gene_expression_adata.obs_names)
+
+        # Get Y_protein from Pass 1 results
+        if "cell_prop" in self.results and self.results["cell_prop"] is not None:
+            cell_prop_df = self.results["cell_prop"]
+        else:
+            raise ValueError("Cell proportions not found in results. Run run_cell_proportion_model() first.")
+
+        cell_type_names = [c for c in cell_prop_df.columns if c not in ["spot_id"]]
+        Y_protein = cell_prop_df[cell_type_names].values
+
+        logging.info(f"Input: {len(spot_names)} spots, {len(gene_names)} genes, {len(cell_type_names)} cell types")
+
+        # Run multimodal EM
+        Y_refined, E_final, anchors = multimodal_em_refinement(
+            GEX=GEX,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            n_anchors=n_anchors,
+            min_correlation=min_correlation,
+            lambda_prior=lambda_prior,
+            max_iterations=max_iterations,
+            tolerance=tolerance,
+        )
+
+        # Store results
+        self.cell_prop_refined_results = pd.DataFrame(
+            Y_refined,
+            index=spot_names,
+            columns=cell_type_names,
+        )
+        self.expression_profiles = pd.DataFrame(
+            E_final,
+            index=cell_type_names,
+            columns=gene_names,
+        )
+        self.anchor_genes = anchors
+
+        # Log anchor gene summary
+        logging.info("Anchor genes per cell type:")
+        for ct, genes in anchors.items():
+            logging.info(f"  {ct}: {genes[:5]}{'...' if len(genes) > 5 else ''}")
+
+        # Save results
+        import json
+        from pathlib import Path
+
+        output_folder = Path(self.output_folder)
+        output_path = output_folder / f"{self.sample_name}_cell_prop_refined_results.csv"
+        self.cell_prop_refined_results.to_csv(output_path)
+        logging.info(f"Saved refined proportions to {output_path}")
+
+        anchors_path = output_folder / f"{self.sample_name}_anchor_genes.json"
+        with open(anchors_path, "w") as f:
+            json.dump(anchors, f, indent=2)
+        logging.info(f"Saved anchor genes to {anchors_path}")
+
+        return self.cell_prop_refined_results
 
     def _run_cell_classification(self, **kwargs):
         """Archived — gating-based cell classification module removed."""
