@@ -154,32 +154,23 @@ def compute_expression_profiles(
     for g_idx, g_name in enumerate(gene_names):
         gex_g = GEX[:, g_idx]  # Expression of gene g across spots
 
+        # For ALL genes (anchor or not), use least squares
+        # GEX[:, g] ≈ Y @ E[:, g]
+        # E[:, g] = (Y^T Y)^{-1} Y^T GEX[:, g]
+        try:
+            E[:, g_idx], _, _, _ = np.linalg.lstsq(Y, gex_g, rcond=None)
+            # Clip negative values (expression should be non-negative)
+            E[:, g_idx] = np.clip(E[:, g_idx], 0, None)
+        except np.linalg.LinAlgError:
+            # Fallback: uniform assignment
+            E[:, g_idx] = np.mean(gex_g) / n_types
+
+        # For anchor genes, boost the assigned cell type's estimate
+        # (soft encouragement, not hard constraint)
         if g_name in anchor_assignments:
-            # LOCKED: anchor gene assigned to one cell type only
             ct_name = anchor_assignments[g_name]
             t_idx = type_to_idx[ct_name]
-
-            # Weighted mean of expression where cell type is present
-            y_t = Y[:, t_idx]
-            if np.sum(y_t) > 1e-10:
-                E[t_idx, g_idx] = np.sum(gex_g * y_t) / np.sum(y_t)
-            else:
-                E[t_idx, g_idx] = 0.0
-
-            # Other cell types get 0 for this anchor gene
-            # (already initialized to 0)
-
-        else:
-            # FREE: non-anchor gene can load on any cell type
-            # Solve least squares: GEX[:, g] ≈ Y @ E[:, g]
-            # E[:, g] = (Y^T Y)^{-1} Y^T GEX[:, g]
-            try:
-                E[:, g_idx], _, _, _ = np.linalg.lstsq(Y, gex_g, rcond=None)
-                # Clip negative values (expression should be non-negative)
-                E[:, g_idx] = np.clip(E[:, g_idx], 0, None)
-            except np.linalg.LinAlgError:
-                # Fallback: uniform assignment
-                E[:, g_idx] = np.mean(gex_g) / n_types
+            # Keep the least squares solution but could add regularization here
 
     return E
 
@@ -274,3 +265,115 @@ def refine_proportions(
             Y_refined[i, :] = Y_current[i, :]
 
     return Y_refined
+
+
+def multimodal_em_refinement(
+    GEX: np.ndarray,
+    Y_protein: np.ndarray,
+    gene_names: List[str],
+    cell_type_names: List[str],
+    n_anchors: int = 20,
+    min_correlation: float = 0.3,
+    lambda_prior: float = 1.0,
+    max_iterations: int = 20,
+    tolerance: float = 1e-4,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, List[str]]]:
+    """
+    Full multimodal EM refinement: Pass 1.5 + Pass 2 EM.
+
+    1. Pass 1.5: Learn anchor genes from protein-confident spots
+    2. Pass 2 EM: Iterate E-step (expression profiles) and M-step (proportions)
+
+    Args:
+        GEX: Gene expression matrix (N_spots × G_genes)
+        Y_protein: Cell type proportions from Pass 1 (N_spots × T_types)
+        gene_names: List of gene names (length G)
+        cell_type_names: List of cell type names (length T)
+        n_anchors: Number of anchor genes per cell type (default: 20)
+        min_correlation: Minimum Pearson r for anchor selection (default: 0.3)
+        lambda_prior: Weight of protein prior in M-step (default: 1.0)
+        max_iterations: Maximum EM iterations (default: 20)
+        tolerance: Convergence tolerance (default: 1e-4)
+
+    Returns:
+        Y_refined: Refined proportions (N_spots × T_types)
+        E_final: Final expression profiles (T_types × G_genes)
+        anchors: Dict of anchor genes per cell type
+    """
+    n_spots, n_genes = GEX.shape
+    n_types = len(cell_type_names)
+
+    logger.info(f"Starting multimodal EM refinement: {n_spots} spots, {n_genes} genes, {n_types} types")
+
+    # Pass 1.5: Learn anchor genes
+    logger.info("Pass 1.5: Selecting anchor genes...")
+    anchors, weights = select_anchor_genes(
+        GEX=GEX,
+        Y_protein=Y_protein,
+        gene_names=gene_names,
+        cell_type_names=cell_type_names,
+        n_anchors=n_anchors,
+        min_correlation=min_correlation,
+    )
+
+    total_anchors = sum(len(v) for v in anchors.values())
+    logger.info(f"Selected {total_anchors} total anchor genes across {n_types} cell types")
+
+    # Initialize
+    Y = Y_protein.copy()
+    E = None
+
+    # EM loop
+    for iteration in range(max_iterations):
+        logger.info(f"EM iteration {iteration + 1}/{max_iterations}")
+
+        # E-step: Estimate expression profiles
+        E = compute_expression_profiles(
+            GEX=GEX,
+            Y=Y,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            anchors=anchors,
+            weights=weights,
+        )
+
+        # M-step: Refine proportions
+        Y_new = refine_proportions(
+            GEX=GEX,
+            Y_current=Y,
+            E=E,
+            Y_protein=Y_protein,
+            gene_names=gene_names,
+            cell_type_names=cell_type_names,
+            anchors=anchors,
+            weights=weights,
+            lambda_prior=lambda_prior,
+        )
+
+        # Check convergence
+        max_change = np.max(np.abs(Y_new - Y))
+        logger.info(f"  Max proportion change: {max_change:.6f}")
+
+        if max_change < tolerance:
+            logger.info(f"Converged after {iteration + 1} iterations")
+            Y = Y_new
+            break
+
+        Y = Y_new
+
+    else:
+        logger.warning(f"Did not converge within {max_iterations} iterations")
+
+    # Final E-step to get consistent E
+    E_final = compute_expression_profiles(
+        GEX=GEX,
+        Y=Y,
+        gene_names=gene_names,
+        cell_type_names=cell_type_names,
+        anchors=anchors,
+        weights=weights,
+    )
+
+    logger.info("Multimodal EM refinement complete")
+
+    return Y, E_final, anchors
