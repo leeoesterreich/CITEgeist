@@ -110,8 +110,9 @@ def largest_remainder_discretize(proportions: np.ndarray, n_total: int) -> np.nd
     if n_remaining > 0:
         # Get indices sorted by remainder (descending)
         indices = np.argsort(-remainders)
-        # Give one extra count to top n_remaining types
+        n_types = len(proportions)
+        # Give one extra count to top n_remaining types (wrap around if needed)
         for i in range(n_remaining):
-            counts[indices[i]] += 1
+            counts[indices[i % n_types]] += 1
 
     return counts
