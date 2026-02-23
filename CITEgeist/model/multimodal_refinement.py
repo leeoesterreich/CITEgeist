@@ -154,23 +154,27 @@ def compute_expression_profiles(
     for g_idx, g_name in enumerate(gene_names):
         gex_g = GEX[:, g_idx]  # Expression of gene g across spots
 
-        # For ALL genes (anchor or not), use least squares
-        # GEX[:, g] ≈ Y @ E[:, g]
-        # E[:, g] = (Y^T Y)^{-1} Y^T GEX[:, g]
-        try:
-            E[:, g_idx], _, _, _ = np.linalg.lstsq(Y, gex_g, rcond=None)
-            # Clip negative values (expression should be non-negative)
-            E[:, g_idx] = np.clip(E[:, g_idx], 0, None)
-        except np.linalg.LinAlgError:
-            # Fallback: uniform assignment
-            E[:, g_idx] = np.mean(gex_g) / n_types
-
-        # For anchor genes, boost the assigned cell type's estimate
-        # (soft encouragement, not hard constraint)
         if g_name in anchor_assignments:
+            # LOCKED: anchor gene assigned to one cell type only
             ct_name = anchor_assignments[g_name]
             t_idx = type_to_idx[ct_name]
-            # Keep the least squares solution but could add regularization here
+
+            # Weighted mean of expression where cell type is present
+            y_t = Y[:, t_idx]
+            if np.sum(y_t) > 1e-10:
+                E[t_idx, g_idx] = np.sum(gex_g * y_t) / np.sum(y_t)
+            else:
+                E[t_idx, g_idx] = 0.0
+
+            # Other cell types get 0 for this anchor gene (already initialized to 0)
+
+        else:
+            # FREE: non-anchor gene can load on any cell type via least squares
+            try:
+                E[:, g_idx], _, _, _ = np.linalg.lstsq(Y, gex_g, rcond=None)
+                E[:, g_idx] = np.clip(E[:, g_idx], 0, None)
+            except np.linalg.LinAlgError:
+                E[:, g_idx] = np.mean(gex_g) / n_types
 
     return E
 

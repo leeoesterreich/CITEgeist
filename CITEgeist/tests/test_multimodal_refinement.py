@@ -108,6 +108,26 @@ class TestComputeExpressionProfiles:
         assert not np.any(np.isnan(E))
         assert not np.any(np.isinf(E))
 
+        # Anchor genes should have non-zero expression ONLY for their cell type
+        # Gene_0 is anchor for TypeA (index 0)
+        gene_0_idx = 0
+        assert E[0, gene_0_idx] > 0  # TypeA has expression
+        # For locked anchors, other types should be 0
+        assert E[1, gene_0_idx] == 0  # TypeB should be 0
+        assert E[2, gene_0_idx] == 0  # TypeC should be 0
+
+        # Gene_2 is anchor for TypeB (index 1)
+        gene_2_idx = 2
+        assert E[1, gene_2_idx] > 0  # TypeB has expression
+        assert E[0, gene_2_idx] == 0  # TypeA should be 0
+        assert E[2, gene_2_idx] == 0  # TypeC should be 0
+
+        # Gene_4 is anchor for TypeC (index 2)
+        gene_4_idx = 4
+        assert E[2, gene_4_idx] > 0  # TypeC has expression
+        assert E[0, gene_4_idx] == 0  # TypeA should be 0
+        assert E[1, gene_4_idx] == 0  # TypeB should be 0
+
 
 class TestRefineProportions:
     """Test M-step: refine proportions given expression profiles."""
