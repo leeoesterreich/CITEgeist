@@ -63,6 +63,14 @@ from .anchored_program_discovery import (
     discover_joint_programs,
 )
 
+# Module 3b: Single-cell resolution
+from .morphology_features import extract_nucleus_features, largest_remainder_discretize
+from .soft_label_classifier import SoftLabelClassifier
+from .hungarian_assignment import assign_nuclei_to_types
+from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
+from .cell_level_gex import distribute_gex_to_cells
+from .single_cell_output import create_single_cell_adata
+
 # Module 5: Cross-sample integration
 from .cross_sample_integration import (
     AlignedProgram,
@@ -140,6 +148,15 @@ __all__ = [
     "JointProgram",
     "JointDiscoveryResult",
     "discover_joint_programs",
+    # Module 3b: Single-cell resolution
+    "extract_nucleus_features",
+    "largest_remainder_discretize",
+    "SoftLabelClassifier",
+    "assign_nuclei_to_types",
+    "run_nucleus_assignment",
+    "NucleusAssignmentResult",
+    "distribute_gex_to_cells",
+    "create_single_cell_adata",
     # Module 5: Cross-sample integration
     "AlignedProgram",
     "ConservedRelationship",
