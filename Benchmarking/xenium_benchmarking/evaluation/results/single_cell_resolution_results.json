@@ -1,0 +1,533 @@
+{
+  "method": "CITEgeist_SingleCell",
+  "regions": {
+    "region_0": {
+      "region_id": 0,
+      "status": "success",
+      "n_cells": 21875,
+      "proportion_metrics": {
+        "B cells_pearson_r": 0.7557242121631643,
+        "B cells_rmse": 0.12238534704378866,
+        "B cells_mae": 0.0888538300368756,
+        "CD4+ T cells_pearson_r": 0.23390014694205777,
+        "CD4+ T cells_rmse": 0.14585159919571863,
+        "CD4+ T cells_mae": 0.12769457857491334,
+        "CD8+ T cells_pearson_r": 0.805729995538877,
+        "CD8+ T cells_rmse": 0.11716703472467628,
+        "CD8+ T cells_mae": 0.09568546918425301,
+        "Macrophages_pearson_r": 0.7062216505063241,
+        "Macrophages_rmse": 0.10389754283431836,
+        "Macrophages_mae": 0.07549083454102046,
+        "Endothelial_pearson_r": 0.6626469420966573,
+        "Endothelial_rmse": 0.11001301648451813,
+        "Endothelial_mae": 0.08118624645020768,
+        "Epithelial_pearson_r": 0.6054104605144057,
+        "Epithelial_rmse": 0.10349489561975299,
+        "Epithelial_mae": 0.06931913471884193,
+        "Fibroblasts_pearson_r": 0.6290869651906925,
+        "Fibroblasts_rmse": 0.10707551729382099,
+        "Fibroblasts_mae": 0.08194308365521055,
+        "overall_pearson_r": 0.6622751662682558,
+        "overall_rmse": 0.11652890457568606,
+        "overall_mae": 0.08859616816590322,
+        "mean_jsd": 0.3900755352192562,
+        "n_spots": 1398
+      },
+      "gex_metrics_total": {
+        "gex_pearson_r": 0.9526263264929322,
+        "gex_log_rmse": 2.1815987083002963,
+        "mean_gene_pearson_r": 0.7009952162994944,
+        "n_genes_evaluated": 395,
+        "n_genes_total": 395,
+        "n_spots": 1398
+      },
+      "gex_metrics_by_celltype": {
+        "B cells": {
+          "gex_pearson_r": 0.11093621966618486,
+          "gex_log_rmse": 3.990078315391623,
+          "mean_gene_pearson_r": 0.1623537932793164,
+          "n_genes_evaluated": 394,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "CD4+ T cells": {
+          "gex_pearson_r": 0.22642988254754895,
+          "gex_log_rmse": 4.7717630309846335,
+          "mean_gene_pearson_r": 0.11875567068430412,
+          "n_genes_evaluated": 380,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "CD8+ T cells": {
+          "gex_pearson_r": 0.5646037138416697,
+          "gex_log_rmse": 4.317715408620341,
+          "mean_gene_pearson_r": 0.23457646526637344,
+          "n_genes_evaluated": 393,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "Macrophages": {
+          "gex_pearson_r": 0.6629746610650804,
+          "gex_log_rmse": 3.924876907412145,
+          "mean_gene_pearson_r": 0.2684745202400076,
+          "n_genes_evaluated": 395,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "Endothelial": {
+          "gex_pearson_r": 0.5989892710323212,
+          "gex_log_rmse": 3.8116876911865485,
+          "mean_gene_pearson_r": 0.25952329907988947,
+          "n_genes_evaluated": 395,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "Epithelial": {
+          "gex_pearson_r": 0.7030626704946035,
+          "gex_log_rmse": 3.6566101194492,
+          "mean_gene_pearson_r": 0.19878127540563503,
+          "n_genes_evaluated": 394,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        },
+        "Fibroblasts": {
+          "gex_pearson_r": 0.4565959836128971,
+          "gex_log_rmse": 4.30487448788335,
+          "mean_gene_pearson_r": 0.144461327335144,
+          "n_genes_evaluated": 391,
+          "n_genes_total": 395,
+          "n_spots": 1398
+        }
+      },
+      "gex_metrics": {
+        "mean_celltype_pearson_r": 0.47479891460861506,
+        "std_celltype_pearson_r": 0.20888041142998415,
+        "n_celltypes_evaluated": 7
+      }
+    },
+    "region_1": {
+      "region_id": 1,
+      "status": "success",
+      "n_cells": 19875,
+      "proportion_metrics": {
+        "B cells_pearson_r": 0.17326600802673062,
+        "B cells_rmse": 0.11083450855621778,
+        "B cells_mae": 0.07997889297514953,
+        "CD4+ T cells_pearson_r": 0.10004131414083561,
+        "CD4+ T cells_rmse": 0.1458549367823065,
+        "CD4+ T cells_mae": 0.122328255279918,
+        "CD8+ T cells_pearson_r": 0.8417941332345446,
+        "CD8+ T cells_rmse": 0.10583192730628176,
+        "CD8+ T cells_mae": 0.08640588691171217,
+        "Macrophages_pearson_r": 0.7191248875375719,
+        "Macrophages_rmse": 0.1116573570795516,
+        "Macrophages_mae": 0.08565897072501479,
+        "Endothelial_pearson_r": 0.6639647883670798,
+        "Endothelial_rmse": 0.11264908557545994,
+        "Endothelial_mae": 0.07954657297163734,
+        "Epithelial_pearson_r": 0.48654400743092874,
+        "Epithelial_rmse": 0.10997148011703044,
+        "Epithelial_mae": 0.07779429159779466,
+        "Fibroblasts_pearson_r": 0.5616036920853636,
+        "Fibroblasts_rmse": 0.134962869312327,
+        "Fibroblasts_mae": 0.10441911321248055,
+        "overall_pearson_r": 0.6037023017421334,
+        "overall_rmse": 0.11965679021455818,
+        "overall_mae": 0.09087599766767242,
+        "mean_jsd": 0.38696357251286356,
+        "n_spots": 1411
+      },
+      "gex_metrics_total": {
+        "gex_pearson_r": 0.962242551536591,
+        "gex_log_rmse": 1.9793670675267883,
+        "mean_gene_pearson_r": 0.734462611992555,
+        "n_genes_evaluated": 392,
+        "n_genes_total": 392,
+        "n_spots": 1411
+      },
+      "gex_metrics_by_celltype": {
+        "B cells": {
+          "gex_pearson_r": 0.02862863733011171,
+          "gex_log_rmse": 3.9054896382044966,
+          "mean_gene_pearson_r": 0.0627214008473638,
+          "n_genes_evaluated": 238,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "CD4+ T cells": {
+          "gex_pearson_r": 0.21594980078295214,
+          "gex_log_rmse": 4.778738428953387,
+          "mean_gene_pearson_r": 0.10176763897737756,
+          "n_genes_evaluated": 372,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "CD8+ T cells": {
+          "gex_pearson_r": 0.6536822944475799,
+          "gex_log_rmse": 4.250749359358965,
+          "mean_gene_pearson_r": 0.24860903184596003,
+          "n_genes_evaluated": 391,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "Macrophages": {
+          "gex_pearson_r": 0.7094807470936124,
+          "gex_log_rmse": 3.6623430684647262,
+          "mean_gene_pearson_r": 0.30376759126604924,
+          "n_genes_evaluated": 392,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "Endothelial": {
+          "gex_pearson_r": 0.631206243869585,
+          "gex_log_rmse": 3.872333776911893,
+          "mean_gene_pearson_r": 0.27400209014274524,
+          "n_genes_evaluated": 392,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "Epithelial": {
+          "gex_pearson_r": 0.7115653104940426,
+          "gex_log_rmse": 3.5925333994388007,
+          "mean_gene_pearson_r": 0.18161132845790412,
+          "n_genes_evaluated": 392,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        },
+        "Fibroblasts": {
+          "gex_pearson_r": 0.5429279548777903,
+          "gex_log_rmse": 4.444817628062865,
+          "mean_gene_pearson_r": 0.1747423042155598,
+          "n_genes_evaluated": 389,
+          "n_genes_total": 392,
+          "n_spots": 1411
+        }
+      },
+      "gex_metrics": {
+        "mean_celltype_pearson_r": 0.49906299841366775,
+        "std_celltype_pearson_r": 0.24905178199123523,
+        "n_celltypes_evaluated": 7
+      }
+    },
+    "region_2": {
+      "region_id": 2,
+      "status": "success",
+      "n_cells": 23149,
+      "proportion_metrics": {
+        "B cells_pearson_r": 0.36339958228338687,
+        "B cells_rmse": 0.10189925272237435,
+        "B cells_mae": 0.07487735759136749,
+        "CD4+ T cells_pearson_r": 0.49476490081483915,
+        "CD4+ T cells_rmse": 0.13974054979315115,
+        "CD4+ T cells_mae": 0.12021199516039179,
+        "CD8+ T cells_pearson_r": 0.7525132188277099,
+        "CD8+ T cells_rmse": 0.12315417265871169,
+        "CD8+ T cells_mae": 0.09557793759761958,
+        "Macrophages_pearson_r": 0.7707779956777504,
+        "Macrophages_rmse": 0.13241037550754584,
+        "Macrophages_mae": 0.08878509652724174,
+        "Endothelial_pearson_r": 0.6276758332523038,
+        "Endothelial_rmse": 0.11119555189673698,
+        "Endothelial_mae": 0.07738405870977155,
+        "Epithelial_pearson_r": 0.5756813812298687,
+        "Epithelial_rmse": 0.15369808743464364,
+        "Epithelial_mae": 0.10101817763211843,
+        "Fibroblasts_pearson_r": 0.5014793660881562,
+        "Fibroblasts_rmse": 0.10678522169725917,
+        "Fibroblasts_mae": 0.08091385698832163,
+        "overall_pearson_r": 0.6598076658498087,
+        "overall_rmse": 0.12535718861533893,
+        "overall_mae": 0.09125264002954746,
+        "mean_jsd": 0.3717754270843217,
+        "n_spots": 1311
+      },
+      "gex_metrics_total": {
+        "gex_pearson_r": 0.9744807510436023,
+        "gex_log_rmse": 1.6693173762127294,
+        "mean_gene_pearson_r": 0.832317081284358,
+        "n_genes_evaluated": 396,
+        "n_genes_total": 396,
+        "n_spots": 1311
+      },
+      "gex_metrics_by_celltype": {
+        "B cells": {
+          "gex_pearson_r": 0.1263039558540688,
+          "gex_log_rmse": 3.9831883923010034,
+          "mean_gene_pearson_r": 0.0752534907354172,
+          "n_genes_evaluated": 390,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "CD4+ T cells": {
+          "gex_pearson_r": 0.2968981860414771,
+          "gex_log_rmse": 4.76110401505001,
+          "mean_gene_pearson_r": 0.16679878110206275,
+          "n_genes_evaluated": 394,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "CD8+ T cells": {
+          "gex_pearson_r": 0.5836416154291624,
+          "gex_log_rmse": 4.20505618308012,
+          "mean_gene_pearson_r": 0.2592587039099666,
+          "n_genes_evaluated": 396,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "Macrophages": {
+          "gex_pearson_r": 0.7074217855224135,
+          "gex_log_rmse": 3.737968974948358,
+          "mean_gene_pearson_r": 0.32752223277568693,
+          "n_genes_evaluated": 396,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "Endothelial": {
+          "gex_pearson_r": 0.48738191121550706,
+          "gex_log_rmse": 3.9536494059937595,
+          "mean_gene_pearson_r": 0.27910213762566394,
+          "n_genes_evaluated": 393,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "Epithelial": {
+          "gex_pearson_r": 0.6498320117853001,
+          "gex_log_rmse": 3.5733035864070852,
+          "mean_gene_pearson_r": 0.20566502038190557,
+          "n_genes_evaluated": 396,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        },
+        "Fibroblasts": {
+          "gex_pearson_r": 0.2959819575873822,
+          "gex_log_rmse": 4.325673854830571,
+          "mean_gene_pearson_r": 0.17431642266586225,
+          "n_genes_evaluated": 376,
+          "n_genes_total": 396,
+          "n_spots": 1311
+        }
+      },
+      "gex_metrics": {
+        "mean_celltype_pearson_r": 0.4496373462050444,
+        "std_celltype_pearson_r": 0.19906790960934942,
+        "n_celltypes_evaluated": 7
+      }
+    },
+    "region_3": {
+      "region_id": 3,
+      "status": "success",
+      "n_cells": 23177,
+      "proportion_metrics": {
+        "B cells_pearson_r": 0.842231931042275,
+        "B cells_rmse": 0.10817259442490462,
+        "B cells_mae": 0.07545137731699465,
+        "CD4+ T cells_pearson_r": 0.4073094181879191,
+        "CD4+ T cells_rmse": 0.13338270425734616,
+        "CD4+ T cells_mae": 0.1087050614008632,
+        "CD8+ T cells_pearson_r": 0.7325386832823884,
+        "CD8+ T cells_rmse": 0.0997541903166022,
+        "CD8+ T cells_mae": 0.07692864103602348,
+        "Macrophages_pearson_r": 0.7305262796425807,
+        "Macrophages_rmse": 0.14365998346958242,
+        "Macrophages_mae": 0.10725795586208471,
+        "Endothelial_pearson_r": 0.4128751064716152,
+        "Endothelial_rmse": 0.12346404846728874,
+        "Endothelial_mae": 0.07760750390849257,
+        "Epithelial_pearson_r": 0.6207504509738734,
+        "Epithelial_rmse": 0.129546566535768,
+        "Epithelial_mae": 0.08080569088660472,
+        "Fibroblasts_pearson_r": 0.41808669166043494,
+        "Fibroblasts_rmse": 0.11401036584292377,
+        "Fibroblasts_mae": 0.08269399754366226,
+        "overall_pearson_r": 0.7246871109539458,
+        "overall_rmse": 0.1225359381689398,
+        "overall_mae": 0.0870643182792465,
+        "mean_jsd": 0.3674060722258807,
+        "n_spots": 1455
+      },
+      "gex_metrics_total": {
+        "gex_pearson_r": 0.9595827693885266,
+        "gex_log_rmse": 1.8911113875545387,
+        "mean_gene_pearson_r": 0.7667133795421427,
+        "n_genes_evaluated": 400,
+        "n_genes_total": 400,
+        "n_spots": 1455
+      },
+      "gex_metrics_by_celltype": {
+        "B cells": {
+          "gex_pearson_r": 0.19252595760099775,
+          "gex_log_rmse": 3.819158018683818,
+          "mean_gene_pearson_r": 0.1456421728752551,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "CD4+ T cells": {
+          "gex_pearson_r": 0.2964096722677354,
+          "gex_log_rmse": 4.704264880732159,
+          "mean_gene_pearson_r": 0.1578828145405861,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "CD8+ T cells": {
+          "gex_pearson_r": 0.616706341540701,
+          "gex_log_rmse": 4.13985106580084,
+          "mean_gene_pearson_r": 0.24180277871989156,
+          "n_genes_evaluated": 400,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "Macrophages": {
+          "gex_pearson_r": 0.7773241934828302,
+          "gex_log_rmse": 3.643763869567558,
+          "mean_gene_pearson_r": 0.34311684619123395,
+          "n_genes_evaluated": 400,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "Endothelial": {
+          "gex_pearson_r": 0.4237551057240506,
+          "gex_log_rmse": 3.96788924512995,
+          "mean_gene_pearson_r": 0.2157380535087468,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "Epithelial": {
+          "gex_pearson_r": 0.6764854037196717,
+          "gex_log_rmse": 3.4836667141987743,
+          "mean_gene_pearson_r": 0.19410416870427105,
+          "n_genes_evaluated": 400,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        },
+        "Fibroblasts": {
+          "gex_pearson_r": 0.24002371521259014,
+          "gex_log_rmse": 4.252254259212884,
+          "mean_gene_pearson_r": 0.11790099065217127,
+          "n_genes_evaluated": 381,
+          "n_genes_total": 400,
+          "n_spots": 1455
+        }
+      },
+      "gex_metrics": {
+        "mean_celltype_pearson_r": 0.46046148422122535,
+        "std_celltype_pearson_r": 0.21385020705866026,
+        "n_celltypes_evaluated": 7
+      }
+    },
+    "region_4": {
+      "region_id": 4,
+      "status": "success",
+      "n_cells": 27911,
+      "proportion_metrics": {
+        "B cells_pearson_r": 0.8947720015802161,
+        "B cells_rmse": 0.10052856379595028,
+        "B cells_mae": 0.07206072010202944,
+        "CD4+ T cells_pearson_r": 0.5034036331183958,
+        "CD4+ T cells_rmse": 0.12644019880881854,
+        "CD4+ T cells_mae": 0.1087627500627063,
+        "CD8+ T cells_pearson_r": 0.6806513098670124,
+        "CD8+ T cells_rmse": 0.10690741670386701,
+        "CD8+ T cells_mae": 0.0868305590990097,
+        "Macrophages_pearson_r": 0.7505375790604641,
+        "Macrophages_rmse": 0.12880220049397678,
+        "Macrophages_mae": 0.09775199163458037,
+        "Endothelial_pearson_r": 0.33717901259284144,
+        "Endothelial_rmse": 0.1259206792362158,
+        "Endothelial_mae": 0.08474471841481279,
+        "Epithelial_pearson_r": 0.3866239004223637,
+        "Epithelial_rmse": 0.1130242827748454,
+        "Epithelial_mae": 0.07358047958192244,
+        "Fibroblasts_pearson_r": 0.42863294673255414,
+        "Fibroblasts_rmse": 0.11944132018021293,
+        "Fibroblasts_mae": 0.09299774122966578,
+        "overall_pearson_r": 0.7271918704257592,
+        "overall_rmse": 0.117721859564062,
+        "overall_mae": 0.08810413716067525,
+        "mean_jsd": 0.38232381724187714,
+        "n_spots": 1404
+      },
+      "gex_metrics_total": {
+        "gex_pearson_r": 0.9409909803165023,
+        "gex_log_rmse": 2.1215099066472005,
+        "mean_gene_pearson_r": 0.7377680997248751,
+        "n_genes_evaluated": 399,
+        "n_genes_total": 399,
+        "n_spots": 1404
+      },
+      "gex_metrics_by_celltype": {
+        "B cells": {
+          "gex_pearson_r": 0.24568711998631948,
+          "gex_log_rmse": 3.9952426110744343,
+          "mean_gene_pearson_r": 0.17905208977389567,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "CD4+ T cells": {
+          "gex_pearson_r": 0.2892505840062133,
+          "gex_log_rmse": 4.836179472534518,
+          "mean_gene_pearson_r": 0.16336234167982738,
+          "n_genes_evaluated": 398,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "CD8+ T cells": {
+          "gex_pearson_r": 0.6096756440400624,
+          "gex_log_rmse": 4.374618258637944,
+          "mean_gene_pearson_r": 0.22743205062341107,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "Macrophages": {
+          "gex_pearson_r": 0.7667878233217161,
+          "gex_log_rmse": 3.7863671502423393,
+          "mean_gene_pearson_r": 0.3366216783419676,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "Endothelial": {
+          "gex_pearson_r": 0.4262751143321257,
+          "gex_log_rmse": 4.3042988804052005,
+          "mean_gene_pearson_r": 0.21023192105189292,
+          "n_genes_evaluated": 398,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "Epithelial": {
+          "gex_pearson_r": 0.5644010315796478,
+          "gex_log_rmse": 3.9182953775829006,
+          "mean_gene_pearson_r": 0.1382923839830393,
+          "n_genes_evaluated": 399,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        },
+        "Fibroblasts": {
+          "gex_pearson_r": 0.26276136089875746,
+          "gex_log_rmse": 4.638922398877605,
+          "mean_gene_pearson_r": 0.12581906779691518,
+          "n_genes_evaluated": 383,
+          "n_genes_total": 399,
+          "n_spots": 1404
+        }
+      },
+      "gex_metrics": {
+        "mean_celltype_pearson_r": 0.4521198111664061,
+        "std_celltype_pearson_r": 0.18597706578638967,
+        "n_celltypes_evaluated": 7
+      }
+    }
+  },
+  "aggregate": {
+    "mean_proportion_pearson_r": 0.6755328230479805,
+    "std_proportion_pearson_r": 0.04618976297576783,
+    "mean_gex_pearson_r": 0.46721611092299176,
+    "std_gex_pearson_r": 0.018189334082413966,
+    "n_regions_evaluated": 5,
+    "n_regions_successful": 5
+  }
+}
