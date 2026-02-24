@@ -13,6 +13,7 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
+from scipy.spatial import cKDTree
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -76,3 +77,41 @@ def load_ground_truth(gt_type: str, gt_dir: Path) -> pd.DataFrame:
     logger.info(f"Loaded {gt_type} GT: {len(gt_df)} cells, {gt_df['cell_type'].nunique()} types")
 
     return gt_df
+
+
+def match_cellpose_to_gt(
+    cellpose_coords: pd.DataFrame,
+    gt_coords: pd.DataFrame,
+    max_dist: float = 10.0,
+) -> Dict[int, str]:
+    """
+    Match Cellpose nuclei to ground truth cells by spatial proximity.
+
+    Uses a KD-tree for efficient nearest-neighbor lookup. Each Cellpose
+    nucleus is matched to its closest ground truth cell if within max_dist.
+
+    Args:
+        cellpose_coords: DataFrame with nucleus_id, centroid_x, centroid_y
+        gt_coords: DataFrame with x_centroid, y_centroid (index = cell_id)
+        max_dist: Maximum distance in microns for a valid match
+
+    Returns:
+        Dict mapping nucleus_id -> gt_cell_id for matched nuclei
+    """
+    gt_xy = gt_coords[["x_centroid", "y_centroid"]].values
+    gt_tree = cKDTree(gt_xy)
+    gt_ids = gt_coords.index.tolist()
+
+    cellpose_xy = cellpose_coords[["centroid_x", "centroid_y"]].values
+    nucleus_ids = cellpose_coords["nucleus_id"].values
+
+    distances, indices = gt_tree.query(cellpose_xy, k=1)
+
+    matches = {}
+    for i, (nid, dist, gt_idx) in enumerate(zip(nucleus_ids, distances, indices)):
+        if dist <= max_dist:
+            matches[int(nid)] = gt_ids[gt_idx]
+
+    logger.info(f"Matched {len(matches)}/{len(nucleus_ids)} nuclei to GT (max_dist={max_dist}µm)")
+
+    return matches
