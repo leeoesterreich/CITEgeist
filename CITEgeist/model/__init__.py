@@ -9,9 +9,11 @@ from .gurobi_impl import (
     optimize_cell_proportions,
     optimize_gene_expression,
     estimate_true_expression_cell,
-    # Anchor module functions for GEX deconvolution
-    compute_anchor_modules,
-    compute_anchor_scores,
+)
+
+# GEX module-aware enrichment functions
+from .gex_modules import (
+    discover_anchor_genes,
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
@@ -107,6 +109,8 @@ __all__ = [
     "optimize_cell_proportions",
     "optimize_gene_expression",
     "estimate_true_expression_cell",
+    # GEX module-aware enrichment
+    "discover_anchor_genes",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
