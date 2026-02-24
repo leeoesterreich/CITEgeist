@@ -1,0 +1,36 @@
+{
+  "n_regions": 4,
+  "total_cells": 56741,
+  "methods": {
+    "morphology": {
+      "overall_accuracy_mean": 0.2839929878549867,
+      "overall_accuracy_std": 0.03791061185785482,
+      "macro_f1_mean": 0.23518639775556993,
+      "macro_f1_std": 0.037857408324395485,
+      "macro_precision_mean": 0.24863611643496122,
+      "macro_precision_std": 0.03428600242581491,
+      "macro_recall_mean": 0.25330536503445994,
+      "macro_recall_std": 0.028614267801232808
+    },
+    "random": {
+      "overall_accuracy_mean": 0.2851938475190714,
+      "overall_accuracy_std": 0.03828520207951865,
+      "macro_f1_mean": 0.23594569417984063,
+      "macro_f1_std": 0.038451523634502854,
+      "macro_precision_mean": 0.24968430673023073,
+      "macro_precision_std": 0.03483248394782201,
+      "macro_recall_mean": 0.254626805484093,
+      "macro_recall_std": 0.02941629888463749
+    },
+    "spot_proportion": {
+      "overall_accuracy_mean": 0.2863853836441392,
+      "overall_accuracy_std": 0.039235970081018035,
+      "macro_f1_mean": 0.23599011754730628,
+      "macro_f1_std": 0.03989063773214882,
+      "macro_precision_mean": 0.2505159719843273,
+      "macro_precision_std": 0.03683036945125595,
+      "macro_recall_mean": 0.25354128184843394,
+      "macro_recall_std": 0.03072600995582572
+    }
+  }
+}
