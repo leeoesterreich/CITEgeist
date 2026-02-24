@@ -115,3 +115,144 @@ def match_cellpose_to_gt(
     logger.info(f"Matched {len(matches)}/{len(nucleus_ids)} nuclei to GT (max_dist={max_dist}µm)")
 
     return matches
+
+
+# --- Baseline Assignment Methods ---
+
+def run_baseline_random(
+    original_assignments: pd.DataFrame,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """
+    Random baseline: shuffle cell type assignments within each spot.
+
+    This baseline preserves the cell type distribution per spot but
+    randomizes which nucleus gets which cell type. Serves as a lower
+    bound for morphology-guided assignment.
+
+    Args:
+        original_assignments: DataFrame with nucleus_id, spot_id, cell_type
+        seed: Random seed for reproducibility
+
+    Returns:
+        DataFrame with same structure, shuffled cell_type within each spot
+    """
+    rng = np.random.default_rng(seed)
+    result = original_assignments.copy()
+
+    for spot_id in result["spot_id"].unique():
+        mask = result["spot_id"] == spot_id
+        types = result.loc[mask, "cell_type"].values.copy()
+        rng.shuffle(types)
+        result.loc[mask, "cell_type"] = types
+
+    return result
+
+
+def run_baseline_uniform(
+    spot_props: pd.DataFrame,
+    nuclei_per_spot: pd.Series,
+    cell_types: List[str],
+) -> pd.DataFrame:
+    """
+    Uniform baseline: all nuclei get equal probability, Hungarian assigns.
+
+    This baseline ignores morphology completely and assigns all nuclei
+    uniform probability across cell types. The Hungarian algorithm then
+    assigns nuclei to satisfy the target counts from spot proportions.
+
+    Args:
+        spot_props: DataFrame indexed by spot_id, columns are cell types with proportions
+        nuclei_per_spot: Series mapping spot_id -> nuclei count
+        cell_types: List of cell type names (column order for proportions)
+
+    Returns:
+        DataFrame with nucleus_id, spot_id, cell_type
+    """
+    import sys
+    sys.path.insert(0, "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist")
+    from CITEgeist.model.morphology_features import largest_remainder_discretize
+    from CITEgeist.model.hungarian_assignment import assign_nuclei_to_types
+
+    results = []
+    nucleus_counter = 0
+
+    for spot_id in spot_props.index:
+        n_nuclei = int(nuclei_per_spot.get(spot_id, 0))
+        if n_nuclei == 0:
+            continue
+
+        props = spot_props.loc[spot_id, cell_types].values.astype(float)
+        counts = largest_remainder_discretize(props, n_nuclei)
+
+        # Uniform probability: all nuclei have equal probability for all types
+        probs = np.ones((n_nuclei, len(cell_types))) / len(cell_types)
+        nucleus_ids = np.arange(nucleus_counter, nucleus_counter + n_nuclei)
+
+        assignments = assign_nuclei_to_types(probs, counts, nucleus_ids)
+
+        for nid, type_idx in assignments.items():
+            results.append({
+                "nucleus_id": nid,
+                "spot_id": spot_id,
+                "cell_type": cell_types[type_idx],
+            })
+
+        nucleus_counter += n_nuclei
+
+    return pd.DataFrame(results)
+
+
+def run_baseline_spot_proportion(
+    nuclei_df: pd.DataFrame,
+    spot_props: pd.DataFrame,
+    nuclei_per_spot: pd.Series,
+    cell_types: List[str],
+) -> pd.DataFrame:
+    """
+    Spot-proportion baseline: use spot proportions as probability for all nuclei.
+
+    This baseline assigns all nuclei within a spot the same probability vector
+    (the spot's cell type proportions). Unlike morphology-guided assignment,
+    it ignores individual nucleus features. The Hungarian algorithm then
+    optimally assigns nuclei to cell types.
+
+    Args:
+        nuclei_df: DataFrame with nucleus_id, spot_id
+        spot_props: DataFrame indexed by spot_id, columns are cell types with proportions
+        nuclei_per_spot: Series mapping spot_id -> nuclei count
+        cell_types: List of cell type names (column order for proportions)
+
+    Returns:
+        DataFrame with nucleus_id, spot_id, cell_type
+    """
+    import sys
+    sys.path.insert(0, "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist")
+    from CITEgeist.model.morphology_features import largest_remainder_discretize
+    from CITEgeist.model.hungarian_assignment import assign_nuclei_to_types
+
+    results = []
+
+    for spot_id in spot_props.index:
+        spot_nuclei = nuclei_df[nuclei_df["spot_id"] == spot_id]
+        n_nuclei = len(spot_nuclei)
+        if n_nuclei == 0:
+            continue
+
+        props = spot_props.loc[spot_id, cell_types].values.astype(float)
+        counts = largest_remainder_discretize(props, n_nuclei)
+
+        # All nuclei in spot get the same probability vector (spot proportions)
+        probs = np.tile(props, (n_nuclei, 1))
+        nucleus_ids = spot_nuclei["nucleus_id"].values
+
+        assignments = assign_nuclei_to_types(probs, counts, nucleus_ids)
+
+        for nid, type_idx in assignments.items():
+            results.append({
+                "nucleus_id": int(nid),
+                "spot_id": spot_id,
+                "cell_type": cell_types[type_idx],
+            })
+
+    return pd.DataFrame(results)
