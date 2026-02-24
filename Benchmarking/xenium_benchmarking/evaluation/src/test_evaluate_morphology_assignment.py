@@ -1,6 +1,8 @@
 # test_evaluate_morphology_assignment.py
 """Tests for morphology-guided cell type assignment evaluation."""
 
+import tempfile
+
 import pytest
 import pandas as pd
 import numpy as np
@@ -14,6 +16,8 @@ from evaluate_morphology_assignment import (
     run_baseline_spot_proportion,
     compute_accuracy_metrics,
     compute_confusion_matrix,
+    plot_confusion_matrix,
+    plot_baseline_comparison,
     PROTEIN_GT_CELL_TYPES,
     RNA_GT_CELL_TYPES,
 )
@@ -293,3 +297,86 @@ def test_compute_confusion_matrix_three_types():
     assert cm[1, 0] == 1  # B->A
     assert cm[2, 1] == 1  # C->B
     assert cm[0, 2] == 1  # A->C
+
+
+# --- Visualization Tests ---
+
+def test_plot_confusion_matrix_creates_file():
+    """Test confusion matrix plot creation."""
+    cm = np.array([[10, 2], [3, 15]])
+    cell_types = ["Type A", "Type B"]
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        output_path = Path(f.name)
+
+    plot_confusion_matrix(cm, cell_types, output_path, title="Test CM")
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    output_path.unlink()
+
+
+def test_plot_confusion_matrix_normalized():
+    """Test confusion matrix plot with normalization."""
+    cm = np.array([[8, 2], [4, 6]])
+    cell_types = ["A", "B"]
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        output_path = Path(f.name)
+
+    plot_confusion_matrix(cm, cell_types, output_path, normalize=True)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    output_path.unlink()
+
+
+def test_plot_confusion_matrix_unnormalized():
+    """Test confusion matrix plot without normalization."""
+    cm = np.array([[8, 2], [4, 6]])
+    cell_types = ["A", "B"]
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        output_path = Path(f.name)
+
+    plot_confusion_matrix(cm, cell_types, output_path, normalize=False)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    output_path.unlink()
+
+
+def test_plot_baseline_comparison_creates_file():
+    """Test baseline comparison plot creation."""
+    results = {
+        "morphology": {"overall_accuracy": 0.65, "macro_f1": 0.60},
+        "random": {"overall_accuracy": 0.40, "macro_f1": 0.35},
+        "uniform": {"overall_accuracy": 0.45, "macro_f1": 0.40},
+        "spot_proportion": {"overall_accuracy": 0.55, "macro_f1": 0.50},
+    }
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        output_path = Path(f.name)
+
+    plot_baseline_comparison(results, output_path)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    output_path.unlink()
+
+
+def test_plot_baseline_comparison_partial_metrics():
+    """Test baseline comparison handles missing metrics gracefully."""
+    results = {
+        "method_a": {"overall_accuracy": 0.7},  # Missing macro_f1
+        "method_b": {"overall_accuracy": 0.5, "macro_f1": 0.45},
+    }
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+        output_path = Path(f.name)
+
+    plot_baseline_comparison(results, output_path)
+
+    assert output_path.exists()
+    assert output_path.stat().st_size > 0
+    output_path.unlink()

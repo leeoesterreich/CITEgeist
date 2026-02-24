@@ -11,8 +11,12 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+import matplotlib
+matplotlib.use("Agg")  # Non-interactive backend for SLURM
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 from scipy.spatial import cKDTree
 from sklearn.metrics import precision_recall_fscore_support, confusion_matrix as sklearn_confusion_matrix
 
@@ -329,3 +333,103 @@ def compute_confusion_matrix(
 
     cm = sklearn_confusion_matrix(gt, pred, labels=cell_types)
     return cm
+
+
+# --- Visualization Functions ---
+
+def plot_confusion_matrix(
+    cm: np.ndarray,
+    cell_types: List[str],
+    output_path: Path,
+    title: str = "Confusion Matrix",
+    normalize: bool = True,
+) -> None:
+    """
+    Plot confusion matrix heatmap.
+
+    Args:
+        cm: Confusion matrix array (rows=actual, cols=predicted)
+        cell_types: List of cell type names (row/column labels)
+        output_path: Path to save the plot
+        title: Plot title
+        normalize: If True, normalize rows to sum to 1
+    """
+    if normalize:
+        row_sums = cm.sum(axis=1, keepdims=True)
+        row_sums[row_sums == 0] = 1  # Avoid division by zero
+        cm_plot = cm.astype(float) / row_sums
+        fmt = ".2f"
+    else:
+        cm_plot = cm
+        fmt = "d"
+
+    fig, ax = plt.subplots(figsize=(10, 8))
+    sns.heatmap(
+        cm_plot,
+        annot=True,
+        fmt=fmt,
+        cmap="Blues",
+        xticklabels=cell_types,
+        yticklabels=cell_types,
+        ax=ax,
+    )
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+    ax.set_title(title)
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+    logger.info(f"Saved confusion matrix: {output_path}")
+
+
+def plot_baseline_comparison(
+    results: Dict[str, Dict[str, float]],
+    output_path: Path,
+) -> None:
+    """
+    Plot bar chart comparing methods on accuracy and F1.
+
+    Args:
+        results: Dict mapping method name -> metrics dict with
+                 'overall_accuracy' and 'macro_f1' keys
+        output_path: Path to save the plot
+    """
+    methods = list(results.keys())
+    accuracies = [results[m].get("overall_accuracy", 0) for m in methods]
+    f1_scores = [results[m].get("macro_f1", 0) for m in methods]
+
+    x = np.arange(len(methods))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    bars1 = ax.bar(x - width / 2, accuracies, width, label="Accuracy", color="steelblue")
+    bars2 = ax.bar(x + width / 2, f1_scores, width, label="Macro F1", color="darkorange")
+
+    ax.set_xlabel("Method")
+    ax.set_ylabel("Score")
+    ax.set_title("Morphology Assignment: Baseline Comparison")
+    ax.set_xticks(x)
+    ax.set_xticklabels(methods, rotation=45, ha="right")
+    ax.legend()
+    ax.set_ylim(0, 1)
+
+    # Add value labels on bars
+    for bar in list(bars1) + list(bars2):
+        height = bar.get_height()
+        ax.annotate(
+            f"{height:.2f}",
+            xy=(bar.get_x() + bar.get_width() / 2, height),
+            xytext=(0, 3),
+            textcoords="offset points",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+        )
+
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+    logger.info(f"Saved baseline comparison: {output_path}")
