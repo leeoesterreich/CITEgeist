@@ -9,6 +9,9 @@ from .gurobi_impl import (
     optimize_cell_proportions,
     optimize_gene_expression,
     estimate_true_expression_cell,
+    # Anchor module functions for GEX deconvolution
+    compute_anchor_modules,
+    compute_anchor_scores,
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
@@ -64,7 +67,8 @@ from .anchored_program_discovery import (
 )
 
 # Module 3b: Single-cell resolution
-from .morphology_features import extract_nucleus_features, largest_remainder_discretize
+from .watershed_segmentation import watershed_from_nuclei
+from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
 from .soft_label_classifier import SoftLabelClassifier
 from .hungarian_assignment import assign_nuclei_to_types
 from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
@@ -157,7 +161,9 @@ __all__ = [
     "JointDiscoveryResult",
     "discover_joint_programs",
     # Module 3b: Single-cell resolution
+    "watershed_from_nuclei",
     "extract_nucleus_features",
+    "extract_cell_features",
     "largest_remainder_discretize",
     "SoftLabelClassifier",
     "assign_nuclei_to_types",
