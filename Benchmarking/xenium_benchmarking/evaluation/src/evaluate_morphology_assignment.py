@@ -574,10 +574,32 @@ def evaluate_region(
         return None
 
     # Step 4: Prepare Cellpose coordinates for matching
+    # Cellpose coordinates are in PIXEL space, need to convert to MICRONS
+    # Load coord_info.json for this region
+    coord_info_path = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_benchmarking/scResolve/images/morphology_hires") / f"Xenium_region_{region_id}" / "coord_info.json"
+
+    if coord_info_path.exists():
+        with open(coord_info_path) as f:
+            coord_info = json.load(f)
+        pixel_size = coord_info["pixel_size"]  # µm per pixel
+        x_offset = coord_info["micron_bounds"]["x_min"]
+        y_offset = coord_info["micron_bounds"]["y_min"]
+        logger.info(f"Loaded coord_info: pixel_size={pixel_size}, offsets=({x_offset:.1f}, {y_offset:.1f})")
+    else:
+        # Fallback: use default values from Xenium (0.2125 µm/pixel)
+        logger.warning(f"coord_info.json not found, using default pixel_size=0.2125")
+        pixel_size = 0.2125
+        x_offset = 0.0
+        y_offset = 0.0
+
+    # Convert pixel coordinates to microns
+    x_micron = adata.obs["x"].values * pixel_size + x_offset
+    y_micron = adata.obs["y"].values * pixel_size + y_offset
+
     cellpose_coords = pd.DataFrame({
         "nucleus_id": adata.obs.index.astype(int).values,
-        "centroid_x": adata.obs["x"].values,
-        "centroid_y": adata.obs["y"].values,
+        "centroid_x": x_micron,
+        "centroid_y": y_micron,
     })
 
     # Step 5: Match Cellpose nuclei to GT cells
