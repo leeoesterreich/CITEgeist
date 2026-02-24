@@ -78,6 +78,108 @@ def extract_nucleus_features(mask: np.ndarray) -> pd.DataFrame:
     return df[columns]
 
 
+def extract_cell_features(
+    nucleus_mask: np.ndarray,
+    cell_mask: np.ndarray,
+) -> pd.DataFrame:
+    """
+    Extract morphology features from paired nucleus and cell masks.
+
+    Assumes nucleus_mask and cell_mask use the same integer labels,
+    where each label corresponds to a nucleus-cell pair.
+
+    Args:
+        nucleus_mask: 2D labeled array of nuclei (from Cellpose)
+        cell_mask: 2D labeled array of cells (from watershed)
+
+    Returns:
+        DataFrame with columns:
+            - cell_id: label from masks
+            - centroid_x, centroid_y: nucleus center coordinates
+            Nuclear features (prefix 'nucleus_'):
+            - nucleus_area, nucleus_circularity, nucleus_eccentricity,
+              nucleus_solidity, nucleus_aspect_ratio
+            Cell features (prefix 'cell_'):
+            - cell_area, cell_circularity, cell_eccentricity,
+              cell_solidity, cell_aspect_ratio
+            Ratio features:
+            - nc_ratio: nucleus_area / cell_area
+            - cytoplasm_area: cell_area - nucleus_area
+    """
+    if nucleus_mask.shape != cell_mask.shape:
+        raise ValueError(
+            f"Shape mismatch: nucleus_mask {nucleus_mask.shape} vs "
+            f"cell_mask {cell_mask.shape}"
+        )
+
+    # Get nucleus features
+    nuc_df = extract_nucleus_features(nucleus_mask)
+    if len(nuc_df) == 0:
+        return pd.DataFrame()
+
+    nuc_df = nuc_df.rename(columns={
+        'nucleus_id': 'cell_id',
+        'area': 'nucleus_area',
+        'circularity': 'nucleus_circularity',
+        'eccentricity': 'nucleus_eccentricity',
+        'solidity': 'nucleus_solidity',
+        'aspect_ratio': 'nucleus_aspect_ratio',
+    })
+    # Drop columns we'll rename differently
+    nuc_df = nuc_df.drop(columns=[
+        'perimeter', 'major_axis_length', 'minor_axis_length'
+    ], errors='ignore')
+
+    # Get cell features using regionprops
+    if cell_mask.max() == 0:
+        return pd.DataFrame()
+
+    props = regionprops_table(
+        cell_mask,
+        properties=[
+            'label',
+            'area',
+            'perimeter',
+            'eccentricity',
+            'solidity',
+            'major_axis_length',
+            'minor_axis_length',
+        ]
+    )
+    cell_df = pd.DataFrame(props)
+    cell_df = cell_df.rename(columns={'label': 'cell_id'})
+
+    # Compute cell circularity
+    perimeter = cell_df['perimeter'].replace(0, np.nan)
+    cell_df['cell_circularity'] = (4 * np.pi * cell_df['area']) / (perimeter ** 2)
+    cell_df['cell_circularity'] = cell_df['cell_circularity'].fillna(1.0).clip(0, 1)
+
+    # Compute cell aspect ratio
+    minor = cell_df['minor_axis_length'].replace(0, np.nan)
+    cell_df['cell_aspect_ratio'] = cell_df['major_axis_length'] / minor
+    cell_df['cell_aspect_ratio'] = cell_df['cell_aspect_ratio'].fillna(1.0)
+
+    # Rename and select columns
+    cell_df = cell_df.rename(columns={
+        'area': 'cell_area',
+        'eccentricity': 'cell_eccentricity',
+        'solidity': 'cell_solidity',
+    })
+    cell_df = cell_df[['cell_id', 'cell_area', 'cell_circularity',
+                       'cell_eccentricity', 'cell_solidity', 'cell_aspect_ratio']]
+
+    # Merge nucleus and cell features
+    merged = nuc_df.merge(cell_df, on='cell_id', how='inner')
+
+    # Compute ratio features
+    merged['nc_ratio'] = merged['nucleus_area'] / merged['cell_area'].replace(0, np.nan)
+    merged['nc_ratio'] = merged['nc_ratio'].fillna(1.0).clip(0, 1)
+    merged['cytoplasm_area'] = merged['cell_area'] - merged['nucleus_area']
+    merged['cytoplasm_area'] = merged['cytoplasm_area'].clip(lower=0)
+
+    return merged
+
+
 def largest_remainder_discretize(proportions: np.ndarray, n_total: int) -> np.ndarray:
     """
     Convert proportions to integer counts using largest remainder method.

@@ -108,3 +108,71 @@ def test_largest_remainder_zero_total():
     counts = largest_remainder_discretize(proportions, n_total)
     assert list(counts) == [0, 0, 0]
     assert counts.sum() == 0
+
+
+# --- Cell Morphology Feature Tests ---
+
+def test_extract_cell_features_single_cell():
+    """Test cell feature extraction from nucleus + cell masks."""
+    from CITEgeist.model.morphology_features import extract_cell_features
+
+    # Create nucleus (small circle) and cell (larger circle) masks
+    nucleus_mask = np.zeros((50, 50), dtype=np.int32)
+    cell_mask = np.zeros((50, 50), dtype=np.int32)
+    y, x = np.ogrid[:50, :50]
+
+    # Nucleus: r=5 at center
+    nucleus_mask[((x - 25)**2 + (y - 25)**2) <= 25] = 1
+    # Cell: r=15 at center (same label)
+    cell_mask[((x - 25)**2 + (y - 25)**2) <= 225] = 1
+
+    features_df = extract_cell_features(nucleus_mask, cell_mask)
+
+    assert len(features_df) == 1
+    assert 'cell_id' in features_df.columns
+    # Nuclear features
+    assert 'nucleus_area' in features_df.columns
+    assert 'nucleus_circularity' in features_df.columns
+    # Cell features
+    assert 'cell_area' in features_df.columns
+    assert 'cell_circularity' in features_df.columns
+    # Ratio features
+    assert 'nc_ratio' in features_df.columns
+    assert 'cytoplasm_area' in features_df.columns
+
+    # Cell area should be larger than nucleus
+    row = features_df.iloc[0]
+    assert row['cell_area'] > row['nucleus_area']
+    # N:C ratio should be < 1
+    assert 0 < row['nc_ratio'] < 1
+    # Cytoplasm = cell - nucleus
+    assert row['cytoplasm_area'] == row['cell_area'] - row['nucleus_area']
+
+
+def test_extract_cell_features_multiple_cells():
+    """Test cell features with multiple cells of different shapes."""
+    from CITEgeist.model.morphology_features import extract_cell_features
+
+    nucleus_mask = np.zeros((100, 100), dtype=np.int32)
+    cell_mask = np.zeros((100, 100), dtype=np.int32)
+    y, x = np.ogrid[:100, :100]
+
+    # Cell 1: Small nucleus, large cell (low N:C ratio - like macrophage)
+    nucleus_mask[((x - 25)**2 + (y - 25)**2) <= 16] = 1  # r=4
+    cell_mask[((x - 25)**2 + (y - 25)**2) <= 225] = 1    # r=15
+
+    # Cell 2: Large nucleus, small cell (high N:C ratio - like lymphocyte)
+    nucleus_mask[((x - 75)**2 + (y - 75)**2) <= 36] = 2  # r=6
+    cell_mask[((x - 75)**2 + (y - 75)**2) <= 64] = 2     # r=8
+
+    features_df = extract_cell_features(nucleus_mask, cell_mask)
+
+    assert len(features_df) == 2
+
+    cell1 = features_df[features_df['cell_id'] == 1].iloc[0]
+    cell2 = features_df[features_df['cell_id'] == 2].iloc[0]
+
+    # Cell 1 should have lower N:C ratio (more cytoplasm)
+    assert cell1['nc_ratio'] < cell2['nc_ratio']
+    # Cell 1 should have larger cytoplasm area
+    assert cell1['cytoplasm_area'] > cell2['cytoplasm_area']
