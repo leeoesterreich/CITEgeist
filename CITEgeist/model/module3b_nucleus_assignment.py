@@ -10,7 +10,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, List, Optional
 
-from .morphology_features import extract_nucleus_features, largest_remainder_discretize
+from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
 from .soft_label_classifier import SoftLabelClassifier
 from .hungarian_assignment import assign_nuclei_to_types
 
@@ -30,6 +30,7 @@ def run_nucleus_assignment(
     proportions: pd.DataFrame,
     nuclei_counts: pd.Series,
     cell_types: List[str],
+    cell_mask: Optional[np.ndarray] = None,
 ) -> NucleusAssignmentResult:
     """
     Run full nucleus assignment pipeline.
@@ -40,12 +41,30 @@ def run_nucleus_assignment(
         proportions: DataFrame with 'spot_id' and one column per cell type
         nuclei_counts: Series mapping spot_id -> nuclei count
         cell_types: List of cell type names (column names in proportions)
+        cell_mask: Optional cell mask from watershed (same labels as nucleus mask).
+                   If provided, extracts cell-level features. If None, uses
+                   nuclear features only.
 
     Returns:
         NucleusAssignmentResult with assignments and metadata
     """
     # Step 1: Extract morphology features
-    morph_df = extract_nucleus_features(mask)
+    if cell_mask is not None:
+        # Use cell-level features (12 features)
+        morph_df = extract_cell_features(mask, cell_mask)
+        morph_df = morph_df.rename(columns={'cell_id': 'nucleus_id'})
+        feature_cols = [
+            'nucleus_area', 'nucleus_circularity', 'nucleus_eccentricity',
+            'nucleus_solidity', 'nucleus_aspect_ratio',
+            'cell_area', 'cell_circularity', 'cell_eccentricity',
+            'cell_solidity', 'cell_aspect_ratio',
+            'nc_ratio', 'cytoplasm_area',
+        ]
+    else:
+        # Use nuclear features only (5 features)
+        morph_df = extract_nucleus_features(mask)
+        feature_cols = ['area', 'circularity', 'eccentricity', 'solidity',
+                        'major_axis_length', 'minor_axis_length', 'aspect_ratio']
 
     # Merge with spot assignments
     morph_df = morph_df.merge(nuclei_spot_map, on='nucleus_id', how='inner')
@@ -59,8 +78,6 @@ def run_nucleus_assignment(
     y_soft = np.vstack(y_soft)  # (n_nuclei, n_types)
 
     # Feature matrix
-    feature_cols = ['area', 'circularity', 'eccentricity', 'solidity',
-                    'major_axis_length', 'minor_axis_length', 'aspect_ratio']
     feature_cols = [c for c in feature_cols if c in morph_df.columns]
     X = morph_df[feature_cols].values
 
