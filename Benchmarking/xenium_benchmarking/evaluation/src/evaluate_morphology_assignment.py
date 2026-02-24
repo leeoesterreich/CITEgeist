@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from scipy.spatial import cKDTree
+from sklearn.metrics import precision_recall_fscore_support, confusion_matrix as sklearn_confusion_matrix
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -256,3 +257,75 @@ def run_baseline_spot_proportion(
             })
 
     return pd.DataFrame(results)
+
+
+# --- Accuracy Metrics ---
+
+def compute_accuracy_metrics(
+    pred_labels: pd.Series,
+    gt_labels: pd.Series,
+    cell_types: List[str],
+) -> Dict[str, float]:
+    """
+    Compute accuracy, precision, recall, F1 per cell type and overall.
+
+    Args:
+        pred_labels: Predicted cell type labels
+        gt_labels: Ground truth cell type labels
+        cell_types: List of cell type names
+
+    Returns:
+        Dict with all metrics including:
+        - overall_accuracy: Fraction of correct predictions
+        - n_cells: Number of cells evaluated
+        - {celltype}_precision, {celltype}_recall, {celltype}_f1, {celltype}_support
+        - macro_precision, macro_recall, macro_f1
+    """
+    common_idx = pred_labels.index.intersection(gt_labels.index)
+    pred = pred_labels.loc[common_idx]
+    gt = gt_labels.loc[common_idx]
+
+    metrics = {}
+    metrics["overall_accuracy"] = (pred == gt).mean()
+    metrics["n_cells"] = len(common_idx)
+
+    precision, recall, f1, support = precision_recall_fscore_support(
+        gt, pred, labels=cell_types, average=None, zero_division=0
+    )
+
+    for i, ct in enumerate(cell_types):
+        metrics[f"{ct}_precision"] = precision[i]
+        metrics[f"{ct}_recall"] = recall[i]
+        metrics[f"{ct}_f1"] = f1[i]
+        metrics[f"{ct}_support"] = int(support[i])
+
+    metrics["macro_precision"] = np.mean(precision)
+    metrics["macro_recall"] = np.mean(recall)
+    metrics["macro_f1"] = np.mean(f1)
+
+    return metrics
+
+
+def compute_confusion_matrix(
+    pred_labels: pd.Series,
+    gt_labels: pd.Series,
+    cell_types: List[str],
+) -> np.ndarray:
+    """
+    Compute confusion matrix (rows=actual/ground truth, cols=predicted).
+
+    Args:
+        pred_labels: Predicted cell type labels
+        gt_labels: Ground truth cell type labels
+        cell_types: List of cell type names (defines row/column order)
+
+    Returns:
+        Confusion matrix as numpy array, shape (n_types, n_types)
+        Entry [i,j] = number of cells with true label i predicted as label j
+    """
+    common_idx = pred_labels.index.intersection(gt_labels.index)
+    pred = pred_labels.loc[common_idx]
+    gt = gt_labels.loc[common_idx]
+
+    cm = sklearn_confusion_matrix(gt, pred, labels=cell_types)
+    return cm

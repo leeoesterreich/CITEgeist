@@ -12,6 +12,8 @@ from evaluate_morphology_assignment import (
     run_baseline_random,
     run_baseline_uniform,
     run_baseline_spot_proportion,
+    compute_accuracy_metrics,
+    compute_confusion_matrix,
     PROTEIN_GT_CELL_TYPES,
     RNA_GT_CELL_TYPES,
 )
@@ -213,3 +215,81 @@ def test_baseline_spot_proportion_empty_spot():
     # Should only have 2 results from spot_1
     assert len(result) == 2
     assert all(result["spot_id"] == "spot_1")
+
+
+# --- Accuracy Metrics Tests ---
+
+def test_compute_accuracy_metrics():
+    """Test accuracy metric computation."""
+    pred_labels = pd.Series(["A", "A", "B", "B", "C"])
+    gt_labels = pd.Series(["A", "B", "B", "B", "C"])
+    cell_types = ["A", "B", "C"]
+
+    metrics = compute_accuracy_metrics(pred_labels, gt_labels, cell_types)
+
+    assert metrics["overall_accuracy"] == 0.8
+    assert "A_precision" in metrics
+    assert "A_recall" in metrics
+    assert "A_f1" in metrics
+    assert "macro_f1" in metrics
+
+
+def test_compute_accuracy_metrics_perfect():
+    """Test accuracy metrics with perfect predictions."""
+    pred_labels = pd.Series(["A", "B", "C", "A", "B"])
+    gt_labels = pd.Series(["A", "B", "C", "A", "B"])
+    cell_types = ["A", "B", "C"]
+
+    metrics = compute_accuracy_metrics(pred_labels, gt_labels, cell_types)
+
+    assert metrics["overall_accuracy"] == 1.0
+    assert metrics["macro_f1"] == 1.0
+    assert metrics["A_precision"] == 1.0
+    assert metrics["A_recall"] == 1.0
+
+
+def test_compute_accuracy_metrics_with_missing_type():
+    """Test accuracy metrics when a cell type has no predictions."""
+    pred_labels = pd.Series(["A", "A", "A"])
+    gt_labels = pd.Series(["A", "B", "A"])
+    cell_types = ["A", "B", "C"]
+
+    metrics = compute_accuracy_metrics(pred_labels, gt_labels, cell_types)
+
+    assert metrics["overall_accuracy"] == pytest.approx(2/3)
+    assert metrics["B_recall"] == 0.0  # No B predicted
+    assert metrics["C_support"] == 0   # No C in GT
+
+
+def test_compute_confusion_matrix():
+    """Test confusion matrix computation."""
+    pred_labels = pd.Series(["A", "A", "B", "B"])
+    gt_labels = pd.Series(["A", "B", "B", "B"])
+    cell_types = ["A", "B"]
+
+    cm = compute_confusion_matrix(pred_labels, gt_labels, cell_types)
+
+    assert cm.shape == (2, 2)
+    assert cm[0, 0] == 1  # A->A
+    assert cm[0, 1] == 0  # A->B
+    assert cm[1, 0] == 1  # B->A
+    assert cm[1, 1] == 2  # B->B
+
+
+def test_compute_confusion_matrix_three_types():
+    """Test confusion matrix with three cell types."""
+    pred_labels = pd.Series(["A", "B", "C", "A", "B", "C"])
+    gt_labels = pd.Series(["A", "B", "C", "B", "C", "A"])
+    cell_types = ["A", "B", "C"]
+
+    cm = compute_confusion_matrix(pred_labels, gt_labels, cell_types)
+
+    assert cm.shape == (3, 3)
+    # Diagonal: correct predictions
+    assert cm[0, 0] == 1  # A->A
+    assert cm[1, 1] == 1  # B->B
+    assert cm[2, 2] == 1  # C->C
+    # Off-diagonal: misclassifications
+    assert cm[1, 0] == 1  # B->A
+    assert cm[2, 1] == 1  # C->B
+    assert cm[0, 2] == 1  # A->C
