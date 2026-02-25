@@ -94,3 +94,29 @@ def test_discover_anchor_genes_empty_cell_type():
     # Type 1 should have empty anchors and weights
     assert anchors[1] == [], "Type 1 should have no anchors"
     assert weights[1] == {}, "Type 1 should have no weights"
+
+
+def test_compute_proportion_enrichment_no_smoothing():
+    """Proportion enrichment should NOT have 80/20 smoothing."""
+    from CITEgeist.model.gurobi_impl import compute_proportion_enrichment
+
+    np.random.seed(42)
+    N, T = 20, 4
+
+    # Create data where gene is only expressed in spots with high type-0 proportion
+    cell_props = np.random.dirichlet(np.ones(T), N)
+    gene_expr = np.zeros(N)
+    high_type0_spots = cell_props[:, 0] > 0.5
+    gene_expr[high_type0_spots] = 100
+
+    enrichment = compute_proportion_enrichment(gene_expr, cell_props)
+
+    # Without smoothing, type 0 should dominate
+    assert enrichment[0] > 0.5, "Type 0 should have majority enrichment"
+
+    # Should sum to 1
+    assert abs(enrichment.sum() - 1.0) < 1e-6, "Enrichment should sum to 1"
+
+    # Should NOT be smoothed toward uniform (1/T = 0.25)
+    # Check that non-enriched types can go below 0.05 (smoothing floor was ~0.05)
+    assert enrichment[1:].min() < 0.1, "Non-enriched types should be low (no smoothing)"

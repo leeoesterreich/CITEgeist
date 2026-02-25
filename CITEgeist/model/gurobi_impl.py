@@ -2256,6 +2256,54 @@ def finetune_cell_proportions_per_marker(
     return Y_refined, initial_beta_values
 
 
+def compute_proportion_enrichment(
+    gene_expr: np.ndarray,
+    cell_type_props: np.ndarray,
+    celltype_frequencies: np.ndarray = None,
+) -> np.ndarray:
+    """
+    Compute proportion-based enrichment WITHOUT smoothing.
+
+    This function calculates how enriched a gene's expression is in each cell type
+    based on the cell type proportions of spots where the gene is expressed.
+    Unlike the internal smoothed version, this returns raw enrichment values
+    that can go to extreme values (close to 0 or 1) for highly specific genes.
+
+    Args:
+        gene_expr: (N,) expression values for one gene across spots
+        cell_type_props: (N, T) cell type proportions per spot
+        celltype_frequencies: (T,) global cell type frequencies for normalization.
+            If None, no frequency normalization is applied.
+
+    Returns:
+        enrichment: (T,) enrichment scores summing to 1
+    """
+    T = cell_type_props.shape[1]
+
+    # Handle zero expression
+    total_expr = gene_expr.sum()
+    if total_expr < 1e-10:
+        return np.ones(T) / T
+
+    # Expression-weighted cell type proportions
+    weights = gene_expr / total_expr
+
+    # Normalize by global frequency if provided
+    if celltype_frequencies is not None:
+        normalized_props = cell_type_props / (celltype_frequencies + 1e-10)
+    else:
+        normalized_props = cell_type_props
+
+    weighted_props = np.sum(normalized_props * weights[:, np.newaxis], axis=0)
+    background_props = np.mean(normalized_props, axis=0)
+
+    epsilon = 1e-10
+    enrichment = weighted_props / (background_props + epsilon)
+
+    # Normalize to sum to 1 (NO 80/20 smoothing)
+    return enrichment / (enrichment.sum() + epsilon)
+
+
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################
