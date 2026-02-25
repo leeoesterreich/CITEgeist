@@ -244,7 +244,7 @@ def compute_softmax_target(
     Example:
         >>> enrichment = np.array([0.4, 0.3, 0.1, 0.1, 0.1])
         >>> target = compute_softmax_target(enrichment, temperature=0.3)
-        >>> print(target)  # [0.63, 0.28, 0.03, 0.03, 0.03] approximately
+        >>> print(target)  # [0.3546, 0.2541, 0.1304, 0.1304, 0.1304] approximately
     """
     # Apply temperature scaling
     logits = enrichment / temperature
