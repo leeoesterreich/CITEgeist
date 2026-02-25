@@ -179,3 +179,91 @@ class TestAnchorGeneDiscovery:
         assert isinstance(anchors, dict)
         assert isinstance(thresholds, dict)
         assert len(anchors) == n_types
+
+
+class TestModuleAwareEnrichment:
+    """Tests for compute_module_aware_enrichment function."""
+
+    def test_boosts_enrichment_for_correlated_genes(self):
+        """Genes correlated with anchors get boosted enrichment."""
+        np.random.seed(42)
+        n_neighbors, n_genes, n_types = 20, 10, 3
+
+        # Neighborhood expression
+        neighborhood_expr = np.random.rand(n_neighbors, n_genes) * 10
+
+        # Make gene 5 correlate with genes 0,1 (anchors for type 0)
+        neighborhood_expr[:, 0] = np.random.rand(n_neighbors) * 10
+        neighborhood_expr[:, 1] = neighborhood_expr[:, 0] + np.random.randn(n_neighbors) * 0.5
+        neighborhood_expr[:, 5] = neighborhood_expr[:, 0] * 0.8 + np.random.randn(n_neighbors) * 1
+
+        # Base enrichment: gene 5 has uniform enrichment
+        base_enrichment = np.ones((n_genes, n_types)) / n_types
+
+        # Anchors: type 0 has genes 0,1
+        anchor_genes = {0: [0, 1], 1: [2, 3], 2: [4]}
+
+        from CITEgeist.model.gex_modules import compute_module_aware_enrichment
+
+        adjusted = compute_module_aware_enrichment(
+            spot_idx=0,
+            neighborhood_expression=neighborhood_expr,
+            base_enrichment=base_enrichment,
+            anchor_genes=anchor_genes,
+            module_weight=0.5,
+        )
+
+        # Gene 5 should have higher enrichment for type 0 now
+        assert adjusted[5, 0] > base_enrichment[5, 0]
+        # Should still sum to 1
+        assert np.allclose(adjusted[5, :].sum(), 1.0)
+
+    def test_skips_small_neighborhoods(self):
+        """Returns base enrichment if neighborhood too small."""
+        n_neighbors, n_genes, n_types = 5, 10, 3  # < min_neighbors_for_corr
+
+        neighborhood_expr = np.random.rand(n_neighbors, n_genes) * 10
+        base_enrichment = np.ones((n_genes, n_types)) / n_types
+        anchor_genes = {0: [0, 1], 1: [2, 3], 2: [4]}
+
+        from CITEgeist.model.gex_modules import compute_module_aware_enrichment
+
+        adjusted = compute_module_aware_enrichment(
+            spot_idx=0,
+            neighborhood_expression=neighborhood_expr,
+            base_enrichment=base_enrichment,
+            anchor_genes=anchor_genes,
+            module_weight=0.5,
+            min_neighbors_for_corr=10,
+        )
+
+        # Should return base enrichment unchanged
+        assert np.allclose(adjusted, base_enrichment)
+
+    def test_only_positive_correlations_boost(self):
+        """Negative correlations don't boost enrichment."""
+        np.random.seed(42)
+        n_neighbors, n_genes, n_types = 20, 10, 3
+
+        neighborhood_expr = np.random.rand(n_neighbors, n_genes) * 10
+
+        # Make gene 5 NEGATIVELY correlate with type 0 anchors
+        neighborhood_expr[:, 0] = np.random.rand(n_neighbors) * 10
+        neighborhood_expr[:, 5] = 10 - neighborhood_expr[:, 0] + np.random.randn(n_neighbors) * 0.5
+
+        base_enrichment = np.ones((n_genes, n_types)) / n_types
+        anchor_genes = {0: [0], 1: [2], 2: [4]}
+
+        from CITEgeist.model.gex_modules import compute_module_aware_enrichment
+
+        adjusted = compute_module_aware_enrichment(
+            spot_idx=0,
+            neighborhood_expression=neighborhood_expr,
+            base_enrichment=base_enrichment,
+            anchor_genes=anchor_genes,
+            module_weight=0.5,
+        )
+
+        # Gene 5 should NOT have boosted enrichment for type 0
+        # (negative correlation gets clipped to 0)
+        assert adjusted[5, 0] <= base_enrichment[5, 0] + 0.01

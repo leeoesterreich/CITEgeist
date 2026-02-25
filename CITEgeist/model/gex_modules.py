@@ -135,3 +135,84 @@ def discover_anchor_genes(
             )
 
     return anchors, thresholds_used
+
+
+def compute_module_aware_enrichment(
+    spot_idx: int,
+    neighborhood_expression: np.ndarray,
+    base_enrichment: np.ndarray,
+    anchor_genes: Dict[int, List[int]],
+    module_weight: float = 0.5,
+    min_neighbors_for_corr: int = 10,
+) -> np.ndarray:
+    """
+    Compute module-aware enrichment by correlating genes with anchors in neighborhood.
+
+    This function adjusts base enrichment scores based on how each gene correlates
+    with anchor genes in the local spatial neighborhood. Genes that co-express with
+    a cell type's anchor genes get boosted enrichment for that cell type, helping
+    allocate weakly-expressed genes to the appropriate cell types.
+
+    Args:
+        spot_idx: Index of center spot (for logging)
+        neighborhood_expression: (N_neighbors x M_genes) expression in neighborhood
+        base_enrichment: (M_genes x T_celltypes) base enrichment scores
+        anchor_genes: {cell_type_idx: [gene_indices]} anchor genes per type
+        module_weight: Weight for module signal vs base enrichment (0-1)
+        min_neighbors_for_corr: Minimum neighbors for reliable correlation
+
+    Returns:
+        adjusted_enrichment: (M_genes x T_celltypes) module-adjusted enrichment
+    """
+    M, T = base_enrichment.shape
+    adjusted = base_enrichment.copy()
+
+    # Skip if neighborhood too small for reliable correlation
+    if neighborhood_expression.shape[0] < min_neighbors_for_corr:
+        return adjusted
+
+    for g in range(M):
+        gene_expr = neighborhood_expression[:, g]
+
+        # Skip if gene has no variance in neighborhood
+        if np.std(gene_expr) < 1e-6:
+            continue
+
+        # Compute correlation with each cell type's anchor genes
+        module_scores = np.zeros(T)
+        for t in range(T):
+            if t not in anchor_genes or not anchor_genes[t]:
+                continue
+
+            # Average correlation with this cell type's anchors
+            anchor_corrs = []
+            for anchor_idx in anchor_genes[t]:
+                if anchor_idx >= neighborhood_expression.shape[1]:
+                    continue
+                anchor_expr = neighborhood_expression[:, anchor_idx]
+                if np.std(anchor_expr) > 1e-6:
+                    r, _ = pearsonr(gene_expr, anchor_expr)
+                    if not np.isnan(r):
+                        anchor_corrs.append(max(0, r))  # only positive correlations
+
+            if anchor_corrs:
+                module_scores[t] = np.mean(anchor_corrs)
+
+        # Normalize module scores to sum to 1 (if any signal)
+        if module_scores.sum() > 0:
+            module_scores = module_scores / module_scores.sum()
+        else:
+            module_scores = np.ones(T) / T  # fallback to uniform
+
+        # Combine base enrichment with module signal
+        adjusted[g, :] = (
+            (1 - module_weight) * base_enrichment[g, :] +
+            module_weight * module_scores
+        )
+
+        # Re-normalize to sum to 1
+        row_sum = adjusted[g, :].sum()
+        if row_sum > 0:
+            adjusted[g, :] = adjusted[g, :] / row_sum
+
+    return adjusted
