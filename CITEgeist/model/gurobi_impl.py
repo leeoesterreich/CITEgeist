@@ -40,9 +40,19 @@ from .checkpoints import CheckpointManager
 try:
     from .utils import get_neighbors_with_fixed_radius
     from .checkpoints import CheckpointManager
+    from .gex_modules import (
+        compute_module_aware_enrichment,
+        compute_softmax_target,
+        compute_kl_penalty_coefficients,
+    )
 except Exception:  # pragma: no cover - fallback for __main__ execution
     from utils import get_neighbors_with_fixed_radius  # type: ignore
     from checkpoints import CheckpointManager  # type: ignore
+    from gex_modules import (  # type: ignore
+        compute_module_aware_enrichment,
+        compute_softmax_target,
+        compute_kl_penalty_coefficients,
+    )
 
 
 def build_spatial_laplacian(
@@ -2260,12 +2270,19 @@ def deconvolute_spot_with_neighbors_with_prior(
     global_enrichment_weight: float = 0.5,
     continuous_relaxation: bool = True,
     lambda_gex_reg: float = 0.01,
+    # NEW parameters for module enrichment and KL regularization
+    anchor_genes: Optional[Dict[int, List[int]]] = None,
+    module_weight: float = 0.5,
+    use_kl_regularization: bool = False,
+    kl_temperature: float = 0.3,
+    lambda_kl: float = 0.1,
 ) -> Optional[np.ndarray]:
     """
     Deconvolute a spot with its neighbors, using enrichment weights and optional prior.
 
     Uses continuous relaxation (LP) by default for fractional gene assignment,
-    with L2 regularization to stabilize the solution.
+    with L2 regularization to stabilize the solution. Optionally supports
+    module-aware enrichment and softmax KL regularization.
 
     Args:
         spot_idx: Index of the center spot to deconvolve.
@@ -2278,6 +2295,11 @@ def deconvolute_spot_with_neighbors_with_prior(
         global_enrichment_weight: Weight for global expression enrichment (0-1).
         continuous_relaxation: If True, use continuous variables (LP); else integer (MIP).
         lambda_gex_reg: L2 regularization weight on X variables.
+        anchor_genes: Optional dict mapping cell type index to list of anchor gene indices.
+        module_weight: Weight for module-aware enrichment (0-1), blends with base enrichment.
+        use_kl_regularization: If True, use softmax KL penalty instead of L2 regularization.
+        kl_temperature: Temperature for softmax target (lower = sharper).
+        lambda_kl: Weight for KL penalty term.
 
     Returns:
         np.ndarray of shape (T, M) with deconvolved expression, or None on failure.
@@ -2352,6 +2374,16 @@ def deconvolute_spot_with_neighbors_with_prior(
                 local_enrichment_weight * local_enrich + global_enrichment_weight * global_enrich
             )
 
+        # Apply module-aware enrichment if anchors provided
+        if anchor_genes is not None and module_weight > 0:
+            gene_specific_enrichment = compute_module_aware_enrichment(
+                spot_idx=spot_idx,
+                neighborhood_expression=neighborhood_expression_data,
+                base_enrichment=gene_specific_enrichment,
+                anchor_genes=anchor_genes,
+                module_weight=module_weight,
+            )
+
         # Build Gurobi model
         model = gp.Model(f"gene_expression_spot_{spot_idx}")
         model.setParam("OutputFlag", 0)
@@ -2397,32 +2429,57 @@ def deconvolute_spot_with_neighbors_with_prior(
         # Center spot proportions (index 0 = center in neighborhood)
         center_props = neighborhood_cell_type_numbers[0, :]
 
-        # Objective: maximize enrichment-weighted allocation + L2 regularization
+        # Objective: maximize enrichment-weighted allocation with regularization
         obj_terms = []
         for k in range(M):
             total_counts = int(center_counts[k])
             if total_counts > 0:
-                for j in range(T):
-                    enrichment_weight = gene_specific_enrichment[k, j]
-                    cell_type_weight = center_props[j]
+                enrichment_for_gene = gene_specific_enrichment[k, :]
 
-                    # Enrichment * proportion target
-                    base_term = enrichment_weight * cell_type_weight * X[j, k]
-                    obj_terms.append(base_term)
+                if use_kl_regularization:
+                    # NEW: Softmax KL-divergence regularization
+                    target = compute_softmax_target(enrichment_for_gene, temperature=kl_temperature)
+                    kl_coeffs = compute_kl_penalty_coefficients(target, total_counts, lambda_kl)
 
-                    # L2 regularization (subtracted since we maximize)
-                    if lambda_gex_reg > 0:
-                        obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
+                    for j in range(T):
+                        # Enrichment term
+                        base_term = enrichment_for_gene[j] * center_props[j] * X[j, k]
+                        obj_terms.append(base_term)
 
-                    # Prior terms
-                    if global_prior is not None and lambda_prior_weight > 0:
-                        try:
-                            prior_value = float(global_prior[j, k])
-                            prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j, k]
-                            obj_terms.append(-prior_penalty)
-                        except Exception as e:
-                            logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
-                            continue
+                        # KL penalty (pulls toward target)
+                        target_j = kl_coeffs['target_counts'][j]
+                        penalty = kl_coeffs['penalty_weight'] * (X[j, k] - target_j) * (X[j, k] - target_j)
+                        obj_terms.append(-penalty)
+
+                        # Prior terms (unchanged)
+                        if global_prior is not None and lambda_prior_weight > 0:
+                            try:
+                                prior_value = float(global_prior[j, k])
+                                prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j, k]
+                                obj_terms.append(-prior_penalty)
+                            except Exception as e:
+                                logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
+                                continue
+                else:
+                    # OLD: L2 regularization (backward compatible)
+                    for j in range(T):
+                        enrichment_weight = enrichment_for_gene[j]
+                        cell_type_weight = center_props[j]
+
+                        base_term = enrichment_weight * cell_type_weight * X[j, k]
+                        obj_terms.append(base_term)
+
+                        if lambda_gex_reg > 0:
+                            obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
+
+                        if global_prior is not None and lambda_prior_weight > 0:
+                            try:
+                                prior_value = float(global_prior[j, k])
+                                prior_penalty = lambda_prior_weight * (1 - prior_value) * X[j, k]
+                                obj_terms.append(-prior_penalty)
+                            except Exception as e:
+                                logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
+                                continue
 
         model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
 
