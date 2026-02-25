@@ -174,6 +174,12 @@ def run_hybrid_benchmark(
     min_counts: int = 25,
     spot_diameter_um: float = 55.0,
     lambda_laplacian: float = 0.1,
+    # NEW parameters for module enrichment and KL regularization
+    use_module_enrichment: bool = False,
+    module_weight: float = 0.5,
+    use_kl_regularization: bool = False,
+    kl_temperature: float = 0.3,
+    lambda_kl: float = 0.1,
 ) -> Dict[str, Any]:
     """
     Run hybrid CITEgeist benchmark for one region.
@@ -194,6 +200,11 @@ def run_hybrid_benchmark(
         min_counts: Minimum counts filter for GEX preprocessing
         spot_diameter_um: Spot diameter in microns
         lambda_laplacian: Spatial smoothing weight for continuous model
+        use_module_enrichment: Use module-aware enrichment based on anchor genes
+        module_weight: Weight for module signal vs base enrichment (0-1)
+        use_kl_regularization: Use KL-divergence regularization instead of L2
+        kl_temperature: Softmax temperature for KL target distribution
+        lambda_kl: KL penalty weight
 
     Returns:
         Dictionary with benchmark results and timing
@@ -359,6 +370,12 @@ def run_hybrid_benchmark(
                 rerun=True,
                 use_discrete_mode=True,
                 cell_counts=cell_counts_df,
+                # NEW parameters
+                use_module_enrichment=use_module_enrichment,
+                module_weight=module_weight,
+                use_kl_regularization=use_kl_regularization,
+                kl_temperature=kl_temperature,
+                lambda_kl=lambda_kl,
             )
             timings["gex_deconv_sec"] = time.time() - t0
             logger.info("GEX deconvolution completed in %.1fs", timings["gex_deconv_sec"])
@@ -443,6 +460,17 @@ def main():
                         help="Spot diameter in microns")
     parser.add_argument("--lambda-laplacian", type=float, default=0.1,
                         help="Spatial smoothing weight")
+    # NEW: Module enrichment and KL regularization
+    parser.add_argument("--use-module-enrichment", action="store_true", default=False,
+                        help="Use module-aware enrichment based on anchor genes")
+    parser.add_argument("--module-weight", type=float, default=0.5,
+                        help="Weight for module signal vs base enrichment (0-1)")
+    parser.add_argument("--use-kl-regularization", action="store_true", default=False,
+                        help="Use KL-divergence regularization instead of L2")
+    parser.add_argument("--kl-temperature", type=float, default=0.3,
+                        help="Softmax temperature for KL target")
+    parser.add_argument("--lambda-kl", type=float, default=0.1,
+                        help="KL penalty weight")
     args = parser.parse_args()
 
     results = run_hybrid_benchmark(
@@ -456,6 +484,12 @@ def main():
         min_counts=args.min_counts,
         spot_diameter_um=args.spot_diameter_um,
         lambda_laplacian=args.lambda_laplacian,
+        # NEW parameters
+        use_module_enrichment=args.use_module_enrichment,
+        module_weight=args.module_weight,
+        use_kl_regularization=args.use_kl_regularization,
+        kl_temperature=args.kl_temperature,
+        lambda_kl=args.lambda_kl,
     )
 
     print(f"\nBenchmark complete. Results saved to: {results['output_dir']}")
