@@ -120,3 +120,24 @@ def test_compute_proportion_enrichment_no_smoothing():
     # Should NOT be smoothed toward uniform (1/T = 0.25)
     # Check that non-enriched types can go below 0.05 (smoothing floor was ~0.05)
     assert enrichment[1:].min() < 0.1, "Non-enriched types should be low (no smoothing)"
+
+
+def test_compute_marker_enrichment():
+    """Marker enrichment uses correlation with anchor genes."""
+    from CITEgeist.model.gurobi_impl import compute_marker_enrichment
+
+    np.random.seed(42)
+    N, T = 20, 3
+
+    # Gene correlates with type-0 anchors
+    anchor_expr = np.random.rand(N, T) * 10  # mean anchor expr per type
+    gene_expr = anchor_expr[:, 0] + np.random.randn(N) * 0.1  # correlates with type 0
+
+    anchor_weights = np.array([0.7, 0.5, 0.3])  # type 0 has strongest anchor
+
+    enrichment = compute_marker_enrichment(gene_expr, anchor_expr, anchor_weights)
+
+    # Type 0 should have highest enrichment (correlates + highest anchor weight)
+    assert enrichment[0] > enrichment[1], "Type 0 should have highest enrichment"
+    assert enrichment[0] > enrichment[2], "Type 0 should have highest enrichment"
+    assert abs(enrichment.sum() - 1.0) < 1e-6, "Should sum to 1"

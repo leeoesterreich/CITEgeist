@@ -2304,6 +2304,51 @@ def compute_proportion_enrichment(
     return enrichment / (enrichment.sum() + epsilon)
 
 
+def compute_marker_enrichment(
+    gene_expr: np.ndarray,
+    anchor_expr: np.ndarray,
+    anchor_weights: np.ndarray,
+) -> np.ndarray:
+    """
+    Compute marker-guided enrichment via correlation with anchor genes.
+
+    Args:
+        gene_expr: (N,) expression of target gene across neighborhood
+        anchor_expr: (N, T) mean anchor expression per cell type in neighborhood
+        anchor_weights: (T,) weight per cell type (mean anchor correlation with proportions)
+
+    Returns:
+        enrichment: (T,) enrichment scores summing to 1
+    """
+    from scipy.stats import pearsonr
+
+    T = anchor_expr.shape[1]
+    enrichment = np.zeros(T)
+
+    # Skip if gene has no variance
+    if np.std(gene_expr) < 1e-10:
+        return np.ones(T) / T
+
+    for t in range(T):
+        anchor_t = anchor_expr[:, t]
+
+        # Skip if anchor has no variance
+        if np.std(anchor_t) < 1e-10:
+            continue
+
+        r, _ = pearsonr(gene_expr, anchor_t)
+
+        if not np.isnan(r):
+            # Only positive correlations, weighted by anchor strength
+            enrichment[t] = max(0, r) * anchor_weights[t]
+
+    # Normalize
+    if enrichment.sum() < 1e-10:
+        return np.ones(T) / T
+
+    return enrichment / enrichment.sum()
+
+
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################
