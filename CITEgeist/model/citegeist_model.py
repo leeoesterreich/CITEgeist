@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 import scanpy as sc
+import scipy.sparse
 from scipy.ndimage import gaussian_filter
 
 # Local imports
@@ -1363,6 +1364,13 @@ class CitegeistModel:
         lambda_gex_reg=0.01,
         cell_counts: Optional[pd.DataFrame] = None,
         use_discrete_mode: bool = False,
+        # NEW parameters for module enrichment and KL regularization
+        use_module_enrichment: bool = True,
+        module_weight: float = 0.5,
+        use_kl_regularization: bool = True,
+        kl_temperature: float = 0.3,
+        lambda_kl: float = 0.1,
+        n_anchor_genes: Tuple[int, int] = (5, 10),
     ):
         """
         Run first pass of gene expression deconvolution.
@@ -1382,6 +1390,12 @@ class CitegeistModel:
             use_discrete_mode (bool): If True, use discrete cell counts instead of
                 continuous proportions for deconvolution. Requires cell_counts or
                 'discrete_cell_counts' in self.results.
+            use_module_enrichment (bool): If True, use anchor genes for module-aware enrichment.
+            module_weight (float): Weight for module-aware enrichment (0-1).
+            use_kl_regularization (bool): If True, use KL-divergence instead of L2 regularization.
+            kl_temperature (float): Temperature for softmax target (lower = sharper).
+            lambda_kl (float): Weight for KL penalty term.
+            n_anchor_genes (Tuple[int, int]): (min_anchors, max_anchors) per cell type.
 
         Returns:
             Dict[str, Any]: {
@@ -1450,6 +1464,28 @@ class CitegeistModel:
                 f"Deconvolution for these spots may fail and their profiles will be imputed as zeros. "
                 f"Example spot indices: {zero_prop_spots[:5]}"
             )
+
+        # Discover anchor genes if using module enrichment
+        anchor_genes = None
+        if use_module_enrichment and not (self.resolution == "cell"):
+            from .gex_modules import discover_anchor_genes
+
+            gene_expr_matrix = self.gene_expression_adata.X
+            if scipy.sparse.issparse(gene_expr_matrix):
+                gene_expr_matrix = gene_expr_matrix.toarray()
+
+            anchor_genes, anchor_thresholds = discover_anchor_genes(
+                gene_expression=gene_expr_matrix,
+                cell_proportions=cell_props_values,
+                min_anchors=n_anchor_genes[0],
+                max_anchors=n_anchor_genes[1],
+            )
+
+            total_anchors = sum(len(v) for v in anchor_genes.values())
+            logging.info(f"Discovered {total_anchors} anchor genes across {len(anchor_genes)} cell types")
+            for t, genes in anchor_genes.items():
+                ct_name = list(self.cell_profile_dict.keys())[t] if self.cell_profile_dict else f"Type_{t}"
+                logging.info(f"  {ct_name}: {len(genes)} anchors (r>={anchor_thresholds[t]:.2f})")
 
         if self.resolution == "cell":
             # Cell-level: estimate true expression per cell (not deconvolution)
@@ -1523,7 +1559,13 @@ class CitegeistModel:
             output_dir=output_dir,
             rerun=rerun,
             continuous_relaxation=continuous_relaxation,
-            lambda_gex_reg=lambda_gex_reg,
+            lambda_gex_reg=lambda_gex_reg if not use_kl_regularization else 0.0,
+            # NEW parameters for module enrichment and KL regularization
+            anchor_genes=anchor_genes,
+            module_weight=module_weight if use_module_enrichment else 0.0,
+            use_kl_regularization=use_kl_regularization,
+            kl_temperature=kl_temperature,
+            lambda_kl=lambda_kl,
         )
 
         # Get dimensions for NaN imputation and consistency checks
