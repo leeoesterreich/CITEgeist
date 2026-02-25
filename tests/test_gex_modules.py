@@ -333,3 +333,63 @@ class TestSoftmaxKLAllocation:
             coeffs_uniform['target_counts'],
             coeffs_concentrated['target_counts']
         )
+
+
+class TestGurobiIntegration:
+    """Tests for integration with Gurobi optimization."""
+
+    @pytest.mark.requires_gurobi
+    def test_kl_objective_produces_valid_allocation(self):
+        """KL objective produces valid count allocations."""
+        import gurobipy as gp
+        from gurobipy import GRB
+        from CITEgeist.model.gex_modules import (
+            compute_softmax_target,
+            compute_kl_penalty_coefficients,
+        )
+
+        n_types = 3
+        total_counts = 100
+        enrichment = np.array([0.5, 0.3, 0.2])
+        props = np.array([0.4, 0.4, 0.2])
+
+        target = compute_softmax_target(enrichment, temperature=0.3)
+        kl_coeffs = compute_kl_penalty_coefficients(target, total_counts, lambda_kl=0.1)
+
+        # Build simple Gurobi model
+        model = gp.Model("test_kl")
+        model.setParam("OutputFlag", 0)
+
+        X = {}
+        for j in range(n_types):
+            X[j] = model.addVar(vtype=GRB.CONTINUOUS, lb=0, ub=total_counts, name=f"X_{j}")
+
+        # Conservation constraint
+        model.addConstr(gp.quicksum(X[j] for j in range(n_types)) == total_counts)
+
+        # KL-style objective
+        obj_terms = []
+        for j in range(n_types):
+            # Enrichment term
+            obj_terms.append(enrichment[j] * props[j] * X[j])
+            # KL penalty (quadratic deviation from target)
+            target_j = kl_coeffs['target_counts'][j]
+            penalty = kl_coeffs['penalty_weight'] * (X[j] - target_j) * (X[j] - target_j)
+            obj_terms.append(-penalty)
+
+        model.setObjective(gp.quicksum(obj_terms), GRB.MAXIMIZE)
+        model.optimize()
+
+        assert model.status == GRB.OPTIMAL
+
+        # Extract solution
+        allocation = np.array([X[j].X for j in range(n_types)])
+
+        # Should sum to total_counts
+        assert np.isclose(allocation.sum(), total_counts)
+
+        # Should be closer to target than uniform
+        uniform = np.ones(n_types) * total_counts / n_types
+        dist_to_target = np.sum((allocation - kl_coeffs['target_counts'])**2)
+        dist_to_uniform = np.sum((allocation - uniform)**2)
+        assert dist_to_target < dist_to_uniform
