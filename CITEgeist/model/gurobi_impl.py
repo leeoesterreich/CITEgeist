@@ -2577,6 +2577,12 @@ def optimize_gene_expression(
     rerun: bool = False,
     continuous_relaxation: bool = True,
     lambda_gex_reg: float = 0.01,
+    # NEW parameters for module enrichment and KL regularization
+    anchor_genes: Optional[Dict[int, List[int]]] = None,
+    module_weight: float = 0.5,
+    use_kl_regularization: bool = False,
+    kl_temperature: float = 0.3,
+    lambda_kl: float = 0.1,
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -2597,6 +2603,11 @@ def optimize_gene_expression(
         rerun (bool): Whether to rerun if results exist
         continuous_relaxation (bool): Use continuous (LP) vs integer (MIP) variables
         lambda_gex_reg (float): L2 regularization weight on X variables
+        anchor_genes (dict, optional): Dict mapping cell type index to anchor gene indices.
+        module_weight (float): Weight for module-aware enrichment (0-1).
+        use_kl_regularization (bool): If True, use KL-divergence instead of L2.
+        kl_temperature (float): Temperature for softmax target (lower = sharper).
+        lambda_kl (float): Weight for KL penalty term.
 
     Returns:
         Dict[str, Any]: {
@@ -2634,6 +2645,11 @@ def optimize_gene_expression(
         logging.info(f"Using enrichment weights - Global: {global_enrichment_weight}, Local: {local_enrichment_weight}")
     if global_prior is not None and lambda_prior_weight > 0:
         logging.info("Using prior-guided deconvolution")
+    if use_kl_regularization:
+        logging.info(f"Using KL regularization (temp={kl_temperature}, lambda={lambda_kl})")
+    if anchor_genes is not None:
+        total_anchors = sum(len(v) for v in anchor_genes.values())
+        logging.info(f"Using module-aware enrichment (weight={module_weight}, {total_anchors} anchors)")
 
     # Initialize futures as empty dict before try block
     futures = {}
@@ -2667,6 +2683,12 @@ def optimize_gene_expression(
                             global_enrichment_weight,
                             continuous_relaxation,
                             lambda_gex_reg,
+                            # NEW parameters for module enrichment and KL regularization
+                            anchor_genes,
+                            module_weight,
+                            use_kl_regularization,
+                            kl_temperature,
+                            lambda_kl,
                         )
                         futures[future] = spot_idx
 
