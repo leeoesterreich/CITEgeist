@@ -14,6 +14,9 @@ from .gurobi_impl import (
 # GEX module-aware enrichment functions
 from .gex_modules import (
     discover_anchor_genes,
+    compute_module_aware_enrichment,
+    compute_softmax_target,
+    compute_kl_penalty_coefficients,
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
@@ -111,6 +114,9 @@ __all__ = [
     "estimate_true_expression_cell",
     # GEX module-aware enrichment
     "discover_anchor_genes",
+    "compute_module_aware_enrichment",
+    "compute_softmax_target",
+    "compute_kl_penalty_coefficients",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
