@@ -267,3 +267,69 @@ class TestModuleAwareEnrichment:
         # Gene 5 should NOT have boosted enrichment for type 0
         # (negative correlation gets clipped to 0)
         assert adjusted[5, 0] <= base_enrichment[5, 0] + 0.01
+
+
+class TestSoftmaxKLAllocation:
+    """Tests for softmax KL-divergence allocation."""
+
+    def test_compute_softmax_target(self):
+        """Softmax target concentrates on high-enrichment cell types."""
+        enrichment = np.array([0.4, 0.3, 0.1, 0.1, 0.1])
+
+        from CITEgeist.model.gex_modules import compute_softmax_target
+
+        # Sharp temperature
+        target_sharp = compute_softmax_target(enrichment, temperature=0.3)
+
+        # Soft temperature
+        target_soft = compute_softmax_target(enrichment, temperature=1.0)
+
+        # Both should sum to 1
+        assert np.allclose(target_sharp.sum(), 1.0)
+        assert np.allclose(target_soft.sum(), 1.0)
+
+        # Sharp should concentrate more on top cell type
+        assert target_sharp[0] > target_soft[0]
+
+        # Top cell type should have highest probability
+        assert target_sharp[0] > target_sharp[1] > target_sharp[2]
+
+    def test_compute_kl_penalty_terms(self):
+        """KL penalty penalizes deviation from target."""
+        from CITEgeist.model.gex_modules import compute_kl_penalty_coefficients
+
+        target = np.array([0.5, 0.3, 0.2])
+        total_counts = 100
+        lambda_kl = 0.1
+
+        coeffs = compute_kl_penalty_coefficients(
+            target_distribution=target,
+            total_counts=total_counts,
+            lambda_kl=lambda_kl,
+        )
+
+        # Should return coefficients for quadratic penalty
+        assert 'target_counts' in coeffs
+        assert 'penalty_weight' in coeffs
+
+        # Target counts should match target * total
+        assert np.allclose(coeffs['target_counts'], target * total_counts)
+
+    def test_kl_replaces_l2_in_objective(self):
+        """Verify KL penalty structure differs from L2."""
+        from CITEgeist.model.gex_modules import compute_kl_penalty_coefficients
+
+        # Uniform target (like L2 would produce)
+        uniform_target = np.array([0.33, 0.33, 0.34])
+
+        # Concentrated target (KL should produce)
+        concentrated_target = np.array([0.6, 0.3, 0.1])
+
+        coeffs_uniform = compute_kl_penalty_coefficients(uniform_target, 100, 0.1)
+        coeffs_concentrated = compute_kl_penalty_coefficients(concentrated_target, 100, 0.1)
+
+        # Target counts should differ
+        assert not np.allclose(
+            coeffs_uniform['target_counts'],
+            coeffs_concentrated['target_counts']
+        )

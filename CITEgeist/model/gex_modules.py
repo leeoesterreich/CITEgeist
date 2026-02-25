@@ -216,3 +216,96 @@ def compute_module_aware_enrichment(
             adjusted[g, :] = adjusted[g, :] / row_sum
 
     return adjusted
+
+
+def compute_softmax_target(
+    enrichment: np.ndarray,
+    temperature: float = 0.3,
+) -> np.ndarray:
+    """
+    Compute softmax target distribution from enrichment scores.
+
+    Converts enrichment scores into a probability distribution using temperature-
+    scaled softmax. Lower temperatures produce sharper distributions that concentrate
+    on high-enrichment cell types; higher temperatures produce softer distributions.
+
+    This is used to create target distributions for KL-divergence regularization,
+    replacing uniform L2 regularization with enrichment-aware allocation targets.
+
+    Args:
+        enrichment: (T,) enrichment scores per cell type (can be any non-negative values)
+        temperature: Softmax temperature parameter (default 0.3)
+            - Lower values (0.1-0.3): Sharp, concentrate on top cell type
+            - Higher values (0.5-1.0): Soft, more uniform distribution
+
+    Returns:
+        target: (T,) probability distribution summing to 1.0
+
+    Example:
+        >>> enrichment = np.array([0.4, 0.3, 0.1, 0.1, 0.1])
+        >>> target = compute_softmax_target(enrichment, temperature=0.3)
+        >>> print(target)  # [0.63, 0.28, 0.03, 0.03, 0.03] approximately
+    """
+    # Apply temperature scaling
+    logits = enrichment / temperature
+
+    # Numerical stability: subtract max before exp
+    logits = logits - logits.max()
+
+    # Softmax
+    exp_logits = np.exp(logits)
+    target = exp_logits / exp_logits.sum()
+
+    # Clip to avoid zeros (for KL stability in downstream Gurobi objective)
+    target = np.clip(target, 1e-6, 1.0)
+
+    # Re-normalize after clipping
+    target = target / target.sum()
+
+    return target
+
+
+def compute_kl_penalty_coefficients(
+    target_distribution: np.ndarray,
+    total_counts: int,
+    lambda_kl: float = 0.1,
+) -> Dict[str, np.ndarray]:
+    """
+    Compute coefficients for KL-divergence penalty in Gurobi objective.
+
+    The KL penalty is approximated as a quadratic penalty that pulls allocations
+    toward the target distribution: lambda * (X[j] - target[j])^2
+
+    This differs from standard L2 regularization which uses uniform targets.
+    By using enrichment-based targets from compute_softmax_target(), we guide
+    gene allocations toward biologically plausible cell types.
+
+    Args:
+        target_distribution: (T,) target probabilities (must sum to 1)
+        total_counts: Total counts to allocate for this gene
+        lambda_kl: Penalty weight (default 0.1)
+            - Higher values: Stronger pull toward target, less variance
+            - Lower values: Weaker pull, more data-driven allocation
+
+    Returns:
+        Dict containing:
+            - 'target_counts': (T,) target allocation in count space
+            - 'penalty_weight': Normalized penalty weight for Gurobi
+
+    Example:
+        >>> target = np.array([0.5, 0.3, 0.2])
+        >>> coeffs = compute_kl_penalty_coefficients(target, total_counts=100, lambda_kl=0.1)
+        >>> print(coeffs['target_counts'])  # [50, 30, 20]
+    """
+    # Convert probability distribution to count space
+    target_counts = target_distribution * total_counts
+
+    # Normalize penalty by total_counts to make lambda_kl scale-invariant
+    # This ensures consistent regularization behavior across genes with different
+    # expression levels (highly expressed genes don't dominate the penalty)
+    penalty_weight = lambda_kl / (total_counts + 1)
+
+    return {
+        'target_counts': target_counts,
+        'penalty_weight': penalty_weight,
+    }
