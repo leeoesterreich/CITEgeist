@@ -2429,6 +2429,14 @@ def deconvolute_spot_with_neighbors_with_prior(
         # Center spot proportions (index 0 = center in neighborhood)
         center_props = neighborhood_cell_type_numbers[0, :]
 
+        # Apply softmax sharpening to proportions (simpler than KL regularization)
+        # This concentrates allocation toward dominant cell types
+        if kl_temperature < 1.0:
+            logits = center_props / kl_temperature
+            logits = logits - logits.max()  # numerical stability
+            exp_logits = np.exp(logits)
+            center_props = exp_logits / (exp_logits.sum() + 1e-10)
+
         # Objective: maximize enrichment-weighted allocation with regularization
         obj_terms = []
         for k in range(M):
