@@ -5,11 +5,64 @@ import pytest
 from CITEgeist.model.module3b_nucleus_assignment import (
     NucleusAssignmentResult,
     run_nucleus_assignment,
+    random_assign_nuclei_to_types,
 )
 
 
-def test_run_nucleus_assignment_basic():
-    """Test end-to-end nucleus assignment."""
+def test_random_assign_nuclei_basic():
+    """Test random assignment respects count constraints."""
+    nucleus_ids = np.array([1, 2, 3, 4, 5])
+    counts = np.array([3, 2])  # 3 of type 0, 2 of type 1
+
+    rng = np.random.default_rng(42)
+    assignments = random_assign_nuclei_to_types(nucleus_ids, counts, rng)
+
+    assert len(assignments) == 5
+    type_counts = [0, 0]
+    for nid, type_idx in assignments.items():
+        type_counts[type_idx] += 1
+
+    assert type_counts == [3, 2]
+
+
+def test_run_nucleus_assignment_random_default():
+    """Test that random assignment is the default."""
+    # Minimal setup
+    mask = np.zeros((50, 50), dtype=np.int32)
+    mask[10:15, 10:15] = 1
+    mask[10:15, 30:35] = 2
+
+    nuclei_spot_map = pd.DataFrame({
+        'nucleus_id': [1, 2],
+        'spot_id': ['spot_0', 'spot_0'],
+    })
+
+    proportions = pd.DataFrame({
+        'spot_id': ['spot_0'],
+        'Cancer': [0.5],
+        'Immune': [0.5],
+    })
+
+    nuclei_counts = pd.Series([2], index=['spot_0'])
+
+    result = run_nucleus_assignment(
+        mask=mask,
+        nuclei_spot_map=nuclei_spot_map,
+        proportions=proportions,
+        nuclei_counts=nuclei_counts,
+        cell_types=['Cancer', 'Immune'],
+    )
+
+    assert isinstance(result, NucleusAssignmentResult)
+    assert result.method == "random"
+    assert result.classifier is None
+    assert result.morphology_features is None
+    assert result.assignment_probs is None
+    assert len(result.assignments) == 2
+
+
+def test_run_nucleus_assignment_morphology():
+    """Test end-to-end nucleus assignment with morphology guidance."""
     np.random.seed(42)
 
     # Create mock mask with 50 nuclei (5 per spot, 10 spots)
@@ -51,9 +104,11 @@ def test_run_nucleus_assignment_basic():
         proportions=proportions,
         nuclei_counts=nuclei_counts,
         cell_types=cell_types,
+        use_morphology=True,  # Enable morphology guidance
     )
 
     assert isinstance(result, NucleusAssignmentResult)
+    assert result.method == "morphology"
     assert len(result.assignments) == 50  # all nuclei assigned
     assert result.classifier is not None
     assert result.morphology_features is not None
@@ -61,9 +116,7 @@ def test_run_nucleus_assignment_basic():
 
 
 def test_result_assignments_valid_types():
-    """Test that all assignments are valid cell types."""
-    np.random.seed(123)
-
+    """Test that all assignments are valid cell types (random mode)."""
     # Minimal setup
     mask = np.zeros((50, 50), dtype=np.int32)
     mask[10:15, 10:15] = 1
@@ -88,6 +141,7 @@ def test_result_assignments_valid_types():
         proportions=proportions,
         nuclei_counts=nuclei_counts,
         cell_types=['Cancer', 'Immune'],
+        random_seed=123,  # For reproducibility
     )
 
     # All assigned types should be valid
@@ -97,8 +151,6 @@ def test_result_assignments_valid_types():
 
 def test_run_nucleus_assignment_with_cell_features():
     """Test assignment using cell morphology features."""
-    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment
-
     # Create synthetic nucleus and cell masks
     nucleus_mask = np.zeros((100, 100), dtype=np.int32)
     cell_mask = np.zeros((100, 100), dtype=np.int32)
@@ -131,11 +183,13 @@ def test_run_nucleus_assignment_with_cell_features():
         proportions=proportions,
         nuclei_counts=nuclei_counts,
         cell_types=cell_types,
-        cell_mask=cell_mask,  # NEW: pass cell mask for cell features
+        cell_mask=cell_mask,
+        use_morphology=True,  # Enable morphology to test cell features
     )
 
     # Should have assignments for both nuclei
     assert len(result.assignments) == 2
+    assert result.method == "morphology"
     # Each should be assigned to one of the types
     assert set(result.assignments.values()) <= {'TypeA', 'TypeB'}
     # Morphology features should include cell features
