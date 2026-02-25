@@ -23,7 +23,7 @@ def discover_anchor_genes(
     max_anchors: int = 10,
     initial_min_correlation: float = 0.3,
     min_expressing_spots: float = 0.1,
-) -> Tuple[Dict[int, List[int]], Dict[int, float]]:
+) -> Tuple[Dict[int, List[int]], Dict[int, float], Dict[int, Dict[int, float]]]:
     """
     Discover anchor genes for each cell type based on correlation with proportions.
 
@@ -51,12 +51,15 @@ def discover_anchor_genes(
         thresholds_used: Dict mapping cell type index to the correlation threshold
             actually used to select anchors for that type
             {cell_type_idx: correlation_threshold}
+        anchor_weights: Dict mapping cell type index to dict of gene correlations
+            {cell_type_idx: {gene_idx: correlation}} for downstream weighting
 
     Example:
         >>> proportions = model.cell_proportions  # from Module 3 Pass 1
         >>> gene_expr = adata.X  # normalized expression
-        >>> anchors, thresholds = discover_anchor_genes(gene_expr, proportions)
+        >>> anchors, thresholds, weights = discover_anchor_genes(gene_expr, proportions)
         >>> print(f"Type 0 anchors: {anchors[0][:5]}")  # top 5 anchor genes
+        >>> print(f"Type 0 weights: {weights[0]}")  # correlation weights
     """
     N, M = gene_expression.shape
     T = cell_proportions.shape[1]
@@ -74,6 +77,7 @@ def discover_anchor_genes(
 
     anchors = {}
     thresholds_used = {}
+    anchor_weights = {}
 
     for t in range(T):
         prop_vector = cell_proportions[:, t]
@@ -82,6 +86,7 @@ def discover_anchor_genes(
         if np.std(prop_vector) < 1e-10:
             anchors[t] = []
             thresholds_used[t] = threshold_sequence[-1]
+            anchor_weights[t] = {}
             logger.warning(f"Cell type {t}: zero variance in proportions, no anchors")
             continue
 
@@ -122,6 +127,10 @@ def discover_anchor_genes(
         anchors[t] = final_candidates[:max_anchors]
         thresholds_used[t] = selected_threshold
 
+        # Build correlation lookup for selected anchors
+        correlation_lookup = {g: r for g, r in all_correlations}
+        anchor_weights[t] = {g: correlation_lookup[g] for g in anchors[t]}
+
         # Log info about anchor discovery
         n_anchors = len(anchors[t])
         if n_anchors < min_anchors:
@@ -134,7 +143,7 @@ def discover_anchor_genes(
                 f"Cell type {t}: {n_anchors} anchors at threshold={selected_threshold:.2f}"
             )
 
-    return anchors, thresholds_used
+    return anchors, thresholds_used, anchor_weights
 
 
 def compute_module_aware_enrichment(
