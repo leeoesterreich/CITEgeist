@@ -2833,6 +2833,7 @@ def optimize_gene_expression(
     lambda_gex_reg: float = 0.01,
     # NEW parameters for module enrichment and KL regularization
     anchor_genes: Optional[Dict[int, List[int]]] = None,
+    anchor_weights: Optional[Dict[int, Dict[int, float]]] = None,
     module_weight: float = 0.5,
     use_kl_regularization: bool = False,
     kl_temperature: float = 0.3,
@@ -2858,6 +2859,8 @@ def optimize_gene_expression(
         continuous_relaxation (bool): Use continuous (LP) vs integer (MIP) variables
         lambda_gex_reg (float): L2 regularization weight on X variables
         anchor_genes (dict, optional): Dict mapping cell type index to anchor gene indices.
+        anchor_weights (dict, optional): Dict {cell_type_idx: {gene_idx: correlation}} with
+            per-gene correlation weights for each anchor. Used by adaptive marker guidance.
         module_weight (float): Weight for module-aware enrichment (0-1).
         use_kl_regularization (bool): If True, use KL-divergence instead of L2.
         kl_temperature (float): Temperature for softmax target (lower = sharper).
@@ -2939,6 +2942,7 @@ def optimize_gene_expression(
                             lambda_gex_reg,
                             # NEW parameters for module enrichment and KL regularization
                             anchor_genes,
+                            anchor_weights,
                             module_weight,
                             use_kl_regularization,
                             kl_temperature,

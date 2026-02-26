@@ -1474,7 +1474,7 @@ class CitegeistModel:
             if scipy.sparse.issparse(gene_expr_matrix):
                 gene_expr_matrix = gene_expr_matrix.toarray()
 
-            anchor_genes, anchor_thresholds = discover_anchor_genes(
+            anchor_genes, anchor_thresholds, anchor_weights = discover_anchor_genes(
                 gene_expression=gene_expr_matrix,
                 cell_proportions=cell_props_values,
                 min_anchors=n_anchor_genes[0],
@@ -1562,6 +1562,7 @@ class CitegeistModel:
             lambda_gex_reg=lambda_gex_reg if not use_kl_regularization else 0.0,
             # NEW parameters for module enrichment and KL regularization
             anchor_genes=anchor_genes,
+            anchor_weights=anchor_weights,  # Pass per-gene correlation weights
             module_weight=module_weight if use_module_enrichment else 0.0,
             use_kl_regularization=use_kl_regularization,
             kl_temperature=kl_temperature,
