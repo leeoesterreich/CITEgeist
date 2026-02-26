@@ -2389,6 +2389,56 @@ def compute_adaptive_enrichment(
     return blended / (blended.sum() + 1e-10)
 
 
+def precompute_anchor_expression(
+    gene_expression: np.ndarray,
+    anchor_genes: Dict[int, List[int]],
+    anchor_weights: Dict[int, Dict[int, float]],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Precompute weighted mean anchor expression per cell type.
+
+    Args:
+        gene_expression: (N, M) expression matrix
+        anchor_genes: {cell_type: [gene_indices]}
+        anchor_weights: {cell_type: {gene_idx: correlation}}
+
+    Returns:
+        anchor_expr: (N, T) weighted mean anchor expression per cell type
+        type_weights: (T,) mean anchor weight per cell type
+    """
+    N = gene_expression.shape[0]
+    T = len(anchor_genes)
+
+    anchor_expr = np.zeros((N, T))
+    type_weights = np.zeros(T)
+
+    for t in range(T):
+        if t not in anchor_genes or not anchor_genes[t]:
+            # No anchors for this type - use uniform
+            anchor_expr[:, t] = 1.0
+            type_weights[t] = 0.1  # low weight
+            continue
+
+        genes = anchor_genes[t]
+        weights_t = anchor_weights.get(t, {})
+
+        # Weighted mean of anchor expressions
+        total_weight = 0.0
+        for g in genes:
+            w = weights_t.get(g, 0.3)  # default weight if missing
+            anchor_expr[:, t] += w * gene_expression[:, g]
+            total_weight += w
+
+        if total_weight > 0:
+            anchor_expr[:, t] /= total_weight
+            type_weights[t] = total_weight / len(genes)  # mean weight
+        else:
+            anchor_expr[:, t] = 1.0
+            type_weights[t] = 0.1
+
+    return anchor_expr, type_weights
+
+
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################

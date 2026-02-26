@@ -167,3 +167,33 @@ def test_compute_adaptive_enrichment():
 
     # Should lean toward marker_enrich (low variance = high anchor weight)
     assert result2[0] > 0.4, "Low-variance case should use markers"
+
+
+def test_precompute_anchor_expression():
+    """Test that anchor expression matrix is computed correctly."""
+    from CITEgeist.model.gurobi_impl import precompute_anchor_expression
+
+    np.random.seed(42)
+    N, M, T = 50, 100, 3
+
+    gene_expr = np.random.rand(N, M) * 100
+
+    # Anchors: type 0 -> genes [0,1], type 1 -> genes [2,3], type 2 -> genes [4,5]
+    anchor_genes = {0: [0, 1], 1: [2, 3], 2: [4, 5]}
+    anchor_weights = {
+        0: {0: 0.8, 1: 0.6},  # gene 0 has r=0.8, gene 1 has r=0.6
+        1: {2: 0.7, 3: 0.5},
+        2: {4: 0.9, 5: 0.4},
+    }
+
+    anchor_expr, type_weights = precompute_anchor_expression(
+        gene_expr, anchor_genes, anchor_weights
+    )
+
+    # Shape: (N, T) - mean anchor expression per type
+    assert anchor_expr.shape == (N, T)
+
+    # Type weights: mean correlation per type
+    assert len(type_weights) == T
+    assert type_weights[0] == pytest.approx(0.7, abs=0.01)  # mean(0.8, 0.6)
+    assert type_weights[2] == pytest.approx(0.65, abs=0.01)  # mean(0.9, 0.4)
