@@ -2349,6 +2349,46 @@ def compute_marker_enrichment(
     return enrichment / enrichment.sum()
 
 
+def compute_adaptive_enrichment(
+    prop_enrichment: np.ndarray,
+    marker_enrichment: np.ndarray,
+    max_variance: float = 0.1,
+) -> np.ndarray:
+    """
+    Adaptively blend proportion and marker enrichment based on proportion variance.
+
+    High proportion variance = trust proportions (peaked distribution)
+    Low proportion variance = use marker guidance (flat distribution needs help)
+
+    For a normalized distribution summing to 1:
+    - Uniform [0.25, 0.25, 0.25, 0.25] has variance ~0
+    - Peaked [0.7, 0.1, 0.1, 0.1] has variance ~0.07
+    - One-hot [1, 0, 0, 0] has variance ~0.19
+
+    Args:
+        prop_enrichment: (T,) proportion-based enrichment (normalized)
+        marker_enrichment: (T,) marker-guided enrichment (normalized)
+        max_variance: Variance threshold above which we fully trust proportions.
+            Default 0.1 is reasonable for typical cell type distributions.
+
+    Returns:
+        blended: (T,) adaptive blend summing to 1
+    """
+    # Variance of proportion enrichment across cell types
+    variance = np.var(prop_enrichment)
+
+    # anchor_weight: 0 when variance is high (peaked), 1 when variance is low (flat)
+    # High variance -> small anchor_weight -> trust proportions
+    # Low variance -> large anchor_weight -> use marker guidance
+    anchor_weight = max(0.0, 1 - variance / max_variance)
+
+    # Blend: (1 - anchor_weight) weights proportions, anchor_weight weights markers
+    blended = (1 - anchor_weight) * prop_enrichment + anchor_weight * marker_enrichment
+
+    # Normalize (should already sum to ~1, but ensure)
+    return blended / (blended.sum() + 1e-10)
+
+
 ################################################################################
 # === DECONVOLUTION FOR GENES ===
 ################################################################################

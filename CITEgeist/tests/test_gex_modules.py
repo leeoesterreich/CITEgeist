@@ -141,3 +141,29 @@ def test_compute_marker_enrichment():
     assert enrichment[0] > enrichment[1], "Type 0 should have highest enrichment"
     assert enrichment[0] > enrichment[2], "Type 0 should have highest enrichment"
     assert abs(enrichment.sum() - 1.0) < 1e-6, "Should sum to 1"
+
+
+def test_compute_adaptive_enrichment():
+    """Adaptive enrichment blends proportion and marker based on variance."""
+    from CITEgeist.model.gurobi_impl import compute_adaptive_enrichment
+
+    np.random.seed(42)
+    N, T = 20, 4
+
+    # Case 1: High variance proportion enrichment -> trust proportions
+    prop_enrich_peaked = np.array([0.7, 0.1, 0.1, 0.1])
+    marker_enrich = np.array([0.25, 0.25, 0.25, 0.25])
+
+    result = compute_adaptive_enrichment(prop_enrich_peaked, marker_enrich)
+
+    # Should be close to prop_enrich (high variance = low anchor weight)
+    assert result[0] > 0.5, "High-variance case should trust proportions"
+
+    # Case 2: Low variance proportion enrichment -> use markers
+    prop_enrich_flat = np.array([0.26, 0.25, 0.25, 0.24])
+    marker_enrich_peaked = np.array([0.6, 0.2, 0.1, 0.1])
+
+    result2 = compute_adaptive_enrichment(prop_enrich_flat, marker_enrich_peaked)
+
+    # Should lean toward marker_enrich (low variance = high anchor weight)
+    assert result2[0] > 0.4, "Low-variance case should use markers"
