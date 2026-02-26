@@ -48,13 +48,23 @@ def load_image(image_path: Path) -> np.ndarray:
     Load image and ensure (C, H, W) format.
 
     Args:
-        image_path: Path to multi-channel TIFF image
+        image_path: Path to multi-channel TIFF or PNG image
 
     Returns:
         Image array with shape (C, H, W)
     """
     logger.info(f"Loading image from {image_path}")
-    image = tifffile.imread(str(image_path))
+    suffix = image_path.suffix.lower()
+
+    if suffix in [".png", ".jpg", ".jpeg"]:
+        # Use PIL for common image formats
+        from PIL import Image
+        img = Image.open(str(image_path))
+        image = np.array(img)
+        logger.info(f"Loaded PNG/JPEG image with shape {image.shape}")
+    else:
+        # Use tifffile for TIFF
+        image = tifffile.imread(str(image_path))
 
     # Handle different input shapes
     if image.ndim == 2:
@@ -74,7 +84,14 @@ def load_image(image_path: Path) -> np.ndarray:
         if image.ndim == 3 and image.shape[-1] <= 4:
             image = np.moveaxis(image, -1, 0)
 
-    logger.info(f"Loaded image with shape {image.shape}")
+    # Convert to float32 for numerical stability
+    if image.dtype == np.uint8:
+        image = image.astype(np.float32) / 255.0
+        logger.info("Converted uint8 to float32 [0,1]")
+    elif image.dtype != np.float32:
+        image = image.astype(np.float32)
+
+    logger.info(f"Loaded image with shape {image.shape}, dtype {image.dtype}")
     return image
 
 
