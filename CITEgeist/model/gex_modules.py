@@ -96,16 +96,27 @@ def discover_anchor_genes(
             gene_vector = gene_expression[:, g]
 
             # Filter: gene must be expressed in enough spots
-            expressing_fraction = (gene_vector > 0).mean()
+            expressing_mask = gene_vector > 0
+            expressing_fraction = expressing_mask.mean()
             if expressing_fraction < min_expressing_spots:
                 continue
 
+            # Need enough expressing spots for reliable correlation
+            n_expressing = expressing_mask.sum()
+            if n_expressing < 30:  # minimum for stable correlation
+                continue
+
+            # Compute Pearson correlation ONLY on expressing spots
+            # This avoids zeros dominating the correlation in sparse spatial data
+            gene_expr_nonzero = gene_vector[expressing_mask]
+            prop_nonzero = prop_vector[expressing_mask]
+
             # Filter: need variance for correlation
-            if np.std(gene_vector) < 1e-10:
+            if np.std(gene_expr_nonzero) < 1e-10:
                 continue
 
             # Compute Pearson correlation
-            r, p = pearsonr(gene_vector, prop_vector)
+            r, p = pearsonr(gene_expr_nonzero, prop_nonzero)
 
             # Only keep significant positive correlations
             if p < 0.05 and not np.isnan(r) and r > 0:
