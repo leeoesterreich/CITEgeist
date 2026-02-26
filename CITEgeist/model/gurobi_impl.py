@@ -2478,7 +2478,8 @@ def deconvolute_spot_with_neighbors_with_prior(
         local_enrichment_weight: Weight for local expression enrichment (0-1).
         global_enrichment_weight: Weight for global expression enrichment (0-1).
         continuous_relaxation: If True, use continuous variables (LP); else integer (MIP).
-        lambda_gex_reg: L2 regularization weight on X variables.
+        lambda_gex_reg: DEPRECATED - L2 regularization weight. No longer used
+            when adaptive marker guidance is enabled. Kept for backward compatibility.
         anchor_genes: Optional dict mapping cell type index to list of anchor gene indices.
         anchor_weights: Optional dict {cell_type_idx: {gene_idx: correlation}} with per-gene
             correlation weights for each anchor. Used by adaptive marker-guided enrichment.
@@ -2720,8 +2721,10 @@ def deconvolute_spot_with_neighbors_with_prior(
                         base_term = enrichment_weight * cell_type_weight * X[j, k]
                         obj_terms.append(base_term)
 
-                        if lambda_gex_reg > 0:
-                            obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
+                        # L2 regularization removed - adaptive enrichment provides sufficient guidance
+                        # The L2 penalty was causing uniform spreading (variance_ratio ~3x)
+                        # if lambda_gex_reg > 0:
+                        #     obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
 
                         if global_prior is not None and lambda_prior_weight > 0:
                             try:
