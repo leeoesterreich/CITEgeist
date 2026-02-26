@@ -2,11 +2,10 @@
 #SBATCH --job-name=vae_pipeline
 #SBATCH --output=logs/vae_pipeline_%j.out
 #SBATCH --error=logs/vae_pipeline_%j.err
-#SBATCH --time=48:00:00
-#SBATCH --partition=l40s
-#SBATCH --gres=gpu:1
+#SBATCH --time=72:00:00
+#SBATCH --partition=htc
 #SBATCH --mem=64G
-#SBATCH --cpus-per-task=8
+#SBATCH --cpus-per-task=16
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
 
@@ -110,9 +109,10 @@ python -m CITEgeist.model.train_vae \
     --output-dir "${OUTPUT_DIR}/vae" \
     --latent-dim 128 \
     --batch-size 64 \
-    --epochs 100 \
+    --epochs 50 \
     --lr 1e-4 \
-    --beta 0.5
+    --beta 0.5 \
+    --device cpu
 
 # Step 4: Prepare proportions file for prototype training
 echo ""
@@ -194,9 +194,10 @@ python -m CITEgeist.model.train_prototypes \
     --n-types 7 \
     --latent-dim 128 \
     --projection-dim 32 \
-    --epochs 50 \
+    --epochs 30 \
     --lr 1e-3 \
-    --sinkhorn-temp 0.1
+    --sinkhorn-temp 0.1 \
+    --device cpu
 
 echo ""
 echo "============================================"
