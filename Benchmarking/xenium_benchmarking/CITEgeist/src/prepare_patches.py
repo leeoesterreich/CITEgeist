@@ -59,6 +59,8 @@ def load_image(image_path: Path) -> np.ndarray:
     if suffix in [".png", ".jpg", ".jpeg"]:
         # Use PIL for common image formats
         from PIL import Image
+        # Disable decompression bomb check for large microscopy images
+        Image.MAX_IMAGE_PIXELS = None
         img = Image.open(str(image_path))
         image = np.array(img)
         logger.info(f"Loaded PNG/JPEG image with shape {image.shape}")
