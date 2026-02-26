@@ -1366,6 +1366,7 @@ class CitegeistModel:
         use_discrete_mode: bool = False,
         # NEW parameters for module enrichment and KL regularization
         use_module_enrichment: bool = True,
+        use_marker_guidance: bool = True,  # NEW - enable adaptive marker enrichment for A/B testing
         module_weight: float = 0.5,
         use_kl_regularization: bool = True,
         kl_temperature: float = 0.3,
@@ -1391,6 +1392,9 @@ class CitegeistModel:
                 continuous proportions for deconvolution. Requires cell_counts or
                 'discrete_cell_counts' in self.results.
             use_module_enrichment (bool): If True, use anchor genes for module-aware enrichment.
+            use_marker_guidance (bool): If True, use adaptive marker-guided enrichment
+                instead of proportion-only enrichment. Recommended for improved weak gene
+                allocation. Takes precedence over use_module_enrichment. Default True.
             module_weight (float): Weight for module-aware enrichment (0-1).
             use_kl_regularization (bool): If True, use KL-divergence instead of L2 regularization.
             kl_temperature (float): Temperature for softmax target (lower = sharper).
@@ -1465,9 +1469,12 @@ class CitegeistModel:
                 f"Example spot indices: {zero_prop_spots[:5]}"
             )
 
-        # Discover anchor genes if using module enrichment
+        # Discover anchor genes if using marker guidance or module enrichment
+        # use_marker_guidance takes precedence for A/B testing purposes
         anchor_genes = None
-        if use_module_enrichment and not (self.resolution == "cell"):
+        anchor_weights = None
+        enable_anchor_discovery = (use_marker_guidance or use_module_enrichment) and not (self.resolution == "cell")
+        if enable_anchor_discovery:
             from .gex_modules import discover_anchor_genes
 
             gene_expr_matrix = self.gene_expression_adata.X
@@ -1563,7 +1570,7 @@ class CitegeistModel:
             # NEW parameters for module enrichment and KL regularization
             anchor_genes=anchor_genes,
             anchor_weights=anchor_weights,  # Pass per-gene correlation weights
-            module_weight=module_weight if use_module_enrichment else 0.0,
+            module_weight=module_weight if (use_marker_guidance or use_module_enrichment) else 0.0,
             use_kl_regularization=use_kl_regularization,
             kl_temperature=kl_temperature,
             lambda_kl=lambda_kl,

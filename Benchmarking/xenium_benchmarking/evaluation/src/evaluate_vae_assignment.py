@@ -25,8 +25,6 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Optional
-
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
