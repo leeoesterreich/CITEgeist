@@ -2455,6 +2455,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     lambda_gex_reg: float = 0.01,
     # NEW parameters for module enrichment and KL regularization
     anchor_genes: Optional[Dict[int, List[int]]] = None,
+    anchor_weights: Optional[Dict[int, Dict[int, float]]] = None,
     module_weight: float = 0.5,
     use_kl_regularization: bool = False,
     kl_temperature: float = 0.3,
@@ -2479,7 +2480,10 @@ def deconvolute_spot_with_neighbors_with_prior(
         continuous_relaxation: If True, use continuous variables (LP); else integer (MIP).
         lambda_gex_reg: L2 regularization weight on X variables.
         anchor_genes: Optional dict mapping cell type index to list of anchor gene indices.
+        anchor_weights: Optional dict {cell_type_idx: {gene_idx: correlation}} with per-gene
+            correlation weights for each anchor. Used by adaptive marker-guided enrichment.
         module_weight: Weight for module-aware enrichment (0-1), blends with base enrichment.
+            NOTE: Deprecated when using adaptive marker guidance (anchor_weights provided).
         use_kl_regularization: If True, use softmax KL penalty instead of L2 regularization.
         kl_temperature: Temperature for softmax target (lower = sharper).
         lambda_kl: Weight for KL penalty term.
@@ -2590,51 +2594,38 @@ def deconvolute_spot_with_neighbors_with_prior(
         total_celltype_counts = np.sum(cell_type_numbers_array, axis=0) + 1e-10
         celltype_frequencies = total_celltype_counts / np.sum(total_celltype_counts)
 
-        # Modified enrichment calculation
-        def compute_expression_aware_enrichment(expression_data, cell_type_props, gene_idx):
-            gene_expr = expression_data[:, gene_idx]
-            expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
-            high_expr_spots = gene_expr >= expr_threshold
-
-            if not np.any(high_expr_spots):
-                return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
-
-            # Normalize cell type proportions by their global frequency
-            normalized_props = cell_type_props / (celltype_frequencies + 1e-10)
-
-            high_expr_props = np.mean(normalized_props[high_expr_spots], axis=0)
-            background_props = np.mean(normalized_props, axis=0)
-
-            epsilon = 1e-10
-            enrichment = high_expr_props / (background_props + epsilon)
-
-            # Apply smoothing to avoid extreme values
-            smoothed_enrichment = 0.8 * enrichment + 0.2 * np.ones_like(enrichment)
-            return smoothed_enrichment / (np.sum(smoothed_enrichment) + epsilon)
-
-        # Compute expression-aware enrichment for each gene
+        # Compute expression-aware enrichment using adaptive marker guidance
         gene_specific_enrichment = np.zeros((M, T))
 
+        # Precompute anchor expression for neighborhood if anchors provided
+        if anchor_genes is not None and anchor_weights is not None:
+            neighborhood_anchor_expr, type_weights = precompute_anchor_expression(
+                neighborhood_expression_data, anchor_genes, anchor_weights
+            )
+        else:
+            neighborhood_anchor_expr = None
+            type_weights = None
+
         for k in range(M):
-            local_enrich = compute_expression_aware_enrichment(
-                neighborhood_expression_data, neighborhood_cell_type_numbers, k
-            )
-            global_enrich = compute_expression_aware_enrichment(
-                deconvolution_expression_data, cell_type_numbers_array, k
-            )
-            gene_specific_enrichment[k] = (
-                local_enrichment_weight * local_enrich + global_enrichment_weight * global_enrich
+            # Proportion-based enrichment (no smoothing)
+            prop_enrich = compute_proportion_enrichment(
+                gene_expr=neighborhood_expression_data[:, k],
+                cell_type_props=neighborhood_cell_type_numbers,
+                celltype_frequencies=celltype_frequencies,
             )
 
-        # Apply module-aware enrichment if anchors provided
-        if anchor_genes is not None and module_weight > 0:
-            gene_specific_enrichment = compute_module_aware_enrichment(
-                spot_idx=spot_idx,
-                neighborhood_expression=neighborhood_expression_data,
-                base_enrichment=gene_specific_enrichment,
-                anchor_genes=anchor_genes,
-                module_weight=module_weight,
-            )
+            # If anchors available, compute adaptive blend
+            if neighborhood_anchor_expr is not None:
+                marker_enrich = compute_marker_enrichment(
+                    gene_expr=neighborhood_expression_data[:, k],
+                    anchor_expr=neighborhood_anchor_expr,
+                    anchor_weights=type_weights,
+                )
+                gene_specific_enrichment[k] = compute_adaptive_enrichment(
+                    prop_enrich, marker_enrich
+                )
+            else:
+                gene_specific_enrichment[k] = prop_enrich
 
         # Build Gurobi model
         model = gp.Model(f"gene_expression_spot_{spot_idx}")
