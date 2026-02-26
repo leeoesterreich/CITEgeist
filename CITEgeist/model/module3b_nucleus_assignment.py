@@ -2,9 +2,12 @@
 
 Assigns individual nuclei to cell types using spot-level proportions.
 
-By default, uses random assignment within spots (respecting cell type counts).
-Morphology-guided assignment is available but provides minimal improvement
-(~1% accuracy gain) over random assignment in benchmarks.
+Three assignment methods are available:
+1. Random (default): Random assignment within spots, respecting cell type counts.
+2. Morphology-guided: Uses nucleus/cell morphology features with soft-label classifier
+   and Hungarian matching. Provides minimal improvement (~1% accuracy gain).
+3. VAE-Sinkhorn: Uses deep learning (VAE encoder + learned prototypes) with
+   optimal transport for assignment. Requires pre-trained models.
 """
 import numpy as np
 import pandas as pd
@@ -203,4 +206,236 @@ def run_nucleus_assignment(
         classifier=clf,
         assignment_probs=probs_df,
         method="morphology",
+    )
+
+
+def run_nucleus_assignment_vae(
+    image: np.ndarray,
+    nuclei_df: pd.DataFrame,
+    proportions: pd.DataFrame,
+    cell_types: List[str],
+    vae_checkpoint: str,
+    prototype_checkpoint: str,
+    device: str = "cuda",
+    patch_expansion: float = 0.75,
+    patch_size: int = 96,
+    latent_dim: int = 128,
+    projection_dim: int = 32,
+    batch_size: int = 64,
+) -> NucleusAssignmentResult:
+    """
+    Run VAE-Sinkhorn nucleus assignment.
+
+    Uses a trained VAE encoder and prototype learning model to assign
+    nuclei to cell types via optimal transport with spot-level proportion
+    constraints.
+
+    Args:
+        image: (C, H, W) multi-channel image (e.g., DAPI + morphology channels)
+        nuclei_df: DataFrame with columns:
+            - 'nucleus_id': unique identifier for each nucleus
+            - 'spot_id': spot assignment for each nucleus
+            - 'bbox_x_min', 'bbox_y_min', 'bbox_x_max', 'bbox_y_max': bounding boxes
+        proportions: DataFrame with 'spot_id' column and one column per cell type
+        cell_types: List of cell type names (column names in proportions)
+        vae_checkpoint: Path to trained VAE checkpoint (.pt file)
+        prototype_checkpoint: Path to trained prototype model checkpoint (.pt file)
+        device: Device to run inference on ('cuda' or 'cpu')
+        patch_expansion: Fraction to expand bbox in each direction (default 0.75)
+        patch_size: Patch size for VAE input (default 96)
+        latent_dim: VAE latent dimension (must match checkpoint, default 128)
+        projection_dim: Projection head output dimension (must match checkpoint, default 32)
+        batch_size: Batch size for patch encoding (default 64)
+
+    Returns:
+        NucleusAssignmentResult with:
+            - assignments: Dict mapping nucleus_id -> cell type name
+            - morphology_features: None (not used in VAE method)
+            - classifier: None (not used in VAE method)
+            - assignment_probs: DataFrame with nucleus_id and confidence scores
+            - method: "vae_sinkhorn"
+
+    Raises:
+        ImportError: If torch is not available
+        FileNotFoundError: If checkpoint files don't exist
+        RuntimeError: If checkpoint architecture doesn't match parameters
+
+    Example:
+        >>> result = run_nucleus_assignment_vae(
+        ...     image=morphology_image,
+        ...     nuclei_df=nuclei_with_bboxes,
+        ...     proportions=spot_proportions,
+        ...     cell_types=['Epithelial', 'Stromal', 'Immune'],
+        ...     vae_checkpoint='models/vae_stage1.pt',
+        ...     prototype_checkpoint='models/prototypes_stage2.pt',
+        ... )
+        >>> print(result.assignments[123])  # Cell type for nucleus 123
+        'Epithelial'
+    """
+    # Lazy imports to avoid breaking existing code if torch is not available
+    try:
+        import torch
+    except ImportError as e:
+        raise ImportError(
+            "PyTorch is required for VAE-Sinkhorn assignment. "
+            "Install with: pip install torch"
+        ) from e
+
+    try:
+        from .vae import VAE
+        from .prototype_learning import PrototypeLearningModel
+        from .patch_extraction import extract_patch
+    except ImportError:
+        # Support direct import for testing
+        from vae import VAE
+        from prototype_learning import PrototypeLearningModel
+        from patch_extraction import extract_patch
+
+    import os
+
+    # Validate checkpoint files exist
+    if not os.path.exists(vae_checkpoint):
+        raise FileNotFoundError(f"VAE checkpoint not found: {vae_checkpoint}")
+    if not os.path.exists(prototype_checkpoint):
+        raise FileNotFoundError(f"Prototype checkpoint not found: {prototype_checkpoint}")
+
+    # Validate required columns in nuclei_df
+    required_cols = ['nucleus_id', 'spot_id', 'bbox_x_min', 'bbox_y_min', 'bbox_x_max', 'bbox_y_max']
+    missing_cols = [c for c in required_cols if c not in nuclei_df.columns]
+    if missing_cols:
+        raise ValueError(f"nuclei_df missing required columns: {missing_cols}")
+
+    n_types = len(cell_types)
+    in_channels = image.shape[0]
+
+    # Load VAE and extract encoder
+    vae = VAE(in_channels=in_channels, latent_dim=latent_dim)
+    vae_state = torch.load(vae_checkpoint, map_location=device)
+    vae.load_state_dict(vae_state)
+    vae.eval()
+    encoder = vae.encoder
+
+    # Load prototype model
+    model = PrototypeLearningModel(
+        encoder=encoder,
+        n_types=n_types,
+        latent_dim=latent_dim,
+        projection_dim=projection_dim,
+    )
+    proto_state = torch.load(prototype_checkpoint, map_location=device)
+    model.load_state_dict(proto_state, strict=False)  # strict=False since encoder is already loaded
+    model.to(device)
+    model.eval()
+
+    # Set up proportions lookup by spot_id
+    prop_cols = cell_types
+    spot_props = proportions.set_index('spot_id')[prop_cols]
+
+    # Process all spots
+    all_assignments = {}
+    all_confidences = []
+
+    unique_spots = nuclei_df['spot_id'].unique()
+
+    for spot_id in unique_spots:
+        # Get nuclei for this spot
+        spot_nuclei = nuclei_df[nuclei_df['spot_id'] == spot_id].copy()
+        nucleus_ids = spot_nuclei['nucleus_id'].values
+
+        if len(nucleus_ids) == 0:
+            continue
+
+        # Get proportions for this spot
+        if spot_id not in spot_props.index:
+            # Skip spots without proportions
+            continue
+        spot_proportions = spot_props.loc[spot_id].values.astype(np.float32)
+
+        # Normalize proportions to sum to 1 (handle edge cases)
+        prop_sum = spot_proportions.sum()
+        if prop_sum <= 0:
+            # No cell types expected, skip
+            continue
+        spot_proportions = spot_proportions / prop_sum
+
+        # Extract patches for all nuclei in this spot
+        patches_list = []
+        for _, row in spot_nuclei.iterrows():
+            bbox = (
+                int(row['bbox_x_min']),
+                int(row['bbox_y_min']),
+                int(row['bbox_x_max']),
+                int(row['bbox_y_max']),
+            )
+            patch = extract_patch(image, bbox, expansion=patch_expansion, output_size=patch_size)
+            patches_list.append(patch)
+
+        patches = np.stack(patches_list, axis=0)  # (N, C, H, W)
+        patches_tensor = torch.tensor(patches, dtype=torch.float32, device=device)
+        proportions_tensor = torch.tensor(spot_proportions, dtype=torch.float32, device=device)
+
+        # Run assignment with batching for memory efficiency
+        N = patches_tensor.shape[0]
+        if N > batch_size:
+            # For large spots, we still need to process all patches together for Sinkhorn
+            # But encode in batches
+            all_mu = []
+            with torch.no_grad():
+                for i in range(0, N, batch_size):
+                    batch_patches = patches_tensor[i:i+batch_size]
+                    mu, _ = model.encoder(batch_patches)
+                    all_mu.append(mu)
+                mu = torch.cat(all_mu, dim=0)
+
+                # Project and compute distances
+                projected = model.heads(mu)
+                proto = model.prototypes()
+                from .projection_heads import compute_distances
+                distances = compute_distances(projected, proto)
+
+                # Sinkhorn OT
+                from .sinkhorn import sinkhorn
+                row_marginal = torch.ones(N, device=device) / N
+                transport_plan = sinkhorn(
+                    distances,
+                    row_marginal,
+                    proportions_tensor,
+                    temperature=0.05,  # Sharp for inference
+                    n_iters=100,
+                )
+
+                # Hard assignment
+                assignments = transport_plan.argmax(dim=1)
+                confidence = transport_plan.max(dim=1).values
+        else:
+            # Use model.assign() directly for smaller spots
+            with torch.no_grad():
+                assignments, confidence = model.assign(patches_tensor, proportions_tensor)
+
+        # Store results
+        assignments_np = assignments.cpu().numpy()
+        confidence_np = confidence.cpu().numpy()
+
+        for i, nid in enumerate(nucleus_ids):
+            type_idx = int(assignments_np[i])
+            all_assignments[int(nid)] = cell_types[type_idx]
+            all_confidences.append({
+                'nucleus_id': int(nid),
+                'spot_id': spot_id,
+                'assigned_type': cell_types[type_idx],
+                'confidence': float(confidence_np[i]),
+            })
+
+    # Create assignment probabilities DataFrame
+    if all_confidences:
+        assignment_probs = pd.DataFrame(all_confidences)
+    else:
+        assignment_probs = pd.DataFrame(columns=['nucleus_id', 'spot_id', 'assigned_type', 'confidence'])
+
+    return NucleusAssignmentResult(
+        assignments=all_assignments,
+        morphology_features=None,
+        classifier=None,
+        assignment_probs=assignment_probs,
+        method="vae_sinkhorn",
     )

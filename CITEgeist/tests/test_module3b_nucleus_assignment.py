@@ -195,3 +195,74 @@ def test_run_nucleus_assignment_with_cell_features():
     # Morphology features should include cell features
     assert 'cell_area' in result.morphology_features.columns
     assert 'nc_ratio' in result.morphology_features.columns
+
+
+def test_vae_assignment_runs():
+    """VAE assignment requires trained models - placeholder test."""
+    pytest.skip("Integration test - requires trained models")
+
+
+def test_vae_assignment_import():
+    """Test that VAE assignment function can be imported."""
+    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_vae
+    assert callable(run_nucleus_assignment_vae)
+
+
+def test_vae_assignment_missing_checkpoint():
+    """Test that missing checkpoint raises FileNotFoundError."""
+    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_vae
+
+    # Create minimal inputs
+    image = np.random.rand(3, 100, 100).astype(np.float32)
+    nuclei_df = pd.DataFrame({
+        'nucleus_id': [1, 2],
+        'spot_id': ['spot_0', 'spot_0'],
+        'bbox_x_min': [10, 50],
+        'bbox_y_min': [10, 50],
+        'bbox_x_max': [30, 70],
+        'bbox_y_max': [30, 70],
+    })
+    proportions = pd.DataFrame({
+        'spot_id': ['spot_0'],
+        'TypeA': [0.5],
+        'TypeB': [0.5],
+    })
+
+    with pytest.raises(FileNotFoundError):
+        run_nucleus_assignment_vae(
+            image=image,
+            nuclei_df=nuclei_df,
+            proportions=proportions,
+            cell_types=['TypeA', 'TypeB'],
+            vae_checkpoint='nonexistent_vae.pt',
+            prototype_checkpoint='nonexistent_proto.pt',
+            device='cpu',
+        )
+
+
+def test_vae_assignment_missing_columns():
+    """Test that missing required columns raises ValueError."""
+    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_vae
+
+    image = np.random.rand(3, 100, 100).astype(np.float32)
+    # Missing bbox columns
+    nuclei_df = pd.DataFrame({
+        'nucleus_id': [1, 2],
+        'spot_id': ['spot_0', 'spot_0'],
+    })
+    proportions = pd.DataFrame({
+        'spot_id': ['spot_0'],
+        'TypeA': [0.5],
+        'TypeB': [0.5],
+    })
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        run_nucleus_assignment_vae(
+            image=image,
+            nuclei_df=nuclei_df,
+            proportions=proportions,
+            cell_types=['TypeA', 'TypeB'],
+            vae_checkpoint='vae.pt',
+            prototype_checkpoint='proto.pt',
+            device='cpu',
+        )
