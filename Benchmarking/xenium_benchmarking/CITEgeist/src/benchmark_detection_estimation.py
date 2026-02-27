@@ -206,7 +206,7 @@ def main():
     # Load data
     gex_path = input_dir / "h5ad_objects" / f"Xenium_region_{args.region_id}_GEX.h5ad"
     cite_path = input_dir / "h5ad_objects" / f"Xenium_region_{args.region_id}_CITE.h5ad"
-    gt_path = input_dir / "ground_truth" / f"Xenium_region_{args.region_id}_GT.csv"
+    gt_path = input_dir / "ground_truth" / f"Xenium_region_{args.region_id}_prop.csv"
 
     for path in [gex_path, cite_path]:
         if not path.exists():
