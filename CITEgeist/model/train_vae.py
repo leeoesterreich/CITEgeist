@@ -35,8 +35,12 @@ from tqdm import tqdm
 # Support both package import and direct import
 try:
     from .vae import VAE
+    from .augmentations import GeometricAugment
+    from .vicreg import vicreg_loss
 except ImportError:
     from vae import VAE
+    from augmentations import GeometricAugment
+    from vicreg import vicreg_loss
 
 
 logging.basicConfig(
@@ -100,6 +104,12 @@ def train_vae(
     device: str = "cuda",
     checkpoint_interval: int = 10,
     num_workers: int = 4,
+    # VICReg parameters
+    use_vicreg: bool = False,
+    vicreg_weight: float = 1.0,
+    vicreg_invariance: float = 25.0,
+    vicreg_variance: float = 25.0,
+    vicreg_covariance: float = 1.0,
 ) -> Dict[str, List[float]]:
     """Train VAE on nucleus patches.
 
@@ -115,9 +125,16 @@ def train_vae(
         device: Device to train on ("cuda" or "cpu").
         checkpoint_interval: Save checkpoint every N epochs.
         num_workers: DataLoader workers.
+        use_vicreg: Enable VICReg loss for discriminative pretraining.
+        vicreg_weight: Weight for VICReg loss relative to VAE loss.
+        vicreg_invariance: VICReg invariance term weight.
+        vicreg_variance: VICReg variance term weight.
+        vicreg_covariance: VICReg covariance term weight.
 
     Returns:
         History dict with loss, recon_loss, kl_loss per epoch.
+        If use_vicreg=True, also includes vicreg_loss, vicreg_invariance,
+        vicreg_variance, vicreg_covariance.
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -153,6 +170,15 @@ def train_vae(
         "recon_loss": [],
         "kl_loss": [],
     }
+    if use_vicreg:
+        history.update({
+            "vicreg_loss": [],
+            "vicreg_invariance": [],
+            "vicreg_variance": [],
+            "vicreg_covariance": [],
+        })
+        augment = GeometricAugment()
+        logger.info("VICReg enabled with geometric augmentations")
 
     # Training loop
     logger.info(f"Starting training for {epochs} epochs")
@@ -161,6 +187,10 @@ def train_vae(
         epoch_loss = 0.0
         epoch_recon = 0.0
         epoch_kl = 0.0
+        epoch_vicreg = 0.0
+        epoch_vic_inv = 0.0
+        epoch_vic_var = 0.0
+        epoch_vic_cov = 0.0
         n_batches = 0
 
         pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")
@@ -170,10 +200,32 @@ def train_vae(
             # Forward pass
             x_recon, mu, logvar = model(batch)
 
-            # Compute loss
-            loss, recon_loss, kl_loss = VAE.loss_function(
+            # Compute VAE loss
+            vae_loss, recon_loss, kl_loss = VAE.loss_function(
                 batch, x_recon, mu, logvar, beta=beta
             )
+
+            loss = vae_loss
+
+            # Add VICReg loss if enabled
+            if use_vicreg:
+                # Create augmented view
+                batch_aug = augment(batch)
+                _, mu_aug, _ = model(batch_aug)
+
+                # Compute VICReg on latents
+                vic_loss, vic_components = vicreg_loss(
+                    mu, mu_aug,
+                    invariance_weight=vicreg_invariance,
+                    variance_weight=vicreg_variance,
+                    covariance_weight=vicreg_covariance,
+                )
+                loss = loss + vicreg_weight * vic_loss
+
+                epoch_vicreg += vic_loss.item()
+                epoch_vic_inv += vic_components["invariance"].item()
+                epoch_vic_var += vic_components["variance"].item()
+                epoch_vic_cov += vic_components["covariance"].item()
 
             # Backward pass
             optimizer.zero_grad()
@@ -187,11 +239,14 @@ def train_vae(
             n_batches += 1
 
             # Update progress bar
-            pbar.set_postfix({
+            postfix = {
                 "loss": f"{loss.item():.4f}",
                 "recon": f"{recon_loss.item():.4f}",
                 "kl": f"{kl_loss.item():.4f}",
-            })
+            }
+            if use_vicreg:
+                postfix["vic"] = f"{vic_loss.item():.4f}"
+            pbar.set_postfix(postfix)
 
         # Average metrics
         avg_loss = epoch_loss / n_batches
@@ -202,10 +257,19 @@ def train_vae(
         history["recon_loss"].append(avg_recon)
         history["kl_loss"].append(avg_kl)
 
-        logger.info(
+        if use_vicreg:
+            history["vicreg_loss"].append(epoch_vicreg / n_batches)
+            history["vicreg_invariance"].append(epoch_vic_inv / n_batches)
+            history["vicreg_variance"].append(epoch_vic_var / n_batches)
+            history["vicreg_covariance"].append(epoch_vic_cov / n_batches)
+
+        log_msg = (
             f"Epoch {epoch+1}/{epochs}: "
             f"loss={avg_loss:.4f}, recon={avg_recon:.4f}, kl={avg_kl:.4f}"
         )
+        if use_vicreg:
+            log_msg += f", vicreg={epoch_vicreg / n_batches:.4f}"
+        logger.info(log_msg)
 
         # Save checkpoint
         if (epoch + 1) % checkpoint_interval == 0:
@@ -310,6 +374,35 @@ def main():
         default=4,
         help="DataLoader workers"
     )
+    parser.add_argument(
+        "--use-vicreg",
+        action="store_true",
+        help="Enable VICReg loss for discriminative pretraining"
+    )
+    parser.add_argument(
+        "--vicreg-weight",
+        type=float,
+        default=1.0,
+        help="Weight for VICReg loss relative to VAE loss"
+    )
+    parser.add_argument(
+        "--vicreg-invariance",
+        type=float,
+        default=25.0,
+        help="VICReg invariance term weight"
+    )
+    parser.add_argument(
+        "--vicreg-variance",
+        type=float,
+        default=25.0,
+        help="VICReg variance term weight"
+    )
+    parser.add_argument(
+        "--vicreg-covariance",
+        type=float,
+        default=1.0,
+        help="VICReg covariance term weight"
+    )
 
     args = parser.parse_args()
 
@@ -325,6 +418,11 @@ def main():
         device=args.device,
         checkpoint_interval=args.checkpoint_interval,
         num_workers=args.num_workers,
+        use_vicreg=args.use_vicreg,
+        vicreg_weight=args.vicreg_weight,
+        vicreg_invariance=args.vicreg_invariance,
+        vicreg_variance=args.vicreg_variance,
+        vicreg_covariance=args.vicreg_covariance,
     )
 
 
