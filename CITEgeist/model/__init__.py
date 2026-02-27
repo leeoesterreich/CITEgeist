@@ -23,6 +23,12 @@ from .utils import cleanup_memory, save_results_to_output, setup_logging, valida
 # Cell type detection (Stage 1 of detection + estimation model)
 from .detection import detect_cell_types
 
+# Masked IQP solver (Stage 2 of detection + estimation model)
+from .masked_iqp import solve_masked_iqp
+
+# Combined detection + estimation pipeline
+from .detection_estimation import solve_detection_estimation
+
 # New marker analysis modules
 from .marker_interest import MarkerInterest, MarkerInterestResult, identify_interesting_markers
 from .spatial_colocalization import (
@@ -122,6 +128,10 @@ __all__ = [
     "compute_kl_penalty_coefficients",
     # Cell type detection (Stage 1)
     "detect_cell_types",
+    # Masked IQP solver (Stage 2)
+    "solve_masked_iqp",
+    # Combined detection + estimation pipeline
+    "solve_detection_estimation",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
