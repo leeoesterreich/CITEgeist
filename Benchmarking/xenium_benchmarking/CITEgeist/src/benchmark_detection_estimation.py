@@ -52,8 +52,8 @@ def build_profile_and_marker_groups(
         antibody_names: List of antibody names in order
 
     Returns:
-        profile: (n_types, n_markers) binary matrix
-        marker_groups: Dict mapping cell_type -> marker indices
+        profile: (n_types, n_markers) binary matrix (Major + Minor for IQP)
+        marker_groups: Dict mapping cell_type -> marker indices (Major only for detection)
     """
     cell_types = list(cell_profile_dict.keys())
     n_types = len(cell_types)
@@ -63,23 +63,28 @@ def build_profile_and_marker_groups(
     name_to_idx = {name: i for i, name in enumerate(antibody_names)}
 
     profile = np.zeros((n_types, n_markers))
-    marker_groups = {}
+    marker_groups = {}  # Major only - for GMM detection
 
     for k, cell_type in enumerate(cell_types):
-        markers = cell_profile_dict[cell_type]["Major"]
-        # Also include minor markers
-        markers = markers + cell_profile_dict[cell_type].get("Minor", [])
+        major_markers = cell_profile_dict[cell_type]["Major"]
+        minor_markers = cell_profile_dict[cell_type].get("Minor", [])
+        all_markers = major_markers + minor_markers
 
-        indices = []
-        for marker in markers:
+        # marker_groups uses ONLY Major markers (for GMM detection)
+        # This avoids requiring optional markers like GranzymeB
+        major_indices = []
+        for marker in major_markers:
             if marker in name_to_idx:
-                idx = name_to_idx[marker]
-                profile[k, idx] = 1
-                indices.append(idx)
+                major_indices.append(name_to_idx[marker])
             else:
                 logger.warning(f"Marker {marker} not found in antibody panel")
 
-        marker_groups[cell_type] = indices
+        marker_groups[cell_type] = major_indices
+
+        # profile uses ALL markers (Major + Minor for IQP signal modeling)
+        for marker in all_markers:
+            if marker in name_to_idx:
+                profile[k, name_to_idx[marker]] = 1
 
     return profile, marker_groups
 
