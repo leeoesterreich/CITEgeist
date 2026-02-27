@@ -122,8 +122,16 @@ def evaluate_vs_ground_truth(
         logger.warning("No matching GT columns found")
         return {}
 
-    gt_counts = gt_df[gt_cols].values
-    gt_props = gt_counts / gt_counts.sum(axis=1, keepdims=True)
+    gt_values = gt_df[gt_cols].values
+
+    # Check if GT is already proportions (values sum to ~1) or counts
+    row_sums = gt_values.sum(axis=1)
+    if np.allclose(row_sums, 1.0, atol=0.1):
+        # Already proportions
+        gt_props = gt_values
+    else:
+        # Counts - normalize
+        gt_props = gt_values / np.maximum(row_sums[:, np.newaxis], 1e-8)
 
     # Overall correlation
     pred_flat = []
@@ -153,7 +161,7 @@ def evaluate_vs_ground_truth(
         detection_rate = n_detected / n_spots
 
         # GT presence rate (how often is this type actually present?)
-        gt_present = (gt_counts[:, gt_idx] > 0).sum() / n_spots
+        gt_present = (gt_props[:, gt_idx] > 0).sum() / n_spots
 
         # Sparsity analysis (key for B cells issue)
         pred_nonzero = (pred_counts[:, k] > 0).sum() / n_spots
