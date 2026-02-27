@@ -46,9 +46,13 @@ def test_per_class_attention_output_shape():
     pred_props, entropy, attn_weights_list = agg(embeddings, soft_assignments)
 
     assert pred_props.shape == (7,)
+    # Proportions should sum to 1
+    assert torch.allclose(pred_props.sum(), torch.tensor(1.0), atol=1e-5)
     assert len(attn_weights_list) == 7
-    for w in attn_weights_list:
+    for k, w in enumerate(attn_weights_list):
         assert w.shape == (20,)
+        # Each class's attention weights should sum to 1
+        assert torch.allclose(w.sum(), torch.tensor(1.0), atol=1e-5), f"Class {k} weights don't sum to 1"
 
 
 def test_entropy_regularization():
