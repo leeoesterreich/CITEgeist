@@ -1,0 +1,87 @@
+# CITEgeist/model/detection.py
+"""Cell type detection using multivariate Gaussian Mixture Models.
+
+This module implements Stage 1 of the two-stage detection + estimation model.
+For each cell type, a 2-component GMM is fit in the joint space of its markers
+to classify spots as signal (cell type present) or background (absent).
+
+The multivariate approach captures marker covariance - e.g., CD4+ T cells
+should have BOTH CD3 and CD4 elevated, not just one.
+"""
+import logging
+from typing import Dict, List, Optional
+
+import numpy as np
+from sklearn.mixture import GaussianMixture
+
+logger = logging.getLogger(__name__)
+
+
+def detect_cell_types(
+    X: np.ndarray,
+    marker_groups: Dict[str, List[int]],
+    threshold: float = 0.5,
+    random_state: int = 42,
+) -> np.ndarray:
+    """
+    Binary detection per cell type using multivariate GMM.
+
+    For each cell type, fits a 2-component GMM (background vs signal) in the
+    joint space of its markers. Spots are classified as "detected" if the
+    posterior probability of belonging to the signal cluster exceeds threshold.
+
+    Args:
+        X: (n_spots, n_markers) antibody signal matrix.
+        marker_groups: Dict mapping cell_type_name -> list of marker indices.
+            Example: {"CD4+ T cells": [0, 3], "B cells": [5]}
+        threshold: Posterior probability threshold for detection (default 0.5).
+        random_state: Random seed for GMM initialization.
+
+    Returns:
+        detected: (n_spots, n_types) boolean mask where detected[i,k]=True
+            means cell type k is present in spot i.
+    """
+    n_spots = X.shape[0]
+    n_types = len(marker_groups)
+    cell_type_names = list(marker_groups.keys())
+
+    detected = np.zeros((n_spots, n_types), dtype=bool)
+
+    for k, cell_type in enumerate(cell_type_names):
+        marker_indices = marker_groups[cell_type]
+
+        # Extract markers for this cell type
+        marker_data = X[:, marker_indices]  # (n_spots, n_markers_k)
+
+        # Handle edge case: single marker
+        if marker_data.ndim == 1:
+            marker_data = marker_data.reshape(-1, 1)
+
+        # Fit 2-component GMM
+        gmm = GaussianMixture(
+            n_components=2,
+            covariance_type='full',
+            random_state=random_state,
+            n_init=3,  # multiple initializations for stability
+        )
+
+        try:
+            gmm.fit(marker_data)
+        except Exception as e:
+            logger.warning(f"GMM fit failed for {cell_type}: {e}. Marking all as not detected.")
+            continue
+
+        # Identify signal cluster (higher mean across markers)
+        cluster_means = gmm.means_.sum(axis=1)
+        signal_cluster = int(np.argmax(cluster_means))
+
+        # Get posterior probability of signal
+        posteriors = gmm.predict_proba(marker_data)[:, signal_cluster]
+
+        # Binary detection
+        detected[:, k] = posteriors > threshold
+
+        n_detected = detected[:, k].sum()
+        logger.debug(f"{cell_type}: {n_detected}/{n_spots} spots detected ({100*n_detected/n_spots:.1f}%)")
+
+    return detected
