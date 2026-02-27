@@ -205,7 +205,11 @@ def main():
     )
     parser.add_argument("--max-iter", type=int, default=10, help="Max EM iterations")
     parser.add_argument(
-        "--detection-threshold", type=float, default=0.5, help="GMM detection threshold"
+        "--detection-threshold", type=float, default=0.5, help="GMM detection threshold (base threshold if adaptive)"
+    )
+    parser.add_argument(
+        "--no-adaptive-threshold", action="store_true",
+        help="Disable adaptive threshold (use fixed threshold for all cell types)"
     )
 
     args = parser.parse_args()
@@ -267,6 +271,7 @@ def main():
         marker_groups=marker_groups,
         max_iter=args.max_iter,
         detection_threshold=args.detection_threshold,
+        adaptive_threshold=not args.no_adaptive_threshold,
     )
 
     runtime = time.time() - start_time
@@ -314,6 +319,7 @@ def main():
         "parameters": {
             "max_iter": args.max_iter,
             "detection_threshold": args.detection_threshold,
+            "adaptive_threshold": not args.no_adaptive_threshold,
         },
         "learned_alpha": alpha.tolist(),
         "learned_beta": beta.tolist(),

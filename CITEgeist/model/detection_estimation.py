@@ -30,6 +30,7 @@ def solve_detection_estimation(
     detection_threshold: float = 0.5,
     convergence_rtol: float = 0.01,
     use_robust_variance: bool = True,
+    adaptive_threshold: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Two-stage detection + estimation with learned noise variance.
@@ -40,9 +41,12 @@ def solve_detection_estimation(
         profile: (n_types, n_markers) binary assignment matrix.
         marker_groups: Dict mapping cell_type -> marker indices.
         max_iter: Maximum EM iterations.
-        detection_threshold: Posterior threshold for GMM detection.
+        detection_threshold: Posterior threshold for GMM detection (base threshold
+            if adaptive_threshold=True).
         convergence_rtol: Relative tolerance for sigma_sq convergence.
         use_robust_variance: If True, use MAD-based variance (robust to outliers).
+        adaptive_threshold: If True, adjust GMM threshold based on cluster weights.
+            Rare types get lower thresholds; common types get higher thresholds.
 
     Returns:
         detected: (n_spots, n_types) binary presence mask.
@@ -55,7 +59,9 @@ def solve_detection_estimation(
     n_types = profile.shape[0]
 
     logger.info("Stage 1: Cell type detection via multivariate GMM")
-    detected = detect_cell_types(X, marker_groups, threshold=detection_threshold)
+    detected = detect_cell_types(
+        X, marker_groups, threshold=detection_threshold, adaptive_threshold=adaptive_threshold
+    )
 
     # Log detection summary
     for k, cell_type in enumerate(marker_groups.keys()):

@@ -20,6 +20,88 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def estimate_beta_direct(
+    X: np.ndarray,
+    nuclei_counts: np.ndarray,
+    profile: np.ndarray,
+    detected: np.ndarray,
+    min_single_spots: int = 3,
+) -> np.ndarray:
+    """
+    Estimate beta directly from single-type detected spots.
+
+    For spots where ONLY one cell type is detected, all nuclei belong to that type.
+    This allows direct estimation: beta_m = (X_m - alpha_m) / nuclei_count
+
+    This avoids the chicken-and-egg problem where OLS learns beta from bad IQP
+    allocations, which then collapse beta to zero for common cell types.
+
+    Args:
+        X: (n_spots, n_markers) observed antibody signal.
+        nuclei_counts: (n_spots,) integer nuclei count per spot.
+        profile: (n_types, n_markers) binary matrix.
+        detected: (n_spots, n_types) boolean detection mask.
+        min_single_spots: Minimum single-type spots needed for direct estimate.
+
+    Returns:
+        beta_init: (n_markers,) initial beta estimates.
+    """
+    n_spots, n_markers = X.shape
+    n_types = profile.shape[0]
+
+    beta = np.ones(n_markers)  # default initialization
+    alpha = np.zeros(n_markers)
+
+    # Count how many types are detected per spot
+    n_detected_per_spot = detected.sum(axis=1)
+
+    for k in range(n_types):
+        # Spots where ONLY this type is detected
+        single_detected = detected[:, k] & (n_detected_per_spot == 1)
+        not_detected = ~detected[:, k]
+
+        # Markers used by this cell type
+        marker_indices = np.where(profile[k] > 0)[0]
+
+        if single_detected.sum() < min_single_spots:
+            # Not enough single-type spots - use dynamic range heuristic
+            for m in marker_indices:
+                if not_detected.sum() > 10:
+                    # Estimate alpha from non-detected spots
+                    alpha[m] = np.percentile(X[not_detected, m], 50)
+                    # Estimate beta from dynamic range
+                    detected_signal = X[detected[:, k], m]
+                    if len(detected_signal) > 0:
+                        signal_above = np.maximum(detected_signal - alpha[m], 0)
+                        # Assume average ~5 cells per spot for scaling
+                        beta[m] = max(1.0, np.percentile(signal_above, 75) / 5)
+            continue
+
+        # Direct estimation from single-type spots
+        for m in marker_indices:
+            # Alpha from non-detected spots
+            if not_detected.sum() > 10:
+                alpha[m] = np.percentile(X[not_detected, m], 50)
+            else:
+                alpha[m] = np.percentile(X[:, m], 10)
+
+            # Beta = (signal - alpha) / nuclei_count in single-type spots
+            signal = X[single_detected, m]
+            n_cells = nuclei_counts[single_detected]
+
+            per_cell_signal = (signal - alpha[m]) / np.maximum(n_cells, 1)
+            valid = per_cell_signal > 0
+
+            if valid.sum() > 0:
+                beta[m] = np.median(per_cell_signal[valid])
+            else:
+                # Fallback to dynamic range
+                beta[m] = max(1.0, (signal.max() - alpha[m]) / max(n_cells.max(), 1))
+
+    logger.info(f"Direct beta initialization: {beta}")
+    return beta
+
+
 def solve_masked_iqp(
     X: np.ndarray,
     nuclei_counts: np.ndarray,
@@ -69,11 +151,15 @@ def solve_masked_iqp(
     n_spots, n_markers = X.shape
     n_types = profile.shape[0]
 
-    # Initialize beta
+    # Initialize beta - use direct estimation if not provided
     if beta_init is None:
-        beta = np.ones(n_markers)
+        beta = estimate_beta_direct(X, nuclei_counts, profile, detected)
     else:
         beta = beta_init.copy()
+
+    # Save initial beta as FLOOR - OLS can refine upward but NEVER collapse below
+    # This is the key robustness mechanism: no hyperparameter tuning needed
+    beta_floor = beta.copy()
 
     # Block coordinate descent
     counts = None
@@ -87,10 +173,17 @@ def solve_masked_iqp(
             X, nuclei_counts, profile, detected, weights, beta, timeout
         )
 
-        # Block 2: Fix counts, solve OLS for alpha and beta
-        alpha_new, beta_new = _solve_ols_fixed_counts(
-            X, counts, profile, weights, beta_min
+        # Block 2: Fix counts, update alpha and beta
+        # Use simple OLS (no ridge needed since we have floor constraint)
+        alpha_new, beta_ols = _solve_ols_fixed_counts(
+            X, counts, profile, weights, beta_min,
+            beta_prior=None,  # No ridge regularization
+            ridge_lambda=0.0,  # Disabled
         )
+
+        # FLOOR CONSTRAINT: Beta can only go UP from direct estimate
+        # This prevents collapse without requiring hyperparameter tuning
+        beta_new = np.maximum(beta_ols, beta_floor)
 
         # Check convergence
         beta_change = np.abs(beta_new - beta).max() / (np.abs(beta).max() + 1e-8)
@@ -369,12 +462,36 @@ def _solve_iqp_fixed_beta_DEPRECATED(
     return counts, alpha
 
 
+def _solve_alpha_fixed_counts_beta(
+    X: np.ndarray,
+    counts: np.ndarray,
+    profile: np.ndarray,
+    beta: np.ndarray,
+) -> np.ndarray:
+    """
+    Solve for alpha (baseline) with fixed counts and beta.
+
+    Model: X[i,m] = alpha[m] + (counts @ profile)[i,m] * beta[m]
+    Solution: alpha[m] = median(X[:,m] - predicted[:,m])
+    """
+    # Compute predicted signal from counts
+    predicted = (counts @ profile) * beta  # (n_spots, n_markers)
+
+    # Alpha is the median residual (robust to outliers)
+    residuals = X - predicted
+    alpha = np.maximum(np.median(residuals, axis=0), 0)
+
+    return alpha
+
+
 def _solve_ols_fixed_counts(
     X: np.ndarray,
     counts: np.ndarray,
     profile: np.ndarray,
     weights: np.ndarray,
     beta_min: float,
+    beta_prior: np.ndarray = None,
+    ridge_lambda: float = 1.0,  # Strong regularization to prevent collapse
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Solve OLS for alpha and beta with fixed counts.
@@ -384,33 +501,53 @@ def _solve_ols_fixed_counts(
 
     This is equivalent to per-marker regression:
         X[:,m] = alpha[m] + beta[m] * (counts @ profile[:,m])
+
+    Uses ridge regularization toward beta_prior to prevent collapse.
     """
     n_spots, n_markers = X.shape
 
     alpha = np.zeros(n_markers)
     beta = np.zeros(n_markers)
 
+    # Default prior is uniform
+    if beta_prior is None:
+        beta_prior = np.ones(n_markers)
+
     for m in range(n_markers):
         # Effective cell count for this marker: sum_k counts[i,k] * profile[k,m]
         effective_counts = counts @ profile[:, m]  # (n_spots,)
+
+        # Skip markers not used by any detected cell type
+        if effective_counts.sum() == 0:
+            beta[m] = beta_prior[m]
+            alpha[m] = np.median(X[:, m])
+            continue
 
         # Weighted least squares: X[:,m] = alpha_m + beta_m * effective_counts
         # Design matrix: [1, effective_counts]
         A = np.column_stack([np.ones(n_spots), effective_counts])
         b = X[:, m]
 
-        # Weighted normal equations
+        # Weighted normal equations with ridge regularization on beta
+        # Regularize toward beta_prior to prevent collapse
         W = np.diag(np.full(n_spots, weights[m]))
         AtWA = A.T @ W @ A
+
+        # Add ridge penalty on beta (second parameter), scaled by data magnitude
+        ridge_penalty = ridge_lambda * np.diag([0, 1]) * AtWA[1, 1]
+        AtWA_reg = AtWA + ridge_penalty
+
+        # Adjust RHS to regularize toward prior
         AtWb = A.T @ W @ b
+        AtWb[1] += ridge_lambda * AtWA[1, 1] * beta_prior[m]
 
         try:
-            params = np.linalg.solve(AtWA, AtWb)
+            params = np.linalg.solve(AtWA_reg, AtWb)
             alpha[m] = max(0, params[0])  # alpha >= 0
             beta[m] = max(beta_min, params[1])  # beta >= beta_min
         except np.linalg.LinAlgError:
-            # Fallback to simple estimates
-            alpha[m] = X[:, m].min()
-            beta[m] = beta_min
+            # Fallback to prior estimates
+            alpha[m] = np.median(X[:, m])
+            beta[m] = beta_prior[m]
 
     return alpha, beta

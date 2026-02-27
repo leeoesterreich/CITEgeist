@@ -17,12 +17,54 @@ from sklearn.mixture import GaussianMixture
 logger = logging.getLogger(__name__)
 
 
+def _compute_adaptive_threshold(
+    gmm: GaussianMixture,
+    signal_cluster: int,
+    base_threshold: float = 0.5,
+) -> float:
+    """
+    Compute adaptive threshold based on GMM cluster weights.
+
+    Rare types (small signal cluster) get lower threshold for sensitivity.
+    Common types (large signal cluster) get higher threshold to avoid over-detection.
+
+    The intuition is:
+    - If signal cluster weight is small (rare type) → GMM found true signal/background
+      split → use lower threshold to catch all signal
+    - If signal cluster weight is large (common type) → GMM may be splitting within
+      signal (moderate vs high expression) → use higher threshold to avoid over-detection
+
+    Args:
+        gmm: Fitted GaussianMixture model.
+        signal_cluster: Index of the signal cluster (higher mean).
+        base_threshold: Default threshold when signal weight is moderate (0.5-0.7).
+
+    Returns:
+        Adaptive threshold value between 0.3 and 0.6.
+    """
+    w_signal = gmm.weights_[signal_cluster]
+
+    if w_signal < 0.3:
+        # Very rare type - GMM found true separation, be sensitive
+        return 0.3
+    elif w_signal < 0.5:
+        # Rare to moderate - slightly lower threshold
+        return 0.4
+    elif w_signal < 0.7:
+        # Common type - use base threshold
+        return base_threshold
+    else:
+        # Very common type - GMM may be splitting within signal, be conservative
+        return 0.6
+
+
 def detect_cell_types(
     X: np.ndarray,
     marker_groups: Dict[str, List[int]],
     threshold: float = 0.5,
     random_state: int = 42,
     log_transform: bool = True,
+    adaptive_threshold: bool = True,
 ) -> np.ndarray:
     """
     Binary detection per cell type using multivariate GMM.
@@ -36,10 +78,16 @@ def detect_cell_types(
         marker_groups: Dict mapping cell_type_name -> list of marker indices.
             Example: {"CD4+ T cells": [0, 3], "B cells": [5]}
         threshold: Posterior probability threshold for detection (default 0.5).
+            If adaptive_threshold=True, this serves as the base threshold.
         random_state: Random seed for GMM initialization.
         log_transform: If True, apply log1p transform before GMM fitting.
             This compresses heavy-tailed distributions and improves separation
             of true signal from background (recommended for antibody data).
+        adaptive_threshold: If True, adjust threshold based on GMM cluster weights.
+            Rare types (small signal cluster weight) get lower thresholds for
+            sensitivity; common types (large signal cluster weight) get higher
+            thresholds to avoid over-detection. Recommended for heterogeneous
+            cell type prevalences.
 
     Returns:
         detected: (n_spots, n_types) boolean mask where detected[i,k]=True
@@ -85,13 +133,25 @@ def detect_cell_types(
         cluster_means = gmm.means_.sum(axis=1)
         signal_cluster = int(np.argmax(cluster_means))
 
+        # Compute threshold (adaptive or fixed)
+        if adaptive_threshold:
+            effective_threshold = _compute_adaptive_threshold(
+                gmm, signal_cluster, base_threshold=threshold
+            )
+        else:
+            effective_threshold = threshold
+
         # Get posterior probability of signal
         posteriors = gmm.predict_proba(marker_data)[:, signal_cluster]
 
         # Binary detection
-        detected[:, k] = posteriors > threshold
+        detected[:, k] = posteriors > effective_threshold
 
         n_detected = detected[:, k].sum()
-        logger.debug(f"{cell_type}: {n_detected}/{n_spots} spots detected ({100*n_detected/n_spots:.1f}%)")
+        w_signal = gmm.weights_[signal_cluster]
+        logger.debug(
+            f"{cell_type}: {n_detected}/{n_spots} spots detected ({100*n_detected/n_spots:.1f}%), "
+            f"signal_weight={w_signal:.2f}, threshold={effective_threshold:.2f}"
+        )
 
     return detected
