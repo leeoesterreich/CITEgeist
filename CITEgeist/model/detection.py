@@ -22,6 +22,7 @@ def detect_cell_types(
     marker_groups: Dict[str, List[int]],
     threshold: float = 0.5,
     random_state: int = 42,
+    log_transform: bool = True,
 ) -> np.ndarray:
     """
     Binary detection per cell type using multivariate GMM.
@@ -36,6 +37,9 @@ def detect_cell_types(
             Example: {"CD4+ T cells": [0, 3], "B cells": [5]}
         threshold: Posterior probability threshold for detection (default 0.5).
         random_state: Random seed for GMM initialization.
+        log_transform: If True, apply log1p transform before GMM fitting.
+            This compresses heavy-tailed distributions and improves separation
+            of true signal from background (recommended for antibody data).
 
     Returns:
         detected: (n_spots, n_types) boolean mask where detected[i,k]=True
@@ -56,6 +60,12 @@ def detect_cell_types(
         # Handle edge case: single marker
         if marker_data.ndim == 1:
             marker_data = marker_data.reshape(-1, 1)
+
+        # Log-transform to compress dynamic range (heavy right tail)
+        # This helps GMM find true signal/background boundary rather than
+        # splitting moderate from high expression
+        if log_transform:
+            marker_data = np.log1p(marker_data)
 
         # Fit 2-component GMM
         gmm = GaussianMixture(
