@@ -118,10 +118,182 @@ def _solve_iqp_fixed_beta(
     """
     Solve IQP for counts and alpha with fixed beta.
 
-    With beta fixed, the problem is:
-        min sum_i sum_m w[m] * (X[i,m] - alpha[m] - sum_k c[i,k]*profile[k,m]*beta[m])^2
+    Uses per-spot optimization for speed (each spot is independent given alpha).
+    Alpha is estimated from residuals after count optimization.
+    """
+    n_spots, n_markers = X.shape
+    n_types = profile.shape[0]
 
-    This is quadratic in (c, alpha) since beta is constant.
+    # Precompute effective signal contribution: profile[k,m] * beta[m]
+    signal_coeff = profile * beta  # (n_types, n_markers)
+
+    # Initialize counts
+    counts = np.zeros((n_spots, n_types), dtype=int)
+
+    # Estimate initial alpha from spots with minimal signal
+    # (where few types are detected)
+    n_detected_per_spot = detected.sum(axis=1)
+    background_mask = n_detected_per_spot <= 1
+    if background_mask.sum() > 10:
+        alpha = np.percentile(X[background_mask], 10, axis=0)
+    else:
+        alpha = np.percentile(X, 5, axis=0)
+    alpha = np.maximum(alpha, 0)
+
+    # Solve each spot independently
+    for i in range(n_spots):
+        detected_types = np.where(detected[i])[0]
+        n_i = int(nuclei_counts[i])
+
+        if len(detected_types) == 0 or n_i == 0:
+            continue
+
+        if len(detected_types) == 1:
+            # Only one type detected - assign all nuclei to it
+            counts[i, detected_types[0]] = n_i
+            continue
+
+        # Multiple types detected - solve small IQP
+        counts[i] = _solve_single_spot_iqp(
+            X[i], n_i, signal_coeff, detected_types, weights, alpha, timeout=5.0
+        )
+
+    # Update alpha estimate from residuals
+    # For each marker, alpha = median(X - predicted) where predicted uses counts
+    predicted = (counts @ profile) * beta
+    residuals = X - predicted
+    alpha = np.maximum(np.median(residuals, axis=0), 0)
+
+    return counts, alpha
+
+
+def _solve_single_spot_iqp(
+    x: np.ndarray,
+    n_cells: int,
+    signal_coeff: np.ndarray,
+    detected_types: np.ndarray,
+    weights: np.ndarray,
+    alpha: np.ndarray,
+    timeout: float = 5.0,
+) -> np.ndarray:
+    """
+    Solve IQP for a single spot.
+
+    Much faster than global IQP since only ~7 integer variables per spot.
+    """
+    import gurobipy as gp
+    from gurobipy import GRB
+
+    n_types = signal_coeff.shape[0]
+    n_markers = len(x)
+    n_detected = len(detected_types)
+
+    # For very small problems, enumerate solutions
+    if n_detected <= 2 and n_cells <= 20:
+        return _enumerate_best_counts(x, n_cells, signal_coeff, detected_types, weights, alpha)
+
+    model = gp.Model("spot_iqp")
+    model.setParam("OutputFlag", 0)
+    model.setParam("TimeLimit", timeout)
+
+    # Variables: counts for detected types only
+    c = model.addVars(n_detected, vtype=GRB.INTEGER, lb=0, ub=n_cells, name="c")
+
+    model.update()
+
+    # Objective: weighted sum of squared residuals
+    obj = gp.QuadExpr()
+    for m in range(n_markers):
+        # predicted = alpha[m] + sum over detected types of c[k] * signal_coeff[type,m]
+        pred = alpha[m]
+        for idx, k in enumerate(detected_types):
+            pred = pred + c[idx] * signal_coeff[k, m]
+
+        residual = x[m] - pred
+        obj += weights[m] * residual * residual
+
+    model.setObjective(obj, GRB.MINIMIZE)
+
+    # Constraint: counts sum to n_cells
+    model.addConstr(gp.quicksum(c[idx] for idx in range(n_detected)) == n_cells, "sum")
+
+    model.optimize()
+
+    # Extract solution
+    counts = np.zeros(n_types, dtype=int)
+    if model.status in [GRB.OPTIMAL, GRB.TIME_LIMIT]:
+        for idx, k in enumerate(detected_types):
+            counts[k] = int(round(c[idx].X))
+
+        # Ensure sum constraint (rounding may break it)
+        diff = n_cells - counts.sum()
+        if diff != 0:
+            # Adjust largest count
+            largest_idx = detected_types[np.argmax(counts[detected_types])]
+            counts[largest_idx] += diff
+    else:
+        # Fallback: distribute evenly
+        per_type = n_cells // n_detected
+        remainder = n_cells % n_detected
+        for idx, k in enumerate(detected_types):
+            counts[k] = per_type + (1 if idx < remainder else 0)
+
+    return counts
+
+
+def _enumerate_best_counts(
+    x: np.ndarray,
+    n_cells: int,
+    signal_coeff: np.ndarray,
+    detected_types: np.ndarray,
+    weights: np.ndarray,
+    alpha: np.ndarray,
+) -> np.ndarray:
+    """
+    For small problems, enumerate all valid count combinations.
+    """
+    n_types = signal_coeff.shape[0]
+    n_detected = len(detected_types)
+
+    best_counts = np.zeros(n_types, dtype=int)
+    best_cost = float('inf')
+
+    if n_detected == 1:
+        best_counts[detected_types[0]] = n_cells
+        return best_counts
+
+    # Two types: enumerate all splits
+    for c0 in range(n_cells + 1):
+        c1 = n_cells - c0
+
+        # Compute cost
+        counts_vec = np.zeros(n_types)
+        counts_vec[detected_types[0]] = c0
+        counts_vec[detected_types[1]] = c1
+
+        predicted = alpha + counts_vec @ signal_coeff
+        residuals = x - predicted
+        cost = (weights * residuals ** 2).sum()
+
+        if cost < best_cost:
+            best_cost = cost
+            best_counts = counts_vec.astype(int)
+
+    return best_counts
+
+
+def _solve_iqp_fixed_beta_DEPRECATED(
+    X: np.ndarray,
+    nuclei_counts: np.ndarray,
+    profile: np.ndarray,
+    detected: np.ndarray,
+    weights: np.ndarray,
+    beta: np.ndarray,
+    timeout: float,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    DEPRECATED: Global IQP solver - too slow for large datasets.
+    Kept for reference.
     """
     import gurobipy as gp
     from gurobipy import GRB
