@@ -40,3 +40,28 @@ def test_geometric_augment_batch():
     x_aug = aug(x)
 
     assert x_aug.shape == x.shape
+
+
+def test_geometric_augment_non_square():
+    """Non-square images should preserve shape (only 0/180 rotation)."""
+    from CITEgeist.model.augmentations import GeometricAugment
+
+    aug = GeometricAugment()
+    x = torch.randn(2, 96, 64)  # Non-square image
+
+    # Run multiple times to test different random rotations
+    for _ in range(10):
+        x_aug = aug(x)
+        assert x_aug.shape == x.shape, f"Shape changed: {x.shape} -> {x_aug.shape}"
+
+
+def test_geometric_augment_preserves_values():
+    """Rotation/flip should preserve pixel values (no intensity modification)."""
+    from CITEgeist.model.augmentations import GeometricAugment
+
+    aug = GeometricAugment(max_translate=0)  # Disable translation to test preservation
+    x = torch.randn(2, 96, 96)
+    x_aug = aug(x)
+
+    # Flattened sorted values should match (rotation/flip just rearranges pixels)
+    assert torch.allclose(x.flatten().sort().values, x_aug.flatten().sort().values)

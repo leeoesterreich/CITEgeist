@@ -50,8 +50,12 @@ class GeometricAugment(nn.Module):
 
     def _augment_single(self, x: torch.Tensor) -> torch.Tensor:
         """Augment a single image (C, H, W)."""
-        # Random rotation (0, 90, 180, 270)
-        k = random.randint(0, 3)
+        # Random rotation (0, 90, 180, 270 for square; 0, 180 for non-square)
+        H, W = x.shape[1], x.shape[2]
+        if H == W:
+            k = random.randint(0, 3)  # 0, 90, 180, 270 degrees
+        else:
+            k = random.randint(0, 1) * 2  # 0 or 180 degrees only
         x = torch.rot90(x, k, dims=(1, 2))
 
         # Random horizontal flip

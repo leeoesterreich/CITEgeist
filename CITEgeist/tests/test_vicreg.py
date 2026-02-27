@@ -58,3 +58,17 @@ def test_vicreg_covariance_penalizes_correlation():
 
     # Covariance loss should be high
     assert components["covariance"].item() > 10
+
+
+def test_vicreg_batch_size_one_raises():
+    """VICReg should raise error for batch_size=1."""
+    from CITEgeist.model.vicreg import vicreg_loss
+
+    z = torch.randn(1, 128)  # Single sample
+    z_aug = torch.randn(1, 128)
+
+    try:
+        vicreg_loss(z, z_aug)
+        assert False, "Should have raised ValueError"
+    except ValueError as e:
+        assert "batch_size >= 2" in str(e)

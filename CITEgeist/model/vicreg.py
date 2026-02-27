@@ -35,8 +35,16 @@ def vicreg_loss(
     Returns:
         total_loss: Weighted sum of all components
         components: Dict with individual loss terms
+
+    Raises:
+        ValueError: If batch_size < 2 (variance computation requires at least 2 samples)
     """
     batch_size, dim = z.shape
+
+    if batch_size < 2:
+        raise ValueError(
+            f"VICReg requires batch_size >= 2 for variance computation, got {batch_size}"
+        )
 
     # === Invariance Loss ===
     # MSE between embeddings of augmented views
