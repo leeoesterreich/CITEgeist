@@ -20,6 +20,9 @@ from .gex_modules import (
 )
 from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
 
+# Cell type detection (Stage 1 of detection + estimation model)
+from .detection import detect_cell_types
+
 # New marker analysis modules
 from .marker_interest import MarkerInterest, MarkerInterestResult, identify_interesting_markers
 from .spatial_colocalization import (
@@ -117,6 +120,8 @@ __all__ = [
     "compute_module_aware_enrichment",
     "compute_softmax_target",
     "compute_kl_penalty_coefficients",
+    # Cell type detection (Stage 1)
+    "detect_cell_types",
     # Utilities
     "cleanup_memory",
     "save_results_to_output",
