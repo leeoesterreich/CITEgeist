@@ -70,6 +70,19 @@ class DirectSoftmaxModel(nn.Module):
         use_attention: bool = False,
         use_per_class_attention: bool = False,
         attention_entropy_weight: float = 0.1,
+        # Class imbalance reweighting
+        class_weights: Optional[torch.Tensor] = None,
+        # Unknown class rejection (energy-based)
+        enable_unknown: bool = False,
+        unknown_threshold: float = 0.15,
+        unknown_prior: float = 0.25,
+        # Attention confidence bias
+        attention_confidence_bias: bool = True,
+        # Consistency regularization (JS divergence between views)
+        consistency_weight: float = 0.0,
+        consistency_temp: float = 0.1,
+        # Size features (from bbox dimensions)
+        use_size_features: bool = False,
     ):
         """Initialize direct softmax model.
 
@@ -86,17 +99,41 @@ class DirectSoftmaxModel(nn.Module):
             use_attention: Use attention-weighted aggregation instead of mean.
             use_per_class_attention: Use per-class attention heads (MoE style).
             attention_entropy_weight: Weight for attention entropy regularization.
+            class_weights: (K,) tensor of per-class weights for KL loss. If None,
+                uniform weights are used. Use inverse frequency to upweight rare classes.
+            enable_unknown: Enable Unknown class rejection via energy/confidence.
+            unknown_threshold: Max probability threshold for Unknown assignment.
+                Nuclei with max_prob < threshold are assigned to Unknown.
+            unknown_prior: Expected proportion of Unknown cells (for logging/monitoring).
+            attention_confidence_bias: If True, bias attention by classification confidence.
+                High-confidence nuclei get higher attention weights.
+            consistency_weight: Weight for consistency loss (JS divergence between views).
+                If 0.0, consistency regularization is disabled.
+            consistency_temp: Temperature for softmax in consistency loss. Lower values
+                create sharper targets. Can be annealed during training.
+            use_size_features: If True, concatenate size features (log1p(w,h,area)) to
+                latent before projection. Requires size_features in forward()/assign().
         """
         super().__init__()
+
+        # Size features
+        self.use_size_features = use_size_features
+        input_dim = latent_dim + 3 if use_size_features else latent_dim
+
+        # Class weights for KL loss (registered as buffer for device handling)
+        if class_weights is not None:
+            self.register_buffer("class_weights", class_weights)
+        else:
+            self.register_buffer("class_weights", None)
 
         # Frozen encoder
         self.encoder = encoder
         for p in self.encoder.parameters():
             p.requires_grad = False
 
-        # Projection head
+        # Projection head (input_dim accounts for size features if enabled)
         self.projection = nn.Sequential(
-            nn.Linear(latent_dim, 64),
+            nn.Linear(input_dim, 64),
             nn.ReLU(inplace=True),
             nn.Linear(64, projection_dim),
         )
@@ -125,16 +162,37 @@ class DirectSoftmaxModel(nn.Module):
         self.use_per_class_attention = use_per_class_attention
         self.attention_entropy_weight = attention_entropy_weight
 
+        # Unknown class rejection
+        self.enable_unknown = enable_unknown
+        self.unknown_threshold = unknown_threshold
+        self.unknown_prior = unknown_prior
+
+        # Consistency regularization
+        self.consistency_weight = consistency_weight
+        self.consistency_temp = consistency_temp
+
+        # Data augmentation for consistency (simple random augmentations)
+        if consistency_weight > 0:
+            self.augment = nn.Sequential(
+                # Random horizontal flip is not easily differentiable, so we use
+                # random noise and dropout as simple augmentations
+                nn.Dropout(p=0.1),
+            )
+        else:
+            self.augment = None
+
         if use_attention:
             if use_per_class_attention:
                 self.aggregator = PerClassAttentionAggregator(
                     embed_dim=projection_dim,
                     n_types=n_types,
+                    use_confidence_bias=attention_confidence_bias,
                 )
             else:
                 self.aggregator = AttentionAggregator(
                     embed_dim=projection_dim,
                     n_types=n_types,
+                    use_confidence_bias=attention_confidence_bias,
                 )
 
     def compute_logits(
@@ -170,6 +228,7 @@ class DirectSoftmaxModel(nn.Module):
         patches: torch.Tensor,
         proportions: torch.Tensor,
         return_components: bool = False,
+        size_features: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Forward pass for a single spot.
 
@@ -177,6 +236,7 @@ class DirectSoftmaxModel(nn.Module):
             patches: (N, C, H, W) nucleus patches for this spot
             proportions: (K,) cell type proportions for this spot
             return_components: If True, return dict of loss components
+            size_features: (N, 3) bbox size features (required if use_size_features=True)
 
         Returns:
             loss: Total loss (KL + repulsion + entropy)
@@ -184,10 +244,18 @@ class DirectSoftmaxModel(nn.Module):
         """
         N = patches.shape[0]
 
+        # Validate size_features if required
+        if self.use_size_features and size_features is None:
+            raise ValueError("size_features required when use_size_features=True")
+
         # Encode patches (frozen)
         with torch.no_grad():
             mu, _ = self.encoder(patches)
         z = mu
+
+        # Concatenate size features if enabled
+        if self.use_size_features and size_features is not None:
+            z = torch.cat([z, size_features], dim=1)  # (N, latent_dim + 3)
 
         # Project to shared space
         projected = self.projection(z)  # (N, D)
@@ -198,11 +266,23 @@ class DirectSoftmaxModel(nn.Module):
         # Softmax to get per-nucleus soft assignments
         soft_assignments = F.softmax(logits / self.temperature, dim=1)  # (N, K)
 
+        # Unknown class rejection: downweight uncertain nuclei in aggregation
+        if self.enable_unknown:
+            max_probs = soft_assignments.max(dim=1).values  # (N,)
+            certainty = max_probs.unsqueeze(1)  # (N, 1)
+            soft_assignments_weighted = soft_assignments * certainty
+            # Renormalize to maintain probability interpretation
+            soft_assignments_for_agg = soft_assignments_weighted / (
+                soft_assignments_weighted.sum(dim=1, keepdim=True) + 1e-8
+            )
+        else:
+            soft_assignments_for_agg = soft_assignments
+
         # Aggregate to spot-level predicted proportions
         if self.use_attention:
-            pred_props, attention_entropy, _ = self.aggregator(projected, soft_assignments)
+            pred_props, attention_entropy, _ = self.aggregator(projected, soft_assignments_for_agg)
         else:
-            pred_props = soft_assignments.mean(dim=0)  # (K,)
+            pred_props = soft_assignments_for_agg.mean(dim=0)  # (K,)
             attention_entropy = torch.tensor(0.0, device=logits.device)
 
         # === Loss components ===
@@ -211,7 +291,11 @@ class DirectSoftmaxModel(nn.Module):
         # KL(true || pred) = sum(true * log(true / pred))
         # Add small epsilon to avoid log(0)
         eps = 1e-8
-        kl_loss = (proportions * torch.log((proportions + eps) / (pred_props + eps))).sum()
+        per_class_kl = proportions * torch.log((proportions + eps) / (pred_props + eps))
+        if self.class_weights is not None:
+            kl_loss = (self.class_weights * per_class_kl).sum()
+        else:
+            kl_loss = per_class_kl.sum()
 
         # 2. Prototype repulsion loss (keep prototypes spread apart)
         repulsion_loss = self._prototype_repulsion_loss()
@@ -234,6 +318,13 @@ class DirectSoftmaxModel(nn.Module):
         if self.use_attention:
             loss = loss - self.attention_entropy_weight * attention_entropy
 
+        # 4. Consistency regularization (JS divergence between views)
+        if self.consistency_weight > 0 and self.training:
+            consistency_loss = self._compute_consistency_loss(patches, projected)
+            loss = loss + self.consistency_weight * consistency_loss
+        else:
+            consistency_loss = torch.tensor(0.0, device=logits.device)
+
         # Monitoring metrics
         with torch.no_grad():
             # Prediction accuracy (how close are predicted props to true)
@@ -241,6 +332,12 @@ class DirectSoftmaxModel(nn.Module):
 
             # Assignment confidence (mean max probability)
             confidence = soft_assignments.max(dim=1).values.mean()
+
+            # Unknown rate (fraction of nuclei below threshold)
+            if self.enable_unknown:
+                unknown_rate = (soft_assignments.max(dim=1).values < self.unknown_threshold).float().mean()
+            else:
+                unknown_rate = torch.tensor(0.0, device=logits.device)
 
             # Prototype separation
             proto_norm = F.normalize(self.prototypes, dim=1)
@@ -262,6 +359,8 @@ class DirectSoftmaxModel(nn.Module):
                 "confidence": confidence,
                 "proto_min_dist": proto_min_dist,
                 "logit_std": logit_std,
+                "unknown_rate": unknown_rate,
+                "consistency": consistency_loss,
             }
             if self.use_attention:
                 components["attention_entropy"] = attention_entropy
@@ -282,11 +381,55 @@ class DirectSoftmaxModel(nn.Module):
         loss = F.relu(self.repulsion_margin - pairwise_dists).mean()
         return loss
 
+    def _compute_consistency_loss(
+        self,
+        patches: torch.Tensor,
+        projected: torch.Tensor,
+    ) -> torch.Tensor:
+        """Compute consistency loss (JS divergence) between original and augmented views.
+
+        The idea is that the same nucleus should be assigned to the same cell type
+        regardless of small perturbations (augmentations). This encourages the model
+        to learn robust representations.
+
+        Args:
+            patches: (N, C, H, W) original nucleus patches
+            projected: (N, D) projected embeddings of original patches
+
+        Returns:
+            js_divergence: Mean JS divergence between original and augmented views
+        """
+        # Augment patches
+        patches_aug = self.augment(patches)
+
+        # Encode augmented patches (encoder is frozen)
+        with torch.no_grad():
+            mu_aug, _ = self.encoder(patches_aug)
+
+        # Project augmented embeddings
+        projected_aug = self.projection(mu_aug)
+
+        # Compute soft assignments for both views
+        logits_orig = self.compute_logits(projected, self.prototypes)
+        logits_aug = self.compute_logits(projected_aug, self.prototypes)
+
+        p1 = F.softmax(logits_orig / self.consistency_temp, dim=1)
+        p2 = F.softmax(logits_aug / self.consistency_temp, dim=1)
+
+        # JS divergence = 0.5 * KL(p1 || m) + 0.5 * KL(p2 || m) where m = 0.5 * (p1 + p2)
+        eps = 1e-8
+        m = 0.5 * (p1 + p2)
+        js_div = 0.5 * (p1 * torch.log((p1 + eps) / (m + eps))).sum(dim=1) + \
+                 0.5 * (p2 * torch.log((p2 + eps) / (m + eps))).sum(dim=1)
+
+        return js_div.mean()
+
     def assign(
         self,
         patches: torch.Tensor,
         proportions: Optional[torch.Tensor] = None,
         use_hungarian: bool = True,
+        size_features: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Assign nuclei to cell types.
 
@@ -294,16 +437,28 @@ class DirectSoftmaxModel(nn.Module):
             patches: (N, C, H, W) nucleus patches
             proportions: (K,) cell type proportions (needed for Hungarian)
             use_hungarian: Use Hungarian matching to respect proportions
+            size_features: (N, 3) bbox size features (required if use_size_features=True)
 
         Returns:
-            assignments: (N,) cell type indices
+            assignments: (N,) cell type indices. If enable_unknown=True, low-confidence
+                nuclei are assigned to index n_types (Unknown class).
             confidence: (N,) assignment confidence scores
         """
+        # Validate size_features if required
+        if self.use_size_features and size_features is None:
+            raise ValueError("size_features required when use_size_features=True")
+
         self.eval()
         with torch.no_grad():
             # Encode and project
             mu, _ = self.encoder(patches)
-            projected = self.projection(mu)
+            z = mu
+
+            # Concatenate size features if enabled
+            if self.use_size_features and size_features is not None:
+                z = torch.cat([z, size_features], dim=1)
+
+            projected = self.projection(z)
 
             # Compute logits and soft assignments
             logits = self.compute_logits(projected, self.prototypes)
@@ -317,6 +472,12 @@ class DirectSoftmaxModel(nn.Module):
                 # Simple argmax
                 assignments = soft_assignments.argmax(dim=1)
                 confidence = soft_assignments.max(dim=1).values
+
+            # Unknown class rejection: assign low-confidence nuclei to Unknown
+            if self.enable_unknown:
+                max_probs = soft_assignments.max(dim=1).values
+                unknown_mask = max_probs < self.unknown_threshold
+                assignments[unknown_mask] = self.n_types  # Unknown = class K
 
         return assignments, confidence
 
@@ -375,19 +536,31 @@ class DirectSoftmaxModel(nn.Module):
     def get_embeddings(
         self,
         patches: torch.Tensor,
+        size_features: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get embeddings for visualization.
 
         Args:
             patches: (N, C, H, W) nucleus patches
+            size_features: (N, 3) bbox size features (required if use_size_features=True)
 
         Returns:
             projected: (N, D) projected embeddings
             prototypes: (K, D) prototype vectors
         """
+        # Validate size_features if required
+        if self.use_size_features and size_features is None:
+            raise ValueError("size_features required when use_size_features=True")
+
         self.eval()
         with torch.no_grad():
             mu, _ = self.encoder(patches)
-            projected = self.projection(mu)
+            z = mu
+
+            # Concatenate size features if enabled
+            if self.use_size_features and size_features is not None:
+                z = torch.cat([z, size_features], dim=1)
+
+            projected = self.projection(z)
 
         return projected, self.prototypes.detach()
