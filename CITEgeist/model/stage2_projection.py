@@ -35,6 +35,7 @@ class Stage2ProjectionHead(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
         self.projection_dim = projection_dim
+        self.hidden_dim = hidden_dim
 
         self.layers = nn.Sequential(
             nn.Linear(latent_dim, hidden_dim),
