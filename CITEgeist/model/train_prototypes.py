@@ -130,6 +130,47 @@ def load_spot_patches(
     return torch.from_numpy(patches).to(device)
 
 
+def load_spot_data(
+    patches_dir: Path,
+    spot_id: str,
+    device: torch.device,
+) -> Tuple[Optional[torch.Tensor], Optional[torch.Tensor]]:
+    """Load patches AND size features for a spot.
+
+    Args:
+        patches_dir: Directory containing patch and size files.
+        spot_id: Spot identifier.
+        device: Device to load tensors on.
+
+    Returns:
+        patches: (N, C, H, W) tensor or None if file not found.
+        sizes: (N, 3) tensor of size features or None if file not found.
+
+    Raises:
+        FileNotFoundError: If patches exist but sizes are missing.
+    """
+    # Try both naming conventions
+    patch_file = patches_dir / f"{spot_id}_patches.npy"
+    if not patch_file.exists():
+        patch_file = patches_dir / f"spot_{spot_id}_patches.npy"
+    if not patch_file.exists():
+        return None, None
+
+    size_file = patches_dir / f"{spot_id}_sizes.npy"
+    if not size_file.exists():
+        size_file = patches_dir / f"spot_{spot_id}_sizes.npy"
+    if not size_file.exists():
+        raise FileNotFoundError(
+            f"Size features not found for spot {spot_id}. "
+            f"Re-run prepare_patches.py to generate size features."
+        )
+
+    patches = torch.from_numpy(np.load(patch_file).astype(np.float32)).to(device)
+    sizes = torch.from_numpy(np.load(size_file).astype(np.float32)).to(device)
+
+    return patches, sizes
+
+
 def train_prototypes(
     vae_checkpoint: str,
     patches_dir: str,
@@ -172,6 +213,18 @@ def train_prototypes(
     use_attention: bool = False,
     use_per_class_attention: bool = False,
     attention_entropy_weight: float = 0.1,
+    # Class imbalance reweighting
+    class_weight_method: str = "none",  # "none", "inverse_freq", "sqrt_inverse"
+    # Unknown class rejection
+    enable_unknown: bool = False,
+    unknown_threshold: float = 0.15,
+    # Attention confidence bias
+    attention_confidence_bias: bool = True,
+    # Consistency regularization
+    consistency_weight: float = 0.0,
+    consistency_temp: float = 0.1,
+    # Size features (from bbox dimensions)
+    use_size_features: bool = False,
 ) -> Dict[str, List[float]]:
     """Train projection heads and prototypes.
 
@@ -216,6 +269,17 @@ def train_prototypes(
         contrastive_margin: Margin for contrastive loss (shared space only).
         use_direct_softmax: Use direct softmax model (no Sinkhorn, recommended).
         softmax_temperature: Temperature for softmax assignments (direct softmax only).
+        class_weight_method: Method for computing class weights for KL loss.
+            "none": Uniform weights (default).
+            "inverse_freq": Weight = 1 / class_frequency.
+            "sqrt_inverse": Weight = 1 / sqrt(class_frequency).
+        enable_unknown: Enable Unknown class rejection via energy/confidence threshold.
+        unknown_threshold: Max probability threshold for Unknown assignment.
+        attention_confidence_bias: Bias attention by classification confidence.
+        consistency_weight: Weight for consistency loss (JS divergence). 0.0 = disabled.
+        consistency_temp: Temperature for consistency loss softmax.
+        use_size_features: Concatenate bbox size features to VAE embeddings before
+            projection. Requires size feature files from prepare_patches.py v2.
 
     Returns:
         History dict with loss per epoch.
@@ -223,6 +287,16 @@ def train_prototypes(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
     patches_path = Path(patches_dir)
+
+    # Validate global_stats.npz exists if using size features
+    if use_size_features:
+        global_stats_path = patches_path / "global_stats.npz"
+        if not global_stats_path.exists():
+            raise FileNotFoundError(
+                f"global_stats.npz not found in {patches_path}. "
+                f"Re-run prepare_patches.py with new preprocessing."
+            )
+        logger.info(f"Found global_stats.npz - using new preprocessing")
 
     # Setup device
     if device == "cuda" and not torch.cuda.is_available():
@@ -292,6 +366,26 @@ def train_prototypes(
         for _, row in proportions_df.iterrows()
     }
 
+    # Compute class weights for KL loss if using direct softmax
+    class_weights = None
+    if use_direct_softmax and class_weight_method != "none":
+        # Compute mean proportion per class across all spots
+        mean_props = proportions_df[celltype_cols].mean(axis=0).values
+        # Avoid division by zero for absent classes
+        mean_props = np.clip(mean_props, 1e-6, None)
+
+        if class_weight_method == "inverse_freq":
+            weights = 1.0 / mean_props
+        elif class_weight_method == "sqrt_inverse":
+            weights = 1.0 / np.sqrt(mean_props)
+        else:
+            raise ValueError(f"Unknown class_weight_method: {class_weight_method}")
+
+        # Normalize so weights sum to n_types (preserves loss scale)
+        weights = weights / weights.sum() * n_types
+        class_weights = torch.tensor(weights.astype(np.float32), device=device)
+        logger.info(f"Class weights ({class_weight_method}): {class_weights.cpu().numpy()}")
+
     # Initialize model based on architecture choice
     initial_temp = temp_start if temp_anneal else sinkhorn_temp
 
@@ -310,12 +404,19 @@ def train_prototypes(
             use_attention=use_attention,
             use_per_class_attention=use_per_class_attention,
             attention_entropy_weight=attention_entropy_weight,
+            class_weights=class_weights,
+            enable_unknown=enable_unknown,
+            unknown_threshold=unknown_threshold,
+            attention_confidence_bias=attention_confidence_bias,
+            consistency_weight=consistency_weight,
+            consistency_temp=consistency_temp,
+            use_size_features=use_size_features,
         )
         model = model.to(device)
         logger.info(
             f"Initialized DirectSoftmaxModel: n_types={n_types}, "
             f"latent_dim={latent_dim}, projection_dim={projection_dim}, "
-            f"temperature={softmax_temperature}"
+            f"temperature={softmax_temperature}, use_size_features={use_size_features}"
         )
         if use_attention:
             attn_type = "per-class" if use_per_class_attention else "shared"
@@ -406,8 +507,17 @@ def train_prototypes(
         # Run K-means clustering on VAE embeddings
         kmeans = KMeans(n_clusters=n_types, n_init=10, random_state=42).fit(all_z)
 
-        if use_shared_space:
+        if use_direct_softmax:
+            # DirectSoftmax: project cluster centers through projection head
+            # model.prototypes is nn.Parameter directly
+            with torch.no_grad():
+                cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32, device=device)
+                projected_centers = model.projection(cluster_centers)  # (K, D)
+                model.prototypes.data = projected_centers
+            logger.info("Initialized prototypes from K-means (DirectSoftmax)")
+        elif use_shared_space:
             # For shared space: project cluster centers through single head
+            # model.prototypes is SharedPrototypes module with .prototypes attribute
             with torch.no_grad():
                 cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32, device=device)
                 projected_centers = model.projection(cluster_centers)  # (K, D)
@@ -415,6 +525,7 @@ def train_prototypes(
             logger.info("Initialized prototypes from K-means (shared space)")
         else:
             # For per-type heads: project each center through its head
+            # model.prototypes is Prototypes module with .prototypes attribute
             with torch.no_grad():
                 cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32, device=device)
                 for k in range(n_types):
@@ -514,8 +625,12 @@ def train_prototypes(
             batch_valid_spots = 0
 
             for spot_id in batch_spots:
-                # Load patches for this spot
-                patches = load_spot_patches(patches_path, spot_id, device)
+                # Load patches (and size features if enabled)
+                if use_size_features and use_direct_softmax:
+                    patches, sizes = load_spot_data(patches_path, spot_id, device)
+                else:
+                    patches = load_spot_patches(patches_path, spot_id, device)
+                    sizes = None
                 if patches is None:
                     continue
 
@@ -530,7 +645,10 @@ def train_prototypes(
                     continue
 
                 # Forward pass with component tracking
-                components, _ = model(patches, proportions, return_components=True)
+                if use_size_features and use_direct_softmax:
+                    components, _ = model(patches, proportions, return_components=True, size_features=sizes)
+                else:
+                    components, _ = model(patches, proportions, return_components=True)
 
                 # Weight loss by nuclei count
                 weighted_loss = components["total"] * n_cells
@@ -733,6 +851,17 @@ def train_prototypes(
         final_data["repulsion_weight"] = repulsion_weight
         final_data["repulsion_margin"] = repulsion_margin
         final_data["entropy_weight"] = entropy_weight
+        # New ablation parameters
+        final_data["enable_unknown"] = enable_unknown
+        final_data["unknown_threshold"] = unknown_threshold
+        final_data["use_attention"] = use_attention
+        final_data["use_per_class_attention"] = use_per_class_attention
+        final_data["attention_confidence_bias"] = attention_confidence_bias
+        final_data["consistency_weight"] = consistency_weight
+        final_data["consistency_temp"] = consistency_temp
+        final_data["class_weight_method"] = class_weight_method
+        if use_attention:
+            final_data["aggregator_state_dict"] = model.aggregator.state_dict()
     elif use_shared_space:
         final_data["prototypes_state_dict"] = model.prototypes.state_dict()
         final_data["sinkhorn_temp"] = temp_end if temp_anneal else sinkhorn_temp
@@ -1023,6 +1152,59 @@ def main():
         default=0.1,
         help="Weight for attention entropy regularization"
     )
+    # Class imbalance reweighting
+    parser.add_argument(
+        "--class-weight-method",
+        type=str,
+        default="none",
+        choices=["none", "inverse_freq", "sqrt_inverse"],
+        help="Method for class weight computation: none (uniform), inverse_freq, sqrt_inverse"
+    )
+    # Unknown class rejection
+    parser.add_argument(
+        "--enable-unknown",
+        action="store_true",
+        help="Enable Unknown class rejection via energy/confidence threshold"
+    )
+    parser.add_argument(
+        "--unknown-threshold",
+        type=float,
+        default=0.15,
+        help="Max probability threshold for Unknown assignment (nuclei below this are Unknown)"
+    )
+    # Attention confidence bias
+    parser.add_argument(
+        "--attention-confidence-bias",
+        action="store_true",
+        default=True,
+        help="Bias attention by classification confidence (default: True)"
+    )
+    parser.add_argument(
+        "--no-attention-confidence-bias",
+        action="store_false",
+        dest="attention_confidence_bias",
+        help="Disable confidence-biased attention"
+    )
+    # Consistency regularization
+    parser.add_argument(
+        "--consistency-weight",
+        type=float,
+        default=0.0,
+        help="Weight for consistency loss (JS divergence between views). 0.0 disables it."
+    )
+    parser.add_argument(
+        "--consistency-temp",
+        type=float,
+        default=0.1,
+        help="Temperature for consistency loss softmax"
+    )
+    # Size features
+    parser.add_argument(
+        "--use-size-features",
+        action="store_true",
+        default=False,
+        help="Use bbox size features (requires new preprocessing with prepare_patches.py v2)"
+    )
 
     args = parser.parse_args()
 
@@ -1068,6 +1250,18 @@ def main():
         use_attention=args.use_attention,
         use_per_class_attention=args.use_per_class_attention,
         attention_entropy_weight=args.attention_entropy_weight,
+        # Class imbalance reweighting
+        class_weight_method=args.class_weight_method,
+        # Unknown class rejection
+        enable_unknown=args.enable_unknown,
+        unknown_threshold=args.unknown_threshold,
+        # Attention confidence bias
+        attention_confidence_bias=args.attention_confidence_bias,
+        # Consistency regularization
+        consistency_weight=args.consistency_weight,
+        consistency_temp=args.consistency_temp,
+        # Size features
+        use_size_features=args.use_size_features,
     )
 
 
