@@ -3,7 +3,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from CITEgeist.model.patch_extraction import extract_patch, compute_global_stats
+from CITEgeist.model.patch_extraction import (
+    extract_patch,
+    compute_global_stats,
+    extract_patch_with_size,
+)
 
 
 class TestComputeGlobalStats:
@@ -165,3 +169,50 @@ class TestExtractPatchesForSpot:
         )
 
         assert patches.shape == (3, 3, 96, 96)  # 3 nuclei, 3 channels, 96x96
+
+
+class TestExtractPatchWithSize:
+    """Test patch extraction with size features."""
+
+    def test_returns_patch_and_size(self):
+        """Test that function returns both patch and size features."""
+        image = np.random.rand(2, 100, 100).astype(np.float32) * 1000
+        bbox = (20, 20, 50, 50)  # 30x30 bbox
+        stats = compute_global_stats(image, norm_method="percentile")
+
+        patch, size_features = extract_patch_with_size(image, bbox, global_stats=stats)
+
+        assert patch.shape == (2, 96, 96)
+        assert size_features.shape == (3,)
+
+    def test_size_features_are_log_transformed(self):
+        """Test that size features are log1p transformed."""
+        image = np.random.rand(2, 100, 100).astype(np.float32)
+        bbox = (10, 10, 20, 30)  # w=10, h=20, area=200
+        stats = compute_global_stats(image, norm_method="percentile")
+
+        _, size_features = extract_patch_with_size(image, bbox, global_stats=stats)
+
+        expected_log_w = np.log1p(10)
+        expected_log_h = np.log1p(20)
+        expected_log_area = np.log1p(200)
+
+        np.testing.assert_almost_equal(size_features[0], expected_log_w, decimal=5)
+        np.testing.assert_almost_equal(size_features[1], expected_log_h, decimal=5)
+        np.testing.assert_almost_equal(size_features[2], expected_log_area, decimal=5)
+
+    def test_different_bbox_sizes_give_different_features(self):
+        """Test that different bbox sizes produce different features."""
+        image = np.random.rand(2, 200, 200).astype(np.float32)
+        stats = compute_global_stats(image, norm_method="percentile")
+
+        small_bbox = (10, 10, 20, 20)  # 10x10
+        large_bbox = (50, 50, 100, 100)  # 50x50
+
+        _, small_size = extract_patch_with_size(image, small_bbox, global_stats=stats)
+        _, large_size = extract_patch_with_size(image, large_bbox, global_stats=stats)
+
+        # Large bbox should have larger size features
+        assert large_size[0] > small_size[0]  # log_w
+        assert large_size[1] > small_size[1]  # log_h
+        assert large_size[2] > small_size[2]  # log_area

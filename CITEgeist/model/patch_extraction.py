@@ -100,6 +100,43 @@ def extract_patch(
     return resized
 
 
+def extract_patch_with_size(
+    image: np.ndarray,
+    bbox: Tuple[int, int, int, int],
+    expansion: float = 0.75,
+    output_size: int = 96,
+    global_stats: Dict[str, Any] = None,
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Extract patch AND return size features.
+
+    Args:
+        image: (C, H, W) multi-channel image
+        bbox: (x_min, y_min, x_max, y_max) nucleus bounding box
+        expansion: Fraction to expand bbox in each direction
+        output_size: Final patch size after resize
+        global_stats: REQUIRED - normalization stats from compute_global_stats()
+
+    Returns:
+        patch: (C, output_size, output_size) normalized patch
+        size_features: (3,) array of [log1p(width), log1p(height), log1p(area)]
+    """
+    x_min, y_min, x_max, y_max = bbox
+    w = x_max - x_min
+    h = y_max - y_min
+    area = w * h
+
+    # Log-transform for better scale (nuclei vary 10-1000 px^2)
+    size_features = np.array([
+        np.log1p(w),
+        np.log1p(h),
+        np.log1p(area),
+    ], dtype=np.float32)
+
+    patch = extract_patch(image, bbox, expansion, output_size, global_stats)
+
+    return patch, size_features
+
+
 def extract_patches_for_spot(
     image: np.ndarray,
     nuclei_df: pd.DataFrame,
