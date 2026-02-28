@@ -5,14 +5,26 @@ Prepare nucleus patches for VAE training.
 Extracts patches around detected nuclei from multi-channel images,
 organizing them by spot for downstream Sinkhorn assignment.
 
-Usage:
+Supports two modes:
+1. Single image mode (--image): Load a single multi-channel image (PNG/TIFF)
+2. OME-TIFF mode (--dapi + --boundary + --region): Load DAPI and boundary
+   channels from separate OME-TIFF files and crop to a specific region
+
+Usage (single image):
     python prepare_patches.py \
         --image morphology_mip.tiff \
         --mask cellpose_nuclei.npy \
         --nuclei_spot_map nuclei_spot_mapping.csv \
-        --output_dir output/patches \
-        --expansion 0.75 \
-        --patch_size 96
+        --output_dir output/patches
+
+Usage (OME-TIFF dual channel):
+    python prepare_patches.py \
+        --dapi ch0000_dapi.ome.tif \
+        --boundary ch0001_atp1a1_cd45_e-cadherin.ome.tif \
+        --region 0 \
+        --mask cellpose_nuclei.npy \
+        --nuclei_spot_map nuclei_spot_mapping.csv \
+        --output_dir output/patches
 """
 from __future__ import annotations
 
@@ -33,8 +45,130 @@ from tqdm import tqdm
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from CITEgeist.model.patch_extraction import extract_patch
+from CITEgeist.model.patch_extraction import (
+    compute_global_stats,
+    extract_patch_with_size,
+)
 from CITEgeist.model.morphology_features import extract_nucleus_features
+
+# =============================================================================
+# OME-TIFF REGION LOADING (for Xenium benchmark)
+# =============================================================================
+
+# Pixel size for Xenium morphology images
+PIXEL_SIZE_UM = 0.2125
+
+# Region boundaries in microns (from pseudo-Visium data)
+# Format: (x_min, x_max, y_min, y_max)
+REGION_BOUNDS_UM = {
+    0: (29.01, 2279.01, 30.87, 5486.83),
+    1: (2329.01, 4579.01, 30.87, 5400.23),
+    2: (4629.01, 6829.01, 30.87, 5486.83),
+    3: (6879.01, 9129.01, 30.87, 5660.04),
+    4: (9179.01, 11429.01, 30.87, 5746.64),
+}
+
+PADDING_UM = 100.0  # Padding around region in microns
+
+
+def micron_to_pixel(x_um: float, y_um: float) -> tuple:
+    """Convert micron coordinates to pixel coordinates."""
+    x_px = int(x_um / PIXEL_SIZE_UM)
+    y_px = int(y_um / PIXEL_SIZE_UM)
+    return x_px, y_px
+
+
+def get_region_bounds_pixel(region_id: int) -> tuple:
+    """Get pixel bounds for a region with padding."""
+    x_min_um, x_max_um, y_min_um, y_max_um = REGION_BOUNDS_UM[region_id]
+
+    # Add padding
+    x_min_um -= PADDING_UM
+    x_max_um += PADDING_UM
+    y_min_um -= PADDING_UM
+    y_max_um += PADDING_UM
+
+    x_min_px, y_min_px = micron_to_pixel(x_min_um, y_min_um)
+    x_max_px, y_max_px = micron_to_pixel(x_max_um, y_max_um)
+
+    # Ensure non-negative
+    x_min_px = max(0, x_min_px)
+    y_min_px = max(0, y_min_px)
+
+    return x_min_px, x_max_px, y_min_px, y_max_px
+
+
+def load_ome_tiff_region(tiff_path: Path, region_id: int) -> np.ndarray:
+    """
+    Load a region from an OME-TIFF channel image.
+
+    Args:
+        tiff_path: Path to OME-TIFF file
+        region_id: Region ID (0-4)
+
+    Returns:
+        2D numpy array of channel intensities (H, W)
+    """
+    x_min, x_max, y_min, y_max = get_region_bounds_pixel(region_id)
+
+    logger.info(
+        "Loading region %d from %s (y=[%d:%d], x=[%d:%d])",
+        region_id, tiff_path.name, y_min, y_max, x_min, x_max
+    )
+
+    with tifffile.TiffFile(tiff_path) as tif:
+        page = tif.pages[0]
+        # OME-TIFF reads as (Y, X)
+        region = page.asarray()[y_min:y_max, x_min:x_max]
+
+    return region.astype(np.float32)
+
+
+def load_dual_channel_image(
+    dapi_path: Path,
+    boundary_path: Path,
+    region_id: int,
+) -> np.ndarray:
+    """
+    Load DAPI and boundary channels and stack as 2-channel image.
+
+    Args:
+        dapi_path: Path to DAPI OME-TIFF
+        boundary_path: Path to boundary OME-TIFF
+        region_id: Region ID (0-4)
+
+    Returns:
+        Image array with shape (2, H, W), normalized to [0, 1]
+    """
+    logger.info("Loading dual-channel image (DAPI + boundary) for region %d", region_id)
+
+    # Load both channels
+    dapi = load_ome_tiff_region(dapi_path, region_id)
+    boundary = load_ome_tiff_region(boundary_path, region_id)
+
+    # Verify shapes match
+    if dapi.shape != boundary.shape:
+        raise ValueError(
+            f"Channel shape mismatch: DAPI {dapi.shape} vs boundary {boundary.shape}"
+        )
+
+    # Normalize each channel to [0, 1] (uint16 data)
+    dapi_norm = dapi / 65535.0
+    boundary_norm = boundary / 65535.0
+
+    # Stack as (2, H, W)
+    image = np.stack([dapi_norm, boundary_norm], axis=0)
+
+    logger.info(
+        "Loaded dual-channel image: shape=%s, DAPI range=[%.3f, %.3f], "
+        "boundary range=[%.3f, %.3f]",
+        image.shape,
+        dapi_norm.min(), dapi_norm.max(),
+        boundary_norm.min(), boundary_norm.max(),
+    )
+
+    return image
+
 
 logging.basicConfig(
     level=logging.INFO,
@@ -167,31 +301,61 @@ def add_bboxes_to_features(features_df: pd.DataFrame, mask: np.ndarray) -> pd.Da
 
 
 def prepare_patches(
-    image_path: str,
     mask_path: str,
     nuclei_spot_map_path: str,
     output_dir: str,
+    image_path: Optional[str] = None,
+    dapi_path: Optional[str] = None,
+    boundary_path: Optional[str] = None,
+    region_id: Optional[int] = None,
     expansion: float = 0.75,
     patch_size: int = 96,
     min_bbox_size: int = 4,
+    norm_method: str = "percentile",
 ) -> None:
     """
     Extract and save patches for all nuclei, organized by spot.
 
+    Supports two modes:
+    1. Single image mode: provide image_path
+    2. OME-TIFF dual channel mode: provide dapi_path, boundary_path, region_id
+
     Args:
-        image_path: Path to multi-channel TIFF image
         mask_path: Path to Cellpose nucleus mask (.npy or .tiff)
         nuclei_spot_map_path: CSV mapping nucleus_id to spot_id
         output_dir: Output directory for patches
+        image_path: Path to multi-channel TIFF/PNG image (mode 1)
+        dapi_path: Path to DAPI OME-TIFF (mode 2)
+        boundary_path: Path to boundary OME-TIFF (mode 2)
+        region_id: Region ID 0-4 for OME-TIFF cropping (mode 2)
         expansion: Bbox expansion fraction (default 0.75)
         patch_size: Output patch size (default 96)
         min_bbox_size: Minimum bbox dimension to extract (default 4)
+        norm_method: Normalization method ("percentile" or "minmax")
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load image
-    image = load_image(Path(image_path))
+    # Load image (two modes)
+    if dapi_path is not None and boundary_path is not None and region_id is not None:
+        # Mode 2: Dual-channel OME-TIFF
+        image = load_dual_channel_image(
+            Path(dapi_path), Path(boundary_path), region_id
+        )
+    elif image_path is not None:
+        # Mode 1: Single image
+        image = load_image(Path(image_path))
+    else:
+        raise ValueError(
+            "Must provide either --image OR (--dapi, --boundary, --region)"
+        )
+
+    # Compute and save global normalization stats
+    logger.info(f"Computing global normalization stats (method={norm_method})...")
+    global_stats = compute_global_stats(image, norm_method=norm_method)
+    stats_path = output_dir / "global_stats.npz"
+    np.savez(stats_path, **global_stats)
+    logger.info(f"Saved global normalization stats to {stats_path}")
 
     # Load mask
     mask = load_mask(Path(mask_path))
@@ -244,6 +408,7 @@ def prepare_patches(
         spot_nuclei = features_df[features_df["spot_id"] == spot_id]
 
         patches = []
+        size_features_list = []
         nucleus_ids = []
 
         for _, row in spot_nuclei.iterrows():
@@ -265,8 +430,11 @@ def prepare_patches(
                 continue
 
             try:
-                patch = extract_patch(image, bbox, expansion, patch_size)
+                patch, size_feats = extract_patch_with_size(
+                    image, bbox, expansion, patch_size, global_stats
+                )
                 patches.append(patch)
+                size_features_list.append(size_feats)
                 nucleus_ids.append(row["nucleus_id"])
                 stats["successful_patches"] += 1
             except Exception as e:
@@ -279,7 +447,10 @@ def prepare_patches(
         if patches:
             # Stack patches: (N, C, H, W)
             patches_array = np.stack(patches, axis=0)
+            sizes_array = np.stack(size_features_list, axis=0)
+
             np.save(output_dir / f"spot_{spot_id}_patches.npy", patches_array)
+            np.save(output_dir / f"spot_{spot_id}_sizes.npy", sizes_array)
 
             # Save nucleus IDs for this spot (for later reference)
             np.save(
@@ -300,6 +471,20 @@ def prepare_patches(
         json.dump(stats, f, indent=2)
     logger.info(f"Saved extraction stats to {stats_path}")
 
+    # Validate required outputs exist
+    required_base_files = ["global_stats.npz", "nucleus_features.csv"]
+    for f in required_base_files:
+        if not (output_dir / f).exists():
+            raise RuntimeError(f"Missing required output: {f}")
+
+    # Spot-check a few spots (validate patches have matching sizes)
+    sample_spots = list(spot_ids)[:3]
+    for spot_id in sample_spots:
+        patches_file = output_dir / f"spot_{spot_id}_patches.npy"
+        sizes_file = output_dir / f"spot_{spot_id}_sizes.npy"
+        if patches_file.exists() and not sizes_file.exists():
+            raise RuntimeError(f"Patches exist but sizes missing for spot {spot_id}")
+
     # Print summary
     logger.info("=" * 50)
     logger.info("Patch extraction complete:")
@@ -316,21 +501,43 @@ def main():
         description="Prepare nucleus patches for VAE training",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Example:
+Example (single image):
     python prepare_patches.py \\
         --image morphology_mip.tiff \\
         --mask cellpose_nuclei.npy \\
         --nuclei_spot_map nuclei_spot_mapping.csv \\
-        --output_dir output/patches \\
-        --expansion 0.75 \\
-        --patch_size 96
+        --output_dir output/patches
+
+Example (OME-TIFF dual channel - RECOMMENDED):
+    python prepare_patches.py \\
+        --dapi ch0000_dapi.ome.tif \\
+        --boundary ch0001_atp1a1_cd45_e-cadherin.ome.tif \\
+        --region 0 \\
+        --mask cellpose_nuclei.npy \\
+        --nuclei_spot_map nuclei_spot_mapping.csv \\
+        --output_dir output/patches
         """,
     )
+    # Image input (mutually exclusive modes)
     parser.add_argument(
         "--image",
-        required=True,
-        help="Path to multi-channel TIFF image",
+        help="Path to multi-channel TIFF/PNG image (mode 1)",
     )
+    parser.add_argument(
+        "--dapi",
+        help="Path to DAPI OME-TIFF (mode 2, use with --boundary and --region)",
+    )
+    parser.add_argument(
+        "--boundary",
+        help="Path to boundary channel OME-TIFF (mode 2)",
+    )
+    parser.add_argument(
+        "--region",
+        type=int,
+        choices=[0, 1, 2, 3, 4],
+        help="Region ID for OME-TIFF cropping (mode 2)",
+    )
+    # Required arguments
     parser.add_argument(
         "--mask",
         required=True,
@@ -346,6 +553,7 @@ Example:
         required=True,
         help="Output directory for patches",
     )
+    # Optional arguments
     parser.add_argument(
         "--expansion",
         type=float,
@@ -364,17 +572,32 @@ Example:
         default=4,
         help="Minimum bbox dimension to extract (default: 4)",
     )
+    parser.add_argument(
+        "--norm-method",
+        type=str,
+        choices=["minmax", "percentile"],
+        default="percentile",
+        help="Normalization method: minmax (dtype range) or percentile (1st/99th)",
+    )
 
     args = parser.parse_args()
 
+    # Validate arguments
+    if args.image is None and (args.dapi is None or args.boundary is None or args.region is None):
+        parser.error("Must provide either --image OR (--dapi, --boundary, --region)")
+
     prepare_patches(
-        image_path=args.image,
         mask_path=args.mask,
         nuclei_spot_map_path=args.nuclei_spot_map,
         output_dir=args.output_dir,
+        image_path=args.image,
+        dapi_path=args.dapi,
+        boundary_path=args.boundary,
+        region_id=args.region,
         expansion=args.expansion,
         patch_size=args.patch_size,
         min_bbox_size=args.min_bbox_size,
+        norm_method=args.norm_method,
     )
 
 
