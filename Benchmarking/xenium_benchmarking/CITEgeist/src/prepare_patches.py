@@ -402,6 +402,7 @@ def prepare_patches(
         "successful_patches": 0,
         "failed_patches": 0,
         "empty_spots": 0,
+        "norm_method": norm_method,
     }
 
     for spot_id in tqdm(spot_ids, desc="Processing spots"):

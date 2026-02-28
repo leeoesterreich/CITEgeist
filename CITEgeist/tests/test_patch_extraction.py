@@ -87,6 +87,19 @@ class TestExtractPatch:
         assert patch.min() >= 0.0
         assert patch.max() <= 1.0
 
+    def test_uniform_channel_does_not_crash(self):
+        """Test that a uniform-intensity channel doesn't cause division by zero."""
+        image = np.zeros((2, 100, 100), dtype=np.float32)
+        image[0, :, :] = 500  # Uniform channel
+        image[1, :, :] = 100  # Another uniform channel
+        bbox = (20, 20, 50, 50)
+
+        stats = compute_global_stats(image, norm_method="minmax")
+        patch = extract_patch(image, bbox, global_stats=stats)
+
+        # Should not crash, result should not contain NaN
+        assert not np.any(np.isnan(patch))
+
     def test_intensity_preserved_across_patches(self):
         """Test that intensity differences are preserved across patches."""
         # Create image with bright region (channel 0) and dim region
