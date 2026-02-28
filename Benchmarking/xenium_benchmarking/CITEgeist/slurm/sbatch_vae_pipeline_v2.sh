@@ -115,11 +115,12 @@ python -m CITEgeist.model.train_vae \
     --output-dir "${OUTPUT_DIR}/vae" \
     --in-channels 2 \
     --latent-dim 128 \
-    --batch-size 128 \
+    --batch-size 256 \
     --epochs 50 \
     --lr 1e-4 \
     --beta 0.5 \
-    --device cuda
+    --device cuda \
+    --num-workers 8
 
 # Verify VAE checkpoint has preprocessing_version
 echo "Verifying VAE checkpoint..."
