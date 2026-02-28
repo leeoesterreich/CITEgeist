@@ -3,9 +3,9 @@
 #SBATCH --output=slurm/logs/preprocess_v2_%A_%a.out
 #SBATCH --error=slurm/logs/preprocess_v2_%A_%a.err
 #SBATCH --array=0-4
-#SBATCH --time=2:00:00
-#SBATCH --mem=32G
-#SBATCH --cpus-per-task=4
+#SBATCH --time=1:00:00
+#SBATCH --mem=48G
+#SBATCH --cpus-per-task=16
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
 
@@ -79,7 +79,8 @@ python -m Benchmarking.xenium_benchmarking.CITEgeist.src.prepare_patches \
     --output_dir "${REGION_OUTPUT}" \
     --expansion 0.75 \
     --patch_size 96 \
-    --norm-method percentile
+    --norm-method percentile \
+    --num-workers 16
 
 echo ""
 echo "============================================"

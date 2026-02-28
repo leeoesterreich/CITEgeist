@@ -32,8 +32,9 @@ import argparse
 import json
 import logging
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, Any, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -300,6 +301,77 @@ def add_bboxes_to_features(features_df: pd.DataFrame, mask: np.ndarray) -> pd.Da
     return features_df
 
 
+def _process_single_spot(
+    spot_id: str,
+    spot_nuclei_data: List[Dict],
+    image: np.ndarray,
+    global_stats: Dict[str, Any],
+    expansion: float,
+    patch_size: int,
+    min_bbox_size: int,
+    output_dir: Path,
+) -> Tuple[int, int, bool]:
+    """Process a single spot - extract patches and save to disk.
+
+    Args:
+        spot_id: Spot identifier
+        spot_nuclei_data: List of dicts with nucleus bbox info
+        image: (C, H, W) image array
+        global_stats: Normalization stats
+        expansion: Bbox expansion fraction
+        patch_size: Output patch size
+        min_bbox_size: Minimum bbox dimension
+        output_dir: Output directory
+
+    Returns:
+        (successful_patches, failed_patches, is_empty)
+    """
+    patches = []
+    size_features_list = []
+    nucleus_ids = []
+    failed = 0
+
+    for row in spot_nuclei_data:
+        bbox = (
+            int(row["bbox_x_min"]),
+            int(row["bbox_y_min"]),
+            int(row["bbox_x_max"]),
+            int(row["bbox_y_max"]),
+        )
+
+        # Skip very small bboxes
+        bbox_w = bbox[2] - bbox[0]
+        bbox_h = bbox[3] - bbox[1]
+        if bbox_w < min_bbox_size or bbox_h < min_bbox_size:
+            failed += 1
+            continue
+
+        try:
+            patch, size_feats = extract_patch_with_size(
+                image, bbox, expansion, patch_size, global_stats
+            )
+            patches.append(patch)
+            size_features_list.append(size_feats)
+            nucleus_ids.append(row["nucleus_id"])
+        except Exception:
+            failed += 1
+            continue
+
+    if patches:
+        patches_array = np.stack(patches, axis=0)
+        sizes_array = np.stack(size_features_list, axis=0)
+
+        np.save(output_dir / f"spot_{spot_id}_patches.npy", patches_array)
+        np.save(output_dir / f"spot_{spot_id}_sizes.npy", sizes_array)
+        np.save(
+            output_dir / f"spot_{spot_id}_nucleus_ids.npy",
+            np.array(nucleus_ids, dtype=np.int64),
+        )
+        return len(patches), failed, False
+    else:
+        return 0, failed, True
+
+
 def prepare_patches(
     mask_path: str,
     nuclei_spot_map_path: str,
@@ -312,6 +384,7 @@ def prepare_patches(
     patch_size: int = 96,
     min_bbox_size: int = 4,
     norm_method: str = "percentile",
+    num_workers: int = 1,
 ) -> None:
     """
     Extract and save patches for all nuclei, organized by spot.
@@ -332,6 +405,7 @@ def prepare_patches(
         patch_size: Output patch size (default 96)
         min_bbox_size: Minimum bbox dimension to extract (default 4)
         norm_method: Normalization method ("percentile" or "minmax")
+        num_workers: Number of parallel workers (default 1, set to 16 for HPC)
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -403,63 +477,69 @@ def prepare_patches(
         "failed_patches": 0,
         "empty_spots": 0,
         "norm_method": norm_method,
+        "num_workers": num_workers,
     }
 
-    for spot_id in tqdm(spot_ids, desc="Processing spots"):
+    # Prepare spot data for parallel processing
+    # Convert to list of dicts to avoid DataFrame pickling issues
+    spot_data = {}
+    for spot_id in spot_ids:
         spot_nuclei = features_df[features_df["spot_id"] == spot_id]
+        spot_data[spot_id] = spot_nuclei.to_dict("records")
 
-        patches = []
-        size_features_list = []
-        nucleus_ids = []
+    if num_workers > 1:
+        # Parallel processing with ThreadPoolExecutor
+        # ThreadPoolExecutor works well here because cv2/numpy release the GIL
+        logger.info(f"Using {num_workers} parallel workers")
 
-        for _, row in spot_nuclei.iterrows():
-            bbox = (
-                int(row["bbox_x_min"]),
-                int(row["bbox_y_min"]),
-                int(row["bbox_x_max"]),
-                int(row["bbox_y_max"]),
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
+            # Submit all tasks
+            futures = {
+                executor.submit(
+                    _process_single_spot,
+                    spot_id,
+                    spot_data[spot_id],
+                    image,
+                    global_stats,
+                    expansion,
+                    patch_size,
+                    min_bbox_size,
+                    output_dir,
+                ): spot_id
+                for spot_id in spot_ids
+            }
+
+            # Collect results with progress bar
+            for future in tqdm(
+                as_completed(futures), total=len(futures), desc="Processing spots"
+            ):
+                spot_id = futures[future]
+                try:
+                    successful, failed, is_empty = future.result()
+                    stats["successful_patches"] += successful
+                    stats["failed_patches"] += failed
+                    if is_empty:
+                        stats["empty_spots"] += 1
+                except Exception as e:
+                    logger.error(f"Error processing spot {spot_id}: {e}")
+                    stats["empty_spots"] += 1
+    else:
+        # Sequential processing (original behavior)
+        for spot_id in tqdm(spot_ids, desc="Processing spots"):
+            successful, failed, is_empty = _process_single_spot(
+                spot_id,
+                spot_data[spot_id],
+                image,
+                global_stats,
+                expansion,
+                patch_size,
+                min_bbox_size,
+                output_dir,
             )
-
-            # Skip very small bboxes
-            bbox_w = bbox[2] - bbox[0]
-            bbox_h = bbox[3] - bbox[1]
-            if bbox_w < min_bbox_size or bbox_h < min_bbox_size:
-                logger.debug(
-                    f"Skipping nucleus {row['nucleus_id']} - bbox too small: {bbox_w}x{bbox_h}"
-                )
-                stats["failed_patches"] += 1
-                continue
-
-            try:
-                patch, size_feats = extract_patch_with_size(
-                    image, bbox, expansion, patch_size, global_stats
-                )
-                patches.append(patch)
-                size_features_list.append(size_feats)
-                nucleus_ids.append(row["nucleus_id"])
-                stats["successful_patches"] += 1
-            except Exception as e:
-                logger.debug(
-                    f"Failed to extract patch for nucleus {row['nucleus_id']}: {e}"
-                )
-                stats["failed_patches"] += 1
-                continue
-
-        if patches:
-            # Stack patches: (N, C, H, W)
-            patches_array = np.stack(patches, axis=0)
-            sizes_array = np.stack(size_features_list, axis=0)
-
-            np.save(output_dir / f"spot_{spot_id}_patches.npy", patches_array)
-            np.save(output_dir / f"spot_{spot_id}_sizes.npy", sizes_array)
-
-            # Save nucleus IDs for this spot (for later reference)
-            np.save(
-                output_dir / f"spot_{spot_id}_nucleus_ids.npy",
-                np.array(nucleus_ids, dtype=np.int64),
-            )
-        else:
-            stats["empty_spots"] += 1
+            stats["successful_patches"] += successful
+            stats["failed_patches"] += failed
+            if is_empty:
+                stats["empty_spots"] += 1
 
     # Save features with spot assignments and bboxes
     features_path = output_dir / "nucleus_features.csv"
@@ -580,6 +660,12 @@ Example (OME-TIFF dual channel - RECOMMENDED):
         default="percentile",
         help="Normalization method: minmax (dtype range) or percentile (1st/99th)",
     )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=1,
+        help="Number of parallel workers (default: 1, use 16 for HPC)",
+    )
 
     args = parser.parse_args()
 
@@ -599,6 +685,7 @@ Example (OME-TIFF dual channel - RECOMMENDED):
         patch_size=args.patch_size,
         min_bbox_size=args.min_bbox_size,
         norm_method=args.norm_method,
+        num_workers=args.num_workers,
     )
 
 
