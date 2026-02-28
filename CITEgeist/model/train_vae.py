@@ -279,6 +279,9 @@ def train_vae(
                 "model_state_dict": model.state_dict(),
                 "optimizer_state_dict": optimizer.state_dict(),
                 "history": history,
+                "in_channels": in_channels,
+                "latent_dim": latent_dim,
+                "preprocessing_version": 2,  # v1=per-patch z-score, v2=global percentile
             }, checkpoint_path)
             logger.info(f"Saved checkpoint: {checkpoint_path}")
 
@@ -289,6 +292,7 @@ def train_vae(
         "model_state_dict": model.state_dict(),
         "in_channels": in_channels,
         "latent_dim": latent_dim,
+        "preprocessing_version": 2,  # v1=per-patch z-score, v2=global percentile
     }, final_path)
     logger.info(f"Saved final model: {final_path}")
 
