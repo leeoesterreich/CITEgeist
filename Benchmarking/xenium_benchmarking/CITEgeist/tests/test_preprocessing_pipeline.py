@@ -122,11 +122,11 @@ class TestPreprocessingPipeline:
         patch_minmax, _ = extract_patch_with_size(image, bbox, global_stats=stats_minmax)
         patch_pctl, _ = extract_patch_with_size(image, bbox, global_stats=stats_pctl)
 
-        # Both should be in [0, 1] range
-        assert patch_minmax.min() >= 0.0
-        assert patch_minmax.max() <= 1.0
-        assert patch_pctl.min() >= 0.0
-        assert patch_pctl.max() <= 1.0
+        # Both should be in [0, 1] range (with small tolerance for interpolation)
+        assert patch_minmax.min() >= -1e-6
+        assert patch_minmax.max() <= 1.0 + 1e-6
+        assert patch_pctl.min() >= -1e-6
+        assert patch_pctl.max() <= 1.0 + 1e-6
 
     def test_full_pipeline_directory_structure(self):
         """Test complete output directory structure for downstream compatibility."""
