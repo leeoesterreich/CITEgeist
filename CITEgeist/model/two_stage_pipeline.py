@@ -81,19 +81,20 @@ class TwoStagePipeline:
         stage1_proportions: pd.DataFrame,
         stage1_cell_counts: pd.DataFrame,
         load_patches_fn: Callable[[str], torch.Tensor],
-        n_epochs_phase1: int = 10,
-        n_epochs_phase2: int = 50,
+        n_epochs: int = 50,
         high_purity_threshold: float = 0.70,
         checkpoint_dir: Optional[Path] = None,
     ) -> None:
         """Train Stage 2 model.
 
+        Phase 1: Single-pass initialization from high-purity spot centroids.
+        Phase 2: Iterative finetuning with Sinkhorn OT loss on all spots.
+
         Args:
             stage1_proportions: (n_spots, n_types) proportions from Stage 1
             stage1_cell_counts: (n_spots, n_types) cell counts from Stage 1
             load_patches_fn: Function to load patches for a spot_id
-            n_epochs_phase1: Epochs for Phase 1 (high-purity init)
-            n_epochs_phase2: Epochs for Phase 2 (all-spot finetuning)
+            n_epochs: Epochs for Phase 2 finetuning
             high_purity_threshold: Threshold for high-purity spots
             checkpoint_dir: Directory to save checkpoints
         """
@@ -123,15 +124,15 @@ class TwoStagePipeline:
 
         # Phase 2: Finetune on all spots
         logger.info("-" * 40)
-        logger.info(f"Phase 2: Finetuning ({n_epochs_phase2} epochs)")
+        logger.info(f"Phase 2: Finetuning ({n_epochs} epochs)")
         logger.info("-" * 40)
 
         spot_ids = stage1_cell_counts.index.tolist()
 
-        for epoch in range(n_epochs_phase2):
+        for epoch in range(n_epochs):
             epoch_losses = []
 
-            for spot_id in tqdm(spot_ids, desc=f"Epoch {epoch+1}/{n_epochs_phase2}", disable=True):
+            for spot_id in tqdm(spot_ids, desc=f"Epoch {epoch+1}/{n_epochs}", disable=True):
                 patches = load_patches_fn(spot_id)
                 if patches is None or len(patches) == 0:
                     continue
