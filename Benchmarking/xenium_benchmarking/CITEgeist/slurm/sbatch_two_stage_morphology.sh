@@ -29,7 +29,8 @@ OUTPUT_DIR="${REPO_ROOT}/Benchmarking/xenium_benchmarking/CITEgeist/output/two_s
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"
-mkdir -p "$(dirname $0)/logs"
+SLURM_DIR="${REPO_ROOT}/Benchmarking/xenium_benchmarking/CITEgeist/slurm"
+mkdir -p "${SLURM_DIR}/logs"
 
 # Run benchmark for this region
 REGION=${SLURM_ARRAY_TASK_ID}

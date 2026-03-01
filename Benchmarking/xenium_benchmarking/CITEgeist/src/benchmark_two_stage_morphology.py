@@ -29,6 +29,21 @@ from CITEgeist.model.constrained_assignment import proportions_to_counts, random
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+
+def convert_to_native(obj):
+    """Convert numpy types to native Python types for JSON serialization."""
+    if isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {k: convert_to_native(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [convert_to_native(v) for v in obj]
+    return obj
+
 # Data paths
 XENIUM_DIR = Path("/ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma")
 PSEUDOVISIUM_DIR = REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_protein_gt"
@@ -340,7 +355,7 @@ def main():
     }
 
     with open(output_dir / f"region_{eval_region}_results.json", "w") as f:
-        json.dump(output, f, indent=2)
+        json.dump(convert_to_native(output), f, indent=2)
 
     logger.info(f"\nResults saved to {output_dir}")
 
