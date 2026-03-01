@@ -1,7 +1,9 @@
-"""Nuclear morphology feature extraction from Cellpose masks."""
+"""Nuclear morphology feature extraction from Cellpose masks and image patches."""
 import numpy as np
 import pandas as pd
-from skimage.measure import regionprops_table
+from skimage.measure import regionprops_table, regionprops, label
+from skimage.feature import graycomatrix, graycoprops
+from scipy.ndimage import sobel
 
 
 def extract_nucleus_features(mask: np.ndarray) -> pd.DataFrame:
@@ -218,3 +220,115 @@ def largest_remainder_discretize(proportions: np.ndarray, n_total: int) -> np.nd
             counts[indices[i % n_types]] += 1
 
     return counts
+
+
+def extract_extended_features(patch: np.ndarray) -> np.ndarray:
+    """
+    Extract 12 morphology features from a 2-channel patch.
+
+    Args:
+        patch: (2, H, W) array with DAPI (channel 0) and boundary (channel 1)
+
+    Returns:
+        (12,) feature vector:
+        - Basic (6): dapi_mean, dapi_std, dapi_area, boundary_mean, boundary_std, channel_corr
+        - Shape (3): circularity, eccentricity, solidity
+        - Texture (3): dapi_entropy, dapi_contrast, boundary_gradient_mag
+    """
+    dapi = patch[0].astype(np.float32)
+    boundary = patch[1].astype(np.float32)
+
+    # Basic features (6)
+    dapi_mean = float(dapi.mean())
+    dapi_std = float(dapi.std())
+    dapi_area = float((dapi > dapi.mean()).sum()) if dapi.mean() > 0 else 0.0
+    boundary_mean = float(boundary.mean())
+    boundary_std = float(boundary.std())
+
+    # Channel correlation
+    if dapi.std() > 1e-6 and boundary.std() > 1e-6:
+        corr = np.corrcoef(dapi.flatten(), boundary.flatten())[0, 1]
+        channel_corr = float(corr) if not np.isnan(corr) else 0.0
+    else:
+        channel_corr = 0.0
+
+    # Shape features (3) - from thresholded DAPI
+    threshold = dapi.mean() + 0.5 * dapi.std() if dapi.std() > 0 else dapi.mean()
+    binary = dapi > threshold
+    labeled = label(binary)
+
+    if labeled.max() > 0:
+        props = regionprops(labeled)
+        largest = max(props, key=lambda p: p.area)
+        circularity = 4 * np.pi * largest.area / (largest.perimeter ** 2) if largest.perimeter > 0 else 0.0
+        eccentricity = float(largest.eccentricity)
+        solidity = float(largest.solidity)
+    else:
+        circularity, eccentricity, solidity = 0.0, 0.0, 0.0
+
+    # Texture features (3)
+    # GLCM entropy and contrast
+    dapi_uint8 = (dapi / (dapi.max() + 1e-6) * 255).astype(np.uint8)
+    if dapi_uint8.max() > dapi_uint8.min():
+        glcm = graycomatrix(dapi_uint8, distances=[1], angles=[0], levels=256, symmetric=True, normed=True)
+        dapi_contrast = float(graycoprops(glcm, 'contrast')[0, 0])
+        # Entropy from normalized GLCM
+        glcm_norm = glcm[:, :, 0, 0]
+        glcm_norm = glcm_norm / (glcm_norm.sum() + 1e-10)
+        dapi_entropy = float(-np.sum(glcm_norm * np.log2(glcm_norm + 1e-10)))
+    else:
+        dapi_contrast, dapi_entropy = 0.0, 0.0
+
+    # Boundary gradient magnitude
+    grad_x = sobel(boundary, axis=0)
+    grad_y = sobel(boundary, axis=1)
+    boundary_gradient_mag = float(np.sqrt(grad_x**2 + grad_y**2).mean())
+
+    features = np.array([
+        dapi_mean, dapi_std, dapi_area, boundary_mean, boundary_std, channel_corr,
+        circularity, eccentricity, solidity,
+        dapi_entropy, dapi_contrast, boundary_gradient_mag
+    ], dtype=np.float32)
+
+    # Replace any remaining NaN with 0
+    features = np.nan_to_num(features, nan=0.0)
+
+    return features
+
+
+def extract_patch(image: np.ndarray, x: float, y: float, size: int = 64) -> np.ndarray:
+    """
+    Extract a patch centered at (x, y) from a multi-channel image.
+
+    Args:
+        image: (H, W, C) or (C, H, W) image
+        x, y: center coordinates (in pixels)
+        size: patch size (square)
+
+    Returns:
+        (C, size, size) patch array
+    """
+    # Ensure channel-first format
+    if image.ndim == 3 and image.shape[2] <= 4:  # (H, W, C)
+        image = np.transpose(image, (2, 0, 1))
+
+    C, H, W = image.shape
+    half = size // 2
+
+    x, y = int(round(x)), int(round(y))
+
+    # Clamp to image bounds
+    x0, x1 = max(0, x - half), min(W, x + half)
+    y0, y1 = max(0, y - half), min(H, y + half)
+
+    patch = np.zeros((C, size, size), dtype=image.dtype)
+
+    # Compute offsets for centering
+    px0 = half - (x - x0)
+    py0 = half - (y - y0)
+    px1 = px0 + (x1 - x0)
+    py1 = py0 + (y1 - y0)
+
+    patch[:, py0:py1, px0:px1] = image[:, y0:y1, x0:x1]
+
+    return patch
