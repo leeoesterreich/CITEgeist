@@ -89,3 +89,65 @@ class TestMorphologyClassifier:
         assert log_likes.shape == (5, 3)
         # Class 2 should have low (fallback) likelihood
         assert np.all(log_likes[:, 2] <= log_likes[:, :2].max())
+
+
+class TestConstrainedAssignment:
+    """Test Hungarian assignment with count constraints."""
+
+    def test_hungarian_respects_counts(self):
+        """Assignments should match count constraints exactly."""
+        from CITEgeist.model.constrained_assignment import hungarian_assign
+
+        # 10 samples, 3 types, counts [4, 3, 3]
+        log_likes = np.random.rand(10, 3)
+        counts = np.array([4, 3, 3])
+
+        assignments = hungarian_assign(log_likes, counts)
+
+        assert len(assignments) == 10
+        assert (assignments == 0).sum() == 4
+        assert (assignments == 1).sum() == 3
+        assert (assignments == 2).sum() == 3
+
+    def test_hungarian_maximizes_likelihood(self):
+        """Should prefer high-likelihood assignments."""
+        from CITEgeist.model.constrained_assignment import hungarian_assign
+
+        # Clear preference: sample 0 strongly prefers type 0
+        log_likes = np.array([
+            [10.0, 0.0, 0.0],  # Sample 0 strongly prefers type 0
+            [0.0, 5.0, 0.0],  # Sample 1 prefers type 1
+            [0.0, 0.0, 5.0],  # Sample 2 prefers type 2
+        ])
+        counts = np.array([1, 1, 1])
+
+        assignments = hungarian_assign(log_likes, counts)
+
+        assert assignments[0] == 0  # Should get preferred type
+        assert assignments[1] == 1
+        assert assignments[2] == 2
+
+    def test_hungarian_handles_count_mismatch(self):
+        """Should adjust when counts don't match n_samples."""
+        from CITEgeist.model.constrained_assignment import hungarian_assign
+
+        log_likes = np.random.rand(5, 3)
+        counts = np.array([2, 2, 2])  # Sum = 6, but only 5 samples
+
+        assignments = hungarian_assign(log_likes, counts)
+
+        assert len(assignments) == 5
+        assert all(0 <= a < 3 for a in assignments)
+
+    def test_random_assign_respects_counts(self):
+        """Random baseline should also respect counts."""
+        from CITEgeist.model.constrained_assignment import random_assign
+
+        counts = np.array([4, 3, 3])
+
+        assignments = random_assign(counts, n_samples=10)
+
+        assert len(assignments) == 10
+        assert (assignments == 0).sum() == 4
+        assert (assignments == 1).sum() == 3
+        assert (assignments == 2).sum() == 3
