@@ -209,3 +209,25 @@ class TestStage2Pipeline:
         assert (assignments == 0).sum() == 2
         assert (assignments == 1).sum() == 2
         assert (assignments == 2).sum() == 1
+
+    def test_assign_spot_method(self):
+        """assign_spot should extract patches and assign in one call."""
+        from CITEgeist.model.stage2_pipeline import Stage2Pipeline
+
+        cell_types = ["TypeA", "TypeB", "TypeC"]
+        pipeline = Stage2Pipeline(cell_types=cell_types)
+
+        # Train first
+        train_patches = np.random.rand(100, 2, 64, 64).astype(np.float32)
+        train_labels = np.array([0] * 40 + [1] * 35 + [2] * 25)
+        pipeline.train(train_patches, train_labels)
+
+        # Test assign_spot
+        image = np.random.rand(128, 128, 2).astype(np.float32)
+        cell_coords = np.array([[32, 32], [64, 64], [96, 96]])
+        proportions = np.array([0.5, 0.3, 0.2])
+
+        assignments = pipeline.assign_spot(image, cell_coords, proportions)
+
+        assert len(assignments) == 3
+        assert all(0 <= a < 3 for a in assignments)

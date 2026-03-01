@@ -123,6 +123,7 @@ from .stage2_high_purity import (
     compute_type_centroids,
 )
 from .two_stage_pipeline import TwoStagePipeline
+from .stage2_pipeline import Stage2Pipeline
 
 __all__ = [
     # Core model
@@ -234,4 +235,6 @@ __all__ = [
     "collect_embeddings_by_type",
     "compute_type_centroids",
     "TwoStagePipeline",
+    # Stage 2 Morphology: GMM-based single-cell assignment
+    "Stage2Pipeline",
 ]
