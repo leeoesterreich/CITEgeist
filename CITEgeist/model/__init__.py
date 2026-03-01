@@ -112,6 +112,18 @@ from .cross_sample_integration import (
     save_integration_results,
 )
 
+# Stage 2: Two-stage VAE-guided assignment
+from .stage2_projection import Stage2ProjectionHead
+from .stage2_prototypes import Stage2Prototypes
+from .stage2_model import Stage2Model
+from .stage2_trainer import Stage2Trainer
+from .stage2_high_purity import (
+    find_high_purity_spots,
+    collect_embeddings_by_type,
+    compute_type_centroids,
+)
+from .two_stage_pipeline import TwoStagePipeline
+
 __all__ = [
     # Core model
     "CitegeistModel",
@@ -213,4 +225,13 @@ __all__ = [
     "compare_bivariate_relationships",
     "build_similarity_network",
     "save_integration_results",
+    # Stage 2: Two-stage VAE-guided assignment
+    "Stage2ProjectionHead",
+    "Stage2Prototypes",
+    "Stage2Model",
+    "Stage2Trainer",
+    "find_high_purity_spots",
+    "collect_embeddings_by_type",
+    "compute_type_centroids",
+    "TwoStagePipeline",
 ]
