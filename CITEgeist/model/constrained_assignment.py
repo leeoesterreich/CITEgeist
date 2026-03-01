@@ -2,6 +2,8 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
+from .morphology_features import largest_remainder_discretize
+
 
 def hungarian_assign(log_likes: np.ndarray, counts: np.ndarray) -> np.ndarray:
     """
@@ -78,28 +80,5 @@ def random_assign(counts: np.ndarray, n_samples: int) -> np.ndarray:
     return np.array(assignments)
 
 
-def proportions_to_counts(proportions: np.ndarray, n_cells: int) -> np.ndarray:
-    """
-    Convert proportions to integer counts using largest remainder method.
-
-    Args:
-        proportions: (K,) proportions summing to 1
-        n_cells: total number of cells
-
-    Returns:
-        (K,) integer counts summing to n_cells
-    """
-    # Initial allocation
-    float_counts = proportions * n_cells
-    counts = np.floor(float_counts).astype(int)
-
-    # Distribute remainder by largest fractional parts
-    remainder = n_cells - counts.sum()
-    fractional = float_counts - counts
-
-    for _ in range(int(remainder)):
-        idx = np.argmax(fractional)
-        counts[idx] += 1
-        fractional[idx] = 0  # Don't pick same index twice
-
-    return counts
+# Alias for API consistency - delegates to the canonical implementation
+proportions_to_counts = largest_remainder_discretize

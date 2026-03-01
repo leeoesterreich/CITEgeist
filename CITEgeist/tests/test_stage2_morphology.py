@@ -151,3 +151,23 @@ class TestConstrainedAssignment:
         assert (assignments == 0).sum() == 4
         assert (assignments == 1).sum() == 3
         assert (assignments == 2).sum() == 3
+
+    def test_proportions_to_counts_sums_correctly(self):
+        """Counts should sum to n_total and approximate proportions."""
+        from CITEgeist.model.constrained_assignment import proportions_to_counts
+
+        proportions = np.array([0.4, 0.35, 0.25])
+        counts = proportions_to_counts(proportions, 10)  # positional arg
+
+        assert counts.sum() == 10
+        assert np.allclose(counts / counts.sum(), proportions, atol=0.15)
+
+    def test_proportions_to_counts_handles_zero(self):
+        """Should handle n_total=0 gracefully."""
+        from CITEgeist.model.constrained_assignment import proportions_to_counts
+
+        proportions = np.array([0.5, 0.3, 0.2])
+        counts = proportions_to_counts(proportions, 0)  # positional arg
+
+        assert counts.sum() == 0
+        assert len(counts) == 3
