@@ -171,3 +171,41 @@ class TestConstrainedAssignment:
 
         assert counts.sum() == 0
         assert len(counts) == 3
+
+
+class TestStage2Pipeline:
+    """Test the full Stage 2 pipeline."""
+
+    def test_pipeline_initialization(self):
+        """Pipeline should initialize with cell types."""
+        from CITEgeist.model.stage2_pipeline import Stage2Pipeline
+
+        cell_types = ["TypeA", "TypeB", "TypeC"]
+        pipeline = Stage2Pipeline(cell_types=cell_types)
+
+        assert pipeline.cell_types == cell_types
+        assert pipeline.classifier is not None
+
+    def test_pipeline_train_and_assign(self):
+        """Pipeline should train and then assign cells."""
+        from CITEgeist.model.stage2_pipeline import Stage2Pipeline
+
+        cell_types = ["TypeA", "TypeB", "TypeC"]
+        pipeline = Stage2Pipeline(cell_types=cell_types)
+
+        # Training data
+        train_patches = np.random.rand(100, 2, 64, 64).astype(np.float32)
+        train_labels = np.array([0] * 40 + [1] * 35 + [2] * 25)
+
+        pipeline.train(train_patches, train_labels)
+
+        # Inference: 5 cells in spot with counts [2, 2, 1]
+        test_patches = np.random.rand(5, 2, 64, 64).astype(np.float32)
+        counts = np.array([2, 2, 1])
+
+        assignments = pipeline.assign(test_patches, counts)
+
+        assert len(assignments) == 5
+        assert (assignments == 0).sum() == 2
+        assert (assignments == 1).sum() == 2
+        assert (assignments == 2).sum() == 1
