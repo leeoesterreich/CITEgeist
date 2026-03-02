@@ -1,10 +1,19 @@
 """Tests for Cellpose H&E segmentation."""
+import sys
+from pathlib import Path
 import numpy as np
 import pytest
+
+# Add src directory to path for imports
+_src_dir = Path(__file__).parent
+if str(_src_dir) not in sys.path:
+    sys.path.insert(0, str(_src_dir))
+
 from run_cellpose_he import (
     preprocess_he_for_cellpose,
     segment_tile,
     stitch_masks,
+    extract_centroids,
 )
 
 
@@ -207,3 +216,29 @@ class TestIntegration:
 
         assert masks.shape == (128, 128)
         assert masks.dtype in [np.int32, np.int64]
+
+
+def test_extract_centroids():
+    """Test centroid extraction from mask."""
+    # Create mask with two nuclei at known positions
+    mask = np.zeros((100, 100), dtype=np.int32)
+    mask[10:20, 10:20] = 1  # Nucleus 1 centered around (15, 15)
+    mask[70:80, 70:80] = 2  # Nucleus 2 centered around (75, 75)
+
+    centroids = extract_centroids(mask)
+
+    assert centroids.shape == (2, 2)  # 2 nuclei, (y, x) coords
+    # Check centroids are approximately correct (center of each region)
+    assert abs(centroids[0, 0] - 14.5) < 1  # y of nucleus 1
+    assert abs(centroids[0, 1] - 14.5) < 1  # x of nucleus 1
+    assert abs(centroids[1, 0] - 74.5) < 1  # y of nucleus 2
+    assert abs(centroids[1, 1] - 74.5) < 1  # x of nucleus 2
+
+
+def test_extract_centroids_empty():
+    """Test centroid extraction with empty mask."""
+    mask = np.zeros((50, 50), dtype=np.int32)
+
+    centroids = extract_centroids(mask)
+
+    assert centroids.shape == (0, 2)  # No nuclei
