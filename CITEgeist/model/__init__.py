@@ -85,6 +85,13 @@ from .watershed_segmentation import watershed_from_nuclei
 from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
 from .soft_label_classifier import SoftLabelClassifier
 from .hungarian_assignment import assign_nuclei_to_types
+from .constrained_assignment import (
+    ConstrainedAssignment,
+    COARSE_MAPPING,
+    extract_patch_features,
+    hungarian_assign,
+    random_assign,
+)
 from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
 from .cell_level_gex import distribute_gex_to_cells
 from .single_cell_output import create_single_cell_adata
@@ -124,6 +131,10 @@ from .stage2_high_purity import (
 )
 from .two_stage_pipeline import TwoStagePipeline
 from .stage2_pipeline import Stage2Pipeline
+
+# H&E Morphology Support: ViT + MIL for single-cell assignment
+from .vit_extractor import ViTFeatureExtractor, load_uni_extractor
+from .proportion_mil import ProportionGuidedMIL, proportion_loss, entropy_regularization
 
 __all__ = [
     # Core model
@@ -237,4 +248,16 @@ __all__ = [
     "TwoStagePipeline",
     # Stage 2 Morphology: GMM-based single-cell assignment
     "Stage2Pipeline",
+    # Constrained single-cell assignment
+    "ConstrainedAssignment",
+    "COARSE_MAPPING",
+    "extract_patch_features",
+    "hungarian_assign",
+    "random_assign",
+    # H&E Morphology Support: ViT + MIL
+    "ViTFeatureExtractor",
+    "load_uni_extractor",
+    "ProportionGuidedMIL",
+    "proportion_loss",
+    "entropy_regularization",
 ]
