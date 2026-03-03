@@ -20,9 +20,12 @@ from tqdm import tqdm
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from CITEgeist.model.mae import MAE
-from CITEgeist.model.dino import DINO
-from CITEgeist.model.vit_encoder import ViTEncoder
+# Import directly from model files to avoid __init__.py import chain
+# (which pulls in pandas and causes GLIBC issues on some GPU nodes)
+sys.path.insert(0, str(REPO_ROOT / "CITEgeist" / "model"))
+from mae import MAE
+from dino import DINO
+from vit_encoder import ViTEncoder
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
