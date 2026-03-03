@@ -6,6 +6,7 @@
 #SBATCH --mem=64G
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
+#SBATCH --cluster=gpu
 #SBATCH --partition=l40s
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
