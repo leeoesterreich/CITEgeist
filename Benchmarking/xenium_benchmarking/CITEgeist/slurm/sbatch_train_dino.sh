@@ -1,8 +1,9 @@
 #!/bin/bash
 #SBATCH --job-name=train_dino
+#SBATCH --cluster=gpu
+#SBATCH --partition=l40s
 #SBATCH --output=slurm/logs/train_dino_%j.out
 #SBATCH --error=slurm/logs/train_dino_%j.err
-#SBATCH --partition=l40s
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
