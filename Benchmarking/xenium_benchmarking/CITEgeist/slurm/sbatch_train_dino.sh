@@ -15,6 +15,9 @@
 
 set -e
 
+# Clean LD_LIBRARY_PATH to avoid GLIBC conflicts with system libraries
+export LD_LIBRARY_PATH=$(echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -v "ondemand-jupyter" | tr '\n' ':' | sed 's/:$//')
+
 echo "============================================"
 echo "DINO Training Job"
 echo "Started: $(date)"

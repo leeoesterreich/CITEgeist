@@ -30,6 +30,9 @@ set -e
 # Create logs directory if not exists
 mkdir -p logs
 
+# Clean LD_LIBRARY_PATH to avoid GLIBC conflicts with system libraries
+export LD_LIBRARY_PATH=$(echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -v "ondemand-jupyter" | tr '\n' ':' | sed 's/:$//')
+
 # Load modules and activate environment
 eval "$(conda shell.bash hook)"
 conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
