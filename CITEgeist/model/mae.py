@@ -29,8 +29,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from .vit_encoder import ViTEncoder, TransformerBlock, _trunc_normal_
-from .ssl_utils import random_masking, patchify
+try:
+    from .vit_encoder import ViTEncoder, TransformerBlock, _trunc_normal_
+    from .ssl_utils import random_masking, patchify
+except ImportError:
+    from vit_encoder import ViTEncoder, TransformerBlock, _trunc_normal_
+    from ssl_utils import random_masking, patchify
 
 
 class MAEDecoder(nn.Module):
