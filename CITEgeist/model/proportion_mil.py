@@ -87,21 +87,17 @@ class ProportionGuidedMIL(nn.Module):
         # Attention logits per cell type
         A_logits = self.attention_W(A_gate)  # (N, K)
 
-        # Softmax over nuclei for each cell type
-        attention = F.softmax(A_logits, dim=0)  # (N, K)
+        # Softmax over CELL TYPES (dim=1) so each nucleus gives a probability
+        # distribution over types. This allows different nuclei to vote differently.
+        # Previous bug: softmax(dim=0) made each column sum to 1, causing
+        # proportions = sum(attention)/N = [1,1,...,1]/N = uniform always!
+        attention = F.softmax(A_logits, dim=1)  # (N, K) - each row sums to 1
 
-        # Weighted aggregation: (K, N) @ (N, D) -> (K, D)
-        weighted_embeddings = torch.mm(attention.T, embeddings)  # (K, input_dim)
+        # Proportions = average vote across all nuclei
+        # Each nucleus "votes" for cell types via its attention distribution
+        proportions = attention.mean(dim=0)  # (K,) - average of N probability vectors
 
-        # Classify each weighted embedding
-        type_logits = self.classifier(weighted_embeddings)  # (K, K)
-
-        # Diagonal gives prediction for each type's aggregated embedding
-        # But simpler: just use attention weights directly as proportions
-        proportions = attention.sum(dim=0) / N  # (K,)
-
-        # Ensure sums to 1
-        proportions = proportions / (proportions.sum() + 1e-8)
+        # No additional normalization needed - mean of normalized rows is normalized
 
         return proportions, attention
 
@@ -109,7 +105,10 @@ class ProportionGuidedMIL(nn.Module):
         self,
         attention: torch.Tensor,
     ) -> torch.Tensor:
-        """Convert attention to per-nucleus type probabilities.
+        """Return per-nucleus type probabilities.
+
+        With the corrected forward(), attention is already row-normalized
+        (softmax over dim=1), so this just returns the attention directly.
 
         Args:
             attention: (N, K) attention weights from forward()
@@ -117,8 +116,8 @@ class ProportionGuidedMIL(nn.Module):
         Returns:
             (N, K) probability of each type for each nucleus
         """
-        # Normalize per nucleus (row-wise)
-        return F.softmax(attention, dim=1)
+        # Attention is already softmax-normalized per nucleus (row)
+        return attention
 
 
 def proportion_loss(

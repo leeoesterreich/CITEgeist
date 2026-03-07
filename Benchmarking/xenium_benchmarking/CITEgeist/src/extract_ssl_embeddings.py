@@ -25,6 +25,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "CITEgeist" / "model"))
 from mae import MAE
 from dino import DINO
+from simclr import SimCLR
 from vit_encoder import ViTEncoder
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -39,10 +40,10 @@ class SimplePatchDataset(Dataset):
         patches_dir = Path(patches_dir)
 
         for region_dir in sorted(patches_dir.glob("region_*")):
-            patch_files.extend(sorted(region_dir.glob("*.npy")))
+            patch_files.extend(sorted(region_dir.glob("*_patches.npy")))
 
         if not patch_files:
-            patch_files = sorted(patches_dir.glob("*.npy"))
+            patch_files = sorted(patches_dir.glob("*_patches.npy"))
 
         all_patches = []
         for pf in tqdm(patch_files, desc="Loading"):
@@ -69,15 +70,19 @@ def load_encoder(checkpoint_path: str, model_type: str, device: torch.device):
     checkpoint = torch.load(checkpoint_path, map_location=device)
 
     if model_type == "mae":
-        model = MAE(in_channels=2)
+        model = MAE(in_chans=2)
         model.load_state_dict(checkpoint["model_state_dict"])
         encoder = model.encoder
     elif model_type == "dino":
         model = DINO(in_channels=2)
         model.load_state_dict(checkpoint["model_state_dict"])
         encoder = model.student_encoder
+    elif model_type == "simclr":
+        model = SimCLR(in_channels=2)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        encoder = model.encoder
     elif model_type == "vit":
-        encoder = ViTEncoder(in_channels=2)
+        encoder = ViTEncoder(in_chans=2)
         encoder.load_state_dict(checkpoint["encoder_state_dict"])
     else:
         raise ValueError(f"Unknown model type: {model_type}")
@@ -132,7 +137,7 @@ def extract_embeddings(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--model-type", type=str, required=True, choices=["mae", "dino", "vit"])
+    parser.add_argument("--model-type", type=str, required=True, choices=["mae", "dino", "simclr", "vit"])
     parser.add_argument("--patches-dir", type=str, required=True)
     parser.add_argument("--output-dir", type=str, required=True)
     parser.add_argument("--batch-size", type=int, default=256)
