@@ -43,11 +43,25 @@ PSEUDOVISIUM_DIR = PROJECT_ROOT / "Benchmarking" / "xenium_pseudovisium"
 DATA_DIR = PSEUDOVISIUM_DIR / "data_protein_gt"
 HYBRID_OUTPUT_DIR = BENCHMARK_ROOT / "output" / "hybrid_cellpose"
 PATCHES_DIR = BENCHMARK_ROOT / "output" / "patches_v2"
+XENIUM_DATA_DIR = Path("/ix1/alee/LO_LAB/General/Public_Data/10x_PublicData/Xenium_RNA_Proteomic_RenalCellCarcinoma")
 
 # Ground truth files
 CELL_TYPES_PATH = DATA_DIR / "cell_type_assignments.csv"
 CELL_TO_SPOT_PATH = DATA_DIR / "cell_to_spot_mapping.csv"
 GT_PROPS_DIR = PROJECT_ROOT / "Benchmarking" / "xenium_benchmarking" / "ground_truth" / "proportions"
+
+# Pixel size for Xenium morphology images (from experiment.xenium)
+PIXEL_SIZE_UM = 0.2125
+
+# Region boundaries in microns (from prepare_patches.py)
+REGION_BOUNDS_UM = {
+    0: (29.01, 2279.01, 30.87, 5486.83),
+    1: (2329.01, 4579.01, 30.87, 5400.23),
+    2: (4629.01, 6829.01, 30.87, 5486.83),
+    3: (6879.01, 9129.01, 30.87, 5660.04),
+    4: (9179.01, 11429.01, 30.87, 5746.64),
+}
+PADDING_UM = 100.0
 
 
 def load_stage1_results(region_id: int) -> pd.DataFrame:
@@ -132,12 +146,98 @@ def load_patches(region_id: int) -> dict:
     return spot_data
 
 
+def build_cellpose_to_xenium_map(
+    region_id: int,
+    cellpose_nucleus_ids: np.ndarray,
+    max_distance_um: float = 5.0,
+) -> Dict[int, str]:
+    """Map Cellpose nucleus IDs to Xenium cell barcodes by spatial proximity.
+
+    Cellpose centroids are in pixel coordinates of the cropped region image.
+    Xenium cell centroids are in microns (global coordinate system).
+
+    Args:
+        region_id: Region index (0-4)
+        cellpose_nucleus_ids: Array of Cellpose nucleus IDs from nucleus_features.csv
+        max_distance_um: Maximum matching distance in microns
+
+    Returns:
+        Dict mapping Cellpose nucleus_id (int) -> Xenium barcode (str)
+    """
+    from scipy.spatial import cKDTree
+
+    # Load Cellpose centroids
+    features_path = PATCHES_DIR / f"region_{region_id}" / "nucleus_features.csv"
+    cp_df = pd.read_csv(features_path)
+
+    # Compute crop origin: region bounds with padding, clamped to 0
+    x_min_um = max(0, REGION_BOUNDS_UM[region_id][0] - PADDING_UM)
+    y_min_um = max(0, REGION_BOUNDS_UM[region_id][2] - PADDING_UM)
+
+    # Convert Cellpose pixel coords to microns (global)
+    cp_x = cp_df['centroid_x'].values * PIXEL_SIZE_UM + x_min_um * PIXEL_SIZE_UM
+    cp_y = cp_df['centroid_y'].values * PIXEL_SIZE_UM + y_min_um * PIXEL_SIZE_UM
+
+    # Wait — x_min_um is already in microns after clamping; the pixel origin
+    # is int(x_min_um / PIXEL_SIZE_UM) pixels. So:
+    # pixel_in_crop * PIXEL_SIZE = offset from crop origin in microns
+    # global_micron = pixel_in_crop * PIXEL_SIZE + crop_origin_microns
+    # crop_origin_microns = max(0, x_min_um - PADDING_UM) but x_min_um is already padded...
+    # Actually the crop is: pixel bounds = micron_to_pixel(x_min_um - PADDING, y_min_um - PADDING)
+    # clamped to 0. So crop_origin_px = max(0, int((x_min - pad) / pixel_size))
+    # And global_micron = (crop_origin_px + pixel_in_crop) * pixel_size
+    x_min_crop_um = REGION_BOUNDS_UM[region_id][0] - PADDING_UM
+    y_min_crop_um = REGION_BOUNDS_UM[region_id][2] - PADDING_UM
+    x_origin_px = max(0, int(x_min_crop_um / PIXEL_SIZE_UM))
+    y_origin_px = max(0, int(y_min_crop_um / PIXEL_SIZE_UM))
+
+    cp_global_x = (x_origin_px + cp_df['centroid_x'].values) * PIXEL_SIZE_UM
+    cp_global_y = (y_origin_px + cp_df['centroid_y'].values) * PIXEL_SIZE_UM
+
+    # Load ALL Xenium cells in spatial region (not just GT-mapped)
+    xenium_cells = pd.read_parquet(XENIUM_DATA_DIR / "cells.parquet")
+    x_lo = REGION_BOUNDS_UM[region_id][0] - PADDING_UM
+    x_hi = REGION_BOUNDS_UM[region_id][1] + PADDING_UM
+    y_lo = REGION_BOUNDS_UM[region_id][2] - PADDING_UM
+    y_hi = REGION_BOUNDS_UM[region_id][3] + PADDING_UM
+    region_xenium = xenium_cells[
+        (xenium_cells['x_centroid'] >= max(0, x_lo)) & (xenium_cells['x_centroid'] <= x_hi) &
+        (xenium_cells['y_centroid'] >= max(0, y_lo)) & (xenium_cells['y_centroid'] <= y_hi)
+    ].copy()
+
+    # Build KD-tree on Xenium coords, query with Cellpose
+    xen_coords = np.column_stack([region_xenium['x_centroid'].values, region_xenium['y_centroid'].values])
+    cp_coords = np.column_stack([cp_global_x, cp_global_y])
+    tree = cKDTree(xen_coords)
+    dists, idxs = tree.query(cp_coords, k=1)
+
+    # Build mapping for matches within threshold
+    cp_to_xenium = {}
+    n_matched = 0
+    for i, (d, idx) in enumerate(zip(dists, idxs)):
+        if d <= max_distance_um:
+            cp_nid = int(cp_df['nucleus_id'].iloc[i])
+            xen_barcode = region_xenium['cell_id'].iloc[idx]
+            cp_to_xenium[cp_nid] = xen_barcode
+            n_matched += 1
+
+    logger.info(
+        "Spatial matching: %d/%d Cellpose nuclei matched to Xenium (%.1f%%, thresh=%.1fµm, "
+        "median dist=%.2fµm)",
+        n_matched, len(cp_df), n_matched / len(cp_df) * 100,
+        max_distance_um, float(np.median(dists)),
+    )
+    return cp_to_xenium
+
+
 def evaluate(
     assignments: dict,
     gt_props: pd.DataFrame,
     gt_cells: pd.DataFrame,
     nuclei_spot_map: pd.DataFrame,
     cell_types: list,
+    cellpose_to_xenium: Dict[int, str] = None,
+    gt_types_df: pd.DataFrame = None,
 ) -> dict:
     """Compute all evaluation metrics."""
     from scipy.stats import pearsonr
@@ -185,41 +285,44 @@ def evaluate(
                 per_type_corr[ct] = {'pearson_r': 0.0, 'p_value': 1.0}
         metrics['per_type_correlations'] = per_type_corr
 
-    # 2. Per-spot accuracy against GT cell-level assignments
-    # Note: Cellpose nucleus IDs != Xenium cell barcodes, so we compare
-    # at spot level: GT proportions from single-cell assignments vs predicted
-    if gt_cells is not None:
-        gt_spot_props_sc = []
-        pred_spot_props_sc = []
-        for spot_id in gt_cells['spot_id'].unique():
-            spot_gt = gt_cells[gt_cells['spot_id'] == spot_id]
-            spot_nuclei = nuclei_spot_map[nuclei_spot_map['spot_id'] == spot_id]
-            if len(spot_gt) == 0 or len(spot_nuclei) == 0:
-                continue
-            # GT proportions from single-cell assignments
-            gt_counts = np.zeros(n_types)
-            for ct in spot_gt['cell_type']:
-                if ct in cell_types:
-                    gt_counts[cell_types.index(ct)] += 1
-            gt_prop_sc = gt_counts / gt_counts.sum() if gt_counts.sum() > 0 else gt_counts
-            # Predicted proportions
-            pred_counts = np.zeros(n_types)
-            for nid in spot_nuclei['nucleus_id']:
-                if nid in assignments:
-                    ct = assignments[nid]
-                    if ct in cell_types:
-                        pred_counts[cell_types.index(ct)] += 1
-            pred_prop_sc = pred_counts / pred_counts.sum() if pred_counts.sum() > 0 else pred_counts
-            gt_spot_props_sc.append(gt_prop_sc)
-            pred_spot_props_sc.append(pred_prop_sc)
+    # 2. Single-cell accuracy via spatial matching
+    if cellpose_to_xenium is not None and gt_types_df is not None:
+        correct, total = 0, 0
+        per_type_correct = {ct: 0 for ct in cell_types}
+        per_type_total = {ct: 0 for ct in cell_types}
 
-        if gt_spot_props_sc:
-            gt_arr_sc = np.array(gt_spot_props_sc)
-            pred_arr_sc = np.array(pred_spot_props_sc)
-            r_sc, p_sc = pearsonr(gt_arr_sc.flatten(), pred_arr_sc.flatten())
-            metrics['sc_gt_proportion_r'] = float(r_sc)
-            metrics['sc_gt_proportion_p'] = float(p_sc)
-            metrics['sc_gt_spots_evaluated'] = len(gt_spot_props_sc)
+        for cp_nid, pred_type in assignments.items():
+            if cp_nid not in cellpose_to_xenium:
+                continue
+            xen_barcode = cellpose_to_xenium[cp_nid]
+            if xen_barcode not in gt_types_df.index:
+                continue
+            gt_type = gt_types_df.loc[xen_barcode, 'cell_type']
+            if gt_type not in cell_types:
+                continue
+            total += 1
+            per_type_total[gt_type] = per_type_total.get(gt_type, 0) + 1
+            if pred_type == gt_type:
+                correct += 1
+                per_type_correct[gt_type] = per_type_correct.get(gt_type, 0) + 1
+
+        if total > 0:
+            metrics['single_cell_accuracy'] = correct / total
+            metrics['single_cell_total'] = total
+            metrics['single_cell_correct'] = correct
+            metrics['random_baseline'] = 1.0 / n_types
+            metrics['per_type_accuracy'] = {
+                ct: per_type_correct[ct] / max(per_type_total[ct], 1)
+                for ct in cell_types if per_type_total[ct] > 0
+            }
+            metrics['per_type_total'] = {
+                ct: per_type_total[ct]
+                for ct in cell_types if per_type_total[ct] > 0
+            }
+            logger.info(
+                "Single-cell accuracy: %d/%d = %.1f%% (random=%.1f%%)",
+                correct, total, correct / total * 100, 100.0 / n_types,
+            )
 
     return metrics
 
@@ -289,10 +392,19 @@ def main():
 
     logger.info("Assignment complete: %d nuclei assigned", len(result.assignments))
 
+    # Build Cellpose → Xenium spatial mapping for single-cell accuracy
+    all_cp_nids = nuclei_spot_map['nucleus_id'].values
+    cellpose_to_xenium = build_cellpose_to_xenium_map(
+        args.region, all_cp_nids, max_distance_um=5.0,
+    )
+    gt_types_df = pd.read_csv(CELL_TYPES_PATH, index_col=0)
+
     # Evaluate
     metrics = evaluate(
         result.assignments, gt_props, gt_cells,
         nuclei_spot_map, CELL_TYPES,
+        cellpose_to_xenium=cellpose_to_xenium,
+        gt_types_df=gt_types_df,
     )
 
     logger.info("Results: prop_r=%.4f, sc_acc=%.4f",
