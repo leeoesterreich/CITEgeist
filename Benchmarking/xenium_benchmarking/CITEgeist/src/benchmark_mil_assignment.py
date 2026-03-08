@@ -185,34 +185,41 @@ def evaluate(
                 per_type_corr[ct] = {'pearson_r': 0.0, 'p_value': 1.0}
         metrics['per_type_correlations'] = per_type_corr
 
-    # 2. Single-cell accuracy (if ground truth available)
+    # 2. Per-spot accuracy against GT cell-level assignments
+    # Note: Cellpose nucleus IDs != Xenium cell barcodes, so we compare
+    # at spot level: GT proportions from single-cell assignments vs predicted
     if gt_cells is not None:
-        # Map Xenium cell barcodes to cell types
-        gt_map = dict(zip(gt_cells['cell_barcode'].astype(int), gt_cells['cell_type']))
-        correct, total = 0, 0
-        per_type_correct = {ct: 0 for ct in cell_types}
-        per_type_total = {ct: 0 for ct in cell_types}
-        for nid, pred_type in assignments.items():
-            nid_int = int(nid) if not isinstance(nid, int) else nid
-            if nid_int in gt_map:
-                gt_type = gt_map[nid_int]
-                total += 1
-                if gt_type in per_type_total:
-                    per_type_total[gt_type] += 1
-                if pred_type == gt_type:
-                    correct += 1
-                    if gt_type in per_type_correct:
-                        per_type_correct[gt_type] += 1
+        gt_spot_props_sc = []
+        pred_spot_props_sc = []
+        for spot_id in gt_cells['spot_id'].unique():
+            spot_gt = gt_cells[gt_cells['spot_id'] == spot_id]
+            spot_nuclei = nuclei_spot_map[nuclei_spot_map['spot_id'] == spot_id]
+            if len(spot_gt) == 0 or len(spot_nuclei) == 0:
+                continue
+            # GT proportions from single-cell assignments
+            gt_counts = np.zeros(n_types)
+            for ct in spot_gt['cell_type']:
+                if ct in cell_types:
+                    gt_counts[cell_types.index(ct)] += 1
+            gt_prop_sc = gt_counts / gt_counts.sum() if gt_counts.sum() > 0 else gt_counts
+            # Predicted proportions
+            pred_counts = np.zeros(n_types)
+            for nid in spot_nuclei['nucleus_id']:
+                if nid in assignments:
+                    ct = assignments[nid]
+                    if ct in cell_types:
+                        pred_counts[cell_types.index(ct)] += 1
+            pred_prop_sc = pred_counts / pred_counts.sum() if pred_counts.sum() > 0 else pred_counts
+            gt_spot_props_sc.append(gt_prop_sc)
+            pred_spot_props_sc.append(pred_prop_sc)
 
-        metrics['single_cell_accuracy'] = correct / max(total, 1)
-        metrics['single_cell_total'] = total
-        metrics['single_cell_correct'] = correct
-        metrics['per_type_accuracy'] = {
-            ct: per_type_correct[ct] / max(per_type_total[ct], 1)
-            for ct in cell_types
-        }
-        # Random baseline
-        metrics['random_baseline'] = 1.0 / n_types
+        if gt_spot_props_sc:
+            gt_arr_sc = np.array(gt_spot_props_sc)
+            pred_arr_sc = np.array(pred_spot_props_sc)
+            r_sc, p_sc = pearsonr(gt_arr_sc.flatten(), pred_arr_sc.flatten())
+            metrics['sc_gt_proportion_r'] = float(r_sc)
+            metrics['sc_gt_proportion_p'] = float(p_sc)
+            metrics['sc_gt_spots_evaluated'] = len(gt_spot_props_sc)
 
     return metrics
 

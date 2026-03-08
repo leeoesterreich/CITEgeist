@@ -14,11 +14,12 @@
 
 module load gurobi/12.0.3
 
+source ~/.bashrc
 eval "$(conda shell.bash hook)"
 conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
 
-# Clean LD_LIBRARY_PATH to avoid GLIBC conflicts
-export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$(echo $LD_LIBRARY_PATH | tr ':' '\n' | grep -v ondemand | paste -sd ':')"
+# Clean LD_LIBRARY_PATH to avoid GLIBC/CUDA conflicts
+export LD_LIBRARY_PATH=""
 
 REGION=${SLURM_ARRAY_TASK_ID}
 
