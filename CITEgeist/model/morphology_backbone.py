@@ -97,6 +97,10 @@ class DAPIBackbone(MorphologyBackbone):
         """Load encoder weights from a SimCLR checkpoint."""
         state = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
+        # Handle wrapped checkpoint format {'model_state_dict': ..., 'epoch': ...}
+        if 'model_state_dict' in state:
+            state = state['model_state_dict']
+
         # SimCLR checkpoint has 'encoder.*' prefix
         encoder_state = {}
         for k, v in state.items():
