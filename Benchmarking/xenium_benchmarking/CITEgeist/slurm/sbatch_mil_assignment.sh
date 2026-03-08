@@ -1,6 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=mil_assign
 #SBATCH --array=0-4
+#SBATCH --cluster=gpu
 #SBATCH --partition=l40s
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
@@ -21,7 +22,6 @@ export LD_LIBRARY_PATH="$CONDA_PREFIX/lib:$(echo $LD_LIBRARY_PATH | tr ':' '\n' 
 
 REGION=${SLURM_ARRAY_TASK_ID}
 
-# UPDATE THESE PATHS before submission
 SIMCLR_CHECKPOINT="output/simclr_ssl/simclr_best.pt"
 OUTPUT_DIR="output/mil_assignment"
 

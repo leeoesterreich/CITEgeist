@@ -6,16 +6,18 @@ Pipeline:
 3. Extract DAPI+boundary embeddings via backbone
 4. Train MIL head on proportions
 5. Proportion-weighted Hungarian assignment
-6. Evaluate: proportion r, single-cell accuracy, GEX r
+6. Evaluate: proportion r, single-cell accuracy
 """
 import argparse
 import json
 import logging
 import sys
 from pathlib import Path
+from typing import Dict
 
 import numpy as np
 import pandas as pd
+import torch
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -35,53 +37,103 @@ CELL_TYPES = [
     "Macrophages", "Endothelial", "Epithelial", "Fibroblasts",
 ]
 
-DATA_ROOT = Path(PROJECT_ROOT / "Benchmarking" / "xenium_pseudovisium" / "data_protein_gt")
+# Paths
+BENCHMARK_ROOT = PROJECT_ROOT / "Benchmarking" / "xenium_benchmarking" / "CITEgeist"
+PSEUDOVISIUM_DIR = PROJECT_ROOT / "Benchmarking" / "xenium_pseudovisium"
+DATA_DIR = PSEUDOVISIUM_DIR / "data_protein_gt"
+HYBRID_OUTPUT_DIR = BENCHMARK_ROOT / "output" / "hybrid_cellpose"
+PATCHES_DIR = BENCHMARK_ROOT / "output" / "patches_v2"
+
+# Ground truth files
+CELL_TYPES_PATH = DATA_DIR / "cell_type_assignments.csv"
+CELL_TO_SPOT_PATH = DATA_DIR / "cell_to_spot_mapping.csv"
+GT_PROPS_DIR = PROJECT_ROOT / "Benchmarking" / "xenium_benchmarking" / "ground_truth" / "proportions"
 
 
 def load_stage1_results(region_id: int) -> pd.DataFrame:
-    """Load hybrid post-filter proportions from Module 3."""
-    results_dir = PROJECT_ROOT / "Benchmarking" / "xenium_benchmarking" / "CITEgeist" / "output" / "hybrid_cellpose"
+    """Load hybrid proportions from Module 3.
+
+    Returns DataFrame with spot_id index and cell type columns.
+    """
     region_name = f"Xenium_region_{region_id}"
-    prop_path = results_dir / region_name / f"{region_name}_deconv_predictions.csv"
+    prop_path = HYBRID_OUTPUT_DIR / region_name / f"{region_name}_deconv_predictions.csv"
     if not prop_path.exists():
         raise FileNotFoundError(f"Stage 1 results not found: {prop_path}")
-    return pd.read_csv(prop_path)
+    props = pd.read_csv(prop_path, index_col=0)
+    return props
 
 
 def load_ground_truth(region_id: int):
-    """Load ground truth proportions and single-cell assignments."""
+    """Load ground truth proportions and single-cell assignments.
+
+    Returns:
+        gt_props: DataFrame with spot_id index and cell type columns
+        gt_cells: DataFrame with columns [spot_id, cell_barcode, cell_type] or None
+    """
     region_name = f"Xenium_region_{region_id}"
 
     # Spot-level proportions
-    gt_props_path = DATA_ROOT / "ground_truth" / f"{region_name}_proportions.csv"
-    gt_props = pd.read_csv(gt_props_path)
+    gt_props_path = GT_PROPS_DIR / f"{region_name}_prop.csv"
+    gt_props = pd.read_csv(gt_props_path, index_col=0)
 
-    # Single-cell assignments
-    gt_cells_path = DATA_ROOT / "ground_truth" / f"{region_name}_cell_assignments.csv"
-    gt_cells = pd.read_csv(gt_cells_path) if gt_cells_path.exists() else None
+    # Single-cell assignments (global files, filter by region)
+    gt_cells = None
+    if CELL_TYPES_PATH.exists() and CELL_TO_SPOT_PATH.exists():
+        cell_types_df = pd.read_csv(CELL_TYPES_PATH, index_col=0)
+        mapping_df = pd.read_csv(CELL_TO_SPOT_PATH, index_col=0)
+
+        # Filter to this region
+        region_mapping = mapping_df[
+            (mapping_df['region_id'] == region_id) &
+            (mapping_df['spot_idx'] != -1)
+        ].copy()
+
+        if len(region_mapping) > 0:
+            region_mapping['cell_barcode'] = region_mapping.index
+            gt_cells = region_mapping.merge(cell_types_df, left_index=True, right_index=True)
+            gt_cells = gt_cells[['spot_id', 'cell_barcode', 'cell_type']]
+            logger.info("Loaded %d GT cells for region %d", len(gt_cells), region_id)
 
     return gt_props, gt_cells
 
 
 def load_patches(region_id: int) -> dict:
-    """Load pre-extracted nucleus patches per spot."""
-    patches_dir = PROJECT_ROOT / "Benchmarking" / "xenium_benchmarking" / "CITEgeist" / "output" / "patches"
-    region_name = f"Xenium_region_{region_id}"
-    region_dir = patches_dir / region_name
+    """Load pre-extracted nucleus patches per spot.
 
-    spot_patches = {}
+    Patch files: spot_spot_XXXX_patches.npy (where spot_id = "spot_XXXX")
+    Nucleus IDs: spot_spot_XXXX_nucleus_ids.npy (Xenium cell barcodes)
+
+    Returns:
+        dict mapping spot_id -> dict with keys 'patches' (ndarray) and 'nucleus_ids' (ndarray)
+    """
+    region_dir = PATCHES_DIR / f"region_{region_id}"
+    if not region_dir.exists():
+        raise FileNotFoundError(f"Patches directory not found: {region_dir}")
+
+    spot_data = {}
     for f in sorted(region_dir.glob("*_patches.npy")):
-        spot_id = f.stem.replace("_patches", "")
-        patches = np.load(f)
-        if len(patches) > 0:
-            spot_patches[spot_id] = patches
+        # File: spot_spot_1032_patches.npy -> spot_id = "spot_1032"
+        stem = f.stem.replace("_patches", "")  # "spot_spot_1032"
+        spot_id = stem.replace("spot_", "", 1)  # "spot_1032"
 
-    return spot_patches
+        patches = np.load(f)
+        if len(patches) == 0:
+            continue
+
+        # Load companion nucleus IDs
+        nid_path = f.parent / f"{stem}_nucleus_ids.npy"
+        nucleus_ids = np.load(nid_path) if nid_path.exists() else np.arange(len(patches))
+
+        spot_data[spot_id] = {
+            'patches': patches,
+            'nucleus_ids': nucleus_ids,
+        }
+
+    return spot_data
 
 
 def evaluate(
     assignments: dict,
-    proportions: pd.DataFrame,
     gt_props: pd.DataFrame,
     gt_cells: pd.DataFrame,
     nuclei_spot_map: pd.DataFrame,
@@ -89,41 +141,61 @@ def evaluate(
 ) -> dict:
     """Compute all evaluation metrics."""
     from scipy.stats import pearsonr
+    from sklearn.metrics import mean_squared_error
 
     metrics = {}
+    n_types = len(cell_types)
 
     # 1. Proportion correlation: re-aggregate assignments to proportions
     pred_spot_props = []
-    for spot_id in gt_props['spot_id'].unique():
+    gt_spot_props = []
+    for spot_id in gt_props.index:
         spot_nuclei = nuclei_spot_map[nuclei_spot_map['spot_id'] == spot_id]
         n = len(spot_nuclei)
         if n == 0:
             continue
-        type_counts = np.zeros(len(cell_types))
+        type_counts = np.zeros(n_types)
         for nid in spot_nuclei['nucleus_id']:
             if nid in assignments:
                 ct = assignments[nid]
                 if ct in cell_types:
                     type_counts[cell_types.index(ct)] += 1
         pred_spot_props.append(type_counts / max(n, 1))
+        gt_spot_props.append(gt_props.loc[spot_id, cell_types].values.astype(float))
 
     if pred_spot_props:
-        pred_flat = np.array(pred_spot_props).flatten()
-        gt_flat = gt_props[cell_types].values.flatten()
-        min_len = min(len(pred_flat), len(gt_flat))
-        r, p = pearsonr(pred_flat[:min_len], gt_flat[:min_len])
+        pred_arr = np.array(pred_spot_props)
+        gt_arr = np.array(gt_spot_props)
+        pred_flat = pred_arr.flatten()
+        gt_flat = gt_arr.flatten()
+        r, p = pearsonr(pred_flat, gt_flat)
         metrics['proportion_pearson_r'] = float(r)
         metrics['proportion_pearson_p'] = float(p)
+        metrics['proportion_rmse'] = float(np.sqrt(mean_squared_error(gt_arr, pred_arr)))
+
+        # Per-type correlations
+        per_type_corr = {}
+        for i, ct in enumerate(cell_types):
+            gt_col = gt_arr[:, i]
+            pred_col = pred_arr[:, i]
+            if gt_col.std() > 0 and pred_col.std() > 0:
+                r_ct, p_ct = pearsonr(gt_col, pred_col)
+                per_type_corr[ct] = {'pearson_r': float(r_ct), 'p_value': float(p_ct)}
+            else:
+                per_type_corr[ct] = {'pearson_r': 0.0, 'p_value': 1.0}
+        metrics['per_type_correlations'] = per_type_corr
 
     # 2. Single-cell accuracy (if ground truth available)
     if gt_cells is not None:
-        gt_map = dict(zip(gt_cells['nucleus_id'], gt_cells['cell_type']))
+        # Map Xenium cell barcodes to cell types
+        gt_map = dict(zip(gt_cells['cell_barcode'].astype(int), gt_cells['cell_type']))
         correct, total = 0, 0
         per_type_correct = {ct: 0 for ct in cell_types}
         per_type_total = {ct: 0 for ct in cell_types}
         for nid, pred_type in assignments.items():
-            if nid in gt_map:
-                gt_type = gt_map[nid]
+            nid_int = int(nid) if not isinstance(nid, int) else nid
+            if nid_int in gt_map:
+                gt_type = gt_map[nid_int]
                 total += 1
                 if gt_type in per_type_total:
                     per_type_total[gt_type] += 1
@@ -134,10 +206,13 @@ def evaluate(
 
         metrics['single_cell_accuracy'] = correct / max(total, 1)
         metrics['single_cell_total'] = total
+        metrics['single_cell_correct'] = correct
         metrics['per_type_accuracy'] = {
             ct: per_type_correct[ct] / max(per_type_total[ct], 1)
             for ct in cell_types
         }
+        # Random baseline
+        metrics['random_baseline'] = 1.0 / n_types
 
     return metrics
 
@@ -156,31 +231,40 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info("=== MIL Benchmark: Region %d ===", args.region)
+    device = args.device if torch.cuda.is_available() else 'cpu'
+    logger.info("=== MIL Benchmark: Region %d (device=%s) ===", args.region, device)
 
     # Load data
     stage1_props = load_stage1_results(args.region)
     gt_props, gt_cells = load_ground_truth(args.region)
-    spot_patches = load_patches(args.region)
+    spot_data = load_patches(args.region)
 
-    logger.info("Loaded %d spots with patches", len(spot_patches))
+    logger.info("Loaded %d spots with patches, %d stage1 spots",
+                len(spot_data), len(stage1_props))
 
     # Initialize backbone
-    backbone = DAPIBackbone(checkpoint=args.simclr_checkpoint, device=args.device)
+    backbone = DAPIBackbone(checkpoint=args.simclr_checkpoint, device=device)
 
-    # Extract embeddings
+    # Extract embeddings and build nuclei_spot_map with real Xenium cell IDs
     embeddings = {}
     nuclei_records = []
-    for spot_id, patches in spot_patches.items():
-        emb = backbone.extract_numpy(patches, batch_size=args.batch_size, device=args.device)
+    for spot_id, data in spot_data.items():
+        patches = data['patches']
+        nucleus_ids = data['nucleus_ids']
+        emb = backbone.extract_numpy(patches, batch_size=args.batch_size, device=device)
         embeddings[spot_id] = emb
-        for i in range(len(patches)):
-            nuclei_records.append({'nucleus_id': f"{spot_id}_{i}", 'spot_id': spot_id})
+        for nid in nucleus_ids:
+            nuclei_records.append({'nucleus_id': int(nid), 'spot_id': spot_id})
 
     nuclei_spot_map = pd.DataFrame(nuclei_records)
     nuclei_counts = nuclei_spot_map.groupby('spot_id').size()
 
     logger.info("Extracted embeddings: %d spots, %d nuclei", len(embeddings), len(nuclei_spot_map))
+
+    # Prepare proportions DataFrame for run_nucleus_assignment_mil
+    # Needs 'spot_id' column + cell type columns
+    props_for_mil = stage1_props[CELL_TYPES].copy()
+    props_for_mil['spot_id'] = props_for_mil.index
 
     # Run MIL assignment
     from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_mil
@@ -188,19 +272,19 @@ def main():
     result = run_nucleus_assignment_mil(
         embeddings=embeddings,
         nuclei_spot_map=nuclei_spot_map,
-        proportions=stage1_props,
+        proportions=props_for_mil,
         nuclei_counts=nuclei_counts,
         cell_types=CELL_TYPES,
         n_epochs=args.n_epochs,
         lambda_prior=args.lambda_prior,
-        device=args.device,
+        device=device,
     )
 
     logger.info("Assignment complete: %d nuclei assigned", len(result.assignments))
 
     # Evaluate
     metrics = evaluate(
-        result.assignments, stage1_props, gt_props, gt_cells,
+        result.assignments, gt_props, gt_cells,
         nuclei_spot_map, CELL_TYPES,
     )
 
@@ -209,17 +293,20 @@ def main():
                 metrics.get('single_cell_accuracy', -1))
 
     # Save results
-    metrics_path = output_dir / f"region_{args.region}_metrics.json"
+    region_output = output_dir / f"region_{args.region}"
+    region_output.mkdir(parents=True, exist_ok=True)
+
+    metrics_path = region_output / "metrics.json"
     with open(metrics_path, 'w') as f:
         json.dump(metrics, f, indent=2)
 
-    assignments_path = output_dir / f"region_{args.region}_assignments.csv"
+    assignments_path = region_output / "assignments.csv"
     pd.DataFrame([
         {'nucleus_id': nid, 'cell_type': ct}
         for nid, ct in result.assignments.items()
     ]).to_csv(assignments_path, index=False)
 
-    logger.info("Saved results to %s", output_dir)
+    logger.info("Saved results to %s", region_output)
 
 
 if __name__ == "__main__":
