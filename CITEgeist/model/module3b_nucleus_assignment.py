@@ -2,12 +2,15 @@
 
 Assigns individual nuclei to cell types using spot-level proportions.
 
-Three assignment methods are available:
+Four assignment methods are available:
 1. Random (default): Random assignment within spots, respecting cell type counts.
 2. Morphology-guided: Uses nucleus/cell morphology features with soft-label classifier
    and Hungarian matching. Provides minimal improvement (~1% accuracy gain).
 3. VAE-Sinkhorn: Uses deep learning (VAE encoder + learned prototypes) with
    optimal transport for assignment. Requires pre-trained models.
+4. MIL (Multiple Instance Learning): Uses gated attention MIL trained on spot-level
+   proportions, with proportion-weighted Hungarian assignment. Works with any
+   384-dim backbone embeddings (DAPI SimCLR or H&E ImageNet ViT).
 """
 import numpy as np
 import pandas as pd
@@ -438,4 +441,128 @@ def run_nucleus_assignment_vae(
         classifier=None,
         assignment_probs=assignment_probs,
         method="vae_sinkhorn",
+    )
+
+
+def run_nucleus_assignment_mil(
+    embeddings: Dict[str, np.ndarray],
+    nuclei_spot_map: pd.DataFrame,
+    proportions: pd.DataFrame,
+    nuclei_counts: pd.Series,
+    cell_types: List[str],
+    n_epochs: int = 100,
+    lambda_prior: float = 1.0,
+    mil_checkpoint: Optional[str] = None,
+    device: str = "cpu",
+    train_frac: float = 0.8,
+    random_seed: int = 42,
+) -> NucleusAssignmentResult:
+    """
+    Run MIL-based nucleus assignment.
+
+    Trains a SingleCellMIL head on spot-level proportion targets, then uses
+    attention weights as per-nucleus type likelihoods for proportion-weighted
+    Hungarian assignment.
+
+    Args:
+        embeddings: Dict mapping spot_id -> (n_nuclei, 384) numpy array
+                    of pre-extracted backbone embeddings
+        nuclei_spot_map: DataFrame with 'nucleus_id' and 'spot_id' columns
+        proportions: DataFrame with 'spot_id' and one column per cell type
+        nuclei_counts: Series mapping spot_id -> nuclei count
+        cell_types: List of cell type names
+        n_epochs: MIL training epochs
+        lambda_prior: Proportion prior weight for Hungarian assignment
+        mil_checkpoint: If set, load pre-trained MIL weights (skip training)
+        device: PyTorch device
+        train_frac: Fraction of spots for training (rest for validation)
+        random_seed: Random seed for train/val split
+
+    Returns:
+        NucleusAssignmentResult with method="mil"
+    """
+    import torch
+    from .single_cell_mil import SingleCellMIL, train_mil
+
+    n_types = len(cell_types)
+    prop_cols = cell_types
+    spot_props = proportions.set_index('spot_id')[prop_cols]
+
+    # Prepare spot data as (embeddings_tensor, proportions_tensor) tuples
+    spot_ids = [sid for sid in spot_props.index if sid in embeddings]
+    spot_data = []
+    for sid in spot_ids:
+        emb = torch.tensor(embeddings[sid], dtype=torch.float32)
+        props = torch.tensor(spot_props.loc[sid].values, dtype=torch.float32)
+        spot_data.append((emb, props))
+
+    # Train/val split
+    rng = np.random.default_rng(random_seed)
+    indices = rng.permutation(len(spot_data))
+    n_train = int(len(spot_data) * train_frac)
+    train_spots = [spot_data[i] for i in indices[:n_train]]
+    val_spots = [spot_data[i] for i in indices[n_train:]]
+    if not val_spots:
+        val_spots = train_spots  # Fallback if too few spots
+
+    # Initialize and train MIL
+    model = SingleCellMIL(input_dim=384, n_types=n_types)
+
+    if mil_checkpoint is not None:
+        state = torch.load(mil_checkpoint, map_location=device, weights_only=False)
+        model.load_state_dict(state)
+    else:
+        train_mil(
+            model, train_spots, val_spots,
+            n_epochs=n_epochs, device=device,
+        )
+
+    # Inference: get attention weights per spot, run Hungarian
+    model.to(device)
+    model.eval()
+    all_assignments = {}
+    all_attention_records = []
+
+    for spot_id in nuclei_spot_map['spot_id'].unique():
+        if spot_id not in embeddings or spot_id not in spot_props.index:
+            continue
+
+        spot_nuclei = nuclei_spot_map[nuclei_spot_map['spot_id'] == spot_id]
+        nucleus_ids = spot_nuclei['nucleus_id'].values
+        spot_emb = torch.tensor(embeddings[spot_id], dtype=torch.float32, device=device)
+        spot_proportions = spot_props.loc[spot_id].values.astype(np.float64)
+        n_nuclei = int(nuclei_counts.get(spot_id, len(spot_nuclei)))
+
+        with torch.no_grad():
+            _, attention = model(spot_emb)  # (N, K)
+        attention_np = attention.cpu().numpy()
+
+        # Discretize proportions to counts
+        counts = largest_remainder_discretize(spot_proportions, n_nuclei)
+
+        # Proportion-weighted Hungarian assignment
+        type_assignments = assign_nuclei_to_types(
+            attention_np, counts, nucleus_ids,
+            lambda_prior=lambda_prior,
+            proportions=spot_proportions,
+        )
+
+        for nid, type_idx in type_assignments.items():
+            all_assignments[nid] = cell_types[type_idx]
+
+        # Store attention for diagnostics
+        for i, nid in enumerate(nucleus_ids):
+            record = {'nucleus_id': nid, 'spot_id': spot_id}
+            for k, ct in enumerate(cell_types):
+                record[ct] = float(attention_np[i, k])
+            all_attention_records.append(record)
+
+    assignment_probs = pd.DataFrame(all_attention_records) if all_attention_records else None
+
+    return NucleusAssignmentResult(
+        assignments=all_assignments,
+        morphology_features=None,
+        classifier=None,
+        assignment_probs=assignment_probs,
+        method="mil",
     )

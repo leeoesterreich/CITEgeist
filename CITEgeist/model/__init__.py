@@ -92,7 +92,7 @@ from .constrained_assignment import (
     hungarian_assign,
     random_assign,
 )
-from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
+from .module3b_nucleus_assignment import run_nucleus_assignment, run_nucleus_assignment_mil, NucleusAssignmentResult
 from .cell_level_gex import distribute_gex_to_cells
 from .single_cell_output import create_single_cell_adata
 
@@ -132,9 +132,35 @@ from .stage2_high_purity import (
 from .two_stage_pipeline import TwoStagePipeline
 from .stage2_pipeline import Stage2Pipeline
 
+# Module 3b MIL: Single-cell assignment via attention
+from .morphology_backbone import MorphologyBackbone, DAPIBackbone, HEBackbone
+from .single_cell_mil import SingleCellMIL, mil_loss, train_mil
+
 # H&E Morphology Support: ViT + MIL for single-cell assignment
 from .vit_extractor import ViTFeatureExtractor, load_uni_extractor
 from .proportion_mil import ProportionGuidedMIL, proportion_loss, entropy_regularization
+
+# SSL ViT for Nucleus Morphology
+from .vit_encoder import ViTEncoder, create_vit_small
+from .ssl_utils import (
+    MAEAugmentation,
+    DINOMultiCrop,
+    random_masking,
+    patchify,
+    unpatchify,
+)
+# DEPRECATED: MAE underperforms SimCLR in constrained setting
+from .mae import MAE, MAEDecoder
+# DEPRECATED: DINO training collapsed; use SimCLR via DAPIBackbone
+from .dino import DINO, DINOHead, create_dino_model
+
+# Deprecated modules list — kept for backward compatibility but superseded
+_DEPRECATED = [
+    "MAE", "MAEDecoder",
+    "DINO", "DINOHead", "create_dino_model",
+    "ProportionGuidedMIL",  # Superseded by SingleCellMIL
+    "solve_masked_iqp",  # Discrete IQP superseded by MIL assignment
+]
 
 __all__ = [
     # Core model
@@ -217,6 +243,7 @@ __all__ = [
     "SoftLabelClassifier",
     "assign_nuclei_to_types",
     "run_nucleus_assignment",
+    "run_nucleus_assignment_mil",
     "NucleusAssignmentResult",
     "distribute_gex_to_cells",
     "create_single_cell_adata",
@@ -254,10 +281,30 @@ __all__ = [
     "extract_patch_features",
     "hungarian_assign",
     "random_assign",
+    # Module 3b MIL: Morphology backbone + attention
+    "MorphologyBackbone",
+    "DAPIBackbone",
+    "HEBackbone",
+    "SingleCellMIL",
+    "mil_loss",
+    "train_mil",
     # H&E Morphology Support: ViT + MIL
     "ViTFeatureExtractor",
     "load_uni_extractor",
     "ProportionGuidedMIL",
     "proportion_loss",
     "entropy_regularization",
+    # SSL ViT for Nucleus Morphology
+    "ViTEncoder",
+    "create_vit_small",
+    "MAEAugmentation",
+    "DINOMultiCrop",
+    "random_masking",
+    "patchify",
+    "unpatchify",
+    "MAE",
+    "MAEDecoder",
+    "DINO",
+    "DINOHead",
+    "create_dino_model",
 ]

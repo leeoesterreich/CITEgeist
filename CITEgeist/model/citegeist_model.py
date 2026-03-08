@@ -1362,11 +1362,12 @@ class CitegeistModel:
         rerun=True,
         continuous_relaxation=True,
         lambda_gex_reg=0.01,
+        enrichment_smoothing=0.0,  # Testing: no smoothing
         cell_counts: Optional[pd.DataFrame] = None,
         use_discrete_mode: bool = False,
         # NEW parameters for module enrichment and KL regularization
         use_module_enrichment: bool = True,
-        use_marker_guidance: bool = True,  # NEW - enable adaptive marker enrichment for A/B testing
+        use_marker_guidance: bool = False,  # Disabled - baseline approach works better
         module_weight: float = 0.5,
         use_kl_regularization: bool = True,
         kl_temperature: float = 0.3,
@@ -1566,7 +1567,8 @@ class CitegeistModel:
             output_dir=output_dir,
             rerun=rerun,
             continuous_relaxation=continuous_relaxation,
-            lambda_gex_reg=lambda_gex_reg if not use_kl_regularization else 0.0,
+            lambda_gex_reg=lambda_gex_reg,
+            enrichment_smoothing=enrichment_smoothing,  # 0.2 = 80/20, 0.0 = none
             # NEW parameters for module enrichment and KL regularization
             anchor_genes=anchor_genes,
             anchor_weights=anchor_weights,  # Pass per-gene correlation weights
@@ -2045,3 +2047,129 @@ class CitegeistModel:
             logging.info(f"Saved single-cell AnnData to {output_path}")
 
         return adata_sc
+
+    def run_single_cell_assignment(
+        self,
+        patches_dir: str,
+        nuclei_counts: pd.Series,
+        modality: str = "he",
+        backbone_checkpoint: Optional[str] = None,
+        mil_checkpoint: Optional[str] = None,
+        lambda_prior: float = 1.0,
+        n_epochs: int = 100,
+        batch_size: int = 64,
+        device: str = "cpu",
+    ) -> pd.DataFrame:
+        """
+        Module 3b: Assign individual nuclei to cell types using MIL.
+
+        Requires Module 3 (run_cell_proportion_model) to have been run first.
+        Uses a modality-specific backbone to extract nucleus embeddings,
+        trains a MIL head on spot-level proportions, then runs proportion-weighted
+        Hungarian assignment.
+
+        Args:
+            patches_dir: Directory containing per-spot nucleus patches.
+                Expected structure: {spot_id}_patches.npy files
+            nuclei_counts: Series mapping spot_id -> number of nuclei
+            modality: "dapi" (2ch, 96x96 SimCLR) or "he" (3ch, 224x224 ImageNet ViT)
+            backbone_checkpoint: Path to pre-trained backbone (SimCLR for DAPI,
+                SSL fine-tuned for H&E). If None, uses untrained backbone.
+            mil_checkpoint: Path to pre-trained MIL weights. If None, trains
+                from scratch using Module 3 proportions.
+            lambda_prior: Weight for proportion prior in Hungarian assignment
+            n_epochs: MIL training epochs (ignored if mil_checkpoint provided)
+            batch_size: Batch size for backbone feature extraction
+            device: PyTorch device for backbone and MIL inference
+
+        Returns:
+            DataFrame with columns: nucleus_id, spot_id, cell_type
+        """
+        from .morphology_backbone import DAPIBackbone, HEBackbone
+        from .module3b_nucleus_assignment import run_nucleus_assignment_mil
+        import glob
+
+        # Validate Module 3 has been run
+        if 'cell_prop_finetuned_results' not in self.results:
+            raise RuntimeError(
+                "Module 3 must be run first (run_cell_proportion_model). "
+                "No finetuned proportions found."
+            )
+
+        proportions_df = self.results['cell_prop_finetuned_results']
+        cell_types = [c for c in proportions_df.columns if c != 'spot_id']
+
+        logging.info("Module 3b: Single-cell assignment via MIL (%s backbone)", modality)
+
+        # Initialize backbone
+        if modality == "dapi":
+            backbone = DAPIBackbone(checkpoint=backbone_checkpoint, device=device)
+        elif modality == "he":
+            backbone = HEBackbone(checkpoint=backbone_checkpoint, device=device)
+        else:
+            raise ValueError(f"Unknown modality: {modality}. Use 'dapi' or 'he'.")
+
+        # Extract embeddings per spot
+        embeddings = {}
+        nuclei_spot_records = []
+
+        patch_files = sorted(glob.glob(os.path.join(patches_dir, "*_patches.npy")))
+        logging.info("Found %d patch files in %s", len(patch_files), patches_dir)
+
+        for pf in patch_files:
+            spot_id = os.path.basename(pf).replace("_patches.npy", "")
+            patches = np.load(pf)  # (N, C, H, W)
+            if len(patches) == 0:
+                continue
+
+            emb = backbone.extract_numpy(patches, batch_size=batch_size, device=device)
+            embeddings[spot_id] = emb
+
+            for i in range(len(patches)):
+                nuclei_spot_records.append({
+                    'nucleus_id': f"{spot_id}_{i}",
+                    'spot_id': spot_id,
+                })
+
+        nuclei_spot_map = pd.DataFrame(nuclei_spot_records)
+        logging.info("Extracted embeddings for %d spots, %d nuclei",
+                      len(embeddings), len(nuclei_spot_map))
+
+        # Run MIL assignment
+        result = run_nucleus_assignment_mil(
+            embeddings=embeddings,
+            nuclei_spot_map=nuclei_spot_map,
+            proportions=proportions_df,
+            nuclei_counts=nuclei_counts,
+            cell_types=cell_types,
+            n_epochs=n_epochs,
+            lambda_prior=lambda_prior,
+            mil_checkpoint=mil_checkpoint,
+            device=device,
+        )
+
+        # Convert to DataFrame
+        records = []
+        for nid, ctype in result.assignments.items():
+            matching = nuclei_spot_map.loc[
+                nuclei_spot_map['nucleus_id'] == nid, 'spot_id'
+            ]
+            sid = matching.iloc[0] if len(matching) > 0 else "unknown"
+            records.append({
+                'nucleus_id': nid,
+                'spot_id': sid,
+                'cell_type': ctype,
+            })
+
+        assignments_df = pd.DataFrame(records)
+
+        # Store in results
+        self.results['single_cell_assignments'] = assignments_df
+        self.results['single_cell_attention'] = result.assignment_probs
+
+        # Save to output
+        output_path = os.path.join(self.output_folder, 'single_cell_assignments.csv')
+        assignments_df.to_csv(output_path, index=False)
+        logging.info("Saved %d assignments to %s", len(assignments_df), output_path)
+
+        return assignments_df
