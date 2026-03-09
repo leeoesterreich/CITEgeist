@@ -444,6 +444,131 @@ def run_nucleus_assignment_vae(
     )
 
 
+def run_nucleus_assignment_constrained(
+    patches_dir: str,
+    nuclei_spot_map: pd.DataFrame,
+    proportions: pd.DataFrame,
+    nuclei_counts: pd.Series,
+    cell_types: List[str],
+    purity_threshold: float = 0.5,
+) -> NucleusAssignmentResult:
+    """
+    Run constrained Hungarian assignment using DAPI+boundary morphology features.
+
+    Learns class-conditional Gaussian distributions from high-purity spots,
+    then uses Hungarian matching with log-likelihoods to assign nuclei.
+
+    Args:
+        patches_dir: Directory containing {spot_id}_patches.npy and
+                     {spot_id}_nucleus_ids.npy files
+        nuclei_spot_map: DataFrame with 'nucleus_id' and 'spot_id' columns
+        proportions: DataFrame with 'spot_id' and one column per cell type
+        nuclei_counts: Series mapping spot_id -> nuclei count
+        cell_types: List of cell type names
+        purity_threshold: Minimum dominant proportion to be considered high-purity
+
+    Returns:
+        NucleusAssignmentResult with method="constrained_hungarian"
+    """
+    from pathlib import Path
+    from .constrained_assignment import (
+        ConstrainedAssignment,
+        extract_patch_features,
+    )
+
+    patches_dir = Path(patches_dir)
+
+    # Build proportions DataFrame for ConstrainedAssignment.fit()
+    if 'spot_id' not in proportions.columns:
+        props_for_fit = proportions.copy()
+        props_for_fit['spot_id'] = props_for_fit.index
+    else:
+        props_for_fit = proportions
+
+    # Fit class-conditional Gaussians from high-purity spots
+    assigner = ConstrainedAssignment(mode='morphology')
+    assigner.fit(
+        patches_dir=patches_dir,
+        proportions_df=props_for_fit,
+        purity_threshold=purity_threshold,
+        layout="citegeist",
+    )
+
+    # Set up proportions lookup
+    prop_cols = cell_types
+    if 'spot_id' in proportions.columns:
+        spot_props = proportions.set_index('spot_id')[prop_cols]
+    else:
+        spot_props = proportions[prop_cols]
+
+    # Assign nuclei per spot
+    all_assignments = {}
+
+    for spot_id in nuclei_spot_map['spot_id'].unique():
+        patch_file = patches_dir / f"{spot_id}_patches.npy"
+        nuc_id_file = patches_dir / f"{spot_id}_nucleus_ids.npy"
+
+        if not patch_file.exists():
+            continue
+        if spot_id not in spot_props.index:
+            continue
+
+        spot_nuclei = nuclei_spot_map[nuclei_spot_map['spot_id'] == spot_id]
+        n_nuclei = int(nuclei_counts.get(spot_id, len(spot_nuclei)))
+
+        # Load patches and nucleus IDs
+        patches = np.load(patch_file).astype(np.float32)
+
+        if nuc_id_file.exists():
+            nucleus_ids = np.load(nuc_id_file)
+        else:
+            nucleus_ids = spot_nuclei['nucleus_id'].values
+
+        if len(patches) == 0:
+            continue
+
+        # Validate nucleus_ids/patches alignment
+        if len(nucleus_ids) != len(patches):
+            import logging as _log
+            _log.warning("Spot %s: %d nucleus_ids but %d patches",
+                         spot_id, len(nucleus_ids), len(patches))
+
+        # Extract features (skip corrupt patches with NaN fill)
+        features = []
+        for patch in patches:
+            try:
+                feats = extract_patch_features(patch)
+                if np.any(np.isnan(feats)):
+                    feats = np.zeros_like(feats)
+            except (ValueError, IndexError):
+                feats = np.zeros(13, dtype=np.float32)
+            features.append(feats)
+        features = np.array(features, dtype=np.float32)
+
+        # Get spot proportions and discretize to counts
+        spot_proportions = spot_props.loc[spot_id].values.astype(np.float64)
+        counts = largest_remainder_discretize(spot_proportions, n_nuclei)
+
+        # Run constrained Hungarian assignment
+        type_indices = assigner.assign_spot(features, counts)
+
+        # Map to nucleus IDs (preserve original ID type)
+        for i, nid in enumerate(nucleus_ids[:len(type_indices)]):
+            all_assignments[nid] = cell_types[int(type_indices[i])]
+
+    import logging as _logging
+    _logging.info("Constrained Hungarian: assigned %d / %d nuclei",
+                  len(all_assignments), len(nuclei_spot_map))
+
+    return NucleusAssignmentResult(
+        assignments=all_assignments,
+        morphology_features=None,
+        classifier=None,
+        assignment_probs=None,
+        method="constrained_hungarian",
+    )
+
+
 def run_nucleus_assignment_mil(
     embeddings: Dict[str, np.ndarray],
     nuclei_spot_map: pd.DataFrame,

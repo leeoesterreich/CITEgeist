@@ -312,27 +312,37 @@ class ConstrainedAssignment:
         proportions_df: pd.DataFrame,
         max_spots: int = 2000,
         purity_threshold: float = 0.5,
+        layout: str = "benchmark",
     ) -> "ConstrainedAssignment":
         """
         Learn class-conditional distributions from high-purity spots.
 
         Args:
-            patches_dir: Directory containing region_*/spot_*_patches.npy files
-            proportions_df: DataFrame with spot_id, region, and celltype columns
+            patches_dir: Directory containing patch files.
+            proportions_df: DataFrame with celltype proportion columns.
+                For "benchmark" layout: must have spot_id, region columns.
+                For "citegeist" layout: must have spot_id column (index or column),
+                    celltype columns only (no region column needed).
             max_spots: Maximum spots to use for training
             purity_threshold: Minimum proportion for "high-purity" spots
+            layout: "benchmark" (region_*/spot_*_patches.npy) or
+                    "citegeist" ({spot_id}_patches.npy flat directory)
 
         Returns:
             self (for chaining)
         """
+        if layout not in ("benchmark", "citegeist"):
+            raise ValueError(f"Unknown layout: {layout}. Use 'benchmark' or 'citegeist'.")
+
         if self.mode == "random":
             logger.info("Random mode - no fitting required")
             self._fitted = True
             return self
 
         # Identify celltype columns
+        non_celltype_cols = {"spot_id", "region"}
         celltype_cols = [
-            c for c in proportions_df.columns if c not in ("spot_id", "region")
+            c for c in proportions_df.columns if c not in non_celltype_cols
         ]
         self.celltype_names = celltype_cols
         n_types = len(celltype_cols)
@@ -342,52 +352,88 @@ class ConstrainedAssignment:
         # Collect features grouped by type
         type_features: Dict[int, List] = {i: [] for i in range(n_types)}
 
-        # Find patch files
+        # Find patch files based on layout
         patches_dir = Path(patches_dir)
-        spot_files = []
-        for region_dir in sorted(patches_dir.glob("region_*")):
-            spot_files.extend(list(region_dir.glob("spot_*_patches.npy")))
-        spot_files = spot_files[:max_spots]
-        logger.info(f"Found {len(spot_files)} patch files")
 
-        for patch_file in spot_files:
-            # Extract spot_id and region
-            region = int(patch_file.parent.name.split("_")[1])
-            stem = patch_file.stem.replace("_patches", "")
-            if stem.startswith("spot_"):
-                spot_id = stem[5:]
+        if layout == "citegeist":
+            spot_files = sorted(patches_dir.glob("*_patches.npy"))[:max_spots]
+            logger.info(f"Found {len(spot_files)} patch files (citegeist layout)")
+
+            # Build spot_id lookup from proportions
+            if "spot_id" in proportions_df.columns:
+                prop_lookup = proportions_df.set_index("spot_id")
             else:
-                spot_id = stem
+                prop_lookup = proportions_df  # assume index is spot_id
 
-            # Match to proportions
-            spot_row = proportions_df[
-                (proportions_df["spot_id"] == spot_id)
-                & (proportions_df["region"] == region)
-            ]
-            if len(spot_row) == 0:
-                continue
+            for patch_file in spot_files:
+                spot_id = patch_file.stem.replace("_patches", "")
 
-            props = spot_row[celltype_cols].values[0]
-
-            dominant = int(np.argmax(props))
-            confidence = props[dominant]
-
-            if confidence < purity_threshold:
-                continue
-
-            # Extract features from patches
-            try:
-                patches = np.load(patch_file).astype(np.float32)
-            except Exception:
-                continue
-
-            for patch in patches[:10]:
-                try:
-                    feats = extract_patch_features(patch)
-                    if not np.any(np.isnan(feats)):
-                        type_features[dominant].append(feats)
-                except Exception:
+                if spot_id not in prop_lookup.index:
                     continue
+
+                props = prop_lookup.loc[spot_id, celltype_cols].values.astype(float)
+                dominant = int(np.argmax(props))
+                confidence = props[dominant]
+
+                if confidence < purity_threshold:
+                    continue
+
+                try:
+                    patches = np.load(patch_file).astype(np.float32)
+                except (IOError, ValueError) as e:
+                    logger.warning(f"Failed to load {patch_file}: {e}")
+                    continue
+
+                for patch in patches[:10]:
+                    try:
+                        feats = extract_patch_features(patch)
+                        if not np.any(np.isnan(feats)):
+                            type_features[dominant].append(feats)
+                    except (ValueError, IndexError):
+                        continue
+        else:
+            # benchmark layout: region_*/spot_*_patches.npy
+            spot_files = []
+            for region_dir in sorted(patches_dir.glob("region_*")):
+                spot_files.extend(list(region_dir.glob("spot_*_patches.npy")))
+            spot_files = spot_files[:max_spots]
+            logger.info(f"Found {len(spot_files)} patch files (benchmark layout)")
+
+            for patch_file in spot_files:
+                region = int(patch_file.parent.name.split("_")[1])
+                stem = patch_file.stem.replace("_patches", "")
+                if stem.startswith("spot_"):
+                    spot_id = stem[5:]
+                else:
+                    spot_id = stem
+
+                spot_row = proportions_df[
+                    (proportions_df["spot_id"] == spot_id)
+                    & (proportions_df["region"] == region)
+                ]
+                if len(spot_row) == 0:
+                    continue
+
+                props = spot_row[celltype_cols].values[0]
+                dominant = int(np.argmax(props))
+                confidence = props[dominant]
+
+                if confidence < purity_threshold:
+                    continue
+
+                try:
+                    patches = np.load(patch_file).astype(np.float32)
+                except (IOError, ValueError) as e:
+                    logger.warning(f"Failed to load {patch_file}: {e}")
+                    continue
+
+                for patch in patches[:10]:
+                    try:
+                        feats = extract_patch_features(patch)
+                        if not np.any(np.isnan(feats)):
+                            type_features[dominant].append(feats)
+                    except (ValueError, IndexError):
+                        continue
 
         # Fit scaler on all features
         all_features = []

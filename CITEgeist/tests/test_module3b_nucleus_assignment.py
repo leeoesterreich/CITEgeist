@@ -197,6 +197,151 @@ def test_run_nucleus_assignment_with_cell_features():
     assert 'nc_ratio' in result.morphology_features.columns
 
 
+def test_constrained_hungarian_dapi(tmp_path):
+    """Test constrained Hungarian assignment with synthetic DAPI patches."""
+    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_constrained
+
+    np.random.seed(42)
+    cell_types = ['TypeA', 'TypeB', 'TypeC']
+    n_spots = 20
+    n_nuclei_per_spot = 5
+
+    # Create synthetic patches (2-channel, 48x48) per spot
+    nuclei_records = []
+    for i in range(n_spots):
+        spot_id = f"spot_{i}"
+        patches = np.random.rand(n_nuclei_per_spot, 2, 48, 48).astype(np.float32)
+        # Make TypeA-dominant spots brighter in DAPI
+        if i < 10:
+            patches[:, 0, :, :] += 2.0  # brighter DAPI
+        np.save(tmp_path / f"{spot_id}_patches.npy", patches)
+        nuc_ids = np.arange(i * n_nuclei_per_spot, (i + 1) * n_nuclei_per_spot)
+        np.save(tmp_path / f"{spot_id}_nucleus_ids.npy", nuc_ids)
+
+        for nid in nuc_ids:
+            nuclei_records.append({'nucleus_id': nid, 'spot_id': spot_id})
+
+    nuclei_spot_map = pd.DataFrame(nuclei_records)
+
+    # Proportions: first 10 spots are TypeA-dominant, rest are TypeB-dominant
+    prop_data = []
+    for i in range(n_spots):
+        if i < 10:
+            prop_data.append({'spot_id': f"spot_{i}", 'TypeA': 0.6, 'TypeB': 0.2, 'TypeC': 0.2})
+        else:
+            prop_data.append({'spot_id': f"spot_{i}", 'TypeA': 0.2, 'TypeB': 0.6, 'TypeC': 0.2})
+    proportions = pd.DataFrame(prop_data)
+
+    nuclei_counts = pd.Series(
+        [n_nuclei_per_spot] * n_spots,
+        index=[f"spot_{i}" for i in range(n_spots)]
+    )
+
+    result = run_nucleus_assignment_constrained(
+        patches_dir=str(tmp_path),
+        nuclei_spot_map=nuclei_spot_map,
+        proportions=proportions,
+        nuclei_counts=nuclei_counts,
+        cell_types=cell_types,
+        purity_threshold=0.5,
+    )
+
+    assert isinstance(result, NucleusAssignmentResult)
+    assert result.method == "constrained_hungarian"
+    assert len(result.assignments) > 0
+    # All assignments should be valid cell types
+    for nid, ctype in result.assignments.items():
+        assert ctype in cell_types
+
+
+def test_constrained_hungarian_no_patches(tmp_path):
+    """Test constrained Hungarian with empty patches dir raises ValueError."""
+    from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment_constrained
+
+    nuclei_spot_map = pd.DataFrame({
+        'nucleus_id': [1, 2],
+        'spot_id': ['spot_0', 'spot_0'],
+    })
+    proportions = pd.DataFrame({
+        'spot_id': ['spot_0'],
+        'TypeA': [0.5],
+        'TypeB': [0.5],
+    })
+    nuclei_counts = pd.Series([2], index=['spot_0'])
+
+    with pytest.raises(ValueError, match="No features collected"):
+        run_nucleus_assignment_constrained(
+            patches_dir=str(tmp_path),
+            nuclei_spot_map=nuclei_spot_map,
+            proportions=proportions,
+            nuclei_counts=nuclei_counts,
+            cell_types=['TypeA', 'TypeB'],
+        )
+
+
+def test_single_cell_adata_with_none_morphology():
+    """Test create_single_cell_adata handles morphology_features=None."""
+    from CITEgeist.model.single_cell_output import create_single_cell_adata
+
+    cell_gex = pd.DataFrame(
+        np.random.rand(3, 5),
+        index=[1, 2, 3],
+        columns=[f'gene_{i}' for i in range(5)],
+    )
+    assignments = {1: 'TypeA', 2: 'TypeB', 3: 'TypeA'}
+
+    adata = create_single_cell_adata(
+        cell_gex=cell_gex,
+        morphology_features=None,
+        assignments=assignments,
+        sample_name='test_sample',
+    )
+
+    assert adata.n_obs == 3
+    assert adata.n_vars == 5
+    assert 'cell_type' in adata.obs.columns
+    assert 'spatial' not in adata.obsm  # No coords without morphology
+    assert adata.uns['source_sample'] == 'test_sample'
+
+
+def test_single_cell_adata_with_morphology():
+    """Test create_single_cell_adata stores morphology in obsm."""
+    from CITEgeist.model.single_cell_output import create_single_cell_adata
+
+    cell_gex = pd.DataFrame(
+        np.random.rand(3, 5),
+        index=[1, 2, 3],
+        columns=[f'gene_{i}' for i in range(5)],
+    )
+    assignments = {1: 'TypeA', 2: 'TypeB', 3: 'TypeA'}
+    morph = pd.DataFrame({
+        'nucleus_id': [1, 2, 3],
+        'spot_id': ['s0', 's0', 's1'],
+        'centroid_x': [10.0, 20.0, 30.0],
+        'centroid_y': [15.0, 25.0, 35.0],
+        'area': [100, 150, 120],
+        'circularity': [0.8, 0.9, 0.85],
+        'eccentricity': [0.3, 0.2, 0.4],
+        'solidity': [0.95, 0.9, 0.92],
+        'major_axis_length': [12.0, 14.0, 13.0],
+        'minor_axis_length': [10.0, 12.0, 11.0],
+        'aspect_ratio': [1.2, 1.17, 1.18],
+    })
+
+    adata = create_single_cell_adata(
+        cell_gex=cell_gex,
+        morphology_features=morph,
+        assignments=assignments,
+        sample_name='test_sample',
+    )
+
+    assert adata.n_obs == 3
+    assert 'spatial' in adata.obsm
+    assert 'morphology' in adata.obsm
+    assert adata.obsm['morphology'].shape[1] == 7  # 7 mask features present
+    assert 'morphology_feature_names' in adata.uns
+
+
 def test_vae_assignment_runs():
     """VAE assignment requires trained models - placeholder test."""
     pytest.skip("Integration test - requires trained models")

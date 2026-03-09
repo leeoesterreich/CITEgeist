@@ -46,7 +46,7 @@ from .segmentation import (
     normalize_nuclei_counts_for_prior,
     save_segmentation_artifacts,
 )
-from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult
+from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult  # noqa: F401
 from .cell_level_gex import distribute_gex_to_cells
 from .single_cell_output import create_single_cell_adata
 from .multimodal_refinement import multimodal_em_refinement
@@ -1949,11 +1949,28 @@ class CitegeistModel:
         self,
         mask: np.ndarray,
         nuclei_spot_map: pd.DataFrame,
+        modality: str,
+        patches_dir: Optional[str] = None,
         nuclei_counts: Optional[pd.Series] = None,
+        # DAPI-specific
+        purity_threshold: float = 0.5,
+        # H&E-specific
+        backbone_checkpoint: Optional[str] = None,
+        mil_checkpoint: Optional[str] = None,
+        n_epochs: int = 100,
+        lambda_prior: float = 1.0,
+        # Common
+        batch_size: int = 64,
+        device: str = "cpu",
+        cell_mask: Optional[np.ndarray] = None,
         save_output: bool = True,
     ) -> 'ad.AnnData':
         """
         Run single-cell resolution pipeline (Module 3b + 3c cell mode).
+
+        Dispatches to modality-specific assignment:
+        - "dapi": Constrained Hungarian with DAPI+boundary morphology features
+        - "he": MIL with backbone embeddings (ImageNet ViT or SimCLR)
 
         Requires:
             - run_cell_proportion_model() has been called (Module 3a)
@@ -1962,23 +1979,59 @@ class CitegeistModel:
         Args:
             mask: Cellpose label mask with nucleus labels
             nuclei_spot_map: DataFrame mapping nucleus_id to spot_id
-            nuclei_counts: Optional nuclei counts per spot. If None, computed from nuclei_spot_map.
-            save_output: Whether to save output h5ad file
+            modality: REQUIRED. "dapi" or "he" — determines assignment method.
+            patches_dir: Directory with per-spot patch .npy files.
+                Required for both modalities.
+            nuclei_counts: Optional nuclei counts per spot.
+                If None, computed from nuclei_spot_map.
+            purity_threshold: (DAPI only) Minimum dominant proportion for
+                high-purity training spots (default 0.5)
+            backbone_checkpoint: (H&E only) Path to pre-trained backbone.
+            mil_checkpoint: (H&E only) Path to pre-trained MIL weights.
+            n_epochs: (H&E only) MIL training epochs.
+            lambda_prior: (H&E only) Proportion prior weight for Hungarian.
+            batch_size: Batch size for feature extraction.
+            device: PyTorch device for inference.
+            cell_mask: Optional cell mask for morphology features.
+            save_output: Whether to save output h5ad file.
 
         Returns:
             AnnData with single-cell expression
         """
         import anndata as ad
+        from .module3b_nucleus_assignment import (
+            run_nucleus_assignment_constrained,
+            run_nucleus_assignment_mil,
+        )
+
+        # Validate modality
+        if modality not in ("dapi", "he"):
+            raise ValueError(
+                f"modality must be 'dapi' or 'he', got '{modality}'. "
+                "DAPI uses constrained Hungarian assignment; "
+                "H&E uses MIL-based assignment."
+            )
+
+        # Validate patches_dir
+        if patches_dir is None:
+            raise ValueError("patches_dir is required for morphology-based assignment.")
+        if not os.path.isdir(patches_dir):
+            raise FileNotFoundError(f"patches_dir does not exist: {patches_dir}")
 
         # Validate prerequisites
-        if 'cell_prop' not in self.results:
+        if 'cell_prop' not in self.results and 'cell_prop_finetuned_results' not in self.results:
             raise RuntimeError("Must run run_cell_proportion_model() first (Module 3a)")
         if 'gene_expression_pass1' not in self.results:
             raise RuntimeError("Must run run_cell_expression_pass1() first (Module 3c)")
 
-        # Get proportions
-        proportions = self.results['cell_prop'].copy()
-        proportions['spot_id'] = proportions.index
+        # Get proportions (prefer finetuned if available)
+        if 'cell_prop_finetuned_results' in self.results:
+            proportions = self.results['cell_prop_finetuned_results'].copy()
+        else:
+            proportions = self.results['cell_prop'].copy()
+
+        if 'spot_id' not in proportions.columns:
+            proportions['spot_id'] = proportions.index
 
         # Get cell types
         cell_types = [c for c in proportions.columns if c != 'spot_id']
@@ -1987,20 +2040,74 @@ class CitegeistModel:
         if nuclei_counts is None:
             nuclei_counts = nuclei_spot_map.groupby('spot_id').size()
 
-        # Run Module 3b: nucleus assignment
-        logging.info("Running Module 3b: Per-nucleus assignment")
-        assignment_result = run_nucleus_assignment(
-            mask=mask,
-            nuclei_spot_map=nuclei_spot_map,
-            proportions=proportions,
-            nuclei_counts=nuclei_counts,
-            cell_types=cell_types,
-        )
+        # --- Dispatch to modality-specific assignment ---
+        if modality == "dapi":
+            logging.info("Module 3b: Constrained Hungarian assignment (DAPI morphology)")
+            assignment_result = run_nucleus_assignment_constrained(
+                patches_dir=patches_dir,
+                nuclei_spot_map=nuclei_spot_map,
+                proportions=proportions,
+                nuclei_counts=nuclei_counts,
+                cell_types=cell_types,
+                purity_threshold=purity_threshold,
+            )
 
-        # Get deconvolved GEX - need to convert from spotwise_profiles dict to DataFrame
+        else:  # he
+            logging.info("Module 3b: MIL-based assignment (H&E backbone)")
+            from .morphology_backbone import HEBackbone
+            import glob as glob_mod
+
+            backbone = HEBackbone(checkpoint=backbone_checkpoint, device=device)
+
+            # Extract embeddings per spot
+            embeddings = {}
+            nuclei_spot_records = []
+
+            patch_files = sorted(glob_mod.glob(os.path.join(patches_dir, "*_patches.npy")))
+            logging.info("Found %d patch files in %s", len(patch_files), patches_dir)
+
+            for pf in patch_files:
+                spot_id = os.path.basename(pf).replace("_patches.npy", "")
+                patches = np.load(pf)
+                if len(patches) == 0:
+                    continue
+
+                emb = backbone.extract_numpy(patches, batch_size=batch_size, device=device)
+                embeddings[spot_id] = emb
+
+                nuc_id_file = os.path.join(patches_dir, f"{spot_id}_nucleus_ids.npy")
+                if os.path.exists(nuc_id_file):
+                    nuc_ids = np.load(nuc_id_file)
+                else:
+                    nuc_ids = [f"{spot_id}_{i}" for i in range(len(patches))]
+
+                for nid in nuc_ids:
+                    nuclei_spot_records.append({
+                        'nucleus_id': nid,
+                        'spot_id': spot_id,
+                    })
+
+            he_nuclei_spot_map = pd.DataFrame(nuclei_spot_records)
+            logging.info("Extracted embeddings for %d spots, %d nuclei",
+                         len(embeddings), len(he_nuclei_spot_map))
+
+            assignment_result = run_nucleus_assignment_mil(
+                embeddings=embeddings,
+                nuclei_spot_map=he_nuclei_spot_map,
+                proportions=proportions,
+                nuclei_counts=nuclei_counts,
+                cell_types=cell_types,
+                n_epochs=n_epochs,
+                lambda_prior=lambda_prior,
+                mil_checkpoint=mil_checkpoint,
+                device=device,
+            )
+            # Use the H&E-discovered nuclei map for downstream GEX distribution
+            nuclei_spot_map = he_nuclei_spot_map
+
+        # --- Build deconvolved GEX DataFrame ---
         spotwise_profiles = self.results['gene_expression_pass1']
 
-        # Build DataFrame with spot:::cell_type index
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary not loaded.")
 
@@ -2019,7 +2126,7 @@ class CitegeistModel:
 
         deconvolved_gex = pd.DataFrame(rows, index=indices, columns=gene_names)
 
-        # Run Module 3c cell mode: distribute GEX
+        # --- Distribute GEX to cells ---
         logging.info("Running Module 3c: Cell-level GEX distribution")
         cell_gex = distribute_gex_to_cells(
             deconvolved_gex=deconvolved_gex,
@@ -2027,13 +2134,14 @@ class CitegeistModel:
             nucleus_spot_map=nuclei_spot_map,
         )
 
-        # Create output AnnData
+        # --- Create output AnnData ---
         adata_sc = create_single_cell_adata(
             cell_gex=cell_gex,
             morphology_features=assignment_result.morphology_features,
             assignments=assignment_result.assignments,
             sample_name=self.sample_name,
             classifier=assignment_result.classifier,
+            assignment_method=assignment_result.method,
         )
 
         # Store result
@@ -2084,7 +2192,20 @@ class CitegeistModel:
 
         Returns:
             DataFrame with columns: nucleus_id, spot_id, cell_type
+
+        .. deprecated::
+            Use ``run_single_cell_resolution(modality=...)`` instead, which
+            produces a full single-cell AnnData with deconvolved GEX.
         """
+        import warnings
+        warnings.warn(
+            "run_single_cell_assignment() is deprecated. "
+            "Use run_single_cell_resolution(modality=...) instead, "
+            "which produces a full single-cell AnnData with deconvolved GEX.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         from .morphology_backbone import DAPIBackbone, HEBackbone
         from .module3b_nucleus_assignment import run_nucleus_assignment_mil
         import glob

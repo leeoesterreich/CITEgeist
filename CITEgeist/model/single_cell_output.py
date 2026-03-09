@@ -7,19 +7,22 @@ from typing import Dict, Optional, Any
 
 def create_single_cell_adata(
     cell_gex: pd.DataFrame,
-    morphology_features: pd.DataFrame,
-    assignments: Dict[int, str],
+    morphology_features: Optional[pd.DataFrame],
+    assignments: Dict,
     sample_name: str,
     classifier: Optional[Any] = None,
     gene_metadata: Optional[pd.DataFrame] = None,
+    assignment_method: str = "hungarian",
 ) -> ad.AnnData:
     """
     Create single-cell AnnData from cell-level expression and metadata.
 
     Args:
         cell_gex: DataFrame indexed by nucleus_id with genes as columns
-        morphology_features: DataFrame with nucleus_id, spot_id, centroid_x/y,
-                            and morphology features
+        morphology_features: Optional DataFrame with nucleus_id, spot_id, centroid_x/y,
+                            and morphology features. Can be None for assignment methods
+                            that don't extract mask-based features (e.g., constrained
+                            Hungarian, MIL).
         assignments: Dict mapping nucleus_id -> cell_type
         sample_name: Sample identifier
         classifier: Optional trained morphology classifier to store
@@ -28,12 +31,7 @@ def create_single_cell_adata(
     Returns:
         AnnData object with single-cell data
     """
-    # Ensure morphology indexed by nucleus_id
-    morph = morphology_features.set_index('nucleus_id')
-
-    # Align indices
     nucleus_ids = cell_gex.index
-    morph = morph.loc[nucleus_ids]
 
     # Build obs DataFrame
     obs = pd.DataFrame(index=nucleus_ids)
@@ -42,19 +40,37 @@ def create_single_cell_adata(
     # Cell type assignments
     obs['cell_type'] = pd.Series(assignments)
 
-    # Spot ID
-    obs['spot_id'] = morph['spot_id']
+    # Extract spatial/morphology info if available
+    if morphology_features is not None:
+        morph = morphology_features.set_index('nucleus_id')
+        morph = morph.reindex(nucleus_ids)
 
-    # Spatial coordinates
-    obs['x'] = morph['centroid_x']
-    obs['y'] = morph['centroid_y']
+        if 'spot_id' in morph.columns:
+            obs['spot_id'] = morph['spot_id']
+        if 'centroid_x' in morph.columns:
+            obs['x'] = morph['centroid_x']
+            obs['y'] = morph['centroid_y']
 
-    # Morphology features
-    morph_cols = ['area', 'circularity', 'eccentricity', 'solidity',
-                  'major_axis_length', 'minor_axis_length', 'aspect_ratio', 'perimeter']
-    for col in morph_cols:
-        if col in morph.columns:
-            obs[col] = morph[col]
+        # Store morphology features in obsm (variable dimensions)
+        # 7-dim mask features or 12-dim cell features
+        mask_morph_cols = ['area', 'circularity', 'eccentricity', 'solidity',
+                          'major_axis_length', 'minor_axis_length', 'aspect_ratio',
+                          'perimeter']
+        cell_morph_cols = [
+            'nucleus_area', 'nucleus_circularity', 'nucleus_eccentricity',
+            'nucleus_solidity', 'nucleus_aspect_ratio',
+            'cell_area', 'cell_circularity', 'cell_eccentricity',
+            'cell_solidity', 'cell_aspect_ratio',
+            'nc_ratio', 'cytoplasm_area',
+        ]
+        # Use whichever feature set is present
+        available_cols = [c for c in (mask_morph_cols + cell_morph_cols) if c in morph.columns]
+        if available_cols:
+            morph_matrix = morph[available_cols].values.astype(np.float32)
+        else:
+            morph_matrix = None
+    else:
+        morph_matrix = None
 
     # Create var DataFrame
     if gene_metadata is not None:
@@ -70,12 +86,18 @@ def create_single_cell_adata(
         var=var,
     )
 
-    # Add spatial coordinates to obsm
-    adata.obsm['spatial'] = np.column_stack([obs['x'].values, obs['y'].values])
+    # Add spatial coordinates to obsm if available
+    if 'x' in obs.columns and 'y' in obs.columns:
+        adata.obsm['spatial'] = np.column_stack([obs['x'].values, obs['y'].values])
+
+    # Add morphology features to obsm if available
+    if morph_matrix is not None:
+        adata.obsm['morphology'] = morph_matrix
+        adata.uns['morphology_feature_names'] = available_cols
 
     # Add metadata to uns
     adata.uns['source_sample'] = sample_name
-    adata.uns['assignment_method'] = 'hungarian'
+    adata.uns['assignment_method'] = assignment_method
     if classifier is not None:
         adata.uns['morphology_classifier'] = classifier
 
