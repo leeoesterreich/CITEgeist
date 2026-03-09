@@ -10,6 +10,51 @@
 
 ---
 
+### Task 0: Add Per-Spot Reconstruction Error to Module 3
+
+**Files:**
+- Modify: `CITEgeist/model/gurobi_impl.py` (the per-spot worker function)
+- Modify: `CITEgeist/model/citegeist_model.py` (save recon error to output)
+- Test: manual verification on one sample
+
+Module 3's Gurobi optimization computes reconstruction error internally (`model.ObjVal`) but never returns it. We need to:
+
+1. **In `gurobi_impl.py`**: Modify the per-spot worker function (`deconvolute_spot_with_neighbors_with_prior` or equivalent) to return the Gurobi objective value alongside the proportion vector.
+
+2. **In `citegeist_model.py`**: Collect per-spot reconstruction errors and save as a column in the global results CSV (`*_cell_prop_global_results.csv`), adding a `recon_error` column.
+
+3. **Re-run Module 3** on all 12 samples to generate the updated CSVs with reconstruction error.
+
+**Step 1: Read `gurobi_impl.py` to identify where `model.ObjVal` is computed**
+
+Find the per-spot optimization function that calls `model.optimize()` and access `model.ObjVal`. Modify the return to include this value.
+
+**Step 2: Update the caller in `citegeist_model.py`**
+
+In `run_cell_proportion_model()`, collect the per-spot `ObjVal` into a Series and save alongside proportions.
+
+**Step 3: Re-run Module 3 on all 12 samples**
+
+Use existing `examples/run_module3_unified.py` with the updated code. Submit via SLURM.
+
+**Step 4: Verify reconstruction error column exists**
+
+```bash
+head -1 output/module3_unified/HCC22-088-P1-S1/HCC22-088-P1-S1_cell_prop_global_results.csv
+# Should now include "recon_error" column
+```
+
+**Step 5: Commit**
+
+```bash
+git add CITEgeist/model/gurobi_impl.py CITEgeist/model/citegeist_model.py
+git commit -m "feat: save per-spot reconstruction error from Module 3 optimization"
+```
+
+**Impact on Task 4 (ensemble):** Once recon error is saved in the CSV, the ensemble stage can load it directly instead of computing it post-hoc from binary profiles. Update `stage4_ensemble()` to read `recon_error` from the Module 3 CSV.
+
+---
+
 ### Task 1: Ensemble Proportions Module
 
 **Files:**
@@ -1281,18 +1326,14 @@ git commit -m "feat: add morphology pipeline summary report script"
 ## Task Dependency Chain
 
 ```
-Task 1 (ensemble module + tests)
-  → Task 2 (pipeline script, imports ensemble module)
-    → Task 3 (SLURM script, calls pipeline script)
-      → Task 4 (dry-run test on P1-S1)
-        → Task 5 (summary report after all 12 complete)
+Task 0 (add recon error to Module 3 + re-run)
+  → Task 1 (ensemble module + tests)
+    → Task 2 (pipeline script, imports ensemble module)
+      → Task 3 (SLURM script, calls pipeline script)
+        → Task 4 (dry-run test on P1-S1)
+          → Task 5 (summary report after all 12 complete)
 ```
 
-## Key Risk: Reconstruction Error
+## Note: Reconstruction Error
 
-Module 3 does NOT save per-spot reconstruction error. The pipeline computes it post-hoc from:
-- Original antibody data (loaded from `filtered_feature_bc_matrix.h5`)
-- Profile matrix (from `PROFILE_DICT` binary indicator)
-- Module 3 global proportions
-
-This is a binary profile matrix (1/0), not the optimized beta coefficients from Gurobi. The reconstruction error will be approximate but sufficient for confidence weighting. If needed, we could load the actual beta values from Module 3 checkpoints in a future iteration.
+Task 0 adds per-spot reconstruction error (`model.ObjVal`) directly from Gurobi's optimizer to Module 3 outputs. This uses the actual optimized beta coefficients, not a binary approximation. The ensemble stage reads this directly from the updated CSV.
