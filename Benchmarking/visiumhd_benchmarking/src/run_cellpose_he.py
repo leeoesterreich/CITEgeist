@@ -18,7 +18,7 @@ def get_cellpose_model(model_type: str = 'nuclei', gpu: bool = True):
     """Get or create Cellpose model (singleton).
 
     Args:
-        model_type: Cellpose model type ('nuclei', 'cyto', etc.)
+        model_type: Cellpose model type ('nuclei', 'cyto', 'cpsam', etc.)
         gpu: Use GPU if available
 
     Returns:
@@ -27,7 +27,8 @@ def get_cellpose_model(model_type: str = 'nuclei', gpu: bool = True):
     global _cellpose_model
     if _cellpose_model is None:
         from cellpose import models
-        _cellpose_model = models.Cellpose(model_type=model_type, gpu=gpu)
+        # cellpose v3: models.Cellpose for built-in types (nuclei, cyto, cyto2, cyto3)
+        _cellpose_model = models.Cellpose(gpu=gpu, model_type=model_type)
     return _cellpose_model
 
 
@@ -92,7 +93,7 @@ def segment_tile(
     processed = preprocess_he_for_cellpose(tile)
 
     # Run Cellpose - channels=[0,0] for grayscale
-    masks, flows, styles = model.eval(
+    masks, flows, styles, diams = model.eval(
         processed,
         diameter=diameter,
         channels=[0, 0],
