@@ -1,4 +1,5 @@
 #!/bin/bash
+#SBATCH --cluster=gpu
 #SBATCH --job-name=pc_mil
 #SBATCH --output=Benchmarking/xenium_benchmarking/CITEgeist/slurm/logs/pc_mil_%j.out
 #SBATCH --error=Benchmarking/xenium_benchmarking/CITEgeist/slurm/logs/pc_mil_%j.err

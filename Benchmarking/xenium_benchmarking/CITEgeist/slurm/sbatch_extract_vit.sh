@@ -1,4 +1,5 @@
 #!/bin/bash
+#SBATCH --cluster=gpu
 #SBATCH --job-name=extract_vit
 #SBATCH --output=Benchmarking/xenium_benchmarking/CITEgeist/slurm/logs/extract_vit_%j.out
 #SBATCH --error=Benchmarking/xenium_benchmarking/CITEgeist/slurm/logs/extract_vit_%j.err
