@@ -78,7 +78,7 @@ def test_asymmetric_boost_computed_correctly():
     marker_level_data, marker_names, assignment_matrix, cell_type_names, _ = create_synthetic_data()
 
     # Run optimization (verify it completes without error)
-    Y, beta, marker_beta_dict, alpha = optimize_cell_proportions_per_marker(
+    Y, beta, marker_beta_dict, alpha, _recon_error = optimize_cell_proportions_per_marker(
         marker_level_data=marker_level_data,
         marker_names=marker_names,
         assignment_matrix=assignment_matrix,
@@ -102,7 +102,7 @@ def test_lambda_coverage_zero_is_symmetric():
     """Test that lambda_coverage=0 gives symmetric loss (no marker-count boost)."""
     marker_level_data, marker_names, assignment_matrix, cell_type_names, gt = create_synthetic_data()
 
-    Y_sym, _, _, _ = optimize_cell_proportions_per_marker(
+    Y_sym, _, _, _, _ = optimize_cell_proportions_per_marker(
         marker_level_data=marker_level_data,
         marker_names=marker_names,
         assignment_matrix=assignment_matrix,
@@ -132,7 +132,7 @@ def test_single_marker_celltype_boosted():
     )
 
     # Run with symmetric loss
-    Y_sym, _, _, _ = optimize_cell_proportions_per_marker(
+    Y_sym, _, _, _, _ = optimize_cell_proportions_per_marker(
         marker_level_data=marker_level_data,
         marker_names=marker_names,
         assignment_matrix=assignment_matrix,
@@ -142,7 +142,7 @@ def test_single_marker_celltype_boosted():
     )
 
     # Run with asymmetric loss
-    Y_asym, _, _, _ = optimize_cell_proportions_per_marker(
+    Y_asym, _, _, _, _ = optimize_cell_proportions_per_marker(
         marker_level_data=marker_level_data,
         marker_names=marker_names,
         assignment_matrix=assignment_matrix,
