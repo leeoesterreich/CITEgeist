@@ -84,7 +84,7 @@ CITEgeist achieves strong spot-level cell type proportion estimation (r=0.74 on 
 
 Per-nucleus attention weights (N, K) are averaged to proportions (K,), then multiplied by a learnable **protein profile matrix** (K, M) to reconstruct the spot's protein signal. This creates a self-consistency loop: wrong assignments -> bad reconstruction -> gradient correction.
 
-The protein profile matrix is initialized from Module 2's `cell_profile_dict` (known biology) and allowed to fine-tune during training.
+The protein profile matrix is initialized from Module 2's `cell_profile_dict`. Since `cell_profile_dict` is membership-based (`{cell_type: [marker_list]}`), initialization constructs a binary (K, M) matrix where `profile[k, m] = 1.0` if marker `m` belongs to type `k`, else `0.0`. Marker and cell type ordering must be explicitly aligned with the training data columns. The matrix is then allowed to fine-tune during training to learn continuous profile values.
 
 ### Input Channels
 
@@ -124,9 +124,9 @@ Prevents uniform-assignment collapse. Each nucleus should commit to 1-2 types.
 ```python
 mean_attention = attention.mean(dim=0)  # (K,) = predicted proportions
 active_mask = (true_proportions > 0.01).float()
-L_diversity = -(active_mask * log(mean_attention.clamp(min=0.01) + eps)).sum()
+L_diversity = -(active_mask * log(mean_attention + 0.01)).sum()
 ```
-Prevents dominant-type collapse. If a type is present in the spot, at least some nuclei must be assigned to it. The `clamp(min=0.01)` prevents unbounded gradients as mean_attention approaches 0; combined with `lambda_diversity = 0.05`, this keeps the regularization gentle.
+Prevents dominant-type collapse. If a type is present in the spot, at least some nuclei must be assigned to it. The `+ 0.01` floor prevents log(0) while preserving gradient flow — unlike `clamp(min=0.01)` which would zero the gradient exactly when recovery is needed most. Combined with `lambda_diversity = 0.05`, this keeps the regularization gentle.
 
 ### Combined Loss
 ```python
@@ -198,15 +198,20 @@ During training, the detection mask is **NOT applied** — all types receive gra
 
 ```
 Per spot:
-  1. Detection gate: detected_types = GMM_detection(protein_signal)
+  1. Detection gate: detected = detect_cell_types(X, marker_groups, ...)  # returns (n_spots, n_types) bool
   2. Forward pass: image_features + protein_context -> fused -> per-class gated attention -> logits
-  3. Mask undetected: logits[:, ~detected_types] = -inf
+  3. Mask undetected (with all-false fallback):
+     if detected[spot].any():
+         logits[:, ~detected[spot]] = -inf
+     else:
+         pass  # no masking if detection finds nothing — prevents NaN softmax
   4. Softmax: attention = softmax(logits, dim=1)
   5. Proportions: proportions = attention.mean(dim=0)
   6. Single-cell assignment:
      counts = largest_remainder(proportions, n_nuclei)
-     assignments = hungarian(-attention, counts)
-  7. GEX deconvolution: Module 3 Pass 2 with discrete assignments
+     assignments = hungarian(attention, counts)  # constrained_assignment.py negates internally
+  7. Aggregate to spot counts: spot_counts = assignments.value_counts() per type
+  8. GEX deconvolution: run_cell_expression_pass1(use_discrete_mode=True, cell_counts=spot_counts)
 ```
 
 ### Output Format
@@ -218,9 +223,9 @@ nuc_002    | AACAC.. | Fibroblast| 0.94       | 0.91        | 0.95
 nuc_003    | AACAC.. | Macrophage| 0.45       | 0.38        | 0.67
 ```
 
-- **confidence**: attention weight for assigned type
-- **image_score**: attention from image features alone (diagnostic)
-- **protein_score**: protein proportion for that type (diagnostic)
+- **confidence**: attention weight for assigned type (from softmax output)
+- **image_score**: run a second forward pass with zero protein context; the attention weight for the assigned type measures image-only contribution
+- **protein_score**: `protein_proportions[assigned_type]` — the spot-level protein proportion for that type, measuring how much protein alone supports this assignment
 
 ## Pipeline Integration
 
@@ -292,6 +297,13 @@ def run_pc_mil_assignment(self,
 | No detection mask | Tests if fractional assignment noise hurts |
 | Frozen vs learnable protein profiles | Tests if profile drift helps or hurts |
 
+### Edge Cases
+
+- **Spots with zero nuclei**: Skip entirely — no assignment possible. Output empty rows.
+- **Detection false negatives for rare types**: The all-false fallback (no masking) handles this. Additionally, the diversity loss during training penalizes ignoring present types.
+- **Padded nuclei in variable-length batches**: Mask padded positions in the loss computation — padded nuclei do not contribute to proportion mean or entropy/diversity losses.
+- **Cell type/marker ordering**: Enforce strict ordering alignment at data loading time via explicit column name matching between `protein_props`, `true_props`, detection mask, and profile matrix.
+
 ### Failure Modes to Watch
 
 1. **Protein shortcut**: Model ignores image, echoes protein proportions -> check "no protein conditioning" ablation
@@ -333,9 +345,10 @@ Benchmarking/xenium_benchmarking/CITEgeist/
 
 PC-MIL supersedes `single_cell_mil.py`, `direct_softmax_model.py`, and `proportion_mil.py` for production use. Those files are retained for ablation/historical reference but are not part of the active pipeline going forward.
 
-### No Changes to Existing Files (except bug fix below)
+### Changes to Existing Files
 
-PC-MIL is additive — new files only. Existing pipeline consumed as-is.
+- **`citegeist_model.py`**: Add `run_pc_mil_assignment()` method as new entry point (additive, no existing methods modified)
+- **`test_asymmetric_loss.py`**: Fix 4 unpack sites for API break (bug fix, see below)
 
 ## Bug Fix: Critical #1 (alongside this work)
 
