@@ -100,8 +100,13 @@ def main():
         if patches.ndim == 4 and patches.shape[1] == 2:
             patches = convert_2ch_to_3ch(patches)
 
+        # Resize patches to 224x224 (ViT expects 224x224 input, patches are 96x96)
+        patches_t = torch.from_numpy(patches.astype(np.float32))
+        patches_t = F.interpolate(patches_t, size=(224, 224), mode="bilinear", align_corners=False)
+        patches_resized = patches_t.numpy()
+
         # Extract features
-        features = vit.extract_numpy(patches.astype(np.float32), batch_size=args.batch_size)
+        features = vit.extract_numpy(patches_resized, batch_size=args.batch_size)
         np.save(out_file, features)
         n_processed += 1
 

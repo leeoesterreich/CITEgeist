@@ -11,7 +11,7 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
 
-set -euo pipefail
+set -eo pipefail
 
 echo "=== PC-MIL Benchmark ==="
 echo "Job ID: ${SLURM_JOB_ID}"
@@ -19,9 +19,17 @@ echo "Node: $(hostname)"
 echo "GPU: $(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null || echo 'N/A')"
 date
 
+# Purge default modules to avoid libstdc++ conflicts
+module purge 2>/dev/null || true
+
 # Activate environment
 eval "$(conda shell.bash hook)"
 conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
+
+# Ensure conda's libstdc++ is found before system /lib64
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+
+set -u  # Re-enable nounset after conda activation
 
 # Run benchmark
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist

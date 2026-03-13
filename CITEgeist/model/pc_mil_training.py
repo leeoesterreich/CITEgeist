@@ -27,8 +27,10 @@ def compute_pc_mil_loss(
     observed_protein: torch.Tensor,
     lambda_recon: float = 1.0,
     lambda_entropy: float = 0.1,
-    lambda_diversity: float = 0.05,
+    lambda_diversity: float = 0.5,
     mask: Optional[torch.Tensor] = None,
+    protein_mean: Optional[torch.Tensor] = None,
+    protein_std: Optional[torch.Tensor] = None,
 ) -> Tuple[torch.Tensor, Dict[str, float]]:
     """Compute multi-task PC-MIL loss.
 
@@ -40,8 +42,10 @@ def compute_pc_mil_loss(
         observed_protein: (M,) observed CLR-normalized protein signal
         lambda_recon: Weight for reconstruction loss (default 1.0)
         lambda_entropy: Weight for entropy regularization (default 0.1)
-        lambda_diversity: Weight for diversity loss (default 0.05)
+        lambda_diversity: Weight for diversity loss (default 0.5)
         mask: Optional (N,) bool mask for padded nuclei (True = valid)
+        protein_mean: Optional (M,) mean for z-score normalization
+        protein_std: Optional (M,) std for z-score normalization
 
     Returns:
         total_loss: Scalar loss
@@ -56,8 +60,14 @@ def compute_pc_mil_loss(
     # 1. Proportion loss (MSE)
     l_prop = F.mse_loss(pred_proportions, true_proportions)
 
-    # 2. Protein reconstruction loss (MSE)
-    l_recon = F.mse_loss(reconstructed_protein, observed_protein)
+    # 2. Protein reconstruction loss (MSE on z-scored signals)
+    # Raw protein signals can be ~1e6x larger than proportions, so normalize
+    if protein_mean is not None and protein_std is not None:
+        recon_z = (reconstructed_protein - protein_mean) / (protein_std + eps)
+        obs_z = (observed_protein - protein_mean) / (protein_std + eps)
+        l_recon = F.mse_loss(recon_z, obs_z)
+    else:
+        l_recon = F.mse_loss(reconstructed_protein, observed_protein)
 
     # 3. Entropy regularization (minimize = sharper assignments)
     per_nucleus_entropy = -(attention * torch.log(attention + eps)).sum(dim=1)
@@ -173,9 +183,10 @@ def train_pc_mil(
     weight_decay: float = 1e-4,
     lambda_recon: float = 1.0,
     lambda_entropy: float = 0.1,
-    lambda_diversity: float = 0.05,
+    lambda_diversity: float = 0.5,
     patience: int = 20,
     grad_clip: float = 1.0,
+    recon_warmup_epochs: int = 20,
     device: str = "cpu",
     save_path: Optional[str] = None,
 ) -> Dict[str, list]:
@@ -193,6 +204,7 @@ def train_pc_mil(
         lambda_diversity: Diversity loss weight
         patience: Early stopping patience (epochs without improvement)
         grad_clip: Max gradient norm
+        recon_warmup_epochs: Epochs before reconstruction loss activates (default 20)
         device: 'cuda' or 'cpu'
         save_path: Path to save best model checkpoint
 
@@ -203,6 +215,13 @@ def train_pc_mil(
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=n_epochs, eta_min=1e-5)
 
+    # Compute protein signal normalization stats from training data
+    all_signals = train_dataset.protein_signals  # (n_spots, M)
+    protein_mean = torch.tensor(all_signals.mean(axis=0), dtype=torch.float32, device=device)
+    protein_std = torch.tensor(all_signals.std(axis=0), dtype=torch.float32, device=device)
+    logger.info("Protein signal stats: mean=%.1f, std=%.1f (will z-score in loss)",
+                protein_mean.mean().item(), protein_std.mean().item())
+
     history = {
         "train_loss": [], "val_loss": [], "val_r": [],
         "active_types": [], "mean_entropy": [],
@@ -211,6 +230,10 @@ def train_pc_mil(
     epochs_no_improve = 0
 
     for epoch in range(n_epochs):
+        # Warmup: disable reconstruction loss for first N epochs
+        # so proportion + diversity losses establish multi-type attention
+        epoch_lambda_recon = lambda_recon if epoch >= recon_warmup_epochs else 0.0
+
         # --- Training ---
         model.train()
         epoch_loss = 0.0
@@ -235,9 +258,11 @@ def train_pc_mil(
 
             loss, _ = compute_pc_mil_loss(
                 proportions, true_props, attention, reconstructed, prot_signal,
-                lambda_recon=lambda_recon,
+                lambda_recon=epoch_lambda_recon,
                 lambda_entropy=lambda_entropy,
                 lambda_diversity=lambda_diversity,
+                protein_mean=protein_mean,
+                protein_std=protein_std,
             )
             loss = loss * weight
 
@@ -274,9 +299,11 @@ def train_pc_mil(
 
                 loss, comp = compute_pc_mil_loss(
                     proportions, true_props, attention, reconstructed, prot_signal,
-                    lambda_recon=lambda_recon,
+                    lambda_recon=epoch_lambda_recon,
                     lambda_entropy=lambda_entropy,
                     lambda_diversity=lambda_diversity,
+                    protein_mean=protein_mean,
+                    protein_std=protein_std,
                 )
                 val_loss += loss.item()
 

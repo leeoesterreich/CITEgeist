@@ -11,13 +11,22 @@
 #SBATCH --mail-type=FAIL
 #SBATCH --mail-user=alc376@pitt.edu
 
-set -euo pipefail
+set -eo pipefail
 
 echo "=== ViT Feature Extraction ==="
 date
 
+# Purge default modules to avoid libstdc++ conflicts
+# (python/ondemand-jupyter-python3.8 injects old libstdc++.so.6)
+module purge 2>/dev/null || true
+
 eval "$(conda shell.bash hook)"
 conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
+
+# Ensure conda's libstdc++ is found before system /lib64
+export LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH:-}"
+
+set -u  # Re-enable nounset after conda activation
 
 cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist
 
