@@ -130,8 +130,9 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
     # 6. Cellpose nucleus IDs per spot (from patches_v2)
     nuc_id_dir = REPO_ROOT / f"Benchmarking/xenium_benchmarking/CITEgeist/output/patches_v2/region_{region_id}"
 
-    # 7. ViT features + aligned GT labels per spot
+    # 7. ViT features + morphology sizes + aligned GT labels per spot
     features_per_spot = []
+    morph_per_spot = []
     cell_type_labels = []
 
     for spot_id in spot_ids:
@@ -144,11 +145,18 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
 
         features_per_spot.append(feats)
 
+        # Load morphology size features (3-dim: width, height, area proxy)
+        size_file = nuc_id_dir / f"spot_{spot_id}_sizes.npy"
+        if size_file.exists() and feats.shape[0] > 0:
+            sizes = np.load(size_file).astype(np.float32)  # (N_i, 3)
+        else:
+            sizes = np.zeros((feats.shape[0], 3), dtype=np.float32)
+        morph_per_spot.append(sizes)
+
         # Load Cellpose nucleus IDs (same order as patches/features)
         nuc_id_file = nuc_id_dir / f"spot_{spot_id}_nucleus_ids.npy"
         if nuc_id_file.exists() and feats.shape[0] > 0:
             nuc_ids = np.load(nuc_id_file)
-            # Map each Cellpose nucleus to its spatially-matched GT type
             labels = np.array([
                 cellpose_to_gt.get(int(nid), "Unknown") for nid in nuc_ids
             ])
@@ -159,6 +167,7 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
 
     return {
         "features_per_spot": features_per_spot,
+        "morph_per_spot": morph_per_spot,
         "protein_props": protein_props,
         "protein_signals": protein_signals,
         "true_props": true_props,
@@ -192,6 +201,8 @@ def evaluate_fold(
     total = 0
     per_type = {ct: {"correct": 0, "total": 0} for ct in cell_type_names}
 
+    has_morph = "morph_per_spot" in val_data
+
     for i in range(len(val_data["features_per_spot"])):
         feats = val_data["features_per_spot"][i]
         if len(feats) == 0:
@@ -199,6 +210,10 @@ def evaluate_fold(
 
         img_feats = torch.tensor(feats, dtype=torch.float32)
         prot_props = torch.tensor(val_data["protein_props"][i], dtype=torch.float32)
+
+        morph_feats = None
+        if has_morph:
+            morph_feats = torch.tensor(val_data["morph_per_spot"][i], dtype=torch.float32)
 
         # Detection mask
         detected = val_data.get("detected", np.ones(K, dtype=bool))
@@ -211,6 +226,7 @@ def evaluate_fold(
             protein_proportions=prot_props,
             detected_types=detected,
             cell_type_names=cell_type_names,
+            morph_features=morph_feats,
         )
 
         # Proportion evaluation from discrete assignments
@@ -309,31 +325,38 @@ def main():
         logger.info(f"=== Fold {fold_idx}: train={fold['train']}, val={fold['val']} ===")
 
         # Load data for train/val regions
-        # NOTE: load_region_data must be implemented for actual data layout
-        train_features, train_props, train_signals, train_true = [], [], [], []
+        train_features, train_morph, train_props, train_signals, train_true, train_detected = [], [], [], [], [], []
         for rid in fold["train"]:
             data = load_region_data(rid, features_dir)
             train_features.extend(data["features_per_spot"])
+            train_morph.extend(data["morph_per_spot"])
             train_props.append(data["protein_props"])
             train_signals.append(data["protein_signals"])
             train_true.append(data["true_props"])
+            train_detected.append(data["detected"])
 
         train_props = np.concatenate(train_props)
         train_signals = np.concatenate(train_signals)
         train_true = np.concatenate(train_true)
+        train_detected_arr = np.concatenate(train_detected)
 
         # Inverse frequency weights
         weights = compute_inverse_frequency_weights(train_true)
 
-        train_ds = SpotDataset(train_features, train_props, train_signals, train_true, weights)
+        train_ds = SpotDataset(
+            train_features, train_props, train_signals, train_true, weights,
+            detected_types=train_detected_arr,
+            morph_per_spot=train_morph,
+        )
 
-        # Val — collect per-spot lists, then concatenate arrays for SpotDataset
-        val_features = []
+        # Val — collect per-spot lists
+        val_features, val_morph = [], []
         val_props_list, val_signals_list, val_true_list, val_detected_list = [], [], [], []
         val_labels_list = []
         for rid in fold["val"]:
             data = load_region_data(rid, features_dir)
             val_features.extend(data["features_per_spot"])
+            val_morph.extend(data["morph_per_spot"])
             val_props_list.append(data["protein_props"])
             val_signals_list.append(data["protein_signals"])
             val_true_list.append(data["true_props"])
@@ -345,22 +368,27 @@ def main():
         val_signals = np.concatenate(val_signals_list)
         val_detected = np.concatenate(val_detected_list)
 
-        val_ds = SpotDataset(val_features, val_props, val_signals, val_true)
+        val_ds = SpotDataset(
+            val_features, val_props, val_signals, val_true,
+            detected_types=val_detected,
+            morph_per_spot=val_morph,
+        )
 
         # Build val_data dict for evaluate_fold (per-spot indexing)
         val_data_combined = {
             "features_per_spot": val_features,
-            "protein_props": val_props,   # (n_spots, K) — indexable by spot
-            "true_props": val_true,       # (n_spots, K)
-            "detected": val_detected,     # (n_spots, K) — detection mask
-            "cell_type_labels": val_labels_list,  # per-spot GT from spatial matching
+            "morph_per_spot": val_morph,
+            "protein_props": val_props,
+            "true_props": val_true,
+            "detected": val_detected,
+            "cell_type_labels": val_labels_list,
         }
 
-        # Model
+        # Model (with morphology branch: 3-dim size features)
         K = len(CELL_TYPES)
         M = train_signals.shape[1]
         model = PCMILModel(
-            image_dim=384, n_types=K, n_markers=M,
+            image_dim=384, n_types=K, n_markers=M, morph_dim=3,
         )
 
         save_path = str(output_dir / f"pc_mil_fold{fold_idx}.pt")

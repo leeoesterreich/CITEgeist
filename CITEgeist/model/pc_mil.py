@@ -70,10 +70,12 @@ class PCMILModel(nn.Module):
         hidden_dim: int = 128,
         dropout: float = 0.1,
         init_profile_matrix: Optional[torch.Tensor] = None,
+        morph_dim: int = 0,
     ):
         super().__init__()
         self.n_types = n_types
         self.n_markers = n_markers
+        self.morph_dim = morph_dim
 
         # Image projection: 384 -> 64
         self.image_projection = nn.Sequential(
@@ -88,8 +90,15 @@ class PCMILModel(nn.Module):
             nn.Linear(protein_context_dim, protein_context_dim),
         )
 
+        # Optional morphology feature projection
+        if morph_dim > 0:
+            self.morph_projection = nn.Sequential(
+                nn.Linear(morph_dim, 16),
+                nn.LayerNorm(16),
+            )
+
         # Fused dimension
-        fused_dim = image_proj_dim + protein_context_dim
+        fused_dim = image_proj_dim + protein_context_dim + (16 if morph_dim > 0 else 0)
 
         # Per-class gated attention: K separate gate+score heads
         self.W_gate = nn.ModuleList([
@@ -114,7 +123,10 @@ class PCMILModel(nn.Module):
 
     def _init_weights(self):
         """Xavier initialization for linear layers."""
-        for module in [self.image_projection, self.protein_encoder]:
+        modules_to_init = [self.image_projection, self.protein_encoder]
+        if self.morph_dim > 0:
+            modules_to_init.append(self.morph_projection)
+        for module in modules_to_init:
             for m in module:
                 if isinstance(m, nn.Linear):
                     nn.init.xavier_uniform_(m.weight)
@@ -133,12 +145,14 @@ class PCMILModel(nn.Module):
         self,
         image_features: torch.Tensor,
         protein_proportions: torch.Tensor,
+        morph_features: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass returning pre-softmax logits (for inference masking).
 
         Args:
             image_features: (N, image_dim) pre-extracted ViT features per nucleus
             protein_proportions: (K,) spot-level protein proportions
+            morph_features: Optional (N, morph_dim) morphology features per nucleus
 
         Returns:
             logits: (N, K) pre-softmax logits
@@ -155,8 +169,12 @@ class PCMILModel(nn.Module):
         protein_context = self.protein_encoder(protein_proportions)  # (32,)
         protein_context_broadcast = protein_context.unsqueeze(0).expand(N, -1)  # (N, 32)
 
-        # Fuse: concat image + protein
-        fused = torch.cat([image_emb, protein_context_broadcast], dim=1)  # (N, 96)
+        # Fuse: concat image + protein (+ optional morphology)
+        if morph_features is not None and self.morph_dim > 0:
+            morph_emb = self.morph_projection(morph_features)  # (N, 16)
+            fused = torch.cat([image_emb, protein_context_broadcast, morph_emb], dim=1)
+        else:
+            fused = torch.cat([image_emb, protein_context_broadcast], dim=1)  # (N, 96)
 
         # Per-class gated attention
         logits_list = []
@@ -184,12 +202,14 @@ class PCMILModel(nn.Module):
         self,
         image_features: torch.Tensor,
         protein_proportions: torch.Tensor,
+        morph_features: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass for a single spot.
 
         Args:
             image_features: (N, image_dim) pre-extracted ViT features per nucleus
             protein_proportions: (K,) spot-level protein proportions
+            morph_features: Optional (N, morph_dim) morphology features per nucleus
 
         Returns:
             proportions: (K,) predicted spot-level proportions
@@ -197,6 +217,6 @@ class PCMILModel(nn.Module):
             reconstructed: (M,) reconstructed protein signal
         """
         _, attention, proportions, reconstructed = self.forward_with_logits(
-            image_features, protein_proportions,
+            image_features, protein_proportions, morph_features=morph_features,
         )
         return proportions, attention, reconstructed
