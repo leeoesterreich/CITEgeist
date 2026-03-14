@@ -47,6 +47,7 @@ logger = logging.getLogger(__name__)
 
 # Data paths
 PSEUDOVISIUM_DIR = REPO_ROOT / "Benchmarking/xenium_pseudovisium/data_protein_gt"
+CELLPOSE_XENIUM_MATCHES = REPO_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output/vae_sinkhorn_2ch/evaluation_singlecell/cellpose_xenium_matches.csv"
 HYBRID_OUTPUT_DIR = REPO_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output/hybrid_detection_filter"
 
 # Cell types (achievable-7 for Xenium)
@@ -65,8 +66,18 @@ FOLDS = [
 ]
 
 
+def _load_cellpose_xenium_matches() -> pd.DataFrame:
+    """Load and cache Cellpose-to-Xenium spatial matching (86% match rate <10px)."""
+    if not hasattr(_load_cellpose_xenium_matches, "_cache"):
+        _load_cellpose_xenium_matches._cache = pd.read_csv(CELLPOSE_XENIUM_MATCHES)
+    return _load_cellpose_xenium_matches._cache
+
+
 def load_region_data(region_id: int, features_dir: Path) -> Dict:
     """Load all data for one pseudo-Visium region.
+
+    Uses Cellpose nucleus IDs from patches_v2 to align ViT features with
+    spatially-matched Xenium GT labels (cellpose_xenium_matches.csv).
 
     Returns dict with keys:
         features_per_spot: List of (N_i, 384) arrays per spot
@@ -91,7 +102,6 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
     hybrid_dir = HYBRID_OUTPUT_DIR / region_name
     prop_path = hybrid_dir / f"{region_name}_cell_prop_finetuned_results.csv"
     prop_df = pd.read_csv(prop_path, index_col=0)
-    # Align to ground truth spot order
     prop_df = prop_df.reindex(spot_ids)
     protein_props = prop_df[CELL_TYPES].values  # (n_spots, K)
 
@@ -104,19 +114,23 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
     # 4. CLR-normalized protein signals from CITE h5ad
     cite_path = PSEUDOVISIUM_DIR / "h5ad_objects" / f"{region_name}_CITE.h5ad"
     cite_adata = sc.read_h5ad(cite_path)
-    # Align to spot order
     cite_adata = cite_adata[spot_ids, :]
     protein_signals = cite_adata.X.copy()
     if hasattr(protein_signals, 'toarray'):
         protein_signals = protein_signals.toarray()
     protein_signals = np.array(protein_signals, dtype=np.float32)  # (n_spots, M)
 
-    # 5. Cell-to-spot mapping and cell type labels
-    mapping_df = pd.read_csv(PSEUDOVISIUM_DIR / "cell_to_spot_mapping.csv", index_col=0)
-    ct_df = pd.read_csv(PSEUDOVISIUM_DIR / "cell_type_assignments.csv", index_col=0)
-    region_mapping = mapping_df[mapping_df["region_id"] == region_id]
+    # 5. Cellpose-to-Xenium spatial matches for per-nucleus GT labels
+    matches_df = _load_cellpose_xenium_matches()
+    region_matches = matches_df[matches_df["region"] == region_id].copy()
+    # Build cellpose_id → gt_type lookup (only close matches with known GT)
+    close_matches = region_matches[region_matches["distance"] < 15.0]
+    cellpose_to_gt = dict(zip(close_matches["cellpose_id"], close_matches["gt_type"]))
 
-    # 6. ViT features per spot
+    # 6. Cellpose nucleus IDs per spot (from patches_v2)
+    nuc_id_dir = REPO_ROOT / f"Benchmarking/xenium_benchmarking/CITEgeist/output/patches_v2/region_{region_id}"
+
+    # 7. ViT features + aligned GT labels per spot
     features_per_spot = []
     cell_type_labels = []
 
@@ -126,17 +140,21 @@ def load_region_data(region_id: int, features_dir: Path) -> Dict:
         if feat_file.exists():
             feats = np.load(feat_file)  # (N_i, 384)
         else:
-            # Fallback: empty features (spot will be skipped)
             feats = np.zeros((0, 384), dtype=np.float32)
 
         features_per_spot.append(feats)
 
-        # Get GT labels for nuclei in this spot
-        spot_cells = region_mapping[region_mapping["spot_id"] == spot_id]
-        cell_ids = spot_cells.index
-        labels = ct_df.loc[ct_df.index.isin(cell_ids), "cell_type"].values
-        # Filter to known types only
-        labels = np.array([l if l in CELL_TYPES else "Unknown" for l in labels])
+        # Load Cellpose nucleus IDs (same order as patches/features)
+        nuc_id_file = nuc_id_dir / f"spot_{spot_id}_nucleus_ids.npy"
+        if nuc_id_file.exists() and feats.shape[0] > 0:
+            nuc_ids = np.load(nuc_id_file)
+            # Map each Cellpose nucleus to its spatially-matched GT type
+            labels = np.array([
+                cellpose_to_gt.get(int(nid), "Unknown") for nid in nuc_ids
+            ])
+        else:
+            labels = np.array(["Unknown"] * feats.shape[0])
+
         cell_type_labels.append(labels)
 
     return {
@@ -158,17 +176,21 @@ def evaluate_fold(
 ) -> Dict:
     """Evaluate model on validation fold.
 
-    Evaluates proportion-level metrics (Pearson r, per-type r, RMSE).
-    Note: per-nucleus single-cell accuracy is NOT computed because Cellpose
-    nuclei (used for patches/features) cannot be reliably aligned to Xenium
-    cells (used for GT labels) — they come from different segmentation
-    pipelines with different nucleus counts per spot.
+    Evaluates both:
+    - Proportion-level: Pearson r, per-type r, RMSE
+    - Single-cell: accuracy using spatially-matched Cellpose-to-Xenium GT labels
+      (only evaluates nuclei with known GT, skips "Unknown")
     """
     model.eval()
 
     all_pred_props = []
     all_true_props = []
     K = len(cell_type_names)
+
+    # Single-cell accuracy tracking
+    correct = 0
+    total = 0
+    per_type = {ct: {"correct": 0, "total": 0} for ct in cell_type_names}
 
     for i in range(len(val_data["features_per_spot"])):
         feats = val_data["features_per_spot"][i]
@@ -199,6 +221,22 @@ def evaluate_fold(
         all_pred_props.append(pred_p)
         all_true_props.append(val_data["true_props"][i])
 
+        # Single-cell accuracy (using spatially-matched GT labels)
+        if "cell_type_labels" in val_data:
+            gt_labels = val_data["cell_type_labels"][i]
+            pred_labels = result_df["cell_type"].values
+            for j in range(min(len(gt_labels), len(pred_labels))):
+                gt = gt_labels[j]
+                if gt == "Unknown" or gt not in cell_type_names:
+                    continue  # Skip unmatched/unknown nuclei
+                total += 1
+                pred = pred_labels[j]
+                if gt == pred:
+                    correct += 1
+                per_type[gt]["total"] += 1
+                if gt == pred:
+                    per_type[gt]["correct"] += 1
+
     # Stack for vectorized metrics
     pred_arr = np.array(all_pred_props)  # (n_spots, K)
     true_arr = np.array(all_true_props)  # (n_spots, K)
@@ -211,7 +249,7 @@ def evaluate_fold(
     else:
         prop_r = 0.0
 
-    # Per-type Pearson r (column-wise correlation)
+    # Per-type Pearson r
     per_type_r = {}
     for k, ct in enumerate(cell_type_names):
         p = pred_arr[:, k]
@@ -224,11 +262,22 @@ def evaluate_fold(
     # RMSE
     rmse = float(np.sqrt(np.mean((pred_arr - true_arr) ** 2)))
 
+    # Single-cell accuracy
+    sc_accuracy = correct / total if total > 0 else 0.0
+    per_type_acc = {}
+    for ct in cell_type_names:
+        t = per_type[ct]["total"]
+        c = per_type[ct]["correct"]
+        per_type_acc[ct] = c / t if t > 0 else 0.0
+
     return {
         "proportion_r": prop_r,
         "per_type_r": per_type_r,
         "rmse": rmse,
+        "single_cell_accuracy": sc_accuracy,
+        "per_type_accuracy": per_type_acc,
         "n_spots": len(all_pred_props),
+        "n_evaluated_cells": total,
     }
 
 
@@ -340,7 +389,9 @@ def main():
         all_results.append(fold_results)
 
         logger.info(f"Fold {fold_idx}: prop_r={fold_results['proportion_r']:.4f}, "
-                     f"rmse={fold_results['rmse']:.4f}")
+                     f"rmse={fold_results['rmse']:.4f}, "
+                     f"sc_acc={fold_results['single_cell_accuracy']:.4f} "
+                     f"({fold_results['n_evaluated_cells']} cells)")
 
         # Save fold results
         with open(output_dir / f"fold{fold_idx}_results.json", "w") as f:
@@ -351,18 +402,25 @@ def main():
     if all_results:
         mean_r = np.mean([r["proportion_r"] for r in all_results])
         mean_rmse = np.mean([r["rmse"] for r in all_results])
-        logger.info(f"=== SUMMARY: mean_prop_r={mean_r:.4f}, mean_rmse={mean_rmse:.4f} ===")
+        mean_sc_acc = np.mean([r["single_cell_accuracy"] for r in all_results])
+        total_cells = sum(r["n_evaluated_cells"] for r in all_results)
+        logger.info(f"=== SUMMARY: mean_prop_r={mean_r:.4f}, mean_rmse={mean_rmse:.4f}, "
+                     f"mean_sc_acc={mean_sc_acc:.4f} ({total_cells} cells) ===")
 
-        # Aggregate per-type r across folds
+        # Aggregate per-type metrics across folds
         agg_per_type_r = {}
+        agg_per_type_acc = {}
         for ct in CELL_TYPES:
-            vals = [r["per_type_r"].get(ct, 0.0) for r in all_results]
-            agg_per_type_r[ct] = float(np.mean(vals))
+            agg_per_type_r[ct] = float(np.mean([r["per_type_r"].get(ct, 0.0) for r in all_results]))
+            agg_per_type_acc[ct] = float(np.mean([r["per_type_accuracy"].get(ct, 0.0) for r in all_results]))
 
         summary = {
             "mean_proportion_r": float(mean_r),
             "mean_rmse": float(mean_rmse),
+            "mean_single_cell_accuracy": float(mean_sc_acc),
+            "n_evaluated_cells": total_cells,
             "per_type_r": agg_per_type_r,
+            "per_type_accuracy": agg_per_type_acc,
             "folds": [{k: v for k, v in r.items() if k != "history"} for r in all_results],
         }
         with open(output_dir / "summary.json", "w") as f:
