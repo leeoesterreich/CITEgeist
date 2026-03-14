@@ -158,17 +158,17 @@ def evaluate_fold(
 ) -> Dict:
     """Evaluate model on validation fold.
 
-    Returns dict with proportion_r, single_cell_accuracy, per_type_accuracy.
-    Uses pc_mil_infer_spot for both proportion and single-cell evaluation
-    to ensure consistency (detection masking applied uniformly).
+    Evaluates proportion-level metrics (Pearson r, per-type r, RMSE).
+    Note: per-nucleus single-cell accuracy is NOT computed because Cellpose
+    nuclei (used for patches/features) cannot be reliably aligned to Xenium
+    cells (used for GT labels) — they come from different segmentation
+    pipelines with different nucleus counts per spot.
     """
     model.eval()
 
     all_pred_props = []
     all_true_props = []
-    correct = 0
-    total = 0
-    per_type = {ct: {"correct": 0, "total": 0} for ct in cell_type_names}
+    K = len(cell_type_names)
 
     for i in range(len(val_data["features_per_spot"])):
         feats = val_data["features_per_spot"][i]
@@ -179,7 +179,7 @@ def evaluate_fold(
         prot_props = torch.tensor(val_data["protein_props"][i], dtype=torch.float32)
 
         # Detection mask
-        detected = val_data.get("detected", np.ones(len(cell_type_names), dtype=bool))
+        detected = val_data.get("detected", np.ones(K, dtype=bool))
         if detected.ndim == 2:
             detected = detected[i]
 
@@ -191,55 +191,44 @@ def evaluate_fold(
             cell_type_names=cell_type_names,
         )
 
-        # Proportion evaluation — derive from inference attention (consistent masking)
-        # Count assigned types to get predicted proportions
+        # Proportion evaluation from discrete assignments
         type_counts = result_df["cell_type"].value_counts()
-        pred_p = np.zeros(len(cell_type_names))
+        pred_p = np.zeros(K)
         for k, ct in enumerate(cell_type_names):
             pred_p[k] = type_counts.get(ct, 0) / len(result_df)
         all_pred_props.append(pred_p)
         all_true_props.append(val_data["true_props"][i])
 
-        # Single-cell accuracy (if GT labels available)
-        if "cell_type_labels" in val_data:
-            gt_labels = val_data["cell_type_labels"][i]
-            pred_labels = result_df["cell_type"].values
-            for j in range(len(gt_labels)):
-                if j < len(pred_labels):
-                    total += 1
-                    gt = gt_labels[j]
-                    pred = pred_labels[j]
-                    if gt == pred:
-                        correct += 1
-                    if gt in per_type:
-                        per_type[gt]["total"] += 1
-                        if gt == pred:
-                            per_type[gt]["correct"] += 1
+    # Stack for vectorized metrics
+    pred_arr = np.array(all_pred_props)  # (n_spots, K)
+    true_arr = np.array(all_true_props)  # (n_spots, K)
 
-    # Proportion Pearson r
-    pred_flat = np.concatenate(all_pred_props)
-    true_flat = np.concatenate(all_true_props)
+    # Overall Pearson r (flattened)
+    pred_flat = pred_arr.flatten()
+    true_flat = true_arr.flatten()
     if pred_flat.std() > 0 and true_flat.std() > 0:
         prop_r = float(np.corrcoef(pred_flat, true_flat)[0, 1])
     else:
         prop_r = 0.0
 
-    sc_accuracy = correct / total if total > 0 else 0.0
-    random_accuracy = 1.0 / len(cell_type_names) if total > 0 else 0.0
+    # Per-type Pearson r (column-wise correlation)
+    per_type_r = {}
+    for k, ct in enumerate(cell_type_names):
+        p = pred_arr[:, k]
+        t = true_arr[:, k]
+        if p.std() > 0 and t.std() > 0:
+            per_type_r[ct] = float(np.corrcoef(p, t)[0, 1])
+        else:
+            per_type_r[ct] = 0.0
 
-    per_type_acc = {}
-    for ct in cell_type_names:
-        t = per_type[ct]["total"]
-        c = per_type[ct]["correct"]
-        per_type_acc[ct] = c / t if t > 0 else 0.0
+    # RMSE
+    rmse = float(np.sqrt(np.mean((pred_arr - true_arr) ** 2)))
 
     return {
         "proportion_r": prop_r,
-        "single_cell_accuracy": sc_accuracy,
-        "random_accuracy": random_accuracy,
-        "per_type_accuracy": per_type_acc,
+        "per_type_r": per_type_r,
+        "rmse": rmse,
         "n_spots": len(all_pred_props),
-        "n_cells": total,
     }
 
 
@@ -291,20 +280,19 @@ def main():
 
         # Val — collect per-spot lists, then concatenate arrays for SpotDataset
         val_features = []
-        val_props_list, val_signals_list, val_true_list = [], [], []
-        val_labels_list = []
+        val_props_list, val_signals_list, val_true_list, val_detected_list = [], [], [], []
         for rid in fold["val"]:
             data = load_region_data(rid, features_dir)
             val_features.extend(data["features_per_spot"])
             val_props_list.append(data["protein_props"])
             val_signals_list.append(data["protein_signals"])
             val_true_list.append(data["true_props"])
-            if "cell_type_labels" in data:
-                val_labels_list.extend(data["cell_type_labels"])
+            val_detected_list.append(data["detected"])
 
         val_props = np.concatenate(val_props_list)
         val_true = np.concatenate(val_true_list)
         val_signals = np.concatenate(val_signals_list)
+        val_detected = np.concatenate(val_detected_list)
 
         val_ds = SpotDataset(val_features, val_props, val_signals, val_true)
 
@@ -313,9 +301,8 @@ def main():
             "features_per_spot": val_features,
             "protein_props": val_props,   # (n_spots, K) — indexable by spot
             "true_props": val_true,       # (n_spots, K)
+            "detected": val_detected,     # (n_spots, K) — detection mask
         }
-        if val_labels_list:
-            val_data_combined["cell_type_labels"] = val_labels_list
 
         # Model
         K = len(CELL_TYPES)
@@ -353,7 +340,7 @@ def main():
         all_results.append(fold_results)
 
         logger.info(f"Fold {fold_idx}: prop_r={fold_results['proportion_r']:.4f}, "
-                     f"sc_acc={fold_results['single_cell_accuracy']:.4f}")
+                     f"rmse={fold_results['rmse']:.4f}")
 
         # Save fold results
         with open(output_dir / f"fold{fold_idx}_results.json", "w") as f:
@@ -363,12 +350,19 @@ def main():
     # Summary
     if all_results:
         mean_r = np.mean([r["proportion_r"] for r in all_results])
-        mean_acc = np.mean([r["single_cell_accuracy"] for r in all_results])
-        logger.info(f"=== SUMMARY: mean_prop_r={mean_r:.4f}, mean_sc_acc={mean_acc:.4f} ===")
+        mean_rmse = np.mean([r["rmse"] for r in all_results])
+        logger.info(f"=== SUMMARY: mean_prop_r={mean_r:.4f}, mean_rmse={mean_rmse:.4f} ===")
+
+        # Aggregate per-type r across folds
+        agg_per_type_r = {}
+        for ct in CELL_TYPES:
+            vals = [r["per_type_r"].get(ct, 0.0) for r in all_results]
+            agg_per_type_r[ct] = float(np.mean(vals))
 
         summary = {
             "mean_proportion_r": float(mean_r),
-            "mean_single_cell_accuracy": float(mean_acc),
+            "mean_rmse": float(mean_rmse),
+            "per_type_r": agg_per_type_r,
             "folds": [{k: v for k, v in r.items() if k != "history"} for r in all_results],
         }
         with open(output_dir / "summary.json", "w") as f:
