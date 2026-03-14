@@ -252,8 +252,9 @@ def main():
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--lambda-recon", type=float, default=1.0)
     parser.add_argument("--lambda-entropy", type=float, default=0.1)
-    parser.add_argument("--lambda-diversity", type=float, default=0.05)
-    parser.add_argument("--patience", type=int, default=20)
+    parser.add_argument("--lambda-diversity", type=float, default=0.5)
+    parser.add_argument("--lambda-hungarian", type=float, default=1.0)
+    parser.add_argument("--patience", type=int, default=30)
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--fold", type=int, default=None, help="Run single fold (0-4)")
     args = parser.parse_args()
@@ -334,6 +335,7 @@ def main():
             lambda_recon=args.lambda_recon,
             lambda_entropy=args.lambda_entropy,
             lambda_diversity=args.lambda_diversity,
+            lambda_hungarian=args.lambda_hungarian,
             patience=args.patience,
             device=args.device,
             save_path=save_path,

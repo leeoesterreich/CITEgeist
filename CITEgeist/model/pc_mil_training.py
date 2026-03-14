@@ -1,7 +1,7 @@
 """Training pipeline for Protein-Conditioned MIL.
 
 Provides:
-- compute_pc_mil_loss(): Multi-task loss with 4 components
+- compute_pc_mil_loss(): Multi-task loss with 5 components (incl. Hungarian)
 - SpotDataset: PyTorch dataset for spot-level training data
 - train_pc_mil(): Full training loop with early stopping
 """
@@ -12,11 +12,71 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from scipy.optimize import linear_sum_assignment
 from torch.utils.data import Dataset
 
 from .pc_mil import PCMILModel
 
 logger = logging.getLogger(__name__)
+
+
+def _hungarian_pseudo_labels(
+    attention_np: np.ndarray,
+    true_proportions_np: np.ndarray,
+    n_nuclei: int,
+) -> np.ndarray:
+    """Generate per-nucleus pseudo-labels via constrained Hungarian assignment.
+
+    Uses GT proportions to determine how many nuclei should be assigned to each
+    type, then solves optimal assignment using attention as affinity.
+
+    Args:
+        attention_np: (N, K) attention weights (higher = more affinity)
+        true_proportions_np: (K,) ground truth proportions
+        n_nuclei: number of nuclei N
+
+    Returns:
+        (N,) integer labels in [0, K)
+    """
+    K = len(true_proportions_np)
+    N = n_nuclei
+
+    # Convert proportions to integer counts (largest remainder method)
+    raw_counts = true_proportions_np * N
+    floor_counts = np.floor(raw_counts).astype(int)
+    remainder = raw_counts - floor_counts
+    deficit = N - floor_counts.sum()
+    if deficit > 0:
+        top_idx = np.argsort(-remainder)[:int(deficit)]
+        floor_counts[top_idx] += 1
+    counts = floor_counts
+
+    # Build expanded cost matrix for Hungarian
+    # Replicate each type column by its count
+    col_to_type = []
+    for k in range(K):
+        col_to_type.extend([k] * counts[k])
+
+    if len(col_to_type) != N:
+        # Edge case: rounding mismatch — adjust last type
+        diff = N - len(col_to_type)
+        if diff > 0:
+            col_to_type.extend([np.argmax(counts)] * diff)
+        else:
+            col_to_type = col_to_type[:N]
+
+    col_to_type = np.array(col_to_type)
+
+    # Cost = negative log attention (minimize cost = maximize attention)
+    cost_matrix = -np.log(attention_np + 1e-8)  # (N, K)
+    # Expand to (N, N) using col_to_type mapping
+    expanded_cost = cost_matrix[:, col_to_type]  # (N, N)
+
+    # Solve
+    row_ind, col_ind = linear_sum_assignment(expanded_cost)
+    labels = col_to_type[col_ind]
+
+    return labels
 
 
 def compute_pc_mil_loss(
@@ -28,6 +88,8 @@ def compute_pc_mil_loss(
     lambda_recon: float = 1.0,
     lambda_entropy: float = 0.1,
     lambda_diversity: float = 0.5,
+    lambda_hungarian: float = 0.0,
+    logits: Optional[torch.Tensor] = None,
     mask: Optional[torch.Tensor] = None,
     protein_mean: Optional[torch.Tensor] = None,
     protein_std: Optional[torch.Tensor] = None,
@@ -43,6 +105,8 @@ def compute_pc_mil_loss(
         lambda_recon: Weight for reconstruction loss (default 1.0)
         lambda_entropy: Weight for entropy regularization (default 0.1)
         lambda_diversity: Weight for diversity loss (default 0.5)
+        lambda_hungarian: Weight for Hungarian CE loss (default 0.0 = off)
+        logits: Optional (N, K) pre-softmax logits (required if lambda_hungarian > 0)
         mask: Optional (N,) bool mask for padded nuclei (True = valid)
         protein_mean: Optional (M,) mean for z-score normalization
         protein_std: Optional (M,) std for z-score normalization
@@ -56,12 +120,13 @@ def compute_pc_mil_loss(
     # Apply padding mask if provided
     if mask is not None:
         attention = attention[mask]
+        if logits is not None:
+            logits = logits[mask]
 
     # 1. Proportion loss (MSE)
     l_prop = F.mse_loss(pred_proportions, true_proportions)
 
     # 2. Protein reconstruction loss (MSE on z-scored signals)
-    # Raw protein signals can be ~1e6x larger than proportions, so normalize
     if protein_mean is not None and protein_std is not None:
         recon_z = (reconstructed_protein - protein_mean) / (protein_std + eps)
         obs_z = (observed_protein - protein_mean) / (protein_std + eps)
@@ -74,19 +139,34 @@ def compute_pc_mil_loss(
     l_entropy = per_nucleus_entropy.mean()
 
     # 4. Diversity loss (penalize absent active types)
-    mean_attention = attention.mean(dim=0)  # (K,) = predicted proportions
+    mean_attention = attention.mean(dim=0)
     active_mask = (true_proportions > 0.01).float()
-    # +0.01 floor preserves gradient (unlike clamp which zeros it)
     l_diversity = -(active_mask * torch.log(mean_attention + 0.01)).sum()
 
+    # 5. Hungarian assignment loss (CE on pseudo-labels from optimal assignment)
+    # Bridges spot-level proportions to per-nucleus supervision
+    l_hungarian = torch.tensor(0.0, device=attention.device)
+    if lambda_hungarian > 0 and logits is not None:
+        N = attention.shape[0]
+        attn_np = attention.detach().cpu().numpy()
+        true_np = true_proportions.detach().cpu().numpy()
+        pseudo_labels = _hungarian_pseudo_labels(attn_np, true_np, N)
+        pseudo_labels_t = torch.tensor(pseudo_labels, dtype=torch.long, device=logits.device)
+        l_hungarian = F.cross_entropy(logits, pseudo_labels_t)
+
     # Combined
-    total = l_prop + lambda_recon * l_recon + lambda_entropy * l_entropy + lambda_diversity * l_diversity
+    total = (l_prop
+             + lambda_recon * l_recon
+             + lambda_entropy * l_entropy
+             + lambda_diversity * l_diversity
+             + lambda_hungarian * l_hungarian)
 
     components = {
         "proportion": l_prop.item(),
         "reconstruction": l_recon.item(),
         "entropy": l_entropy.item(),
         "diversity": l_diversity.item(),
+        "hungarian": l_hungarian.item(),
         "total": total.item(),
     }
 
@@ -184,7 +264,8 @@ def train_pc_mil(
     lambda_recon: float = 1.0,
     lambda_entropy: float = 0.1,
     lambda_diversity: float = 0.5,
-    patience: int = 20,
+    lambda_hungarian: float = 1.0,
+    patience: int = 30,
     grad_clip: float = 1.0,
     recon_warmup_epochs: int = 20,
     device: str = "cpu",
@@ -254,13 +335,17 @@ def train_pc_mil(
             if img_feats.shape[0] == 0:
                 continue
 
-            proportions, attention, reconstructed = model(img_feats, prot_props)
+            logits, attention, proportions, reconstructed = model.forward_with_logits(
+                img_feats, prot_props,
+            )
 
             loss, _ = compute_pc_mil_loss(
                 proportions, true_props, attention, reconstructed, prot_signal,
                 lambda_recon=epoch_lambda_recon,
                 lambda_entropy=lambda_entropy,
                 lambda_diversity=lambda_diversity,
+                lambda_hungarian=lambda_hungarian,
+                logits=logits,
                 protein_mean=protein_mean,
                 protein_std=protein_std,
             )
