@@ -348,9 +348,8 @@ def train_pc_mil(
     history = {
         "train_loss": [], "val_loss": [], "val_r": [],
         "active_types": [], "mean_entropy": [],
-        "val_assignment_quality": [], "val_combined_metric": [],
     }
-    best_combined_metric = -1.0
+    best_val_r = -1.0
     epochs_no_improve = 0
 
     for epoch in range(n_epochs):
@@ -395,15 +394,8 @@ def train_pc_mil(
                 img_feats, prot_props, morph_features=morph_feats,
             )
 
-            # Apply detection mask to logits during training (same as inference)
-            # This prevents the model from assigning nuclei to undetected types
-            if detected is not None and detected.any():
-                mask_tensor = detected.to(device)
-                if not mask_tensor.all():
-                    logits = logits.clone()
-                    logits[:, ~mask_tensor] = float("-inf")
-                    attention = F.softmax(logits, dim=1)
-                    proportions = attention.mean(dim=0)
+            # NOTE: Detection mask NOT applied during training (causes collapse).
+            # Mask is applied only at inference via pc_mil_infer_spot().
 
             loss, _ = compute_pc_mil_loss(
                 proportions, true_props, attention, reconstructed, prot_signal,
@@ -434,9 +426,7 @@ def train_pc_mil(
         all_pred, all_target = [], []
         active_count = 0
         total_entropy = 0.0
-        total_assignment_quality = 0.0
         n_val = len(val_dataset)
-        n_val_valid = 0
 
         with torch.no_grad():
             for idx in range(n_val):
@@ -456,17 +446,6 @@ def train_pc_mil(
 
                 proportions, attention, reconstructed = model(img_feats, prot_props, morph_features=morph_feats)
 
-                # Apply detection mask during validation (same as inference)
-                if detected is not None and detected.any():
-                    mask_tensor = detected.to(device)
-                    if not mask_tensor.all():
-                        logits_val, _, _, _ = model.forward_with_logits(
-                            img_feats, prot_props, morph_features=morph_feats,
-                        )
-                        logits_val[:, ~mask_tensor] = float("-inf")
-                        attention = F.softmax(logits_val, dim=1)
-                        proportions = attention.mean(dim=0)
-
                 loss, comp = compute_pc_mil_loss(
                     proportions, true_props, attention, reconstructed, prot_signal,
                     lambda_recon=epoch_lambda_recon,
@@ -480,22 +459,10 @@ def train_pc_mil(
                 all_pred.append(proportions.cpu().numpy())
                 all_target.append(true_props.cpu().numpy())
 
-                # Collapse detection: count types with any nucleus having max attn > 0.3
+                # Collapse detection
                 max_per_type = attention.max(dim=0).values
                 active_count += (max_per_type > 0.3).sum().item()
                 total_entropy += comp["entropy"]
-
-                # Assignment quality: per-type proportion accuracy
-                # Measures how well attention distribution matches true proportions
-                pred_np = proportions.cpu().numpy()
-                true_np = true_props.cpu().numpy()
-                active_types = true_np > 0.01
-                if active_types.sum() > 0:
-                    # Per-type absolute error on active types, inverted to quality
-                    per_type_error = np.abs(pred_np[active_types] - true_np[active_types])
-                    assignment_quality = 1.0 - per_type_error.mean()
-                    total_assignment_quality += max(0.0, assignment_quality)
-                n_val_valid += 1
 
         history["val_loss"].append(val_loss / max(n_val, 1))
         history["active_types"].append(active_count / max(n_val, 1))
@@ -513,17 +480,9 @@ def train_pc_mil(
             r = 0.0
         history["val_r"].append(r)
 
-        # Assignment quality (masked SC proxy)
-        assignment_quality = total_assignment_quality / max(n_val_valid, 1)
-        history["val_assignment_quality"].append(assignment_quality)
-
-        # Combined early stopping metric: proportion r + assignment quality
-        combined_metric = 0.7 * r + 0.3 * assignment_quality
-        history["val_combined_metric"].append(combined_metric)
-
-        # Early stopping on combined metric
-        if combined_metric > best_combined_metric:
-            best_combined_metric = combined_metric
+        # Early stopping on val_r
+        if r > best_val_r:
+            best_val_r = r
             epochs_no_improve = 0
             if save_path:
                 torch.save(model.state_dict(), save_path)
@@ -532,10 +491,10 @@ def train_pc_mil(
 
         if (epoch + 1) % 10 == 0:
             logger.info(
-                "Epoch %d/%d: train=%.4f val=%.4f r=%.4f aq=%.4f comb=%.4f "
+                "Epoch %d/%d: train=%.4f val=%.4f r=%.4f "
                 "active=%.1f entropy=%.4f tau=%.2f",
                 epoch + 1, n_epochs, history["train_loss"][-1],
-                history["val_loss"][-1], r, assignment_quality, combined_metric,
+                history["val_loss"][-1], r,
                 history["active_types"][-1], history["mean_entropy"][-1],
                 epoch_temperature,
             )
