@@ -330,6 +330,7 @@ def main():
         # Val — collect per-spot lists, then concatenate arrays for SpotDataset
         val_features = []
         val_props_list, val_signals_list, val_true_list, val_detected_list = [], [], [], []
+        val_labels_list = []
         for rid in fold["val"]:
             data = load_region_data(rid, features_dir)
             val_features.extend(data["features_per_spot"])
@@ -337,6 +338,7 @@ def main():
             val_signals_list.append(data["protein_signals"])
             val_true_list.append(data["true_props"])
             val_detected_list.append(data["detected"])
+            val_labels_list.extend(data["cell_type_labels"])
 
         val_props = np.concatenate(val_props_list)
         val_true = np.concatenate(val_true_list)
@@ -351,6 +353,7 @@ def main():
             "protein_props": val_props,   # (n_spots, K) — indexable by spot
             "true_props": val_true,       # (n_spots, K)
             "detected": val_detected,     # (n_spots, K) — detection mask
+            "cell_type_labels": val_labels_list,  # per-spot GT from spatial matching
         }
 
         # Model
