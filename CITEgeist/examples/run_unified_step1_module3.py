@@ -56,6 +56,17 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
     else:
         raise ValueError(f"Unknown modality: {modality}")
 
+    # Filter spots with NaN spatial coordinates (causes cKDTree and kneighbors_graph to fail)
+    import numpy as np
+    for adata_attr in ("gene_expression_adata", "antibody_capture_adata"):
+        ad = getattr(model, adata_attr, None)
+        if ad is not None and "spatial" in ad.obsm:
+            finite_mask = np.isfinite(ad.obsm["spatial"]).all(axis=1)
+            n_nan = (~finite_mask).sum()
+            if n_nan > 0:
+                logger.warning(f"Filtering {n_nan} spots with NaN spatial coords from {adata_attr}")
+                setattr(model, adata_attr, ad[finite_mask].copy())
+
     model.preprocess_gex()
     model.preprocess_antibody()
     model.load_cell_profile_dict(CELL_PROFILES_NESTED)
