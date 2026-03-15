@@ -28,6 +28,7 @@ def pc_mil_infer_spot(
     morph_features: Optional[torch.Tensor] = None,
     nucleus_ids: Optional[List[str]] = None,
     barcode: Optional[str] = None,
+    inference_mode: str = "hungarian_constrained",
 ) -> pd.DataFrame:
     """Run PC-MIL inference for a single spot.
 
@@ -41,6 +42,13 @@ def pc_mil_infer_spot(
             through to the model's forward_with_logits (for morphology branch)
         nucleus_ids: Optional list of N nucleus IDs
         barcode: Optional spot barcode
+        inference_mode: Assignment strategy to use. Options:
+            - ``"hungarian_constrained"`` (default): discretize proportions into
+              integer counts and run Hungarian assignment to enforce count
+              constraints.
+            - ``"argmax_global"``: each nucleus is independently assigned to the
+              detected cell type with the highest attention score (no count
+              constraints).
 
     Returns:
         DataFrame with columns: nucleus_id, barcode, cell_type, confidence, protein_score
@@ -79,6 +87,23 @@ def pc_mil_infer_spot(
     attention_np = attention.cpu().numpy()  # (N, K)
     proportions_np = proportions.cpu().numpy()
     protein_props_np = protein_proportions.cpu().numpy() if isinstance(protein_proportions, torch.Tensor) else protein_proportions
+
+    if inference_mode == "argmax_global":
+        # Simple argmax: each nucleus → highest-scoring detected type
+        assignments = attention_np.argmax(axis=1)
+        confidences = attention_np.max(axis=1)
+        assigned_types = [cell_type_names[a] for a in assignments]
+
+        records = []
+        for i in range(N):
+            records.append({
+                "nucleus_id": nucleus_ids[i] if nucleus_ids else f"nuc_{i:04d}",
+                "barcode": barcode or "",
+                "cell_type": assigned_types[i],
+                "confidence": float(confidences[i]),
+                "protein_score": float(confidences[i]),
+            })
+        return pd.DataFrame(records)
 
     # Convert proportions to integer counts
     counts = largest_remainder_discretize(proportions_np, N)
