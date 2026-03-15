@@ -4,8 +4,8 @@
 #SBATCH --time=00:30:00
 #SBATCH --mem=16G
 #SBATCH --cpus-per-task=4
-#SBATCH --cluster=smp
-#SBATCH --partition=smp
+#SBATCH --cluster=htc
+#SBATCH --partition=htc
 #SBATCH --output=output/unified_pipeline/logs/step4_%A_%a.out
 #SBATCH --error=output/unified_pipeline/logs/step4_%A_%a.err
 #SBATCH --mail-type=FAIL
