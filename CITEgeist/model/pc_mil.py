@@ -19,6 +19,29 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 
 
+def flatten_profile_dict(profile_dict: dict) -> dict:
+    """Flatten nested Module 3 profile dict to flat {type: [markers]} for PC-MIL.
+
+    Accepts both formats:
+      - Nested: {"Cancer": {"Major": ["EPCAM-1"], "Minor": ["SDC1-1"]}}
+      - Flat:   {"Cancer": ["EPCAM-1"]}
+
+    Returns flat format, merging Major + Minor if both present.
+    """
+    flat = {}
+    for cell_type, value in profile_dict.items():
+        if isinstance(value, dict):
+            markers = []
+            for category in ("Major", "Minor"):
+                markers.extend(value.get(category, []))
+            flat[cell_type] = markers
+        elif isinstance(value, list):
+            flat[cell_type] = value
+        else:
+            raise ValueError(f"Unexpected profile format for {cell_type}: {type(value)}")
+    return flat
+
+
 def build_profile_matrix(
     cell_profile_dict: Dict[str, List[str]],
     marker_names: List[str],
@@ -26,12 +49,13 @@ def build_profile_matrix(
     """Build (K, M) binary profile matrix from cell_profile_dict.
 
     Args:
-        cell_profile_dict: {cell_type: [marker_name, ...]}
+        cell_profile_dict: {cell_type: [marker_name, ...]} or nested Module 3 format
         marker_names: Ordered list of all marker names (defines column order)
 
     Returns:
         (K, M) numpy array where profile[k, m] = 1.0 if marker m belongs to type k
     """
+    cell_profile_dict = flatten_profile_dict(cell_profile_dict)
     cell_types = list(cell_profile_dict.keys())
     K = len(cell_types)
     M = len(marker_names)
