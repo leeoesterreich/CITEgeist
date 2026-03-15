@@ -47,7 +47,7 @@ class ViTFeatureExtractor(nn.Module):
 
     def __init__(
         self,
-        model_name: str = 'vit_large_patch16_224',
+        model_name: str = 'vit_small_patch16_224',
         pretrained: bool = True,
         weights_path: Optional[Path] = None,
         device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
@@ -87,13 +87,11 @@ class ViTFeatureExtractor(nn.Module):
                 state_dict = state_dict['state_dict']
             self.model.load_state_dict(state_dict, strict=False)
 
-        self.model = self.model.to(device)
         self.model.eval()
-
         self.device = device
         self.embed_dim = self.model.num_features
 
-        # Register normalization as buffer (moves to correct device automatically)
+        # Register normalization as buffer
         self.register_buffer(
             'mean',
             torch.tensor(self.IMAGENET_MEAN).view(1, 3, 1, 1)
@@ -102,6 +100,9 @@ class ViTFeatureExtractor(nn.Module):
             'std',
             torch.tensor(self.IMAGENET_STD).view(1, 3, 1, 1)
         )
+
+        # Move entire module (including model and buffers) to device
+        self.to(device)
 
     def normalize(self, x: torch.Tensor) -> torch.Tensor:
         """Apply ImageNet normalization.
