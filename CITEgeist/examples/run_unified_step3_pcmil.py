@@ -1,0 +1,177 @@
+#!/usr/bin/env python
+"""Step 4: PC-MIL training + inference per sample.
+
+Usage:
+    python run_unified_step3_pcmil.py --sample HCC22-088-P1-S1
+"""
+import argparse
+import json
+import logging
+import os
+import sys
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import scanpy as sc
+import torch
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logger = logging.getLogger(__name__)
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from model.unified_config import (
+    CELL_PROFILES_NESTED, CELL_TYPE_NAMES, OUTPUT_BASE, K,
+    MAX_EPOCHS, PATIENCE, LAMBDA_RECON, LAMBDA_ENTROPY,
+    LAMBDA_DIVERSITY, LAMBDA_HUNGARIAN, RECON_WARMUP_EPOCHS,
+    PROTEIN_DROPOUT,
+)
+from model.pc_mil import PCMILModel, flatten_profile_dict, build_profile_matrix
+from model.pc_mil_training import train_pc_mil, SpotDataset
+from model.pc_mil_inference import pc_mil_infer_spot
+
+
+def load_step2_outputs(sample_name):
+    base = OUTPUT_BASE / sample_name
+    features = np.load(base / "features" / "vit_features.npy")
+    nucleus_ids = np.load(base / "features" / "nucleus_ids.npy")
+    centroids = pd.read_csv(base / "cellpose" / "nuclei_centroids.csv")
+
+    m3_dir = base / "module3"
+    prop_files = list(m3_dir.glob("*finetuned*.csv"))
+    if not prop_files:
+        prop_files = list(m3_dir.glob("*global*.csv"))
+    props_df = pd.read_csv(prop_files[0], index_col=0)
+
+    h5ad_files = list(m3_dir.glob("*.h5ad"))
+    adata = sc.read_h5ad(h5ad_files[0])
+
+    return features, nucleus_ids, centroids, props_df, adata
+
+
+def build_spot_datasets(features, nucleus_ids, centroids, props_df, adata):
+    if "spot_barcode" not in centroids.columns:
+        raise ValueError("Centroids missing spot_barcode. Run Step 2 first.")
+
+    flat_profile = flatten_profile_dict(CELL_PROFILES_NESTED)
+    all_markers = sorted(set(m for ms in flat_profile.values() for m in ms))
+
+    nid_to_idx = {int(nid): i for i, nid in enumerate(nucleus_ids)}
+    spots = props_df.index.tolist()
+
+    features_per_spot = []
+    protein_props_list = []
+    protein_signals_list = []
+
+    for spot in spots:
+        spot_nuclei = centroids[centroids["spot_barcode"] == spot]
+        if len(spot_nuclei) == 0:
+            continue
+
+        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nuclei["nucleus_id"].values
+                        if int(nid) in nid_to_idx]
+        if not feat_indices:
+            continue
+
+        features_per_spot.append(features[feat_indices])
+
+        # Proportions: only use types in CELL_TYPE_NAMES
+        available_cols = [c for c in CELL_TYPE_NAMES if c in props_df.columns]
+        spot_props = props_df.loc[spot, available_cols].values.astype(np.float32)
+        # Pad missing types with 0
+        full_props = np.zeros(K, dtype=np.float32)
+        for i, name in enumerate(CELL_TYPE_NAMES):
+            if name in props_df.columns:
+                full_props[i] = props_df.loc[spot, name]
+        protein_props_list.append(full_props)
+
+        # Protein signal — use zeros as placeholder if not available
+        protein_signals_list.append(np.zeros(len(all_markers), dtype=np.float32))
+
+    protein_props = np.array(protein_props_list)
+    protein_signals = np.array(protein_signals_list)
+
+    dataset = SpotDataset(
+        features_per_spot=features_per_spot,
+        protein_props=protein_props,
+        protein_signals=protein_signals,
+        true_props=protein_props,
+    )
+    return dataset
+
+
+def run_step3(sample_name):
+    step2_marker = OUTPUT_BASE / sample_name / ".step2_complete"
+    if not step2_marker.exists():
+        logger.error(f"Step 2 not complete for {sample_name}")
+        return
+
+    step3_marker = OUTPUT_BASE / sample_name / ".step3_complete"
+    if step3_marker.exists():
+        logger.info(f"Step 3 already complete for {sample_name}, skipping")
+        return
+
+    pcmil_dir = OUTPUT_BASE / sample_name / "pcmil"
+    pcmil_dir.mkdir(parents=True, exist_ok=True)
+
+    features, nucleus_ids, centroids, props_df, adata = load_step2_outputs(sample_name)
+    dataset = build_spot_datasets(features, nucleus_ids, centroids, props_df, adata)
+    logger.info(f"Built dataset with {len(dataset)} spots")
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    flat_profile = flatten_profile_dict(CELL_PROFILES_NESTED)
+    all_markers = sorted(set(m for ms in flat_profile.values() for m in ms))
+    profile_matrix = build_profile_matrix(CELL_PROFILES_NESTED, all_markers)
+    init_profile = torch.tensor(profile_matrix, dtype=torch.float32)
+
+    model = PCMILModel(
+        image_dim=384, n_types=K, n_markers=len(all_markers),
+        image_proj_dim=64, protein_context_dim=32, hidden_dim=128,
+        init_profile_matrix=init_profile,
+    )
+
+    history = train_pc_mil(
+        model=model, train_dataset=dataset, val_dataset=None,
+        n_epochs=MAX_EPOCHS, lr=1e-3,
+        lambda_recon=LAMBDA_RECON, lambda_entropy=LAMBDA_ENTROPY,
+        lambda_diversity=LAMBDA_DIVERSITY, lambda_hungarian=LAMBDA_HUNGARIAN,
+        patience=PATIENCE, recon_warmup_epochs=RECON_WARMUP_EPOCHS,
+        protein_dropout=PROTEIN_DROPOUT, device=device,
+        save_path=str(pcmil_dir / "model_weights.pt"),
+    )
+
+    with open(pcmil_dir / "training_log.json", "w") as f:
+        json.dump({k: [float(v) for v in vs] for k, vs in history.items()}, f)
+
+    # Inference: argmax global
+    model.eval()
+    all_assignments = []
+
+    for i in range(len(dataset)):
+        sample = dataset[i]
+        img_feats = sample["image_features"].to(device)
+        prot_props = sample["protein_props"].to(device)
+        detected = np.ones(K, dtype=bool)
+
+        result = pc_mil_infer_spot(
+            model=model, image_features=img_feats,
+            protein_proportions=prot_props, detected_types=detected,
+            cell_type_names=CELL_TYPE_NAMES,
+            inference_mode="argmax_global",
+        )
+        all_assignments.append(result)
+
+    assignments_df = pd.concat(all_assignments, ignore_index=True)
+    assignments_df.to_csv(pcmil_dir / "assignments.csv", index=False)
+
+    step3_marker.touch()
+    logger.info(f"Step 3 complete for {sample_name}: {len(assignments_df)} nuclei assigned")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Unified pipeline Step 4: PC-MIL")
+    parser.add_argument("--sample", required=True)
+    args = parser.parse_args()
+    run_step3(args.sample)
