@@ -23,17 +23,19 @@ A unified pipeline that runs CITEgeist Module 3 (deconvolution) through PC-MIL (
 
 ```python
 CELL_PROFILES = {
-    "Cancer": ["EPCAM-1"],
-    "Macrophages": ["CD68-1", "CD163-1"],
-    "CD8_T_Cells": ["CD3E-1", "CD8A-1"],
-    "CD4_T_Cells": ["CD4-1"],
-    "B_Cells": ["CD19-1"],
-    "Endothelial": ["PECAM1-1"],
-    "Fibroblasts": ["ACTA2-1"],
-    "Monocytes": ["CD14-1"],
-    "Dendritic_Cells": ["ITGAX-1", "HLA-DRA-1"],
+    "Cancer": {"Major": ["EPCAM-1"]},
+    "Macrophages": {"Major": ["CD68-1", "CD163-1"]},
+    "CD8_T_Cells": {"Major": ["CD3E-1", "CD8A-1"]},
+    "CD4_T_Cells": {"Major": ["CD4-1"]},
+    "B_Cells": {"Major": ["CD19-1"]},
+    "Endothelial": {"Major": ["PECAM1-1"]},
+    "Fibroblasts": {"Major": ["ACTA2-1"]},
+    "Monocytes": {"Major": ["CD14-1"]},
+    "Dendritic_Cells": {"Major": ["ITGAX-1", "HLA-DRA-1"]},
 }
 ```
+
+Note: The codebase requires nested dict format with `"Major"` keys (validated by `validate_cell_profile_dict()`).
 
 ## Pipeline Steps
 
@@ -43,10 +45,11 @@ CELL_PROFILES = {
 **Output**: 9-type proportions + deconvolved GEX parquet
 
 - Cell profile dict: 9 types (Cancer merged, no Luminal/Basal split)
-- Unknown cell type: disabled (`unknown_threshold=1.0`)
+- Unknown cell type: disabled by omitting "Unknown" from the profile dict (the `unknown_threshold` parameter only applies when "Unknown" is a profile key)
 - Cellpose nuclei counts computed within this step via `compute_spot_nuclei_counts_cellpose()`
 - Nuclei counts injected as prior to guide proportion estimation
 - Cellpose model: `nuclei` for DAPI (Xenium), `cyto2` for H&E (patient)
+- **Cellpose masks are cached** and reused by Step 2 (no duplicate segmentation run)
 
 ### Step 2: Cellpose Segmentation + Patch Extraction
 
@@ -94,8 +97,8 @@ CELL_PROFILES = {
 #### Training
 - All spots from one sample as training data
 - No train/val split (evaluated post-hoc via marker genes)
-- Early stopping on training loss plateau
-- ~100-200 epochs
+- Early stopping on training loss plateau, with `max_epochs=200` hard cap (Visium HD showed overfitting beyond ~100 epochs)
+- Attention hidden dim: 128
 
 #### Inference
 - Per-nucleus: argmax of soft assignment → discrete cell type label
@@ -186,7 +189,8 @@ This is evaluation only — ground truth is never used during training.
 - **Progressors (4):** P1-S1, P1-S2, P4-S1, P4-S2_1i_rep
 
 ### Xenium Pseudo-Visium Regions
-- 5 or 14 regions (depending on scope) with DAPI + boundary morphology
+- 14 regions (all available); use 5 for quick iteration during development
+- DAPI + boundary morphology
 - Ground truth available for held-out evaluation
 
 ## Key Code Changes Required
@@ -197,3 +201,10 @@ This is evaluation only — ground truth is never used during training.
 4. **Patch extraction**: Handle 2-channel (Xenium) and 3-channel (H&E) inputs
 5. **Validation module**: Marker gene scoring at single-cell level
 6. **SLURM scripts**: 4 array job templates with marker file gating
+
+## Error Handling
+
+- **Zero nuclei in spot**: Skip spot during PC-MIL training; proportion for that spot comes from Module 3 only
+- **Too few spots for training**: Warn if sample has <100 spots; proceed but flag in validation summary
+- **Module 3 validation failure**: Log warning and continue (set `validation_warn_only=True`)
+- **Corrupt patches / ViT errors**: Skip nucleus, log warning, exclude from assignment
