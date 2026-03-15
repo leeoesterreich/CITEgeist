@@ -202,6 +202,28 @@ This is evaluation only — ground truth is never used during training.
 5. **Validation module**: Marker gene scoring at single-cell level
 6. **SLURM scripts**: 4 array job templates with marker file gating
 
+## Code Gaps (Current State → Target State)
+
+These are gaps between the existing codebase and what this spec requires. The implementation plan must address each.
+
+### Critical
+
+1. **Profile dict schema mismatch in PC-MIL**: Module 3 uses nested `{"Major": [...]}` dicts, but `build_profile_matrix()` in `pc_mil.py` expects flat `{type: [markers]}`. Passing nested dicts will iterate over `"Major"` instead of marker names, producing broken profile rows. **Fix**: Add an adapter that flattens nested profile dicts for PC-MIL's profile matrix builder.
+
+2. **Inference mode hardcoded to Hungarian**: Spec says argmax with no count constraints, but `pc_mil_infer_spot()` in `pc_mil_inference.py` always applies largest-remainder discretization + Hungarian constrained assignment. **Fix**: Add an `inference_mode` parameter (`"argmax_global"` vs `"hungarian_constrained"`) and default to `"argmax_global"` for this pipeline.
+
+3. **Cellpose API not modality-aware**: Spec requires `model_type='nuclei'` + `channels=[1,2]` for Xenium and `model_type='cyto2'` + `channels=[0,0]` for H&E, but `compute_spot_nuclei_counts_cellpose()` in `citegeist_model.py` does not expose `model_type` or `channels` — it's hardcoded to `channels=[0,0]` on RGB. **Fix**: Add `model_type` and `channels` parameters to the Cellpose API, or create a new modality-aware wrapper.
+
+### Warnings
+
+4. **Trainer requires val_dataset**: Current `pc_mil_training.py` requires a `val_dataset` and early-stops on `val_r`. Spec says no train/val split. **Fix**: Make `val_dataset` optional; when absent, use training loss plateau + `max_epochs=200` hard cap for stopping.
+
+5. **Loss hyperparameter drift**: Code defaults to `lambda_diversity=0.5` (strong regularization). Spec doesn't pin values. **Fix**: Document and pin loss weights in the pipeline config to ensure reproducibility.
+
+6. **Feature extractor output format**: Spec expects unified `vit_features.npy` (all nuclei in one array), but current `extract_vit_features.py` writes per-spot files. **Fix**: Write a unified array with matching `nucleus_ids.npy` index, or adapt PC-MIL data loader to read per-spot files.
+
+7. **Core API not wired to PC-MIL**: `run_single_cell_resolution()` in `citegeist_model.py` dispatches to older constrained assignment/MIL paths, not PC-MIL. **Fix**: Add PC-MIL as a dispatch option, or bypass the core API with a standalone orchestrator script.
+
 ## Error Handling
 
 - **Zero nuclei in spot**: Skip spot during PC-MIL training; proportion for that spot comes from Module 3 only
