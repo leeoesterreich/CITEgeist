@@ -446,11 +446,29 @@ def assign_nuclei_centroids_to_spots(
     if centroids_xy.size == 0:
         return pd.Series(counts, index=spot_names, name="nuclei_count_raw")
 
-    tree = cKDTree(spot_centers_xy)
-    dists, idxs = tree.query(centroids_xy, k=1, workers=-1)
+    # Filter out spots with NaN/Inf coordinates before building KDTree
+    finite_mask = np.isfinite(spot_centers_xy).all(axis=1)
+    if not finite_mask.all():
+        n_bad = (~finite_mask).sum()
+        logging.warning("Filtered %d spots with non-finite spatial coordinates", n_bad)
+    finite_centers = spot_centers_xy[finite_mask]
+    finite_indices = np.where(finite_mask)[0]
+
+    if finite_centers.shape[0] == 0:
+        logging.warning("No spots with finite coordinates; returning zero counts")
+        return pd.Series(counts, index=spot_names, name="nuclei_count_raw")
+
+    # Also filter NaN centroids
+    finite_cent_mask = np.isfinite(centroids_xy).all(axis=1)
+    clean_centroids = centroids_xy[finite_cent_mask]
+
+    tree = cKDTree(finite_centers)
+    dists, idxs = tree.query(clean_centroids, k=1, workers=-1)
     valid = dists <= float(spot_radius_px)
     if np.any(valid):
-        np.add.at(counts, idxs[valid], 1)
+        # Map back from finite subset indices to original indices
+        original_idxs = finite_indices[idxs[valid]]
+        np.add.at(counts, original_idxs, 1)
     return pd.Series(counts, index=spot_names, name="nuclei_count_raw")
 
 
