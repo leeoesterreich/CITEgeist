@@ -295,7 +295,7 @@ def compute_inverse_frequency_weights(
 def train_pc_mil(
     model: PCMILModel,
     train_dataset: SpotDataset,
-    val_dataset: SpotDataset,
+    val_dataset: Optional[SpotDataset] = None,
     n_epochs: int = 200,
     lr: float = 1e-3,
     weight_decay: float = 1e-4,
@@ -315,7 +315,8 @@ def train_pc_mil(
     Args:
         model: PCMILModel instance
         train_dataset: Training SpotDataset
-        val_dataset: Validation SpotDataset
+        val_dataset: Optional validation SpotDataset. If None, uses training
+            loss plateau for early stopping (no validation metrics computed).
         n_epochs: Max training epochs
         lr: Learning rate
         weight_decay: AdamW weight decay
@@ -351,6 +352,7 @@ def train_pc_mil(
     }
     best_val_r = -1.0
     epochs_no_improve = 0
+    best_train_loss = float('inf')
 
     for epoch in range(n_epochs):
         # Warmup: disable reconstruction loss for first N epochs
@@ -420,87 +422,118 @@ def train_pc_mil(
         scheduler.step()
         history["train_loss"].append(epoch_loss / max(n_train, 1))
 
-        # --- Validation ---
-        model.eval()
-        val_loss = 0.0
-        all_pred, all_target = [], []
-        active_count = 0
-        total_entropy = 0.0
-        n_val = len(val_dataset)
+        if val_dataset is not None:
+            # --- Validation ---
+            model.eval()
+            val_loss = 0.0
+            all_pred, all_target = [], []
+            active_count = 0
+            total_entropy = 0.0
+            n_val = len(val_dataset)
 
-        with torch.no_grad():
-            for idx in range(n_val):
-                sample = val_dataset[idx]
-                img_feats = sample["image_features"].to(device)
-                prot_props = sample["protein_props"].to(device)
-                prot_signal = sample["protein_signal"].to(device)
-                true_props = sample["true_props"].to(device)
-                detected = sample["detected_types"]  # (K,) bool
+            with torch.no_grad():
+                for idx in range(n_val):
+                    sample = val_dataset[idx]
+                    img_feats = sample["image_features"].to(device)
+                    prot_props = sample["protein_props"].to(device)
+                    prot_signal = sample["protein_signal"].to(device)
+                    true_props = sample["true_props"].to(device)
+                    detected = sample["detected_types"]  # (K,) bool
 
-                if img_feats.shape[0] == 0:
-                    continue
+                    if img_feats.shape[0] == 0:
+                        continue
 
-                morph_feats = sample.get("morph_features")
-                if morph_feats is not None:
-                    morph_feats = morph_feats.to(device)
+                    morph_feats = sample.get("morph_features")
+                    if morph_feats is not None:
+                        morph_feats = morph_feats.to(device)
 
-                proportions, attention, reconstructed = model(img_feats, prot_props, morph_features=morph_feats)
+                    proportions, attention, reconstructed = model(img_feats, prot_props, morph_features=morph_feats)
 
-                loss, comp = compute_pc_mil_loss(
-                    proportions, true_props, attention, reconstructed, prot_signal,
-                    lambda_recon=epoch_lambda_recon,
-                    lambda_entropy=lambda_entropy,
-                    lambda_diversity=lambda_diversity,
-                    protein_mean=protein_mean,
-                    protein_std=protein_std,
-                )
-                val_loss += loss.item()
+                    loss, comp = compute_pc_mil_loss(
+                        proportions, true_props, attention, reconstructed, prot_signal,
+                        lambda_recon=epoch_lambda_recon,
+                        lambda_entropy=lambda_entropy,
+                        lambda_diversity=lambda_diversity,
+                        protein_mean=protein_mean,
+                        protein_std=protein_std,
+                    )
+                    val_loss += loss.item()
 
-                all_pred.append(proportions.cpu().numpy())
-                all_target.append(true_props.cpu().numpy())
+                    all_pred.append(proportions.cpu().numpy())
+                    all_target.append(true_props.cpu().numpy())
 
-                # Collapse detection
-                max_per_type = attention.max(dim=0).values
-                active_count += (max_per_type > 0.3).sum().item()
-                total_entropy += comp["entropy"]
+                    # Collapse detection
+                    max_per_type = attention.max(dim=0).values
+                    active_count += (max_per_type > 0.3).sum().item()
+                    total_entropy += comp["entropy"]
 
-        history["val_loss"].append(val_loss / max(n_val, 1))
-        history["active_types"].append(active_count / max(n_val, 1))
-        history["mean_entropy"].append(total_entropy / max(n_val, 1))
+            history["val_loss"].append(val_loss / max(n_val, 1))
+            history["active_types"].append(active_count / max(n_val, 1))
+            history["mean_entropy"].append(total_entropy / max(n_val, 1))
 
-        # Pearson r
-        if all_pred:
-            pred_flat = np.concatenate(all_pred)
-            target_flat = np.concatenate(all_target)
-            if pred_flat.std() > 0 and target_flat.std() > 0:
-                r = float(np.corrcoef(pred_flat, target_flat)[0, 1])
+            # Pearson r
+            if all_pred:
+                pred_flat = np.concatenate(all_pred)
+                target_flat = np.concatenate(all_target)
+                if pred_flat.std() > 0 and target_flat.std() > 0:
+                    r = float(np.corrcoef(pred_flat, target_flat)[0, 1])
+                else:
+                    r = 0.0
             else:
                 r = 0.0
-        else:
-            r = 0.0
-        history["val_r"].append(r)
+            history["val_r"].append(r)
 
-        # Early stopping on val_r
-        if r > best_val_r:
-            best_val_r = r
-            epochs_no_improve = 0
-            if save_path:
+            # Early stopping on val_r
+            if r > best_val_r:
+                best_val_r = r
+                epochs_no_improve = 0
+                if save_path:
+                    torch.save(model.state_dict(), save_path)
+            else:
+                epochs_no_improve += 1
+
+            if (epoch + 1) % 10 == 0:
+                logger.info(
+                    "Epoch %d/%d: train=%.4f val=%.4f r=%.4f "
+                    "active=%.1f entropy=%.4f tau=%.2f",
+                    epoch + 1, n_epochs, history["train_loss"][-1],
+                    history["val_loss"][-1], r,
+                    history["active_types"][-1], history["mean_entropy"][-1],
+                    epoch_temperature,
+                )
+
+            if epochs_no_improve >= patience:
+                logger.info("Early stopping at epoch %d (patience=%d)", epoch + 1, patience)
+                break
+
+        else:
+            # No validation set: use loss-plateau stopping
+            # Append placeholders for history consistency
+            history["val_loss"].append(0.0)
+            history["val_r"].append(0.0)
+            history["active_types"].append(0.0)
+            history["mean_entropy"].append(0.0)
+
+            # Save best model on training loss
+            current_loss = history["train_loss"][-1]
+            if save_path and current_loss < best_train_loss:
+                best_train_loss = current_loss
                 torch.save(model.state_dict(), save_path)
-        else:
-            epochs_no_improve += 1
 
-        if (epoch + 1) % 10 == 0:
-            logger.info(
-                "Epoch %d/%d: train=%.4f val=%.4f r=%.4f "
-                "active=%.1f entropy=%.4f tau=%.2f",
-                epoch + 1, n_epochs, history["train_loss"][-1],
-                history["val_loss"][-1], r,
-                history["active_types"][-1], history["mean_entropy"][-1],
-                epoch_temperature,
-            )
+            # Loss-plateau early stopping (relative threshold)
+            if epoch > recon_warmup_epochs:
+                recent_losses = history["train_loss"][-patience:]
+                if len(recent_losses) >= patience:
+                    mean_loss = np.mean(recent_losses)
+                    loss_std = np.std(recent_losses)
+                    if mean_loss > 0 and loss_std / mean_loss < 1e-3:
+                        logger.info("Early stop: training loss plateaued (rel_std=%.2e)", loss_std / mean_loss)
+                        break
 
-        if epochs_no_improve >= patience:
-            logger.info("Early stopping at epoch %d (patience=%d)", epoch + 1, patience)
-            break
+            if (epoch + 1) % 10 == 0:
+                logger.info(
+                    "Epoch %d/%d: train=%.4f (no val set)",
+                    epoch + 1, n_epochs, history["train_loss"][-1],
+                )
 
     return history
