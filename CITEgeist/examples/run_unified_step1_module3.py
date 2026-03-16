@@ -80,6 +80,15 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
     model.run_cell_proportion_model(validation_warn_only=True)
     model.run_cell_expression_pass1()
 
+    # Save results h5ad for downstream steps (e.g., PC-MIL antibody signal)
+    try:
+        result_adata = model.get_results_adata()
+        h5ad_path = output_dir / f"{sample_name}_module3_results.h5ad"
+        result_adata.write_h5ad(str(h5ad_path))
+        logger.info(f"Saved results h5ad to {h5ad_path}")
+    except Exception as e:
+        logger.warning(f"Could not save h5ad: {e}")
+
     marker_file.touch()
     logger.info(f"Step 1 complete for {sample_name}")
 

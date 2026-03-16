@@ -32,6 +32,39 @@ from model.pc_mil_training import train_pc_mil, SpotDataset
 from model.pc_mil_inference import pc_mil_infer_spot
 
 
+def load_antibody_signal(sample_name, spots, all_markers):
+    """Load raw antibody signal from SpaceRanger data for protein reconstruction loss."""
+    import squidpy as sq
+    sample_path = DATA_DIR / sample_name / "outs"
+    if not sample_path.exists():
+        logger.warning(f"SpaceRanger data not found at {sample_path}, using zeros for protein signal")
+        return np.zeros((len(spots), len(all_markers)), dtype=np.float32)
+
+    adata = sq.read.visium(
+        str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
+        load_images=False, gex_only=False,
+    )
+    # Split out antibody features
+    if "feature_types" in adata.var.columns:
+        ab_mask = adata.var["feature_types"] == "Antibody Capture"
+        ab_data = adata[:, ab_mask].copy()
+    else:
+        logger.warning("No feature_types column, using zeros for protein signal")
+        return np.zeros((len(spots), len(all_markers)), dtype=np.float32)
+
+    # Build signal matrix for requested spots and markers
+    signals = np.zeros((len(spots), len(all_markers)), dtype=np.float32)
+    ab_names = list(ab_data.var_names)
+    for i, spot in enumerate(spots):
+        if spot in ab_data.obs_names:
+            spot_idx = list(ab_data.obs_names).index(spot)
+            for j, marker in enumerate(all_markers):
+                if marker in ab_names:
+                    m_idx = ab_names.index(marker)
+                    signals[i, j] = float(ab_data.X[spot_idx, m_idx])
+    return signals
+
+
 def load_step2_outputs(sample_name):
     base = OUTPUT_BASE / sample_name
     features = np.load(base / "features" / "vit_features.npy")
@@ -44,13 +77,10 @@ def load_step2_outputs(sample_name):
         prop_files = list(m3_dir.glob("*global*.csv"))
     props_df = pd.read_csv(prop_files[0], index_col=0)
 
-    h5ad_files = list(m3_dir.glob("*.h5ad"))
-    adata = sc.read_h5ad(h5ad_files[0])
-
-    return features, nucleus_ids, centroids, props_df, adata
+    return features, nucleus_ids, centroids, props_df
 
 
-def build_spot_datasets(features, nucleus_ids, centroids, props_df, adata):
+def build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df):
     if "spot_barcode" not in centroids.columns:
         raise ValueError("Centroids missing spot_barcode. Run Step 2 first.")
 
@@ -62,7 +92,7 @@ def build_spot_datasets(features, nucleus_ids, centroids, props_df, adata):
 
     features_per_spot = []
     protein_props_list = []
-    protein_signals_list = []
+    valid_spots = []
 
     for spot in spots:
         spot_nuclei = centroids[centroids["spot_barcode"] == spot]
@@ -75,22 +105,19 @@ def build_spot_datasets(features, nucleus_ids, centroids, props_df, adata):
             continue
 
         features_per_spot.append(features[feat_indices])
+        valid_spots.append(spot)
 
-        # Proportions: only use types in CELL_TYPE_NAMES
-        available_cols = [c for c in CELL_TYPE_NAMES if c in props_df.columns]
-        spot_props = props_df.loc[spot, available_cols].values.astype(np.float32)
-        # Pad missing types with 0
+        # Proportions
         full_props = np.zeros(K, dtype=np.float32)
         for i, name in enumerate(CELL_TYPE_NAMES):
             if name in props_df.columns:
                 full_props[i] = props_df.loc[spot, name]
         protein_props_list.append(full_props)
 
-        # Protein signal — use zeros as placeholder if not available
-        protein_signals_list.append(np.zeros(len(all_markers), dtype=np.float32))
-
     protein_props = np.array(protein_props_list)
-    protein_signals = np.array(protein_signals_list)
+
+    # Load real antibody signal from SpaceRanger
+    protein_signals = load_antibody_signal(sample_name, valid_spots, all_markers)
 
     dataset = SpotDataset(
         features_per_spot=features_per_spot,
@@ -115,8 +142,8 @@ def run_step3(sample_name):
     pcmil_dir = OUTPUT_BASE / sample_name / "pcmil"
     pcmil_dir.mkdir(parents=True, exist_ok=True)
 
-    features, nucleus_ids, centroids, props_df, adata = load_step2_outputs(sample_name)
-    dataset = build_spot_datasets(features, nucleus_ids, centroids, props_df, adata)
+    features, nucleus_ids, centroids, props_df = load_step2_outputs(sample_name)
+    dataset = build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df)
     logger.info(f"Built dataset with {len(dataset)} spots")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
