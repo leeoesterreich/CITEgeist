@@ -49,54 +49,75 @@ def load_image_and_segment(sample_name, modality):
         sample_path = DATA_DIR / sample_name / "outs"
         spatial_dir = sample_path / "spatial"
 
-        # Load fullres image for patch extraction
-        fullres_path = spatial_dir / "tissue_fullres_image.tif"
-        if not fullres_path.exists():
-            fullres_path = spatial_dir / "tissue_fullres_image.png"
-        logger.info(f"Loading fullres image from {fullres_path}")
-        fullres_img = np.array(Image.open(fullres_path))
-        if fullres_img.ndim == 2:
-            fullres_img = np.stack([fullres_img] * 3, axis=-1)
-        elif fullres_img.shape[2] == 4:
-            fullres_img = fullres_img[:, :, :3]  # Drop alpha
-        logger.info(f"Fullres image shape: {fullres_img.shape}")
-
         # Load scale factors
         with open(spatial_dir / "scalefactors_json.json") as f:
             scalefactors = _json.load(f)
-        hires_scale = scalefactors["tissue_hires_scalef"]
+        spot_diameter = scalefactors.get("spot_diameter_fullres", 140)
+
+        # Load tissue positions to get tissue bounding box (fullres coords)
+        tp = pd.read_csv(spatial_dir / "tissue_positions.csv")
+        in_tissue = tp[tp["in_tissue"] == 1]
+        tissue_rows = in_tissue["pxl_row_in_fullres"].values
+        tissue_cols = in_tissue["pxl_col_in_fullres"].values
+
+        # Crop bounding box with padding (1 spot diameter on each side)
+        pad = int(spot_diameter * 2)
+        fullres_raw = Image.open(
+            spatial_dir / "tissue_fullres_image.tif"
+            if (spatial_dir / "tissue_fullres_image.tif").exists()
+            else spatial_dir / "tissue_fullres_image.png"
+        )
+        img_w, img_h = fullres_raw.size
+        crop_y1 = max(0, int(tissue_rows.min()) - pad)
+        crop_y2 = min(img_h, int(tissue_rows.max()) + pad)
+        crop_x1 = max(0, int(tissue_cols.min()) - pad)
+        crop_x2 = min(img_w, int(tissue_cols.max()) + pad)
+        logger.info(f"Tissue crop: [{crop_y1}:{crop_y2}, {crop_x1}:{crop_x2}] "
+                     f"(full image: {img_h}x{img_w})")
+
+        # Crop fullres to tissue region only
+        fullres_crop = np.array(fullres_raw.crop((crop_x1, crop_y1, crop_x2, crop_y2)))
+        del fullres_raw  # Free memory
+        if fullres_crop.ndim == 2:
+            fullres_crop = np.stack([fullres_crop] * 3, axis=-1)
+        elif fullres_crop.shape[2] == 4:
+            fullres_crop = fullres_crop[:, :, :3]
+        logger.info(f"Cropped tissue image: {fullres_crop.shape}")
 
         # Load spot coordinates — need load_images=True for obsm['spatial']
         adata = sq.read.visium(
             str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
             load_images=True, gex_only=True,
         )
-        # obsm['spatial'] is in fullres pixel coordinates
+        # obsm['spatial'] is (col, row) = (x, y) in fullres pixel coords
         raw_coords = adata.obsm["spatial"]
         finite_mask = np.isfinite(raw_coords).all(axis=1)
         if not finite_mask.all():
             n_nan = (~finite_mask).sum()
             logger.warning(f"Filtering {n_nan} spots with NaN spatial coords")
-        spatial_coords = raw_coords[finite_mask]  # Fullres pixel coords
+        # Shift coordinates to crop space
+        spatial_coords_fullres = raw_coords[finite_mask]
+        spatial_coords = spatial_coords_fullres.copy()
+        spatial_coords[:, 0] -= crop_x1  # x offset
+        spatial_coords[:, 1] -= crop_y1  # y offset
         barcodes = [b for b, m in zip(adata.obs_names, finite_mask) if m]
 
-        # Cellpose on fullres (or reuse cached fullres masks)
+        # Cellpose on cropped tissue image
         module3_dir = OUTPUT_BASE / sample_name / "module3"
-        cached_fullres_masks = list(module3_dir.glob("*_cellpose_masks_fullres.npy"))
-        cached_hires_masks = list(module3_dir.glob("*_cellpose_masks_hires.npy"))
+        cached_crop_masks = list(module3_dir.glob("*_cellpose_masks_tissue.npy"))
 
-        if cached_fullres_masks:
-            logger.info(f"Reusing cached fullres Cellpose masks from {cached_fullres_masks[0]}")
-            masks = np.load(cached_fullres_masks[0])
+        if cached_crop_masks:
+            logger.info(f"Reusing cached tissue Cellpose masks from {cached_crop_masks[0]}")
+            masks = np.load(cached_crop_masks[0])
         else:
-            logger.info("Running Cellpose on fullres H&E image")
+            logger.info(f"Running Cellpose on tissue crop ({fullres_crop.shape})")
             cp_model = _get_cellpose_model("cyto2", torch.cuda.is_available())
-            masks, _, _, _ = cp_model.eval(fullres_img, channels=[0, 0], diameter=None)
-            # Cache for future use
-            np.save(module3_dir / f"{sample_name}_cellpose_masks_fullres.npy", masks)
-            logger.info(f"Cached fullres masks: {len(np.unique(masks)) - 1} nuclei")
+            masks, _, _, _ = cp_model.eval(fullres_crop, channels=[0, 0], diameter=None)
+            np.save(module3_dir / f"{sample_name}_cellpose_masks_tissue.npy", masks)
+            n_nuclei = len(np.unique(masks)) - 1
+            logger.info(f"Cellpose found {n_nuclei} nuclei in tissue crop")
 
-        image = fullres_img
+        image = fullres_crop
     else:
         raise NotImplementedError("DAPI modality deferred to Xenium follow-up")
 
