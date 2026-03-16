@@ -51,8 +51,14 @@ def load_image_and_segment(sample_name, modality):
         spatial_key = list(adata.uns["spatial"].keys())[0]
         img = adata.uns["spatial"][spatial_key]["images"]["hires"]
         scale = adata.uns["spatial"][spatial_key]["scalefactors"]["tissue_hires_scalef"]
-        spatial_coords = adata.obsm["spatial"] * scale
-        barcodes = list(adata.obs_names)
+        raw_coords = adata.obsm["spatial"] * scale
+        # Filter NaN spatial coordinates
+        finite_mask = np.isfinite(raw_coords).all(axis=1)
+        if not finite_mask.all():
+            n_nan = (~finite_mask).sum()
+            logger.warning(f"Filtering {n_nan} spots with NaN spatial coords")
+        spatial_coords = raw_coords[finite_mask]
+        barcodes = [b for b, m in zip(adata.obs_names, finite_mask) if m]
 
         # Try to reuse cached masks from Step 1
         module3_dir = OUTPUT_BASE / sample_name / "module3"
