@@ -2,7 +2,7 @@
 #SBATCH --job-name=unified_step4
 #SBATCH --array=0-11
 #SBATCH --time=00:30:00
-#SBATCH --mem=16G
+#SBATCH --mem=64G
 #SBATCH --cpus-per-task=4
 #SBATCH --cluster=htc
 #SBATCH --partition=htc

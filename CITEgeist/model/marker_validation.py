@@ -89,6 +89,8 @@ def summarize_validation(scores_df: pd.DataFrame) -> dict:
         Dict with 'per_type' and 'overall' summary metrics.
     """
     per_type = {}
+    if scores_df.empty or "cell_type" not in scores_df.columns:
+        return {"per_type": {}, "overall": {"n_nuclei": 0, "fraction_correct": 0.0, "median_marker_score": 0.0}}
     for cell_type, group in scores_df.groupby("cell_type"):
         per_type[cell_type] = {
             "n_nuclei": len(group),
