@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name=unified_step2
 #SBATCH --array=0-11
-#SBATCH --time=01:00:00
-#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --mem=64G
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:1
 #SBATCH --cluster=gpu

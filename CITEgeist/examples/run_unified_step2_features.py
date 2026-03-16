@@ -42,37 +42,61 @@ def load_image_and_segment(sample_name, modality):
 
     if modality == "he":
         import squidpy as sq
-        sample_path = DATA_DIR / sample_name / "outs"
+        import json as _json
+        from PIL import Image
+        Image.MAX_IMAGE_PIXELS = None  # Fullres images can be large
 
+        sample_path = DATA_DIR / sample_name / "outs"
+        spatial_dir = sample_path / "spatial"
+
+        # Load fullres image for patch extraction
+        fullres_path = spatial_dir / "tissue_fullres_image.tif"
+        if not fullres_path.exists():
+            fullres_path = spatial_dir / "tissue_fullres_image.png"
+        logger.info(f"Loading fullres image from {fullres_path}")
+        fullres_img = np.array(Image.open(fullres_path))
+        if fullres_img.ndim == 2:
+            fullres_img = np.stack([fullres_img] * 3, axis=-1)
+        elif fullres_img.shape[2] == 4:
+            fullres_img = fullres_img[:, :, :3]  # Drop alpha
+        logger.info(f"Fullres image shape: {fullres_img.shape}")
+
+        # Load scale factors
+        with open(spatial_dir / "scalefactors_json.json") as f:
+            scalefactors = _json.load(f)
+        hires_scale = scalefactors["tissue_hires_scalef"]
+
+        # Load spot coordinates (fullres pixel space = obsm['spatial'] unscaled)
         adata = sq.read.visium(
             str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
-            load_images=True, gex_only=True,
+            load_images=False, gex_only=True,
         )
-        spatial_key = list(adata.uns["spatial"].keys())[0]
-        img = adata.uns["spatial"][spatial_key]["images"]["hires"]
-        scale = adata.uns["spatial"][spatial_key]["scalefactors"]["tissue_hires_scalef"]
-        raw_coords = adata.obsm["spatial"] * scale
-        # Filter NaN spatial coordinates
+        # obsm['spatial'] is in fullres pixel coordinates
+        raw_coords = adata.obsm["spatial"]
         finite_mask = np.isfinite(raw_coords).all(axis=1)
         if not finite_mask.all():
             n_nan = (~finite_mask).sum()
             logger.warning(f"Filtering {n_nan} spots with NaN spatial coords")
-        spatial_coords = raw_coords[finite_mask]
+        spatial_coords = raw_coords[finite_mask]  # Fullres pixel coords
         barcodes = [b for b, m in zip(adata.obs_names, finite_mask) if m]
 
-        # Try to reuse cached masks from Step 1
+        # Cellpose on fullres (or reuse cached fullres masks)
         module3_dir = OUTPUT_BASE / sample_name / "module3"
-        cached_masks = list(module3_dir.glob("*_cellpose_masks.npy"))
+        cached_fullres_masks = list(module3_dir.glob("*_cellpose_masks_fullres.npy"))
+        cached_hires_masks = list(module3_dir.glob("*_cellpose_masks_hires.npy"))
 
-        if cached_masks:
-            logger.info(f"Reusing cached Cellpose masks from {cached_masks[0]}")
-            masks = np.load(cached_masks[0])
+        if cached_fullres_masks:
+            logger.info(f"Reusing cached fullres Cellpose masks from {cached_fullres_masks[0]}")
+            masks = np.load(cached_fullres_masks[0])
         else:
-            logger.info("No cached masks, running Cellpose on H&E")
+            logger.info("Running Cellpose on fullres H&E image")
             cp_model = _get_cellpose_model("cyto2", torch.cuda.is_available())
-            masks, _, _, _ = cp_model.eval(img, channels=[0, 0], diameter=None)
+            masks, _, _, _ = cp_model.eval(fullres_img, channels=[0, 0], diameter=None)
+            # Cache for future use
+            np.save(module3_dir / f"{sample_name}_cellpose_masks_fullres.npy", masks)
+            logger.info(f"Cached fullres masks: {len(np.unique(masks)) - 1} nuclei")
 
-        image = img  # (H, W, 3)
+        image = fullres_img
     else:
         raise NotImplementedError("DAPI modality deferred to Xenium follow-up")
 
@@ -86,13 +110,22 @@ def load_image_and_segment(sample_name, modality):
     np.save(cellpose_dir / "nuclei_masks.npy", masks)
     centroids_df.to_csv(cellpose_dir / "nuclei_centroids.csv", index=False)
 
-    return masks, centroids_df, image, spatial_coords, barcodes
+    # Spot radius in fullres pixels (half the spot diameter)
+    spot_radius_px = scalefactors.get("spot_diameter_fullres", 140) / 2.0
+
+    return masks, centroids_df, image, spatial_coords, barcodes, spot_radius_px
 
 
 def assign_nuclei_to_spots(centroids_df, spatial_coords, barcodes, spot_radius=None):
-    """Assign each nucleus to nearest Visium spot."""
-    tree = cKDTree(spatial_coords)
-    nucleus_coords = centroids_df[["y_pixel", "x_pixel"]].values
+    """Assign each nucleus to nearest Visium spot.
+
+    Note: obsm['spatial'] from squidpy is (x, y) in fullres pixel coords.
+    center_of_mass returns (row, col) = (y, x). We match by swapping nucleus
+    coords to (x, y) before building the KDTree.
+    """
+    tree = cKDTree(spatial_coords)  # (x, y) from obsm['spatial']
+    # Swap nucleus (y, x) → (x, y) to match spatial_coords convention
+    nucleus_coords = centroids_df[["x_pixel", "y_pixel"]].values
     distances, indices = tree.query(nucleus_coords)
 
     centroids_df = centroids_df.copy()
@@ -161,10 +194,12 @@ def run_step2(sample_name, modality="he"):
         logger.info(f"Step 2 already complete for {sample_name}, skipping")
         return
 
-    masks, centroids_df, image, spatial_coords, barcodes = load_image_and_segment(
+    masks, centroids_df, image, spatial_coords, barcodes, spot_radius_px = load_image_and_segment(
         sample_name, modality,
     )
-    centroids_df = assign_nuclei_to_spots(centroids_df, spatial_coords, barcodes)
+    centroids_df = assign_nuclei_to_spots(
+        centroids_df, spatial_coords, barcodes, spot_radius=spot_radius_px,
+    )
     patches, valid_ids = extract_patches(image, centroids_df, modality, PATCH_SIZE)
 
     if len(patches) == 0:
