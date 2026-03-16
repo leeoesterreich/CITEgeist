@@ -32,6 +32,8 @@ SAMPLES=(
 
 SAMPLE=${SAMPLES[$SLURM_ARRAY_TASK_ID]}
 
+cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
+
 # Gate on Step 1 completion
 MARKER="output/unified_pipeline/${SAMPLE}/.step1_complete"
 if [ ! -f "${MARKER}" ]; then
@@ -40,6 +42,4 @@ if [ ! -f "${MARKER}" ]; then
 fi
 
 echo "Running Step 2 (Cellpose + ViT features) for ${SAMPLE}"
-
-cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
 python examples/run_unified_step2_features.py --sample ${SAMPLE} --modality he

@@ -32,6 +32,8 @@ SAMPLES=(
 
 SAMPLE=${SAMPLES[$SLURM_ARRAY_TASK_ID]}
 
+cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
+
 MARKER="output/unified_pipeline/${SAMPLE}/.step2_complete"
 if [ ! -f "${MARKER}" ]; then
     echo "Step 2 not complete for ${SAMPLE}, exiting"
@@ -40,5 +42,4 @@ fi
 
 echo "Running Step 3 (PC-MIL train + infer) for ${SAMPLE}"
 
-cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
 python examples/run_unified_step3_pcmil.py --sample ${SAMPLE}

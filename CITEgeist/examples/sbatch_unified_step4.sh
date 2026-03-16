@@ -31,6 +31,8 @@ SAMPLES=(
 
 SAMPLE=${SAMPLES[$SLURM_ARRAY_TASK_ID]}
 
+cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
+
 MARKER="output/unified_pipeline/${SAMPLE}/.step3_complete"
 if [ ! -f "${MARKER}" ]; then
     echo "Step 3 not complete for ${SAMPLE}, exiting"
@@ -39,5 +41,4 @@ fi
 
 echo "Running Step 4 (Marker gene validation) for ${SAMPLE}"
 
-cd /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/CITEgeist
 python examples/run_unified_step4_validate.py --sample ${SAMPLE}
