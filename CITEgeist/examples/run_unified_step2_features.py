@@ -66,10 +66,10 @@ def load_image_and_segment(sample_name, modality):
             scalefactors = _json.load(f)
         hires_scale = scalefactors["tissue_hires_scalef"]
 
-        # Load spot coordinates (fullres pixel space = obsm['spatial'] unscaled)
+        # Load spot coordinates — need load_images=True for obsm['spatial']
         adata = sq.read.visium(
             str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
-            load_images=False, gex_only=True,
+            load_images=True, gex_only=True,
         )
         # obsm['spatial'] is in fullres pixel coordinates
         raw_coords = adata.obsm["spatial"]
