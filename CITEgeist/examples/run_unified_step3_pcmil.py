@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from model.unified_config import (
-    CELL_PROFILES_NESTED, CELL_TYPE_NAMES, OUTPUT_BASE, K,
+    CELL_PROFILES_NESTED, CELL_TYPE_NAMES, OUTPUT_BASE, DATA_DIR, K,
     MAX_EPOCHS, PATIENCE, LAMBDA_RECON, LAMBDA_ENTROPY,
     LAMBDA_DIVERSITY, LAMBDA_HUNGARIAN, RECON_WARMUP_EPOCHS,
     PROTEIN_DROPOUT,
