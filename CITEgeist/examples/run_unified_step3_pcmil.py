@@ -93,19 +93,24 @@ def build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df)
     features_per_spot = []
     protein_props_list = []
     valid_spots = []
+    nucleus_ids_per_spot = []
 
     for spot in spots:
         spot_nuclei = centroids[centroids["spot_barcode"] == spot]
         if len(spot_nuclei) == 0:
             continue
 
-        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nuclei["nucleus_id"].values
+        spot_nids = spot_nuclei["nucleus_id"].values
+        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nids
                         if int(nid) in nid_to_idx]
         if not feat_indices:
             continue
 
         features_per_spot.append(features[feat_indices])
         valid_spots.append(spot)
+        # Track which nucleus IDs made it into the feature array
+        valid_nids = [str(int(nid)) for nid in spot_nids if int(nid) in nid_to_idx]
+        nucleus_ids_per_spot.append(valid_nids)
 
         # Proportions
         full_props = np.zeros(K, dtype=np.float32)
@@ -125,7 +130,7 @@ def build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df)
         protein_signals=protein_signals,
         true_props=protein_props,
     )
-    return dataset
+    return dataset, valid_spots, nucleus_ids_per_spot
 
 
 def run_step3(sample_name):
@@ -143,7 +148,9 @@ def run_step3(sample_name):
     pcmil_dir.mkdir(parents=True, exist_ok=True)
 
     features, nucleus_ids, centroids, props_df = load_step2_outputs(sample_name)
-    dataset = build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df)
+    dataset, spot_barcodes, nids_per_spot = build_spot_datasets(
+        sample_name, features, nucleus_ids, centroids, props_df,
+    )
     logger.info(f"Built dataset with {len(dataset)} spots")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -172,7 +179,7 @@ def run_step3(sample_name):
     with open(pcmil_dir / "training_log.json", "w") as f:
         json.dump({k: [float(v) for v in vs] for k, vs in history.items()}, f)
 
-    # Inference: argmax global
+    # Inference: argmax global, per spot with barcodes
     model.eval()
     all_assignments = []
 
@@ -186,6 +193,8 @@ def run_step3(sample_name):
             model=model, image_features=img_feats,
             protein_proportions=prot_props, detected_types=detected,
             cell_type_names=CELL_TYPE_NAMES,
+            nucleus_ids=nids_per_spot[i],
+            barcode=spot_barcodes[i],
             inference_mode="argmax_global",
         )
         all_assignments.append(result)
