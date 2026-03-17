@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """
-Benchmark Cellpose nuclei-count fidelity across image resolutions on Xenium pseudo-Visium.
+Benchmark nuclei-count fidelity across image resolutions on Xenium pseudo-Visium.
 
 This version reads morphology images from explicit filesystem paths (not h5ad uns['spatial']).
+Uses StarDist for nuclei segmentation via ``compute_spot_nuclei_counts()``.
 """
 
 from __future__ import annotations
@@ -296,8 +297,6 @@ def main() -> None:
         help="Spot diameter in microns. Standard Visium = 55.0 µm, Visium HD = 8.0 µm.",
     )
     parser.add_argument("--resolutions", nargs="+", default=["lowres", "hires", "fullres"], help="Modes to benchmark.")
-    parser.add_argument("--cellpose-gpu", action="store_true", help="Request GPU for Cellpose.")
-    parser.add_argument("--cellpose-diameter", type=float, default=None, help="Optional diameter override.")
     parser.add_argument("--max-fullres-side", type=int, default=9000, help="Max side for fallback upsampling.")
     parser.add_argument(
         "--fullres-patch-radius-multiplier",
@@ -350,10 +349,8 @@ def main() -> None:
             antibody_capture_adata=adata_for_seg.copy(),
         )
         t0 = time.time()
-        pred_counts = model.compute_spot_nuclei_counts_cellpose(
+        pred_counts = model.compute_spot_nuclei_counts(
             resolution_mode=mode,
-            use_gpu=args.cellpose_gpu,
-            diameter=args.cellpose_diameter,
             max_fullres_side=args.max_fullres_side,
             fullres_patch_mode=(mode == "fullres"),
             fullres_patch_radius_multiplier=args.fullres_patch_radius_multiplier,

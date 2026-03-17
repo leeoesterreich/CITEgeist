@@ -51,6 +51,7 @@ from CITEgeist.model.patch_extraction import (
     extract_patch_with_size,
 )
 from CITEgeist.model.morphology_features import extract_nucleus_features
+from CITEgeist.model.segmentation import StarDistSegmenter
 
 # =============================================================================
 # OME-TIFF REGION LOADING (for Xenium benchmark)
@@ -373,7 +374,7 @@ def _process_single_spot(
 
 
 def prepare_patches(
-    mask_path: str,
+    mask_path: Optional[str],
     nuclei_spot_map_path: str,
     output_dir: str,
     image_path: Optional[str] = None,
@@ -385,6 +386,7 @@ def prepare_patches(
     min_bbox_size: int = 4,
     norm_method: str = "percentile",
     num_workers: int = 1,
+    run_segmentation: bool = False,
 ) -> None:
     """
     Extract and save patches for all nuclei, organized by spot.
@@ -393,8 +395,12 @@ def prepare_patches(
     1. Single image mode: provide image_path
     2. OME-TIFF dual channel mode: provide dapi_path, boundary_path, region_id
 
+    If ``run_segmentation`` is True, StarDist is used to segment the DAPI
+    channel on-the-fly instead of loading a pre-computed mask.
+
     Args:
-        mask_path: Path to Cellpose nucleus mask (.npy or .tiff)
+        mask_path: Path to nucleus mask (.npy or .tiff). Can be None if
+            ``run_segmentation`` is True.
         nuclei_spot_map_path: CSV mapping nucleus_id to spot_id
         output_dir: Output directory for patches
         image_path: Path to multi-channel TIFF/PNG image (mode 1)
@@ -406,6 +412,8 @@ def prepare_patches(
         min_bbox_size: Minimum bbox dimension to extract (default 4)
         norm_method: Normalization method ("percentile" or "minmax")
         num_workers: Number of parallel workers (default 1, set to 16 for HPC)
+        run_segmentation: If True, run StarDist on DAPI channel instead of
+            loading a mask from ``mask_path``.
     """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -431,8 +439,28 @@ def prepare_patches(
     np.savez(stats_path, **global_stats)
     logger.info(f"Saved global normalization stats to {stats_path}")
 
-    # Load mask
-    mask = load_mask(Path(mask_path))
+    # Load or compute mask
+    if run_segmentation:
+        logger.info("Running StarDist segmentation on DAPI channel...")
+        segmenter = StarDistSegmenter("dapi")
+        # Use channel 0 (DAPI) for segmentation
+        dapi_for_seg = image[0]
+        # Normalize to uint8 range for StarDist
+        dapi_min, dapi_max = dapi_for_seg.min(), dapi_for_seg.max()
+        if dapi_max > dapi_min:
+            dapi_uint8 = ((dapi_for_seg - dapi_min) / (dapi_max - dapi_min) * 255).astype(np.uint8)
+        else:
+            dapi_uint8 = np.zeros_like(dapi_for_seg, dtype=np.uint8)
+        mask, _centroids_df = segmenter.segment(dapi_uint8)
+        logger.info("StarDist segmented %d nuclei", int(mask.max()))
+        # Save the mask for future use
+        mask_save_path = Path(output_dir) / "stardist_mask.npy"
+        np.save(mask_save_path, mask)
+        logger.info("Saved segmentation mask to %s", mask_save_path)
+    elif mask_path is not None:
+        mask = load_mask(Path(mask_path))
+    else:
+        raise ValueError("Must provide --mask or --run-segmentation")
 
     # Validate shapes match
     if image.shape[1:] != mask.shape:
@@ -618,11 +646,18 @@ Example (OME-TIFF dual channel - RECOMMENDED):
         choices=[0, 1, 2, 3, 4],
         help="Region ID for OME-TIFF cropping (mode 2)",
     )
-    # Required arguments
+    # Required arguments (mask is required unless --run-segmentation is set)
     parser.add_argument(
         "--mask",
-        required=True,
-        help="Path to Cellpose nucleus mask (.npy or .tiff)",
+        required=False,
+        default=None,
+        help="Path to nucleus mask (.npy or .tiff)",
+    )
+    parser.add_argument(
+        "--run-segmentation",
+        action="store_true",
+        default=False,
+        help="Run StarDist segmentation on DAPI channel instead of loading a mask",
     )
     parser.add_argument(
         "--nuclei_spot_map",
@@ -672,6 +707,8 @@ Example (OME-TIFF dual channel - RECOMMENDED):
     # Validate arguments
     if args.image is None and (args.dapi is None or args.boundary is None or args.region is None):
         parser.error("Must provide either --image OR (--dapi, --boundary, --region)")
+    if args.mask is None and not args.run_segmentation:
+        parser.error("Must provide --mask or --run-segmentation")
 
     prepare_patches(
         mask_path=args.mask,
@@ -686,6 +723,7 @@ Example (OME-TIFF dual channel - RECOMMENDED):
         min_bbox_size=args.min_bbox_size,
         norm_method=args.norm_method,
         num_workers=args.num_workers,
+        run_segmentation=args.run_segmentation,
     )
 
 

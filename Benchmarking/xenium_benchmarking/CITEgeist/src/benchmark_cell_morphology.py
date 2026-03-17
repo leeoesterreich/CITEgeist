@@ -7,7 +7,7 @@ for Module 3b cell type assignment accuracy.
 
 This script:
 1. Loads DAPI and boundary channels from Xenium RCC data
-2. Runs Cellpose on DAPI to get nuclear segmentation
+2. Runs StarDist on DAPI to get nuclear segmentation
 3. Runs watershed using boundary channel to expand to cell boundaries
 4. Extracts cell features (nuclear + cytoplasmic morphology)
 5. Saves outputs for evaluation
@@ -32,7 +32,7 @@ import tifffile
 REPO_ROOT = Path(__file__).parent.parent.parent.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from CITEgeist.model.segmentation import run_cellpose_nuclei_segmentation
+from CITEgeist.model.segmentation import run_nuclei_segmentation
 from CITEgeist.model.watershed_segmentation import watershed_from_nuclei
 from CITEgeist.model.morphology_features import extract_cell_features
 
@@ -201,8 +201,6 @@ def normalize_to_uint8(img: np.ndarray) -> np.ndarray:
 def run_benchmark(
     region_id: int,
     output_dir: Path,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Run cell morphology benchmark for a single region.
@@ -210,8 +208,6 @@ def run_benchmark(
     Args:
         region_id: Region ID (0-4)
         output_dir: Output directory for results
-        use_gpu: Whether to use GPU for Cellpose
-        cellpose_diameter: Cellpose nucleus diameter (auto if None)
 
     Returns:
         Dictionary with benchmark results
@@ -247,35 +243,27 @@ def run_benchmark(
         )
 
     # =========================================================================
-    # Step 2: Cellpose nuclear segmentation
+    # Step 2: StarDist nuclear segmentation
     # =========================================================================
     logger.info("-" * 60)
-    logger.info("STEP 2: Cellpose nuclear segmentation")
+    logger.info("STEP 2: StarDist nuclear segmentation")
     logger.info("-" * 60)
 
-    # Convert DAPI to RGB for Cellpose (expects 3-channel uint8)
+    # Convert DAPI to uint8 for segmentation
     dapi_uint8 = normalize_to_uint8(dapi_img)
-    dapi_rgb = np.stack([dapi_uint8, dapi_uint8, dapi_uint8], axis=-1)
 
-    logger.info(
-        "Running Cellpose (use_gpu=%s, diameter=%s)",
-        use_gpu, cellpose_diameter
-    )
+    logger.info("Running StarDist nuclei segmentation")
 
     t0 = time.time()
-    nucleus_mask, centroids = run_cellpose_nuclei_segmentation(
-        image_rgb_uint8=dapi_rgb,
-        use_gpu=use_gpu,
-        diameter=cellpose_diameter,
-        model_type="nuclei",
-    )
-    timings["cellpose_sec"] = time.time() - t0
+    nucleus_mask, centroids_df = run_nuclei_segmentation(dapi_uint8, modality="dapi")
+    centroids = centroids_df[["x_pixel", "y_pixel"]].values
+    timings["segmentation_sec"] = time.time() - t0
     n_nuclei = len(centroids)
 
     logger.info(
-        "Cellpose: %d nuclei detected in %.1fs (%.1f nuclei/sec)",
-        n_nuclei, timings["cellpose_sec"],
-        n_nuclei / timings["cellpose_sec"] if timings["cellpose_sec"] > 0 else 0,
+        "StarDist: %d nuclei detected in %.1fs (%.1f nuclei/sec)",
+        n_nuclei, timings["segmentation_sec"],
+        n_nuclei / timings["segmentation_sec"] if timings["segmentation_sec"] > 0 else 0,
     )
 
     # =========================================================================
@@ -365,8 +353,8 @@ def run_benchmark(
         "feature_columns": list(features_df.columns),
         "feature_stats": feature_stats,
         "parameters": {
-            "use_gpu": use_gpu,
-            "cellpose_diameter": cellpose_diameter,
+            "segmentation_backend": "stardist",
+            "modality": "dapi",
             "use_gradient": True,
         },
     }
@@ -392,22 +380,12 @@ def main():
         default=str(REPO_ROOT / "Benchmarking/xenium_benchmarking/CITEgeist/output/cell_morphology"),
         help="Output directory for results"
     )
-    parser.add_argument(
-        "--use-gpu", action="store_true",
-        help="Use GPU for Cellpose segmentation"
-    )
-    parser.add_argument(
-        "--cellpose-diameter", type=float, default=None,
-        help="Cellpose nucleus diameter in pixels (auto-detect if not specified)"
-    )
 
     args = parser.parse_args()
 
     results = run_benchmark(
         region_id=args.region,
         output_dir=Path(args.output_dir),
-        use_gpu=args.use_gpu,
-        cellpose_diameter=args.cellpose_diameter,
     )
 
     logger.info("=" * 70)

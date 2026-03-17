@@ -7,7 +7,7 @@ continuous model to address cells with RNA signal but low protein expression.
 
 Pipeline:
 1. Load morphology image for a Xenium pseudo-Visium region
-2. Run Cellpose segmentation to get nuclei counts per spot
+2. Run StarDist segmentation to get nuclei counts per spot
 3. Run continuous CITEgeist model (CLR preprocessing, QP optimization)
 4. Run multimodal EM refinement (anchor gene learning + iterative refinement)
 5. Discretize refined proportions using nuclei counts (largest remainder method)
@@ -43,7 +43,7 @@ from benchmark_constants import ACHIEVABLE_7_CELL_PROFILE_DICT
 from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.segmentation import (
     assign_nuclei_centroids_to_spots,
-    run_cellpose_nuclei_segmentation,
+    run_nuclei_segmentation,
 )
 
 logging.basicConfig(
@@ -110,26 +110,19 @@ def convert_micron_to_pixel(coords_micron: np.ndarray, coord_info: Dict) -> np.n
     return coords_pixel
 
 
-def run_cellpose_and_assign(
+def run_segmentation_and_assign(
     image_rgb: np.ndarray,
     spot_coords_pixel: np.ndarray,
     spot_names: pd.Index,
     spot_diameter_um: float,
     pixel_size_um: float,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
 ) -> pd.Series:
-    """Run Cellpose segmentation and assign nuclei to spots."""
-    logger.info("Running Cellpose segmentation (use_gpu=%s, diameter=%s)",
-                use_gpu, cellpose_diameter)
+    """Run StarDist nuclei segmentation and assign nuclei to spots."""
+    logger.info("Running StarDist nuclei segmentation")
 
     t0 = time.time()
-    masks, centroids_xy = run_cellpose_nuclei_segmentation(
-        image_rgb_uint8=image_rgb,
-        use_gpu=use_gpu,
-        diameter=cellpose_diameter,
-        model_type="nuclei",
-    )
+    masks, centroids_df = run_nuclei_segmentation(image_rgb, modality="dapi")
+    centroids_xy = centroids_df[["x_pixel", "y_pixel"]].values
     seg_time = time.time() - t0
     n_nuclei = len(centroids_xy)
 
@@ -168,8 +161,6 @@ def run_multimodal_benchmark(
     output_dir: Path,
     data_dir: Path = DATA_DIR,
     image_dir: Path = IMAGE_DIR,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
     run_gex: bool = True,
     min_counts: int = 25,
     spot_diameter_um: float = 55.0,
@@ -190,7 +181,7 @@ def run_multimodal_benchmark(
     Multimodal approach:
     1. Run continuous model to get protein-based proportions
     2. Run multimodal EM refinement (Pass 1.5 + Pass 2) using RNA
-    3. Discretize refined proportions using nuclei counts from Cellpose
+    3. Discretize refined proportions using nuclei counts from StarDist
     4. Run GEX deconvolution with discrete counts
 
     Args:
@@ -198,8 +189,6 @@ def run_multimodal_benchmark(
         output_dir: Output directory for results
         data_dir: Directory containing h5ad_objects/
         image_dir: Directory containing morphology images
-        use_gpu: Whether to use GPU for Cellpose
-        cellpose_diameter: Cellpose nucleus diameter (auto if None)
         run_gex: Whether to run GEX deconvolution
         min_counts: Minimum counts filter for GEX preprocessing
         spot_diameter_um: Spot diameter in microns
@@ -247,7 +236,7 @@ def run_multimodal_benchmark(
     # Step 2: Load morphology image and run Cellpose
     # =========================================================================
     logger.info("-" * 60)
-    logger.info("STEP 2: Cellpose nuclei segmentation")
+    logger.info("STEP 2: StarDist nuclei segmentation")
     logger.info("-" * 60)
 
     t0 = time.time()
@@ -258,16 +247,14 @@ def run_multimodal_benchmark(
     spot_coords_pixel = convert_micron_to_pixel(spot_coords_micron, coord_info)
     pixel_size_um = float(coord_info["pixel_size"])
 
-    nuclei_counts = run_cellpose_and_assign(
+    nuclei_counts = run_segmentation_and_assign(
         image_rgb=image_rgb,
         spot_coords_pixel=spot_coords_pixel,
         spot_names=cite_adata.obs_names,
         spot_diameter_um=spot_diameter_um,
         pixel_size_um=pixel_size_um,
-        use_gpu=use_gpu,
-        cellpose_diameter=cellpose_diameter,
     )
-    timings["cellpose_sec"] = time.time() - t0
+    timings["segmentation_sec"] = time.time() - t0
 
     # Save nuclei counts
     nuclei_counts_path = result_dir / f"{sample_name}_nuclei_counts.csv"
@@ -448,9 +435,9 @@ def run_multimodal_benchmark(
             "min_per_spot": int(nuclei_counts.min()),
             "max_per_spot": int(nuclei_counts.max()),
         },
-        "cellpose_params": {
-            "use_gpu": use_gpu,
-            "diameter": cellpose_diameter,
+        "segmentation_params": {
+            "backend": "stardist",
+            "modality": "dapi",
             "spot_diameter_um": spot_diameter_um,
             "pixel_size_um": pixel_size_um,
         },
@@ -497,10 +484,6 @@ def main():
                         help="Directory containing h5ad_objects/")
     parser.add_argument("--image-dir", type=str, default=str(IMAGE_DIR),
                         help="Directory containing morphology images")
-    parser.add_argument("--use-gpu", action="store_true", default=False,
-                        help="Use GPU for Cellpose")
-    parser.add_argument("--cellpose-diameter", type=float, default=None,
-                        help="Cellpose nucleus diameter (auto if not set)")
     parser.add_argument("--no-gex", action="store_true", default=False,
                         help="Skip GEX deconvolution")
     parser.add_argument("--min-counts", type=int, default=25,
@@ -535,8 +518,6 @@ def main():
         output_dir=Path(args.output_dir),
         data_dir=Path(args.data_dir),
         image_dir=Path(args.image_dir),
-        use_gpu=args.use_gpu,
-        cellpose_diameter=args.cellpose_diameter,
         run_gex=not args.no_gex,
         min_counts=args.min_counts,
         spot_diameter_um=args.spot_diameter_um,

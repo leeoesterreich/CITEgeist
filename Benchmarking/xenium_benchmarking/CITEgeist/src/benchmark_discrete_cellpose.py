@@ -1,17 +1,16 @@
 #!/usr/bin/env python
 """
-Discrete cell assignment benchmark with Cellpose nuclei segmentation.
+Discrete cell assignment benchmark with StarDist nuclei segmentation.
 
 This script runs the full CITEgeist discrete pipeline:
 1. Load morphology image for a Xenium pseudo-Visium region
-2. Run Cellpose segmentation to get nuclei counts per spot
+2. Run StarDist segmentation to get nuclei counts per spot
 3. Run discrete cell assignment (IQP) using nuclei counts as constraints
 4. Run GEX deconvolution using discrete cell counts
 5. Save outputs for evaluation
 
 Usage:
     python benchmark_discrete_cellpose.py --region 0 --output-dir ./output/discrete
-    python benchmark_discrete_cellpose.py --region 0 --use-gpu --cellpose-diameter 20
 """
 
 import argparse
@@ -38,9 +37,8 @@ from benchmark_constants import ACHIEVABLE_7_CELL_PROFILE_DICT
 
 from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.segmentation import (
-    SegmentationResult,
     assign_nuclei_centroids_to_spots,
-    run_cellpose_nuclei_segmentation,
+    run_nuclei_segmentation,
 )
 
 logging.basicConfig(
@@ -156,17 +154,15 @@ def convert_micron_to_pixel(
 # =============================================================================
 
 
-def run_cellpose_and_assign(
+def run_segmentation_and_assign(
     image_rgb: np.ndarray,
     spot_coords_pixel: np.ndarray,
     spot_names: pd.Index,
     spot_diameter_um: float,
     pixel_size_um: float,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
 ) -> pd.Series:
     """
-    Run Cellpose segmentation and assign nuclei to spots.
+    Run StarDist nuclei segmentation and assign nuclei to spots.
 
     Args:
         image_rgb: RGB morphology image
@@ -174,27 +170,20 @@ def run_cellpose_and_assign(
         spot_names: Spot identifiers
         spot_diameter_um: Spot diameter in microns (e.g., 55.0 for Visium)
         pixel_size_um: Microns per pixel in image
-        use_gpu: Whether to use GPU for Cellpose
-        cellpose_diameter: Cellpose nucleus diameter (auto-detect if None)
 
     Returns:
         Series with nuclei counts per spot
     """
-    logger.info("Running Cellpose nuclei segmentation...")
+    logger.info("Running StarDist nuclei segmentation...")
     t0 = time.time()
 
-    masks, centroids_xy = run_cellpose_nuclei_segmentation(
-        image_rgb_uint8=image_rgb,
-        use_gpu=use_gpu,
-        diameter=cellpose_diameter,
-        flow_threshold=0.4,
-        cellprob_threshold=0.0,
-    )
+    masks, centroids_df = run_nuclei_segmentation(image_rgb, modality="dapi")
+    centroids_xy = centroids_df[["x_pixel", "y_pixel"]].values
 
     seg_time = time.time() - t0
     n_nuclei = int(masks.max()) if masks.size > 0 else 0
     logger.info(
-        "Cellpose found %d nuclei in %.1fs (%.1f nuclei/sec)",
+        "StarDist found %d nuclei in %.1fs (%.1f nuclei/sec)",
         n_nuclei,
         seg_time,
         n_nuclei / seg_time if seg_time > 0 else 0,
@@ -247,8 +236,6 @@ def run_discrete_benchmark(
     output_dir: Path,
     data_dir: Path = DATA_DIR,
     image_dir: Path = IMAGE_DIR,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
     max_em_iterations: int = 20,
     run_gex: bool = True,
     min_counts: int = 25,
@@ -266,8 +253,6 @@ def run_discrete_benchmark(
         output_dir: Output directory for results
         data_dir: Directory containing h5ad_objects/
         image_dir: Directory containing morphology images
-        use_gpu: Whether to use GPU for Cellpose
-        cellpose_diameter: Cellpose nucleus diameter (auto if None)
         max_em_iterations: Maximum EM iterations for discrete assignment
         run_gex: Whether to run GEX deconvolution
         min_counts: Minimum counts filter for GEX preprocessing
@@ -329,20 +314,18 @@ def run_discrete_benchmark(
     # Step 3: Run Cellpose segmentation
     # =========================================================================
     logger.info("-" * 60)
-    logger.info("STEP 3: Cellpose nuclei segmentation")
+    logger.info("STEP 3: StarDist nuclei segmentation")
     logger.info("-" * 60)
 
     t0 = time.time()
-    nuclei_counts = run_cellpose_and_assign(
+    nuclei_counts = run_segmentation_and_assign(
         image_rgb=image_rgb,
         spot_coords_pixel=spot_coords_pixel,
         spot_names=cite_adata.obs_names,
         spot_diameter_um=spot_diameter_um,
         pixel_size_um=pixel_size_um,
-        use_gpu=use_gpu,
-        cellpose_diameter=cellpose_diameter,
     )
-    timings["cellpose_sec"] = time.time() - t0
+    timings["segmentation_sec"] = time.time() - t0
 
     # Save nuclei counts
     nuclei_counts_path = result_dir / f"{sample_name}_nuclei_counts.csv"
@@ -479,9 +462,9 @@ def run_discrete_benchmark(
             "min_per_spot": int(nuclei_counts.min()),
             "max_per_spot": int(nuclei_counts.max()),
         },
-        "cellpose_params": {
-            "use_gpu": use_gpu,
-            "diameter": cellpose_diameter,
+        "segmentation_params": {
+            "backend": "stardist",
+            "modality": "dapi",
             "spot_diameter_um": spot_diameter_um,
             "pixel_size_um": pixel_size_um,
         },
@@ -500,7 +483,7 @@ def run_discrete_benchmark(
     logger.info("=" * 70)
     logger.info("BENCHMARK COMPLETE")
     logger.info("  Total nuclei: %d", results["nuclei_stats"]["total_nuclei"])
-    logger.info("  Cellpose time: %.1fs", timings["cellpose_sec"])
+    logger.info("  Segmentation time: %.1fs", timings["segmentation_sec"])
     logger.info("  Discrete assignment time: %.1fs", timings["discrete_assignment_sec"])
     if timings["gex_deconv_sec"] is not None and timings["gex_deconv_sec"] > 0:
         logger.info("  GEX deconvolution time: %.1fs", timings["gex_deconv_sec"])
@@ -516,7 +499,7 @@ def run_discrete_benchmark(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Run discrete cell assignment benchmark with Cellpose nuclei segmentation"
+        description="Run discrete cell assignment benchmark with StarDist nuclei segmentation"
     )
 
     # Region selection
@@ -547,18 +530,7 @@ def main():
         help="Directory with morphology images",
     )
 
-    # Cellpose parameters
-    parser.add_argument(
-        "--use-gpu",
-        action="store_true",
-        help="Use GPU for Cellpose segmentation",
-    )
-    parser.add_argument(
-        "--cellpose-diameter",
-        type=float,
-        default=None,
-        help="Cellpose nucleus diameter in pixels (auto-detect if not specified)",
-    )
+    # Spot geometry
     parser.add_argument(
         "--spot-diameter-um",
         type=float,
@@ -634,8 +606,6 @@ def main():
         output_dir=output_dir,
         data_dir=Path(args.data_dir),
         image_dir=Path(args.image_dir),
-        use_gpu=args.use_gpu,
-        cellpose_diameter=args.cellpose_diameter,
         max_em_iterations=args.max_em_iterations,
         run_gex=not args.skip_gex,
         min_counts=args.min_counts,
@@ -654,7 +624,7 @@ def main():
     print(f"  Nuclei detected: {results['nuclei_stats']['total_nuclei']}")
     print(f"  Cell types: {results['n_cell_types']}")
     print(f"  Timings:")
-    print(f"    Cellpose: {results['timings']['cellpose_sec']:.1f}s")
+    print(f"    Segmentation: {results['timings']['segmentation_sec']:.1f}s")
     print(f"    Discrete assignment: {results['timings']['discrete_assignment_sec']:.1f}s")
     if results['timings']['gex_deconv_sec'] is not None:
         if results['timings']['gex_deconv_sec'] > 0:
