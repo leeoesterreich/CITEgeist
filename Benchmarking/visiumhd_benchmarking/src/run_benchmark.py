@@ -2,7 +2,7 @@
 
 End-to-end pipeline:
 1. Create pseudo-Visium spots from Visium HD
-2. Run Cellpose segmentation
+2. Run StarDist segmentation
 3. Extract patches and ViT features
 4. Train MIL with proportion supervision
 5. Evaluate single-cell assignment
@@ -21,7 +21,7 @@ Example usage:
         --sample /path/to/sample.h5ad \
         --wsi /path/to/he_image.tif \
         --output /path/to/output \
-        --skip-cellpose --skip-features
+        --skip-segmentation --skip-features
 """
 import argparse
 import logging
@@ -149,42 +149,39 @@ def step1_create_pseudo_visium(
     }
 
 
-def step2_run_cellpose(
+def step2_run_segmentation(
     wsi_path: Path,
     output_path: Path,
-    diameter: float = 30,
-    gpu: bool = True,
     tile_size: int = 2048,
     overlap: int = 128,
+    modality: str = 'he',
 ) -> Dict[str, Any]:
-    """Step 2: Run Cellpose segmentation on H&E WSI.
+    """Step 2: Run StarDist segmentation on H&E WSI.
 
-    Segments nuclei from whole slide image using Cellpose nuclei model,
+    Segments nuclei from whole slide image using StarDist,
     processing in tiles for memory efficiency.
 
     Args:
         wsi_path: Path to H&E WSI image
         output_path: Path to save nuclei mask (.npy)
-        diameter: Expected nucleus diameter in pixels
-        gpu: Use GPU for segmentation
         tile_size: Tile size for processing
         overlap: Overlap between tiles
+        modality: Segmentation modality ('he' or 'dapi')
 
     Returns:
         Dictionary with:
             - n_nuclei: Number of detected nuclei
             - mask_path: Path to saved mask
     """
-    from run_cellpose_he import segment_wsi
+    from run_segmentation_he import segment_wsi
 
-    logger.info(f"Running Cellpose on {wsi_path}")
+    logger.info(f"Running StarDist segmentation on {wsi_path}")
     mask = segment_wsi(
         wsi_path,
         output_path,
-        diameter=diameter,
-        gpu=gpu,
         tile_size=tile_size,
         overlap=overlap,
+        modality=modality,
     )
     n_nuclei = int(mask.max())
     logger.info(f"Detected {n_nuclei} nuclei")
@@ -213,7 +210,7 @@ def step3_extract_features(
 
     Args:
         wsi_path: Path to H&E WSI image
-        mask_path: Path to Cellpose nuclei mask
+        mask_path: Path to StarDist nuclei mask
         mapping_path: Path to cell-to-spot mapping CSV
         proportions_path: Path to proportions parquet
         output_dir: Directory for output features
@@ -558,7 +555,7 @@ Examples:
 
   # Skip early steps (resume from training):
   python run_benchmark.py --sample data/sample.h5ad --wsi data/he.tif --output results/ \\
-      --skip-cellpose --skip-features
+      --skip-segmentation --skip-features
 
   # Use custom ViT weights (e.g., UNI model):
   python run_benchmark.py --sample data/sample.h5ad --wsi data/he.tif --output results/ \\
@@ -630,20 +627,14 @@ Examples:
         help="Column name for cell type labels (default: cell_type_canonical)"
     )
 
-    # Cellpose arguments
-    parser.add_argument(
-        "--cellpose-diameter", type=float, default=30,
-        help="Expected nucleus diameter for Cellpose (default: 30)"
-    )
-
     # Skip flags
     parser.add_argument(
         "--skip-pseudo-visium", action="store_true",
         help="Skip pseudo-Visium creation (use existing)"
     )
     parser.add_argument(
-        "--skip-cellpose", action="store_true",
-        help="Skip Cellpose segmentation (use existing mask)"
+        "--skip-segmentation", action="store_true",
+        help="Skip StarDist segmentation (use existing mask)"
     )
     parser.add_argument(
         "--skip-features", action="store_true",
@@ -713,27 +704,25 @@ Examples:
         logger.info(f"Loaded {n_cell_types} cell types from existing data")
 
     # =========================================================================
-    # Step 2: Run Cellpose segmentation
+    # Step 2: Run StarDist segmentation
     # =========================================================================
-    mask_path = output_dir / "cellpose_mask.npy"
+    mask_path = output_dir / "stardist_mask.npy"
 
-    if not args.skip_cellpose and not mask_path.exists():
+    if not args.skip_segmentation and not mask_path.exists():
         logger.info("=" * 60)
-        logger.info("Step 2: Run Cellpose segmentation")
+        logger.info("Step 2: Run StarDist segmentation")
         logger.info("=" * 60)
-        step2_run_cellpose(
+        step2_run_segmentation(
             args.wsi, mask_path,
-            diameter=args.cellpose_diameter,
-            gpu='cuda' in args.device,
         )
     else:
         if mask_path.exists():
             logger.info("=" * 60)
-            logger.info("Step 2: Skipping Cellpose (mask already exists)")
+            logger.info("Step 2: Skipping segmentation (mask already exists)")
             logger.info("=" * 60)
         else:
             logger.info("=" * 60)
-            logger.info("Step 2: Skipping Cellpose (--skip-cellpose)")
+            logger.info("Step 2: Skipping segmentation (--skip-segmentation)")
             logger.info("=" * 60)
 
     # =========================================================================

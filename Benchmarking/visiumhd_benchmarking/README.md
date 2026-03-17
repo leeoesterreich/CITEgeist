@@ -27,7 +27,7 @@ This benchmark evaluates morphology-based cell type prediction on Visium HD pILC
 visiumhd_benchmarking/
 ├── src/                    # Source code
 │   ├── create_pseudo_visium.py    # Generate pseudo-Visium spots
-│   ├── run_cellpose_he.py         # Cellpose segmentation
+│   ├── run_segmentation_he.py         # StarDist segmentation
 │   ├── extract_patches_he.py      # H&E patch extraction
 │   ├── vit_extractor.py           # ViT feature extraction
 │   ├── proportion_mil.py          # MIL aggregation module
@@ -39,7 +39,7 @@ visiumhd_benchmarking/
 │       ├── pseudo_visium_spots.csv
 │       ├── cell_to_spot_mapping.csv
 │       ├── ground_truth_proportions.parquet
-│       └── cellpose_masks.npy
+│       └── stardist_masks.npy
 ├── patches/                # Extracted H&E patches
 │   └── {sample}/spot_{id}_patches.npy
 ├── models/                 # Trained model checkpoints
@@ -56,7 +56,7 @@ visiumhd_benchmarking/
 ## Pipeline
 
 1. **Pseudo-Visium Creation**: Generate 55μm spots from Visium HD data
-2. **Cellpose Segmentation**: Re-segment H&E images for consistency
+2. **StarDist Segmentation**: Re-segment H&E images for consistency
 3. **Patch Extraction**: Crop 224×224 RGB patches per nucleus
 4. **ViT Feature Extraction**: Extract 768-dim embeddings using UNI model
 5. **MIL Training**: Train attention-based aggregation with proportion supervision
@@ -71,7 +71,7 @@ sbatch slurm/sbatch_benchmark.sh
 
 # Or run individual steps
 python src/create_pseudo_visium.py --sample TP08-2202
-python src/run_cellpose_he.py --sample TP08-2202
+python src/run_segmentation_he.py --sample TP08-2202
 python src/extract_patches_he.py --sample TP08-2202
 python src/train_mil.py --train_samples TP08-2202 TP12-880
 python src/evaluate_single_cell.py --sample TP15-M509
@@ -80,7 +80,7 @@ python src/evaluate_single_cell.py --sample TP15-M509
 ## Dependencies
 
 - `timm` - PyTorch Image Models (for ViT)
-- `cellpose` - Nuclear segmentation
+- `stardist` - Nuclear segmentation
 - `torch`, `scipy`, `numpy`, `pandas` - Standard scientific stack
 - UNI model weights (requires Hugging Face access)
 

@@ -5,7 +5,7 @@ using pre-trained ViT features and proportion-guided MIL.
 
 Modules:
     create_pseudo_visium: Generate pseudo-Visium spots from Visium HD data
-    run_cellpose_he: Cellpose segmentation wrapper for H&E images
+    run_segmentation_he: StarDist segmentation wrapper for H&E images
     extract_patches_he: Extract 224x224 H&E patches per nucleus
     vit_extractor: Pre-trained ViT feature extraction (UNI model)
     proportion_mil: Proportion-guided MIL aggregation

@@ -1,6 +1,6 @@
-"""Cellpose segmentation for H&E images.
+"""StarDist segmentation for H&E images.
 
-Segments nuclei from H&E WSIs using Cellpose, processing in tiles
+Segments nuclei from H&E WSIs using StarDist, processing in tiles
 to handle large images.
 """
 import numpy as np
@@ -10,96 +10,96 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Lazy import Cellpose (heavy dependency)
-_cellpose_model = None
+# Lazy import StarDist segmenter (heavy dependency)
+_segmenter = None
 
 
-def get_cellpose_model(model_type: str = 'nuclei', gpu: bool = True):
-    """Get or create Cellpose model (singleton).
+def get_segmenter(modality: str = 'he'):
+    """Get or create StarDist segmenter (singleton).
 
     Args:
-        model_type: Cellpose model type ('nuclei', 'cyto', 'cpsam', etc.)
-        gpu: Use GPU if available
+        modality: Segmentation modality ('he' for H&E, 'dapi' for fluorescence)
 
     Returns:
-        Cellpose model instance
+        StarDistSegmenter instance
     """
-    global _cellpose_model
-    if _cellpose_model is None:
-        from cellpose import models
-        # cellpose v3: models.Cellpose for built-in types (nuclei, cyto, cyto2, cyto3)
-        _cellpose_model = models.Cellpose(gpu=gpu, model_type=model_type)
-    return _cellpose_model
+    global _segmenter
+    if _segmenter is None:
+        import importlib.util
+        # Import from CITEgeist package
+        _src_dir = Path(__file__).parent
+        REPO_ROOT = _src_dir.parent.parent.parent
+        spec = importlib.util.spec_from_file_location(
+            'segmentation',
+            REPO_ROOT / 'CITEgeist/model/segmentation.py'
+        )
+        seg_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(seg_module)
+        _segmenter = seg_module.StarDistSegmenter(modality=modality)
+    return _segmenter
 
 
-def preprocess_he_for_cellpose(image: np.ndarray) -> np.ndarray:
-    """Preprocess H&E image for Cellpose nuclei detection.
+def preprocess_he_for_stardist(image: np.ndarray) -> np.ndarray:
+    """Preprocess H&E image for StarDist nuclei detection.
 
-    Cellpose nuclei model works best on images where nuclei are bright.
-    For H&E, hematoxylin stains nuclei blue/purple (dark), so we invert.
+    StarDist H&E model expects RGB uint8 input. Normalization is handled
+    internally by csbdeep. This function ensures correct dtype/shape.
 
     Args:
         image: (H, W, 3) RGB H&E image or (H, W) grayscale, uint8
 
     Returns:
-        Preprocessed image for Cellpose (grayscale, nuclei bright), uint8
+        Preprocessed image for StarDist (RGB uint8)
     """
-    # Convert to grayscale - nuclei appear darker in H&E
-    if image.ndim == 3:
-        # Standard luminance conversion
-        gray = 0.299 * image[..., 0] + 0.587 * image[..., 1] + 0.114 * image[..., 2]
-        gray = gray.astype(np.float32)
-    else:
-        gray = image.astype(np.float32)
+    # Convert grayscale to RGB if needed
+    if image.ndim == 2:
+        image = np.stack([image] * 3, axis=-1)
 
-    # Invert so nuclei are bright (Cellpose expects bright objects on dark background)
-    gray = 255.0 - gray
+    # Ensure uint8
+    if image.dtype != np.uint8:
+        if image.max() <= 1.0:
+            image = (image * 255).astype(np.uint8)
+        else:
+            image = image.astype(np.uint8)
 
-    # Normalize to [0, 255] range
-    min_val = gray.min()
-    max_val = gray.max()
-    if max_val - min_val > 1e-8:
-        gray = (gray - min_val) / (max_val - min_val) * 255.0
-    else:
-        gray = np.zeros_like(gray)
-
-    return gray.astype(np.uint8)
+    return image
 
 
 def segment_tile(
     tile: np.ndarray,
-    diameter: float = 30,
-    model_type: str = 'nuclei',
-    gpu: bool = True,
-    flow_threshold: float = 0.4,
-    cellprob_threshold: float = 0.0,
+    modality: str = 'he',
+    prob_thresh: Optional[float] = None,
+    nms_thresh: Optional[float] = None,
+    scale: Optional[float] = None,
 ) -> np.ndarray:
-    """Segment nuclei in a single tile.
+    """Segment nuclei in a single tile using StarDist.
 
     Args:
         tile: (H, W, 3) RGB tile or (H, W) grayscale
-        diameter: Expected nucleus diameter in pixels
-        model_type: Cellpose model type
-        gpu: Use GPU if available
-        flow_threshold: Flow error threshold for Cellpose
-        cellprob_threshold: Cell probability threshold
+        modality: Segmentation modality ('he' or 'dapi')
+        prob_thresh: Probability threshold for detection (StarDist default if None)
+        nms_thresh: Non-maximum suppression threshold (StarDist default if None)
+        scale: Rescale factor for image (e.g., 0.5 to downscale 2x)
 
     Returns:
         (H, W) integer mask with unique ID per nucleus
     """
-    model = get_cellpose_model(model_type, gpu)
+    segmenter = get_segmenter(modality)
 
     # Preprocess
-    processed = preprocess_he_for_cellpose(tile)
+    processed = preprocess_he_for_stardist(tile)
 
-    # Run Cellpose - channels=[0,0] for grayscale
-    masks, flows, styles, diams = model.eval(
-        processed,
-        diameter=diameter,
-        channels=[0, 0],
-        flow_threshold=flow_threshold,
-        cellprob_threshold=cellprob_threshold,
-    )
+    # Build kwargs for StarDist predict_instances
+    kwargs = {}
+    if prob_thresh is not None:
+        kwargs['prob_thresh'] = prob_thresh
+    if nms_thresh is not None:
+        kwargs['nms_thresh'] = nms_thresh
+    if scale is not None:
+        kwargs['scale'] = scale
+
+    # Run StarDist segmentation
+    masks, _centroids_df = segmenter.segment(processed, **kwargs)
 
     return masks.astype(np.int32)
 
@@ -167,11 +167,11 @@ def segment_wsi(
     output_path: Path,
     tile_size: int = 2048,
     overlap: int = 128,
-    diameter: float = 30,
-    gpu: bool = True,
-    model_type: str = 'nuclei',
+    modality: str = 'he',
+    prob_thresh: Optional[float] = None,
+    nms_thresh: Optional[float] = None,
 ) -> np.ndarray:
-    """Segment entire WSI in tiles.
+    """Segment entire WSI in tiles using StarDist.
 
     Processes large whole slide images by tiling, segmenting each tile,
     and stitching results together.
@@ -181,9 +181,9 @@ def segment_wsi(
         output_path: Path to save mask .npy
         tile_size: Tile size in pixels
         overlap: Overlap between tiles
-        diameter: Expected nucleus diameter
-        gpu: Use GPU
-        model_type: Cellpose model type
+        modality: Segmentation modality ('he' or 'dapi')
+        prob_thresh: Probability threshold for detection
+        nms_thresh: Non-maximum suppression threshold
 
     Returns:
         Full segmentation mask
@@ -224,9 +224,9 @@ def segment_wsi(
         # Segment this tile
         mask = segment_tile(
             tile,
-            diameter=diameter,
-            model_type=model_type,
-            gpu=gpu,
+            modality=modality,
+            prob_thresh=prob_thresh,
+            nms_thresh=nms_thresh,
         )
         tiles.append((mask, (row, col)))
 
@@ -275,7 +275,7 @@ def main():
     import argparse
 
     parser = argparse.ArgumentParser(
-        description='Segment nuclei from H&E WSI using Cellpose'
+        description='Segment nuclei from H&E WSI using StarDist'
     )
     parser.add_argument(
         'wsi_path',
@@ -300,21 +300,23 @@ def main():
         help='Overlap between tiles (default: 128)'
     )
     parser.add_argument(
-        '--diameter',
-        type=float,
-        default=30,
-        help='Expected nucleus diameter (default: 30)'
-    )
-    parser.add_argument(
-        '--no-gpu',
-        action='store_true',
-        help='Disable GPU usage'
-    )
-    parser.add_argument(
-        '--model-type',
+        '--modality',
         type=str,
-        default='nuclei',
-        help='Cellpose model type (default: nuclei)'
+        default='he',
+        choices=['he', 'dapi'],
+        help='Segmentation modality (default: he)'
+    )
+    parser.add_argument(
+        '--prob-thresh',
+        type=float,
+        default=None,
+        help='StarDist probability threshold (default: model default)'
+    )
+    parser.add_argument(
+        '--nms-thresh',
+        type=float,
+        default=None,
+        help='StarDist NMS threshold (default: model default)'
     )
     parser.add_argument(
         '-v', '--verbose',
@@ -336,9 +338,9 @@ def main():
         output_path=args.output_path,
         tile_size=args.tile_size,
         overlap=args.overlap,
-        diameter=args.diameter,
-        gpu=not args.no_gpu,
-        model_type=args.model_type,
+        modality=args.modality,
+        prob_thresh=args.prob_thresh,
+        nms_thresh=args.nms_thresh,
     )
 
 
