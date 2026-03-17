@@ -37,7 +37,6 @@ from .spatial_colocalization import (
     analyze_marker_colocalization,
     LineageDendrogram,
     ProfileDiscoveryResult,
-    discover_profiles,
     discover_profiles_continuous,
     # Singleton rescue
     rescue_singletons,
@@ -48,7 +47,6 @@ from .spatial_colocalization import (
     ProfileTreeNode,
     ProfileTree,
     HierarchicalProfileResult,
-    discover_hierarchical_profiles,
     discover_hierarchical_profiles_continuous,
 )
 
@@ -204,7 +202,6 @@ __all__ = [
     # Profile discovery
     "LineageDendrogram",
     "ProfileDiscoveryResult",
-    "discover_profiles",
     "discover_profiles_continuous",
     # Singleton rescue
     "rescue_singletons",
@@ -215,7 +212,6 @@ __all__ = [
     "ProfileTreeNode",
     "ProfileTree",
     "HierarchicalProfileResult",
-    "discover_hierarchical_profiles",
     "discover_hierarchical_profiles_continuous",
     # Module 4: Protein-anchored program discovery
     "SpatialSubpopulation",
