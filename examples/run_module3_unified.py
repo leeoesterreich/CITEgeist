@@ -109,10 +109,10 @@ def run_module3(
     output_dir: Path,
     profile: dict = None,
     skip_gex: bool = False,
-    cellpose_segmentation: bool = False,
-    cellpose_resolution: str = "hires",
-    cellpose_gpu: bool = False,
-    cellpose_diameter: float = None,
+    nuclei_segmentation: bool = False,
+    segmentation_resolution: str = "hires",
+    segmentation_gpu: bool = False,
+    segmentation_diameter: float = None,
     nuclei_prior_lambda: float = 1.0,
 ) -> dict:
     """
@@ -123,10 +123,10 @@ def run_module3(
         output_dir: Output directory
         profile: Cell profile dictionary (default: UNIFIED_PROFILE)
         skip_gex: If True, skip gene expression deconvolution (faster)
-        cellpose_segmentation: If True, run built-in Cellpose nuclei segmentation
-        cellpose_resolution: Image resolution mode for segmentation (lowres/hires/fullres)
-        cellpose_gpu: If True, request GPU for Cellpose
-        cellpose_diameter: Optional Cellpose diameter override
+        nuclei_segmentation: If True, run built-in nuclei segmentation
+        segmentation_resolution: Image resolution mode for segmentation (lowres/hires/fullres)
+        segmentation_gpu: If True, request GPU for segmentation
+        segmentation_diameter: Optional diameter override for segmentation
         nuclei_prior_lambda: Soft-prior weight for nuclei abundance target
 
     Returns:
@@ -185,16 +185,16 @@ def run_module3(
     model.load_cell_profile_dict(profile)
     logger.info(f"Loaded unified profile with {len(profile)} cell types: {list(profile.keys())}")
 
-    if cellpose_segmentation:
+    if nuclei_segmentation:
         logger.info(
-            "Running Cellpose nuclei segmentation (resolution=%s, gpu=%s)...",
-            cellpose_resolution,
-            cellpose_gpu,
+            "Running nuclei segmentation (resolution=%s, gpu=%s)...",
+            segmentation_resolution,
+            segmentation_gpu,
         )
-        nuclei_counts = model.compute_spot_nuclei_counts_cellpose(
-            resolution_mode=cellpose_resolution,
-            use_gpu=cellpose_gpu,
-            diameter=cellpose_diameter,
+        nuclei_counts = model.compute_spot_nuclei_counts(
+            resolution_mode=segmentation_resolution,
+            use_gpu=segmentation_gpu,
+            diameter=segmentation_diameter,
             save_masks=True,
         )
         logger.info(
@@ -207,7 +207,7 @@ def run_module3(
     logger.info("Running cell proportion model...")
     global_props, finetuned_props = model.run_cell_proportion_model(
         validation_warn_only=True,  # Don't fail on rare cell types
-        use_nuclei_prior=cellpose_segmentation,
+        use_nuclei_prior=nuclei_segmentation,
         nuclei_prior_lambda=nuclei_prior_lambda,
         nuclei_target_col="nuclei_count_target",
     )
@@ -279,27 +279,27 @@ def main():
         help="Optional path to custom profile JSON file",
     )
     parser.add_argument(
-        "--cellpose-segmentation",
+        "--nuclei-segmentation",
         action="store_true",
-        help="Run built-in Cellpose nuclei segmentation and use as soft abundance prior.",
+        help="Run built-in nuclei segmentation and use as soft abundance prior.",
     )
     parser.add_argument(
-        "--cellpose-resolution",
+        "--segmentation-resolution",
         type=str,
         default="hires",
         choices=["lowres", "hires", "fullres"],
-        help="Image resolution mode for Cellpose segmentation.",
+        help="Image resolution mode for nuclei segmentation.",
     )
     parser.add_argument(
-        "--cellpose-gpu",
+        "--segmentation-gpu",
         action="store_true",
-        help="Request GPU execution for Cellpose nuclei model.",
+        help="Request GPU execution for nuclei segmentation model.",
     )
     parser.add_argument(
-        "--cellpose-diameter",
+        "--segmentation-diameter",
         type=float,
         default=None,
-        help="Optional Cellpose diameter override.",
+        help="Optional diameter override for nuclei segmentation.",
     )
     parser.add_argument(
         "--nuclei-prior-lambda",
@@ -340,10 +340,10 @@ def main():
         output_dir=output_dir,
         profile=profile,
         skip_gex=args.skip_gex,
-        cellpose_segmentation=args.cellpose_segmentation,
-        cellpose_resolution=args.cellpose_resolution,
-        cellpose_gpu=args.cellpose_gpu,
-        cellpose_diameter=args.cellpose_diameter,
+        nuclei_segmentation=args.nuclei_segmentation,
+        segmentation_resolution=args.segmentation_resolution,
+        segmentation_gpu=args.segmentation_gpu,
+        segmentation_diameter=args.segmentation_diameter,
         nuclei_prior_lambda=args.nuclei_prior_lambda,
     )
 

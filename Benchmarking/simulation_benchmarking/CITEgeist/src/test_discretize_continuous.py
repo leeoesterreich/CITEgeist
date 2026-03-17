@@ -24,7 +24,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.segmentation import (
     assign_nuclei_centroids_to_spots,
-    run_cellpose_nuclei_segmentation,
+    run_nuclei_segmentation,
 )
 
 logging.basicConfig(
@@ -116,11 +116,12 @@ def main():
     bgr = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
-    logger.info("Running Cellpose...")
+    logger.info("Running nuclei segmentation...")
     start = time.time()
-    masks, centroids = run_cellpose_nuclei_segmentation(rgb, use_gpu=False, model_type="nuclei")
-    cellpose_time = time.time() - start
-    logger.info("Cellpose completed in %.1fs, detected %d nuclei", cellpose_time, len(centroids))
+    masks, centroids_df = run_nuclei_segmentation(rgb, modality="dapi")
+    centroids = centroids_df[["centroid_x", "centroid_y"]].values
+    seg_time = time.time() - start
+    logger.info("Segmentation completed in %.1fs, detected %d nuclei", seg_time, len(centroids))
 
     # Step 2: Assign nuclei to spots
     # Load spot coordinates
