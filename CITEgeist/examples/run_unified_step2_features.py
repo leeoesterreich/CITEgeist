@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Step 2+3: Cellpose patch extraction + ViT-S feature extraction.
+"""Step 2+3: StarDist segmentation + patch extraction + ViT-S feature extraction.
 
 Usage:
     python run_unified_step2_features.py --sample HCC22-088-P1-S1 --modality he
@@ -9,6 +9,8 @@ import logging
 import os
 import sys
 from pathlib import Path
+
+os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
 
 import numpy as np
 import pandas as pd
@@ -23,22 +25,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from model.unified_config import OUTPUT_BASE, VIT_MODEL, PATCH_SIZE, DATA_DIR
 from model.vit_extractor import ViTFeatureExtractor
-
-
-def _get_cellpose_model(model_type, use_gpu):
-    """Cellpose v3/v4 compatibility wrapper."""
-    try:
-        from cellpose import models
-        return models.Cellpose(model_type=model_type, gpu=use_gpu)
-    except AttributeError:
-        from cellpose.models import CellposeModel
-        return CellposeModel(model_type=model_type, gpu=use_gpu)
+from model.segmentation import StarDistSegmenter
 
 
 def load_image_and_segment(sample_name, modality):
-    """Load image + run/reuse Cellpose segmentation."""
-    cellpose_dir = OUTPUT_BASE / sample_name / "cellpose"
-    cellpose_dir.mkdir(parents=True, exist_ok=True)
+    """Load image + run/reuse StarDist segmentation."""
+    seg_dir = OUTPUT_BASE / sample_name / "segmentation"
+    seg_dir.mkdir(parents=True, exist_ok=True)
 
     if modality == "he":
         import squidpy as sq
@@ -102,20 +95,24 @@ def load_image_and_segment(sample_name, modality):
         spatial_coords[:, 1] -= crop_y1  # y offset
         barcodes = [b for b, m in zip(adata.obs_names, finite_mask) if m]
 
-        # Cellpose on cropped tissue image
+        # StarDist on cropped tissue image
         module3_dir = OUTPUT_BASE / sample_name / "module3"
-        cached_crop_masks = list(module3_dir.glob("*_cellpose_masks_tissue.npy"))
+        cached_crop_masks = list(module3_dir.glob("*_stardist_masks_tissue.npy"))
 
         if cached_crop_masks:
-            logger.info(f"Reusing cached tissue Cellpose masks from {cached_crop_masks[0]}")
+            logger.info(f"Reusing cached tissue StarDist masks from {cached_crop_masks[0]}")
             masks = np.load(cached_crop_masks[0])
         else:
-            logger.info(f"Running Cellpose on tissue crop ({fullres_crop.shape})")
-            cp_model = _get_cellpose_model("cyto2", torch.cuda.is_available())
-            masks, _, _, _ = cp_model.eval(fullres_crop, channels=[0, 0], diameter=None)
-            np.save(module3_dir / f"{sample_name}_cellpose_masks_tissue.npy", masks)
+            logger.info(f"Running StarDist on tissue crop ({fullres_crop.shape})")
+            segmenter = StarDistSegmenter(modality="he")
+            masks = segmenter.segment(fullres_crop)
+            np.save(module3_dir / f"{sample_name}_stardist_masks_tissue.npy", masks)
             n_nuclei = len(np.unique(masks)) - 1
-            logger.info(f"Cellpose found {n_nuclei} nuclei in tissue crop")
+            logger.info(f"StarDist found {n_nuclei} nuclei in tissue crop")
+            # Free TF memory
+            import tensorflow as tf
+            tf.keras.backend.clear_session()
+            del segmenter
 
         image = fullres_crop
     else:
@@ -128,8 +125,8 @@ def load_image_and_segment(sample_name, modality):
     centroids_df = pd.DataFrame(centroids, columns=["y_pixel", "x_pixel"])
     centroids_df["nucleus_id"] = nucleus_ids.astype(int)
 
-    np.save(cellpose_dir / "nuclei_masks.npy", masks)
-    centroids_df.to_csv(cellpose_dir / "nuclei_centroids.csv", index=False)
+    np.save(seg_dir / "nuclei_masks.npy", masks)
+    centroids_df.to_csv(seg_dir / "nuclei_centroids.csv", index=False)
 
     # Spot radius in fullres pixels (half the spot diameter)
     spot_radius_px = scalefactors.get("spot_diameter_fullres", 140) / 2.0
@@ -235,13 +232,13 @@ def run_step2(sample_name, modality="he"):
     np.save(feat_dir / "vit_features.npy", features)
     np.save(feat_dir / "nucleus_ids.npy", np.array(valid_ids))
 
-    cellpose_dir = OUTPUT_BASE / sample_name / "cellpose"
+    seg_dir = OUTPUT_BASE / sample_name / "segmentation"
     valid_centroids = centroids_df[centroids_df["nucleus_id"].isin(valid_ids)]
-    valid_centroids.to_csv(cellpose_dir / "nuclei_centroids.csv", index=False)
+    valid_centroids.to_csv(seg_dir / "nuclei_centroids.csv", index=False)
 
     if "spot_barcode" in valid_centroids.columns:
         nps = valid_centroids.groupby("spot_barcode").size().reset_index(name="n_nuclei")
-        nps.to_csv(cellpose_dir / "nuclei_per_spot.csv", index=False)
+        nps.to_csv(seg_dir / "nuclei_per_spot.csv", index=False)
 
     step2_marker.touch()
     logger.info(f"Step 2 complete for {sample_name}: {len(features)} nuclei")

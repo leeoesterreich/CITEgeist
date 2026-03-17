@@ -69,7 +69,7 @@ def load_step2_outputs(sample_name):
     base = OUTPUT_BASE / sample_name
     features = np.load(base / "features" / "vit_features.npy")
     nucleus_ids = np.load(base / "features" / "nucleus_ids.npy")
-    centroids = pd.read_csv(base / "cellpose" / "nuclei_centroids.csv")
+    centroids = pd.read_csv(base / "segmentation" / "nuclei_centroids.csv")
 
     m3_dir = base / "module3"
     prop_files = list(m3_dir.glob("*finetuned*.csv"))

@@ -14,6 +14,7 @@
 
 eval "$(conda shell.bash hook)"
 conda activate /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env
+export TF_FORCE_GPU_ALLOW_GROWTH=true
 
 SAMPLES=(
     "HCC22-088-P1-S1"
@@ -41,5 +42,5 @@ if [ ! -f "${MARKER}" ]; then
     exit 1
 fi
 
-echo "Running Step 2 (Cellpose + ViT features) for ${SAMPLE}"
+echo "Running Step 2 (StarDist + ViT features) for ${SAMPLE}"
 python examples/run_unified_step2_features.py --sample ${SAMPLE} --modality he
