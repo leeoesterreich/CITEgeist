@@ -1,6 +1,0 @@
-gene,MCF7_WT_peaks,MCF7_D538G_peaks,MCF7_delta,T47D_WT_peaks,T47D_D538G_peaks,T47D_delta,opposite_binding
-HSP90B1,1,0,-1,0,1,1,True
-HSPA5,0,0,0,0,0,0,False
-CALR,0,0,0,0,0,0,False
-CANX,0,0,0,0,0,0,False
-PDIA4,0,0,0,0,0,0,False

@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/src/analyze_vim_epithelial_overlap.py", line 11, in <module>
-    import scanpy as sc
-ModuleNotFoundError: No module named 'scanpy'

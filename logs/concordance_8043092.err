@@ -1,9 +1,0 @@
-
-The following have been reloaded with a version change:
-  1) python/ondemand-jupyter-python3.8 => python/ondemand-jupyter-python3.11
-
-/var/spool/slurmd/job8043092/slurm_script: line 13: /ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/envs/CITEgeist_env/bin/activate: No such file or directory
-Traceback (most recent call last):
-  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium/src/analyze_celltype_concordance.py", line 21, in <module>
-    import scanpy as sc
-ModuleNotFoundError: No module named 'scanpy'

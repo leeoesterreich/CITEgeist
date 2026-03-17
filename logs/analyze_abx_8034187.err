@@ -1,6 +1,0 @@
-Traceback (most recent call last):
-  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_antibody_distribution.py", line 101, in <module>
-    main()
-  File "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_antibody_distribution.py", line 83, in main
-    X_proc = model.antibody_matrix_discrete
-AttributeError: 'CitegeistModel' object has no attribute 'antibody_matrix_discrete'

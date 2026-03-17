@@ -1,9 +1,0 @@
-test_id,test_name,model_tested,verdict,effect_size,p_value,details,p_value_BH
-1,ERAD Pathway Suppression,A,Ambiguous,-0.6064448584817865,0.15263821398878843,"ERAD genes show no significant change (mean log2FC=-0.175, p=0.1526)",0.2442211423820615
-2,UPR Stress Relief,A,Supports B,1.4999549358944135,0.0399455181358185,"UPR markers increase in MCF7-D538G (0 DOWN, 3 UP, 2 NC; p=0.0399)",0.079891036271637
-3,Secretory Capacity Co-regulation,A,Supports A,0.9285714285714286,0.00091552734375,"Secretory chaperones co-regulate with HSP90B1 (93% concordant, p=0.0009)",0.003662109375
-4,GRP94 Client Concordance,A,Ambiguous,0.6666666666666666,0.34375,"Mixed client concordance (4/6, p=0.3438)",0.4583333333333333
-5,LRP1 Expression,B,Supports B,10.071482330281976,3.136704636690081e-05,"LRP1 expressed (MCF7=1.1, T47D=3.0 TPM) and regulated by D538G",0.0002509363709352065
-6,RAP/LRPAP1 Gating,B,Supports A,0.0,0.021608942116390976,"LRPAP1 highly expressed (14/19 TPM) and stable, premature binding suppressed",0.057623845643709266
-7,LRP1-HSP90B1 Co-regulation,B,Supports B,1.0,1.0,LRP1-HSP90B1 positively correlated (r=1.00); ER binds at LRP1 locus,1.0
-8,Cross-Cell-Line Consistency,both,Supports B,0.42857142857142855,1.0,Model B (rescue): HSP90B1 UP (MCF7) -> better LRP1 chaperoning -> less premature trapping -> MDK secretion UP; HSP90B1 DOWN (T47D) -> worse chaperoning -> more trapping -> MDK secretion DOWN.,1.0
