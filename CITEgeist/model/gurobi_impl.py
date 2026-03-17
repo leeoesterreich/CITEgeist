@@ -41,7 +41,6 @@ try:
     from .utils import get_neighbors_with_fixed_radius
     from .checkpoints import CheckpointManager
     from .gex_modules import (
-        compute_module_aware_enrichment,
         compute_softmax_target,
         compute_kl_penalty_coefficients,
     )
@@ -49,7 +48,6 @@ except Exception:  # pragma: no cover - fallback for __main__ execution
     from utils import get_neighbors_with_fixed_radius  # type: ignore
     from checkpoints import CheckpointManager  # type: ignore
     from gex_modules import (  # type: ignore
-        compute_module_aware_enrichment,
         compute_softmax_target,
         compute_kl_penalty_coefficients,
     )
@@ -579,7 +577,7 @@ def optimize_cell_proportions_per_marker(
     lambda_coverage: float = 1.0,
     spot_abundance_target: Optional[np.ndarray] = None,
     lambda_abundance_prior: float = 0.0,
-) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray, np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
 
@@ -626,6 +624,8 @@ def optimize_cell_proportions_per_marker(
         - Y_values (np.ndarray): (N, T) cell type proportions
         - beta_values (np.ndarray): (M,) per-marker scaling factors
         - marker_beta_dict (Dict[str, float]): {marker_name: beta_value}
+        - alpha_values (np.ndarray): (M,) per-marker baseline values
+        - recon_error (np.ndarray): (N,) per-spot squared reconstruction error
     """
     N, M = marker_level_data.shape
     T = len(cell_type_names)
@@ -922,360 +922,21 @@ def optimize_cell_proportions_per_marker(
         if marker_has_owner[m] and alpha_values[m] > 0.05:
             logging.info(f"  Marker '{marker_names[m]}': alpha={alpha_values[m]:.3f}, beta={beta_new[m]:.3f}")
 
-    return Y_values, beta_new, marker_beta_dict, alpha_values
-
-
-def classify_cells_from_betas(
-    marker_level_data: np.ndarray,
-    marker_names: List[str],
-    assignment_matrix: np.ndarray,
-    cell_type_names: List[str],
-    beta_values: np.ndarray,
-    alpha_values: np.ndarray,
-    temperature: float = 1.0,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Stage 2 of cell-level assignment: classify cells using learned betas.
-
-    After the QP learns per-marker scaling (beta) and baseline (alpha),
-    this function scores each cell against each type profile and assigns
-    via softmax over negative reconstruction error.
-
-    For each cell i and type j, the score is:
-        score[i,j] = -sum_m w[m,j] * (S[i,m] - alpha[m] - beta[m])^2
-                     + sum_m w[m,j'] * (S[i,m] - alpha[m])^2  (for non-owner types j')
-
-    In words: type j gets a good score when the cell's marker expression
-    is close to (alpha + beta) for j's markers, and close to alpha for
-    markers belonging to other types.
-
-    Args:
-        marker_level_data: (N, M) normalized marker expression per cell.
-        marker_names: Ordered list of marker names (length M).
-        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
-        cell_type_names: Ordered list of cell type names (length T).
-        beta_values: (M,) per-marker scaling factors from QP.
-        alpha_values: (M,) per-marker baselines from QP.
-        temperature: Softmax temperature (lower = sharper). Default 1.0.
-
-    Returns:
-        Y_cell: (N, T) soft assignment matrix (softmax probabilities).
-        scores: (N, T) raw scores before softmax.
-    """
-    N, M = marker_level_data.shape
-    T = len(cell_type_names)
-
-    # For each type j, compute per-cell reconstruction error
-    # Type j "explains" its own markers with alpha + beta, and doesn't
-    # explain other types' markers (expects them at alpha level)
-    scores = np.zeros((N, T), dtype=np.float64)
-
-    for j in range(T):
-        for m in range(M):
-            S_m = marker_level_data[:, m]  # (N,)
-            alpha_m = alpha_values[m]
-            beta_m = beta_values[m]
-
-            if assignment_matrix[m, j] > 0:
-                # This marker belongs to type j: expect S ≈ alpha + beta
-                expected = alpha_m + beta_m
-                residual = (S_m - expected) ** 2
-            else:
-                # This marker does NOT belong to type j: expect S ≈ alpha (baseline)
-                expected = alpha_m
-                residual = (S_m - expected) ** 2
-
-            # Weight by beta (stronger markers matter more)
-            scores[:, j] -= beta_m * residual
-
-    # Softmax with temperature
-    scores_scaled = scores / (temperature + 1e-10)
-    scores_scaled -= scores_scaled.max(axis=1, keepdims=True)  # numerical stability
-    exp_scores = np.exp(scores_scaled)
-    Y_cell = exp_scores / exp_scores.sum(axis=1, keepdims=True)
-
-    # Log statistics
-    max_Y = Y_cell.max(axis=1)
-    dominant = np.argmax(Y_cell, axis=1)
-    entropy = -np.sum(Y_cell * np.log(Y_cell + 1e-10), axis=1)
-    max_entropy = np.log(T)
-
-    logging.info(f"Cell classification (temperature={temperature}):")
-    logging.info(f"  Max Y: mean={max_Y.mean():.3f} median={np.median(max_Y):.3f} "
-                 f"p90={np.percentile(max_Y, 90):.3f}")
-    logging.info(f"  Entropy ratio: {entropy.mean() / max_entropy:.3f}")
-    logging.info(f"  One-hot fraction (>0.9): {np.mean(max_Y > 0.9):.3f}")
-
-    for j_idx, ct in enumerate(cell_type_names):
-        n_dom = np.sum(dominant == j_idx)
-        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
-
-    return Y_cell, scores
-
-
-def beta_weighted_classification(
-    marker_level_data: np.ndarray,
-    marker_names: List[str],
-    assignment_matrix: np.ndarray,
-    cell_type_names: List[str],
-    beta_values: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Classify cells using QP-learned betas as quality weights in a gating classifier.
-
-    For each cell i and type j, computes:
-        positive = beta-weighted mean expression of type j's markers
-        negative = beta-weighted mean expression of markers belonging to other types
-        score[i,j] = positive - negative
-
-    This leverages both positive evidence (high expression of own markers)
-    and negative evidence (low expression of other types' markers), weighted
-    by the QP's learned marker quality estimates.
-
-    Args:
-        marker_level_data: (N, M) normalized marker expression per cell.
-        marker_names: Ordered list of marker names (length M).
-        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
-        cell_type_names: Ordered list of cell type names (length T).
-        beta_values: (M,) per-marker quality weights from QP.
-
-    Returns:
-        Y_cell: (N, T) softmax probabilities.
-        scores: (N, T) raw scores before softmax.
-    """
-    N, M = marker_level_data.shape
-    T = len(cell_type_names)
-
-    scores = np.zeros((N, T), dtype=np.float64)
-
-    for j in range(T):
-        own_mask = assignment_matrix[:, j] > 0  # markers assigned to type j
-        other_mask = ~own_mask  # markers assigned to other types
-
-        # Beta-weighted mean of own markers
-        own_betas = beta_values[own_mask]
-        own_data = marker_level_data[:, own_mask]  # (N, n_own)
-        if own_betas.sum() > 0:
-            positive = (own_data * own_betas).sum(axis=1) / own_betas.sum()
-        else:
-            positive = np.zeros(N)
-
-        # Beta-weighted mean of other markers
-        other_betas = beta_values[other_mask]
-        other_data = marker_level_data[:, other_mask]  # (N, n_other)
-        if other_betas.sum() > 0:
-            negative = (other_data * other_betas).sum(axis=1) / other_betas.sum()
-        else:
-            negative = np.zeros(N)
-
-        scores[:, j] = positive - negative
-
-    # Softmax for probabilities
-    scores_shifted = scores - scores.max(axis=1, keepdims=True)
-    exp_scores = np.exp(scores_shifted)
-    Y_cell = exp_scores / exp_scores.sum(axis=1, keepdims=True)
-
-    # Log statistics
-    max_prob = Y_cell.max(axis=1)
-    dominant = np.argmax(Y_cell, axis=1)
-
-    logging.info("Beta-weighted cell classification:")
-    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f} "
-                 f"p90={np.percentile(max_prob, 90):.3f}")
-    logging.info(f"  One-hot (>0.9): {np.mean(max_prob > 0.9)*100:.1f}%")
-
-    for j_idx, ct in enumerate(cell_type_names):
-        n_dom = np.sum(dominant == j_idx)
-        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
-
-    return Y_cell, scores
-
-
-def bayesian_cell_classification(
-    marker_level_data: np.ndarray,
-    marker_names: List[str],
-    assignment_matrix: np.ndarray,
-    cell_type_names: List[str],
-    beta_values: np.ndarray,
-    alpha_values: np.ndarray,
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Bayesian cell classification using learned betas from the QP.
-
-    Unlike classify_cells_from_betas() which uses beta-weighted scoring
-    (biased toward types with high-beta markers), this function uses
-    precision-weighted Gaussian log-likelihood over ALL markers.
-
-    For each cell i and type j:
-        expected[m,j] = alpha[m] + beta[m] * A[m,j]
-        log P(S_i | type=j) = -0.5 * sum_m (S[i,m] - expected[m,j])^2 / var[m]
-
-    Every marker contributes evidence for AND against each type:
-    - Marker m owned by type j: high S[i,m] matches high expected → good score
-    - Marker m NOT owned by type j: high S[i,m] mismatches low expected → penalty
-
-    This naturally handles negative evidence (CD68 high → penalizes Epithelial)
-    without profile-size bias since all M markers are used for every type.
-
-    Args:
-        marker_level_data: (N, M) normalized marker expression per cell.
-        marker_names: Ordered list of marker names (length M).
-        assignment_matrix: (M, T) binary matrix mapping markers to cell types.
-        cell_type_names: Ordered list of cell type names (length T).
-        beta_values: (M,) per-marker scaling factors from QP.
-        alpha_values: (M,) per-marker baselines from QP.
-
-    Returns:
-        Y_cell: (N, T) posterior probabilities per cell.
-        log_lik: (N, T) log-likelihood scores before normalization.
-    """
-    N, M = marker_level_data.shape
-    T = len(cell_type_names)
-
-    # Expected marker expression for each type
-    # For type j: expected[m,j] = alpha[m] + beta[m] if A[m,j]=1, else alpha[m]
-    expected = np.tile(alpha_values[:, None], (1, T))  # (M, T)
-    expected += beta_values[:, None] * assignment_matrix  # (M, T)
-
-    # Per-marker precision (inverse variance)
-    marker_var = np.var(marker_level_data, axis=0) + 1e-6  # (M,)
-    precision = 1.0 / marker_var  # (M,)
-
-    # Log-likelihood: Gaussian with per-marker precision
-    # log P(S_i | type_j) = -0.5 * sum_m precision[m] * (S[i,m] - expected[m,j])^2
-    log_lik = np.zeros((N, T), dtype=np.float64)
-    for j in range(T):
-        diff = marker_level_data - expected[:, j]  # (N, M)
-        weighted_sq = diff ** 2 * precision  # (N, M)
-        log_lik[:, j] = -0.5 * weighted_sq.sum(axis=1)
-
-    # Posterior via softmax (flat prior)
-    log_lik_shifted = log_lik - log_lik.max(axis=1, keepdims=True)
-    probs = np.exp(log_lik_shifted)
-    probs /= probs.sum(axis=1, keepdims=True)
-
-    # Log statistics
-    max_prob = probs.max(axis=1)
-    dominant = np.argmax(probs, axis=1)
-    entropy = -np.sum(probs * np.log(probs + 1e-10), axis=1)
-    max_entropy = np.log(T)
-
-    logging.info("Bayesian cell classification:")
-    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f} "
-                 f"p90={np.percentile(max_prob, 90):.3f}")
-    logging.info(f"  Entropy ratio: {entropy.mean() / max_entropy:.3f}")
-    logging.info(f"  One-hot fraction (>0.9): {np.mean(max_prob > 0.9):.3f}")
-
-    for j_idx, ct in enumerate(cell_type_names):
-        n_dom = np.sum(dominant == j_idx)
-        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
-
-    return probs, log_lik
-
-
-def supervised_cell_classification(
-    marker_level_data: np.ndarray,
-    Y_qp: np.ndarray,
-    cell_type_names: List[str],
-    confidence_percentile: float = 75.0,
-    classifier_type: str = "logistic",
-) -> Tuple[np.ndarray, dict]:
-    """
-    Two-stage supervised cell classification bootstrapped from QP.
-
-    Stage 1: QP gives soft Y assignments (already done externally).
-    Stage 2: Identify confident cells from QP, train a discriminative
-    classifier on them, then classify all cells.
-
-    The QP is good at learning the relative ordering (argmax is 75.6%
-    accurate) but produces diffuse probabilities. A discriminative
-    classifier trained on the QP's most confident cells can generalize
-    to sharper, more accurate predictions.
-
-    Args:
-        marker_level_data: (N, M) normalized marker expression per cell.
-        Y_qp: (N, T) soft assignment from QP.
-        cell_type_names: Ordered list of cell type names (length T).
-        confidence_percentile: Percentile threshold for confident cells.
-            Higher = stricter = fewer training cells but cleaner labels.
-        classifier_type: "logistic" for logistic regression,
-            "rf" for random forest.
-
-    Returns:
-        Y_supervised: (N, T) class probabilities from supervised model.
-        info: Dict with training stats.
-    """
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.ensemble import RandomForestClassifier
-    from sklearn.preprocessing import StandardScaler
-
-    N, M = marker_level_data.shape
-    T = len(cell_type_names)
-
-    # Confidence = max probability per cell
-    max_probs = Y_qp.max(axis=1)
-    threshold = np.percentile(max_probs, confidence_percentile)
-    confident_mask = max_probs >= threshold
-
-    # Get pseudo-labels from QP argmax
-    qp_labels = np.argmax(Y_qp, axis=1)
-    confident_labels = qp_labels[confident_mask]
-    confident_features = marker_level_data[confident_mask]
-
-    logging.info(f"Supervised classification:")
-    logging.info(f"  Confidence threshold: {threshold:.4f} (p{confidence_percentile:.0f})")
-    logging.info(f"  Confident cells: {confident_mask.sum()}/{N} ({confident_mask.sum()/N*100:.1f}%)")
-
-    # Check that all types are represented in training set
-    unique_train = set(confident_labels.tolist())
-    for j in range(T):
-        n_train_j = np.sum(confident_labels == j)
-        logging.info(f"  Training {cell_type_names[j]}: {n_train_j}")
-    if len(unique_train) < T:
-        missing = [cell_type_names[j] for j in range(T) if j not in unique_train]
-        logging.warning(f"  Missing types in training: {missing}")
-
-    # Standardize features
-    scaler = StandardScaler()
-    X_train = scaler.fit_transform(confident_features)
-    X_all = scaler.transform(marker_level_data)
-
-    # Train classifier
-    if classifier_type == "rf":
-        clf = RandomForestClassifier(
-            n_estimators=100, max_depth=10, random_state=42, n_jobs=-1,
-            class_weight="balanced",
-        )
-    else:
-        clf = LogisticRegression(
-            max_iter=1000, C=1.0, random_state=42, multi_class="multinomial",
-            class_weight="balanced",
-        )
-
-    clf.fit(X_train, confident_labels)
-
-    # Predict all cells
-    Y_supervised = clf.predict_proba(X_all)
-
-    # Log statistics
-    pred_labels = np.argmax(Y_supervised, axis=1)
-    max_prob = Y_supervised.max(axis=1)
-
-    logging.info(f"  Classifier: {classifier_type}")
-    logging.info(f"  Max P: mean={max_prob.mean():.3f} median={np.median(max_prob):.3f}")
-    logging.info(f"  One-hot (>0.9): {np.mean(max_prob > 0.9)*100:.1f}%")
-
-    for j_idx, ct in enumerate(cell_type_names):
-        n_dom = np.sum(pred_labels == j_idx)
-        logging.info(f"  {ct:<20}: n={n_dom:>5} ({n_dom/N*100:5.1f}%)")
-
-    info = {
-        "n_confident": int(confident_mask.sum()),
-        "confidence_threshold": float(threshold),
-        "classifier_type": classifier_type,
-    }
-
-    return Y_supervised, info
+    # Compute per-spot reconstruction error using final betas and alphas
+    # For each spot i: error_i = sum_m (S[i,m] - alpha[m] - beta[m] * Y_combined[i,m])^2
+    # where Y_combined[i,m] = sum of Y_values[i,j] for all owner types j of marker m
+    recon_error = np.zeros(N, dtype=np.float64)
+    for m in range(M):
+        if not marker_has_owner[m]:
+            continue
+        Y_combined_m = np.zeros(N, dtype=np.float64)
+        for j in marker_owners[m]:
+            Y_combined_m += Y_values[:, j]
+        residual = marker_level_data[:, m] - alpha_values[m] - beta_new[m] * Y_combined_m
+        recon_error += residual ** 2
+    logging.info(f"Per-spot recon error: mean={recon_error.mean():.4f}, median={np.median(recon_error):.4f}, max={recon_error.max():.4f}")
+
+    return Y_values, beta_new, marker_beta_dict, alpha_values, recon_error
 
 
 def compute_marker_exclusivity(
@@ -2453,20 +2114,13 @@ def deconvolute_spot_with_neighbors_with_prior(
     global_enrichment_weight: float = 0.5,
     continuous_relaxation: bool = True,
     lambda_gex_reg: float = 0.01,
-    # NEW parameters for module enrichment and KL regularization
-    anchor_genes: Optional[Dict[int, List[int]]] = None,
-    anchor_weights: Optional[Dict[int, Dict[int, float]]] = None,
-    module_weight: float = 0.5,
-    use_kl_regularization: bool = False,
-    kl_temperature: float = 0.3,
-    lambda_kl: float = 0.1,
+    enrichment_smoothing: float = 0.2,  # 0.2 = 80/20 baseline, 0.0 = no smoothing
 ) -> Optional[np.ndarray]:
     """
     Deconvolute a spot with its neighbors, using enrichment weights and optional prior.
 
     Uses continuous relaxation (LP) by default for fractional gene assignment,
-    with L2 regularization to stabilize the solution. Optionally supports
-    module-aware enrichment and softmax KL regularization.
+    with L2 regularization to stabilize the solution.
 
     Args:
         spot_idx: Index of the center spot to deconvolve.
@@ -2478,18 +2132,8 @@ def deconvolute_spot_with_neighbors_with_prior(
         local_enrichment_weight: Weight for local expression enrichment (0-1).
         global_enrichment_weight: Weight for global expression enrichment (0-1).
         continuous_relaxation: If True, use continuous variables (LP); else integer (MIP).
-        lambda_gex_reg: DEPRECATED - L2 regularization weight. No longer used
-            when adaptive marker guidance is enabled. Kept for backward compatibility.
-        anchor_genes: Optional dict mapping cell type index to list of anchor gene indices.
-        anchor_weights: Optional dict {cell_type_idx: {gene_idx: correlation}} with per-gene
-            correlation weights for each anchor. Used by adaptive marker-guided enrichment.
-        module_weight: Weight for module-aware enrichment (0-1), blends with base enrichment.
-            NOTE: Deprecated when using adaptive marker guidance (anchor_weights provided).
-        use_kl_regularization: If True, use softmax KL penalty instead of L2 regularization.
-        kl_temperature: Temperature for softmax target (lower = sharper).
-        lambda_kl: Weight for KL penalty term.
-        use_direct_softmax: If True, skip Gurobi entirely and use direct softmax allocation.
-            This avoids L2's uniform spreading problem.
+        lambda_gex_reg: L2 regularization weight for expression variables (default: 0.01).
+            Provides stability by penalizing large expression values.
 
     Returns:
         np.ndarray of shape (T, M) with deconvolved expression, or None on failure.
@@ -2595,38 +2239,49 @@ def deconvolute_spot_with_neighbors_with_prior(
         total_celltype_counts = np.sum(cell_type_numbers_array, axis=0) + 1e-10
         celltype_frequencies = total_celltype_counts / np.sum(total_celltype_counts)
 
-        # Compute expression-aware enrichment using adaptive marker guidance
+        # Compute expression-aware enrichment using percentile-based method
         gene_specific_enrichment = np.zeros((M, T))
 
-        # Precompute anchor expression for neighborhood if anchors provided
-        if anchor_genes is not None and anchor_weights is not None:
-            neighborhood_anchor_expr, type_weights = precompute_anchor_expression(
-                neighborhood_expression_data, anchor_genes, anchor_weights
-            )
-        else:
-            neighborhood_anchor_expr = None
-            type_weights = None
+        # Use baseline percentile-based enrichment with configurable smoothing
+        def compute_baseline_enrichment(expression_data, cell_type_props, gene_idx, smoothing=0.2):
+            """Baseline enrichment: percentile threshold + optional smoothing."""
+            gene_expr = expression_data[:, gene_idx]
+            expr_threshold = np.percentile(gene_expr[gene_expr > 0], 50) if np.any(gene_expr > 0) else 0
+            high_expr_spots = gene_expr >= expr_threshold
+
+            if not np.any(high_expr_spots):
+                return np.ones(cell_type_props.shape[1]) / cell_type_props.shape[1]
+
+            # Normalize cell type proportions by their global frequency
+            normalized_props = cell_type_props / (celltype_frequencies + 1e-10)
+
+            high_expr_props = np.mean(normalized_props[high_expr_spots], axis=0)
+            background_props = np.mean(normalized_props, axis=0)
+
+            epsilon = 1e-10
+            enrichment = high_expr_props / (background_props + epsilon)
+
+            # Apply smoothing (0.2 = 80/20 baseline, 0.0 = no smoothing)
+            if smoothing > 0:
+                smoothed = (1 - smoothing) * enrichment + smoothing * np.ones_like(enrichment)
+            else:
+                smoothed = enrichment
+            return smoothed / (np.sum(smoothed) + epsilon)
 
         for k in range(M):
-            # Proportion-based enrichment (no smoothing)
-            prop_enrich = compute_proportion_enrichment(
-                gene_expr=neighborhood_expression_data[:, k],
-                cell_type_props=neighborhood_cell_type_numbers,
-                celltype_frequencies=celltype_frequencies,
+            # Use baseline enrichment (percentile-based with smoothing)
+            # Smoothing=0.2 is the original 80/20 blend
+            local_enrich = compute_baseline_enrichment(
+                neighborhood_expression_data, neighborhood_cell_type_numbers, k,
+                smoothing=enrichment_smoothing
             )
-
-            # If anchors available, compute adaptive blend
-            if neighborhood_anchor_expr is not None:
-                marker_enrich = compute_marker_enrichment(
-                    gene_expr=neighborhood_expression_data[:, k],
-                    anchor_expr=neighborhood_anchor_expr,
-                    anchor_weights=type_weights,
-                )
-                gene_specific_enrichment[k] = compute_adaptive_enrichment(
-                    prop_enrich, marker_enrich
-                )
-            else:
-                gene_specific_enrichment[k] = prop_enrich
+            global_enrich = compute_baseline_enrichment(
+                deconvolution_expression_data, cell_type_numbers_array, k,
+                smoothing=enrichment_smoothing
+            )
+            gene_specific_enrichment[k] = (
+                local_enrichment_weight * local_enrich + global_enrichment_weight * global_enrich
+            )
 
         # Build Gurobi model
         model = gp.Model(f"gene_expression_spot_{spot_idx}")
@@ -2721,10 +2376,10 @@ def deconvolute_spot_with_neighbors_with_prior(
                         base_term = enrichment_weight * cell_type_weight * X[j, k]
                         obj_terms.append(base_term)
 
-                        # L2 regularization removed - adaptive enrichment provides sufficient guidance
-                        # The L2 penalty was causing uniform spreading (variance_ratio ~3x)
-                        # if lambda_gex_reg > 0:
-                        #     obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
+                        # L2 regularization with reduced lambda (0.001 vs original 0.01)
+                        # Provides stability while letting marker guidance dominate
+                        if lambda_gex_reg > 0:
+                            obj_terms.append(-lambda_gex_reg * X[j, k] * X[j, k])
 
                         if global_prior is not None and lambda_prior_weight > 0:
                             try:
@@ -2762,59 +2417,6 @@ def deconvolute_spot_with_neighbors_with_prior(
         gc.collect()
 
 
-def log_marker_gene_patterns(zero_patterns, marker_genes):
-    """
-    Log detailed patterns for marker genes.
-    """
-    for gene in marker_genes:
-        logging.info(f"\nPatterns for {gene}:")
-        for ct, genes_data in zero_patterns.items():
-            if gene in genes_data:
-                stats = genes_data[gene]
-                logging.info(f"  {ct}:")
-                logging.info(f"    Zero proportion: {stats['zero_proportion']:.3f}")
-                if stats["n_nonzero"] > 0:
-                    logging.info(f"    Mean nonzero expression: {stats['mean_nonzero_expression']:.3f}")
-                else:
-                    logging.info(f"    Mean nonzero expression: 0.0 (no nonzero values)")
-                logging.info(f"    Number of spots: {stats['n_spots']}")
-                logging.info(f"    Number of nonzero spots: {stats['n_nonzero']}")
-
-
-def scale_genes(expression_matrix):
-    """Scale each gene independently to [0,1] range.
-
-    Args:
-        expression_matrix (np.ndarray): Spots x Genes matrix
-
-    Returns:
-        tuple: (scaled_matrix, gene_mins, gene_maxs)
-    """
-    gene_mins = np.min(expression_matrix, axis=0)
-    gene_maxs = np.max(expression_matrix, axis=0)
-
-    # Avoid division by zero
-    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
-    scaled_matrix = (expression_matrix - gene_mins) / gene_ranges
-
-    return scaled_matrix, gene_mins, gene_maxs
-
-
-def unscale_genes(scaled_matrix, gene_mins, gene_maxs):
-    """Reverse the gene-wise scaling transformation.
-
-    Args:
-        scaled_matrix (np.ndarray): Scaled matrix
-        gene_mins (np.ndarray): Original minimum values per gene
-        gene_maxs (np.ndarray): Original maximum values per gene
-
-    Returns:
-        np.ndarray: Unscaled matrix
-    """
-    gene_ranges = np.maximum(gene_maxs - gene_mins, 1e-10)
-    return (scaled_matrix * gene_ranges) + gene_mins
-
-
 def optimize_gene_expression(
     sample_name: str,
     deconvolution_expression_data: np.ndarray,
@@ -2831,13 +2433,7 @@ def optimize_gene_expression(
     rerun: bool = False,
     continuous_relaxation: bool = True,
     lambda_gex_reg: float = 0.01,
-    # NEW parameters for module enrichment and KL regularization
-    anchor_genes: Optional[Dict[int, List[int]]] = None,
-    anchor_weights: Optional[Dict[int, Dict[int, float]]] = None,
-    module_weight: float = 0.5,
-    use_kl_regularization: bool = False,
-    kl_temperature: float = 0.3,
-    lambda_kl: float = 0.1,
+    enrichment_smoothing: float = 0.2,  # 0.2 = 80/20 baseline, 0.0 = no smoothing
 ) -> Dict[str, Any]:
     """
     Optimize gene expression with enrichment weights and prior guidance.
@@ -2858,13 +2454,7 @@ def optimize_gene_expression(
         rerun (bool): Whether to rerun if results exist
         continuous_relaxation (bool): Use continuous (LP) vs integer (MIP) variables
         lambda_gex_reg (float): L2 regularization weight on X variables
-        anchor_genes (dict, optional): Dict mapping cell type index to anchor gene indices.
-        anchor_weights (dict, optional): Dict {cell_type_idx: {gene_idx: correlation}} with
-            per-gene correlation weights for each anchor. Used by adaptive marker guidance.
-        module_weight (float): Weight for module-aware enrichment (0-1).
-        use_kl_regularization (bool): If True, use KL-divergence instead of L2.
-        kl_temperature (float): Temperature for softmax target (lower = sharper).
-        lambda_kl (float): Weight for KL penalty term.
+        enrichment_smoothing (float): Smoothing factor for enrichment (0.2 = 80/20 blend).
 
     Returns:
         Dict[str, Any]: {
@@ -2940,13 +2530,7 @@ def optimize_gene_expression(
                             global_enrichment_weight,
                             continuous_relaxation,
                             lambda_gex_reg,
-                            # NEW parameters for module enrichment and KL regularization
-                            anchor_genes,
-                            anchor_weights,
-                            module_weight,
-                            use_kl_regularization,
-                            kl_temperature,
-                            lambda_kl,
+                            enrichment_smoothing,  # 0.2 = 80/20, 0.0 = none
                         )
                         futures[future] = spot_idx
 
@@ -3250,246 +2834,9 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
     return adata_norm
 
 
-def validate_prior_effect(spotwise_profiles_pass1, spotwise_profiles_pass2, global_prior):
-    """
-    Compare pass1 and pass2 results to verify prior influence.
-
-    Args:
-        spotwise_profiles_pass1 (dict): First pass results {spot_idx: profile_matrix}
-        spotwise_profiles_pass2 (dict): Second pass results {spot_idx: profile_matrix}
-        global_prior (np.ndarray): Global prior matrix (T x M)
-
-    Returns:
-        dict: Dictionary containing validation metrics
-    """
-    # Validate shapes
-    if not spotwise_profiles_pass1 or not spotwise_profiles_pass2:
-        raise ValueError("Empty profile dictionaries provided")
-
-    # Get shapes from first profile
-    first_profile1 = next(iter(spotwise_profiles_pass1.values()))
-    T, M = first_profile1.shape
-
-    if global_prior.shape != (T, M):
-        raise ValueError(f"Prior shape {global_prior.shape} does not match profiles shape ({T}, {M})")
-
-    prior_guided_changes = []
-    spot_metrics = {}
-
-    # Ensure we have matching spots
-    common_spots = set(spotwise_profiles_pass1.keys()) & set(spotwise_profiles_pass2.keys())
-
-    if not common_spots:
-        logging.error("No matching spots found between pass1 and pass2 results")
-        return None
-
-    for spot in common_spots:
-        profile1 = spotwise_profiles_pass1[spot]
-        profile2 = spotwise_profiles_pass2[spot]
-
-        # Calculate absolute changes between passes
-        profile_diff = np.abs(profile2 - profile1)
-        total_diff = np.sum(profile_diff)
-
-        # Calculate prior influence on pass2 assignment
-        prior_alignment = np.sum(global_prior * profile2)
-
-        prior_guided_changes.append((total_diff, prior_alignment))
-
-        # Store per-spot metrics
-        spot_metrics[spot] = {
-            "total_change": total_diff,
-            "prior_alignment": prior_alignment,
-            "mean_change": np.mean(profile_diff),
-            "max_change": np.max(profile_diff),
-        }
-
-    # Calculate correlation between changes and prior influence
-    changes = np.array([x[0] for x in prior_guided_changes])
-    influences = np.array([x[1] for x in prior_guided_changes])
-
-    correlation = np.corrcoef(changes, influences)[0, 1]
-
-    # Calculate summary statistics
-    validation_metrics = {
-        "prior_correlation": correlation,
-        "mean_total_change": np.mean(changes),
-        "mean_prior_influence": np.mean(influences),
-        "std_total_change": np.std(changes),
-        "std_prior_influence": np.std(influences),
-        "n_spots_analyzed": len(common_spots),
-        "spot_metrics": spot_metrics,
-    }
-
-    # Log summary statistics
-    logging.info("Prior Effect Validation:")
-    logging.info(f"Prior-Change Correlation: {correlation:.4f}")
-    logging.info(f"Mean Total Change: {validation_metrics['mean_total_change']:.4f}")
-    logging.info(f"Mean Prior Influence: {validation_metrics['mean_prior_influence']:.4f}")
-    logging.info(f"Number of Spots Analyzed: {validation_metrics['n_spots_analyzed']}")
-
-
-
-def _create_dummy_anndata(num_spots: int, num_genes: int) -> sc.AnnData:
-    """Create a minimal AnnData with integer counts and spatial coordinates.
-
-    The data is intentionally tiny so that model construction is fast, while
-    still ensuring at least one positive count to create variables.
-
-    Args:
-        num_spots: Number of spatial spots to include.
-        num_genes: Number of genes to include.
-
-    Returns:
-        A newly created AnnData object with `.obsm['spatial']` populated.
-    """
-    X = np.zeros((num_spots, num_genes), dtype=int)
-    # Ensure at least one count is positive so variables are created
-    X[0, 0] = 3
-    if num_genes > 1:
-        X[0, 1] = 1
-
-    adata = sc.AnnData(X=X)
-    adata.obsm['spatial'] = np.zeros((num_spots, 2), dtype=float)
-    return adata
-
-
-def _run_dummy_models() -> Dict[str, bool]:
-    """Build tiny models and trigger writing of their MPS files.
-
-    This function is intended for quick verification that model definitions
-    are valid and can be exported to .mps files. Solver failures are tolerated
-    because the primary goal here is to exercise the `model.write` calls.
-
-    Returns:
-        Dict[str, bool]: Mapping of model key to existence of the written file.
-            Keys: 'cell', 'local', 'gene'.
-    """
-    results: Dict[str, bool] = {'cell': False, 'local': False, 'gene': False}
-
-    try:
-        # Tiny problem sizes
-        num_spots = 1
-        num_cell_types = 2
-        num_genes = 3
-
-        # Create minimal inputs
-        adata = _create_dummy_anndata(num_spots, num_genes)
-        profile_based_antibody_data = np.full((num_spots, num_cell_types), 0.5, dtype=float)
-        cell_type_names = [f"Type_{i}" for i in range(num_cell_types)]
-
-        # 1) Global EM-based cell proportions → writes cell_proportion_model.mps
-        try:
-            optimize_cell_proportions(
-                profile_based_antibody_data=profile_based_antibody_data,
-                cell_type_names=cell_type_names,
-                max_iterations=1,
-            )
-        except Exception as exc:
-            logging.warning("Cell proportions run ended (expected OK if solver missing): %s", str(exc))
-        finally:
-            results['cell'] = os.path.exists('cell_proportion_model.mps')
-
-        # 2) Local refinement of cell proportions → writes local_cell_proportions_model.mps
-        try:
-            deconvolute_local_cell_proportions(
-                spot_idx=0,
-                adata=adata,
-                profile_based_antibody_data=profile_based_antibody_data,
-                radius=2.0,
-                max_iterations=1,
-                beta_values=np.ones(num_cell_types, dtype=float),
-                beta_vary=False,
-                max_y_change=0.4,
-            )
-        except Exception as exc:
-            logging.warning("Local proportions run ended (expected OK if solver missing): %s", str(exc))
-        finally:
-            results['local'] = os.path.exists('local_cell_proportions_model.mps')
-
-        # 3) Gene deconvolution → writes gene_expression_model.mps
-        try:
-            cell_type_numbers_array = np.full((num_spots, num_cell_types), 0.5, dtype=float)
-            deconvolute_spot_with_neighbors_with_prior(
-                spot_idx=0,
-                adata=adata,
-                cell_type_numbers_array=cell_type_numbers_array,
-                radius=2.0,
-                global_prior=None,
-                lambda_prior_weight=0.0,
-                local_enrichment_weight=0.5,
-                global_enrichment_weight=0.5,
-            )
-        except Exception as exc:
-            logging.warning("Gene deconvolution run ended (expected OK if solver missing): %s", str(exc))
-        finally:
-            results['gene'] = os.path.exists('gene_expression_model.mps')
-
-    except Exception as outer_exc:
-        logging.error("Dummy model setup failed: %s", str(outer_exc))
-
-    return results
-
-
 # ===========================================================================
 # Discrete Cell Assignment (Integer Quadratic Programming)
 # ===========================================================================
-
-
-def estimate_prior_proportions_from_markers(
-    raw_marker_data: np.ndarray,
-    assignment_matrix: np.ndarray,
-    cell_type_names: List[str],
-) -> np.ndarray:
-    """
-    Estimate expected global cell type proportions from raw marker signal.
-
-    Uses the mean expression of markers assigned to each cell type (before
-    any scaling) to estimate the relative abundance of each type. This provides
-    a prior that prevents rare cell type over-inflation during discrete assignment.
-
-    Args:
-        raw_marker_data: (N, M) raw antibody data (NOT scaled)
-        assignment_matrix: (M, T) binary matrix mapping markers to cell types
-        cell_type_names: List of cell type names (length T)
-
-    Returns:
-        prior_proportions: (T,) normalized proportions summing to 1.0
-
-    Example:
-        >>> raw_data, marker_names, assignment, cell_types = map_antibodies_to_profiles_v2(...)
-        >>> prior = estimate_prior_proportions_from_markers(raw_data, assignment, cell_types)
-        >>> model.run_discrete_cell_assignment(prior_proportions=prior, lambda_prior=0.5)
-    """
-    N, M = raw_marker_data.shape
-    T = len(cell_type_names)
-
-    # Compute mean signal per marker across all spots
-    marker_means = raw_marker_data.mean(axis=0)  # Shape: (M,)
-
-    # For each cell type, compute mean of its assigned markers' signals
-    # This uses raw signal, so abundant types will have higher values
-    type_signals = np.zeros(T, dtype=np.float64)
-    for t in range(T):
-        assigned_markers = assignment_matrix[:, t] > 0
-        if assigned_markers.any():
-            type_signals[t] = marker_means[assigned_markers].mean()
-        else:
-            type_signals[t] = 0.0
-
-    # Normalize to proportions
-    total = type_signals.sum()
-    if total > 0:
-        prior_proportions = type_signals / total
-    else:
-        # Fallback to uniform if no signal
-        prior_proportions = np.ones(T) / T
-
-    logging.info("Estimated prior proportions from raw marker signals:")
-    for t, name in enumerate(cell_type_names):
-        logging.info(f"  {name}: {100*prior_proportions[t]:.1f}%")
-
-    return prior_proportions
 
 
 def solve_discrete_cell_counts(
@@ -4165,87 +3512,3 @@ def optimize_discrete_cell_assignment_em(
         logging.info(f"  {name}: β={beta_values[m]:.3f}, α={alpha_values[m]:.3f}")
 
     return c_values, beta_values, marker_beta_dict, alpha_values
-
-
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    logging.info("Running gurobi_impl to write .mps files using CitegeistModel where available")
-
-    # Import CitegeistModel lazily to avoid circular imports at module import time
-    try:
-        from .citegeist_model import CitegeistModel  # type: ignore
-    except Exception:  # pragma: no cover
-        from citegeist_model import CitegeistModel  # type: ignore
-
-    DATA_FOLDER = "/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
-    path_to_biopsy = os.path.join(DATA_FOLDER, "HCC22-088-P4-S1/outs")
-    path_to_surgical = os.path.join(DATA_FOLDER, "HCC22-088-P4-S2_1i_rep/outs")
-    path_list = [path_to_surgical]
-
-    cell_profiles = {
-        "Cancer Cells": {"Major": ["EPCAM-1"], "Minor": ["SDC1-1", "KRT5-1"]},
-        "Macrophages": {"Major": ["CD68-1"], "Minor": ["CD14-1"]},
-        "CD4 T Cells": {"Major": ["CD3E-1", "CD4-1"]},
-        "CD8 T Cells": {"Major": ["CD3E-1", "CD8A-1"]},
-        "B Cells": {"Major": ["MS4A1-1", "CD19-1"]},
-        "Endothelial Cells": {"Major": ["PECAM1-1"]},
-        "Fibroblasts": {"Major": ["ACTA2-1"]},
-    }
-
-    any_success = False
-    try:
-        import squidpy as sq  # type: ignore
-    except Exception as exc:  # pragma: no cover
-        logging.error("squidpy not available to read Visium data: %s", str(exc))
-        sq = None  # type: ignore
-
-    for sample_path in path_list:
-        try:
-            if sq is None:
-                raise RuntimeError("squidpy unavailable")
-            sample_name = os.path.basename(os.path.dirname(sample_path))
-            adata = sq.read.visium(sample_path, counts_file='filtered_feature_bc_matrix.h5', load_images=True, gex_only=False)
-
-            model = CitegeistModel(sample_name=sample_name, adata=adata, output_folder=f'output_mps_{sample_name}')
-            model.load_cell_profile_dict(cell_profiles)
-            model.split_adata()
-            model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=25)
-            model.copy_gex_to_protein_adata()
-            model.preprocess_gex()
-            model.preprocess_antibody()
-
-            # Optional: register Gurobi if a license path is provided via env
-            license_file = os.environ.get("GRB_LICENSE_FILE")
-            if license_file and os.path.isfile(license_file):
-                try:
-                    model.register_gurobi(license_file)
-                except Exception as exc:
-                    logging.warning("Gurobi registration skipped: %s", str(exc))
-
-            # Running these will invoke the underlying gurobi_impl functions that write .mps files
-            model.run_cell_proportion_model(radius=400)
-            # Trigger at least one gene model build; pass1 will spawn tasks that write MPS
-            try:
-                model.run_cell_expression_pass1(
-                    radius=400,
-                    max_workers=1,
-                    checkpoint_interval=100,
-                    output_dir=os.path.join(model.output_folder, "checkpoints"),
-                    rerun=True,
-                )
-            except Exception as exc:
-                logging.warning("Pass1 gene expression run ended: %s", str(exc))
-
-            # Check for MPS files
-            cell_mps = os.path.exists('cell_proportion_model.mps')
-            local_mps = os.path.exists('local_cell_proportions_model.mps')
-            gene_mps = os.path.exists('gene_expression_model.mps')
-            logging.info("Sample '%s' MPS write outcomes: cell=%s local=%s gene=%s", sample_name, cell_mps, local_mps, gene_mps)
-            any_success = any_success or cell_mps or local_mps or gene_mps
-        except Exception as exc:
-            logging.error("Failed processing sample at '%s': %s", sample_path, str(exc))
-
-    if not any_success:
-        logging.info("Falling back to dummy models as no MPS files were produced from real data.")
-        outcome = _run_dummy_models()
-        logging.info("Dummy MPS write outcomes: %s", outcome)
