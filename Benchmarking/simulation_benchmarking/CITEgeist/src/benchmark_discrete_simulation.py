@@ -3,8 +3,8 @@
 Discrete cell assignment benchmark on scCube simulation data.
 
 Pipeline:
-1. Load synthetic Cellpose-compatible image
-2. Run Cellpose segmentation with appropriate model (nuclei or cyto2)
+1. Load synthetic nuclei image
+2. Run nuclei segmentation (StarDist)
 3. Compare predicted vs ground truth nuclei counts
 4. Run discrete cell assignment (IQP)
 5. Evaluate against ground truth proportions
@@ -34,7 +34,7 @@ sys.path.insert(0, str(BENCHMARK_ROOT))
 from CITEgeist.model.citegeist_model import CitegeistModel
 from CITEgeist.model.segmentation import (
     assign_nuclei_centroids_to_spots,
-    run_cellpose_nuclei_segmentation,
+    run_nuclei_segmentation,
 )
 
 logging.basicConfig(
@@ -129,23 +129,22 @@ def load_ground_truth_proportions(
     return df
 
 
-def run_cellpose_segmentation(
+def run_segmentation(
     image: np.ndarray,
     mode: str,
     use_gpu: bool = False,
     diameter: Optional[float] = None,
 ) -> tuple:
-    """Run Cellpose segmentation with mode-appropriate model."""
-    model_type = MODE_TO_MODEL[mode]
-    logger.info("Running Cellpose with model_type=%s", model_type)
+    """Run nuclei segmentation with mode-appropriate modality."""
+    modality = MODE_TO_MODEL[mode]
+    logger.info("Running nuclei segmentation with modality=%s", modality)
 
     start = time.time()
-    masks, centroids = run_cellpose_nuclei_segmentation(
+    masks, centroids_df = run_nuclei_segmentation(
         image_rgb_uint8=image,
-        use_gpu=use_gpu,
-        diameter=diameter,
-        model_type=model_type,
+        modality=modality if modality == "dapi" else "he",
     )
+    centroids = centroids_df[["centroid_x", "centroid_y"]].values
     elapsed = time.time() - start
 
     n_detected = int(masks.max()) if masks.size > 0 else 0
@@ -289,11 +288,11 @@ def run_benchmark(
     # Step 1: Load image
     image = load_synthetic_image(replicate_id, condition, mode, image_dir)
 
-    # Step 2: Run Cellpose
-    masks, centroids, cellpose_time = run_cellpose_segmentation(
+    # Step 2: Run nuclei segmentation
+    masks, centroids, seg_time = run_segmentation(
         image, mode, use_gpu=use_gpu, diameter=cellpose_diameter
     )
-    timings["cellpose_sec"] = cellpose_time
+    timings["segmentation_sec"] = seg_time
 
     # Step 3: Load spot coordinates and assign nuclei
     spot_coords_df = compute_spot_coordinates(sccube_dir, condition, replicate_id)

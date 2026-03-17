@@ -4,7 +4,7 @@ Single-cell resolution benchmark using Module 3b nucleus assignment pipeline.
 
 This script tests the new single-cell resolution features on Xenium pseudo-Visium data:
 1. Loads existing CITEgeist hybrid results (proportions + deconvolved GEX)
-2. Runs Cellpose on the morphology image to get nuclei masks (not just counts)
+2. Runs StarDist on the morphology image to get nuclei masks (not just counts)
 3. Maps nuclei centroids to spots
 4. Runs the new run_nucleus_assignment() pipeline
 5. Distributes GEX to individual cells
@@ -39,7 +39,7 @@ sys.path.insert(0, str(BENCHMARK_ROOT))
 from benchmark_constants import ACHIEVABLE_7_CELL_PROFILE_DICT
 
 from CITEgeist.model.segmentation import (
-    run_cellpose_nuclei_segmentation,
+    run_nuclei_segmentation,
 )
 from CITEgeist.model.module3b_nucleus_assignment import run_nucleus_assignment
 from CITEgeist.model.cell_level_gex import distribute_gex_to_cells
@@ -202,8 +202,6 @@ def run_single_cell_benchmark(
     data_dir: Path = DATA_DIR,
     image_dir: Path = IMAGE_DIR,
     hybrid_dir: Path = HYBRID_OUTPUT_DIR,
-    use_gpu: bool = False,
-    cellpose_diameter: Optional[float] = None,
     spot_diameter_um: float = 55.0,
 ) -> Dict[str, Any]:
     """
@@ -215,8 +213,6 @@ def run_single_cell_benchmark(
         data_dir: Directory containing h5ad_objects/
         image_dir: Directory containing morphology images
         hybrid_dir: Directory containing hybrid benchmark results
-        use_gpu: Whether to use GPU for Cellpose
-        cellpose_diameter: Cellpose nucleus diameter (auto if None)
         spot_diameter_um: Spot diameter in microns
 
     Returns:
@@ -264,7 +260,7 @@ def run_single_cell_benchmark(
     # Step 2: Load morphology image and run Cellpose (get mask, not just counts)
     # =========================================================================
     logger.info("-" * 60)
-    logger.info("STEP 2: Cellpose segmentation (full mask)")
+    logger.info("STEP 2: StarDist segmentation (full mask)")
     logger.info("-" * 60)
 
     t0 = time.time()
@@ -272,21 +268,17 @@ def run_single_cell_benchmark(
     coord_info = load_coord_info(region_id, image_dir)
     pixel_size_um = float(coord_info["pixel_size"])
 
-    logger.info("Running Cellpose (use_gpu=%s, diameter=%s)", use_gpu, cellpose_diameter)
-    masks, centroids_xy = run_cellpose_nuclei_segmentation(
-        image_rgb_uint8=image_rgb,
-        use_gpu=use_gpu,
-        diameter=cellpose_diameter,
-        model_type="nuclei",
-    )
-    timings["cellpose_sec"] = time.time() - t0
+    logger.info("Running StarDist nuclei segmentation")
+    masks, centroids_df = run_nuclei_segmentation(image_rgb, modality="dapi")
+    centroids_xy = centroids_df[["x_pixel", "y_pixel"]].values
+    timings["segmentation_sec"] = time.time() - t0
 
     n_nuclei = int(masks.max())
-    logger.info("Segmented %d nuclei in %.1fs", n_nuclei, timings["cellpose_sec"])
+    logger.info("Segmented %d nuclei in %.1fs", n_nuclei, timings["segmentation_sec"])
     logger.info("Mask shape: %s, centroids shape: %s", masks.shape, centroids_xy.shape)
 
     # Save mask for debugging
-    mask_path = result_dir / f"{sample_name}_cellpose_mask.npy"
+    mask_path = result_dir / f"{sample_name}_stardist_mask.npy"
     np.save(mask_path, masks)
     logger.info("Saved mask: %s", mask_path)
 
@@ -482,9 +474,9 @@ def run_single_cell_benchmark(
         "sample_name": sample_name,
         "pipeline": "single_cell_resolution_module3b",
         "cell_types": cell_types,
-        "cellpose_params": {
-            "use_gpu": use_gpu,
-            "diameter": cellpose_diameter,
+        "segmentation_params": {
+            "backend": "stardist",
+            "modality": "dapi",
             "spot_diameter_um": spot_diameter_um,
             "pixel_size_um": pixel_size_um,
         },
@@ -524,10 +516,6 @@ def main():
                         help="Directory containing morphology images")
     parser.add_argument("--hybrid-dir", type=str, default=str(HYBRID_OUTPUT_DIR),
                         help="Directory containing hybrid benchmark results")
-    parser.add_argument("--use-gpu", action="store_true", default=False,
-                        help="Use GPU for Cellpose")
-    parser.add_argument("--cellpose-diameter", type=float, default=None,
-                        help="Cellpose nucleus diameter (auto if not set)")
     parser.add_argument("--spot-diameter-um", type=float, default=55.0,
                         help="Spot diameter in microns")
     args = parser.parse_args()
@@ -538,8 +526,6 @@ def main():
         data_dir=Path(args.data_dir),
         image_dir=Path(args.image_dir),
         hybrid_dir=Path(args.hybrid_dir),
-        use_gpu=args.use_gpu,
-        cellpose_diameter=args.cellpose_diameter,
         spot_diameter_um=args.spot_diameter_um,
     )
 

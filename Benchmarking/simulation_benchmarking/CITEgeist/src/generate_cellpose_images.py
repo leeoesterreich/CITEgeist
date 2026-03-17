@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 """
-Generate Cellpose-compatible synthetic images from scCube simulation data.
+Generate synthetic nuclei images from scCube simulation data.
 
 Supports two image modes:
-- dapi: Grayscale nuclei on black background (for Cellpose 'nuclei' model)
-- h_and_e: H&E-style with purple nuclei and pink cytoplasm (for Cellpose 'cyto2' model)
+- dapi: Grayscale nuclei on black background (for nuclei segmentation models)
+- h_and_e: H&E-style with purple nuclei and pink cytoplasm (for cytoplasm segmentation models)
 """
 
 import argparse
@@ -111,7 +111,7 @@ def generate_dapi_image(
     where nuclei appear as bright filled regions with distinct boundaries.
 
     Note: Nucleus size (radius=15, edge_sigma=3 -> ~36px total diameter) is
-    calibrated to match Cellpose 'nuclei' model expectations (~30+ pixels).
+    calibrated for nuclei segmentation models (~30+ pixels).
     Smaller nuclei (e.g., radius=8) result in poor detection accuracy.
 
     Args:
@@ -184,8 +184,8 @@ def generate_he_image(
     Generate H&E-style image with pink cytoplasm and purple nuclei.
 
     Note: Nucleus sigma=10 gives FWHM ~24px and kernel extent ~60px,
-    calibrated to match Cellpose 'cyto2' model expectations. Cytoplasm
-    radius=25 maintains realistic nucleus-to-cytoplasm ratio.
+    calibrated for cytoplasm segmentation models. Cytoplasm radius=25
+    maintains realistic nucleus-to-cytoplasm ratio.
 
     Args:
         cell_coords: Nx2 array of (x, y) coordinates in original units
@@ -374,7 +374,7 @@ def generate_images_for_replicate(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate Cellpose-compatible images from scCube simulation data"
+        description="Generate synthetic nuclei images from scCube simulation data"
     )
     parser.add_argument(
         "--replicate-id",
@@ -416,7 +416,7 @@ def main():
         "--nucleus-radius",
         type=float,
         default=15.0,
-        help="DAPI nucleus radius in pixels (default: 15.0, ~30px diameter solid disk, calibrated for Cellpose)",
+        help="DAPI nucleus radius in pixels (default: 15.0, ~30px diameter solid disk)",
     )
     parser.add_argument(
         "--edge-sigma",
@@ -428,7 +428,7 @@ def main():
         "--he-nucleus-sigma",
         type=float,
         default=10.0,
-        help="H&E nucleus Gaussian sigma (default: 10.0, ~24px FWHM, calibrated for Cellpose)",
+        help="H&E nucleus Gaussian sigma (default: 10.0, ~24px FWHM)",
     )
     args = parser.parse_args()
 

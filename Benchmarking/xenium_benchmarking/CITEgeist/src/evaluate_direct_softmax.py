@@ -271,8 +271,8 @@ def evaluate_single_cell_accuracy(
             if len(spot_nuclei) == 0:
                 continue
 
-            # Transform coordinates (Cellpose pixels -> Xenium microns)
-            # Cellpose coordinates are in image pixels, need to convert to tissue microns
+            # Transform coordinates (segmentation pixels -> Xenium microns)
+            # Segmentation coordinates are in image pixels, need to convert to tissue microns
             pixel_size = 0.2125  # um/pixel for Xenium morphology images
             cp_x = spot_nuclei["centroid_x"].values * pixel_size + x_min
             cp_y = spot_nuclei["centroid_y"].values * pixel_size

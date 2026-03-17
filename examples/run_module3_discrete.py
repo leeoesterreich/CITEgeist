@@ -13,11 +13,11 @@ Advantages over continuous proportions:
 - +10-16% Pearson correlation on GEX deconvolution (benchmarked)
 
 Requirements:
-- Nuclei counts per spot from Cellpose segmentation or Xenium cell mapping
+- Nuclei counts per spot from nuclei segmentation (e.g., StarDist) or Xenium cell mapping
 - Gurobi license (academic free)
 
 Usage:
-    # With nuclei counts from Cellpose segmentation
+    # With nuclei counts from nuclei segmentation
     python run_module3_discrete.py --sample HCC22-088-P1-S1 \\
         --nuclei-file segmentation/nuclei_counts.csv \\
         --output-dir output/module3_discrete

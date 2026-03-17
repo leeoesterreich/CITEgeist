@@ -1,5 +1,5 @@
 """
-Cellpose-based nuclei segmentation utilities for Visium-style datasets.
+StarDist-based nuclei segmentation utilities for Visium-style datasets.
 
 This module provides optional image segmentation support for generating
 spot-level nuclei counts that can be used as a soft abundance prior during
@@ -8,11 +8,11 @@ cell proportion optimization.
 
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import logging
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -49,6 +49,159 @@ PLATFORM_SPOT_SPACINGS_UM = {
     "visium_hd": 8.0,  # HD bins are contiguous
     "visium_hd_2um": 2.0,
 }
+
+
+class StarDistSegmenter:
+    """Wrapper around StarDist 2D pretrained models for nuclei segmentation.
+
+    Lazily imports StarDist/csbdeep on first use so the module can be imported
+    without those optional dependencies installed.
+
+    Args:
+        modality: One of ``"he"`` (H&E brightfield) or ``"dapi"`` (fluorescence).
+    """
+
+    MODELS = {
+        "he": "2D_versatile_he",
+        "dapi": "2D_versatile_fluo",
+    }
+
+    def __init__(self, modality: str = "he"):
+        if modality not in self.MODELS:
+            raise ValueError(
+                f"Unknown modality '{modality}'. Choose from {list(self.MODELS.keys())}."
+            )
+        self.modality = modality
+
+        try:
+            from stardist.models import StarDist2D  # noqa: F401
+        except ImportError as exc:
+            raise ImportError(
+                "StarDist is required for segmentation. Install with "
+                "`pip install stardist csbdeep` or `pip install \"citegeist[imaging]\"`."
+            ) from exc
+
+        model_name = self.MODELS[modality]
+        logging.info("Loading StarDist model '%s' for modality '%s'", model_name, modality)
+        self._model = StarDist2D.from_pretrained(model_name)
+
+    def segment(
+        self,
+        image: np.ndarray,
+        **kwargs,
+    ) -> Tuple[np.ndarray, pd.DataFrame]:
+        """Run StarDist prediction on an image.
+
+        Args:
+            image: Input image. For ``"he"`` modality this should be an RGB
+                uint8 image; for ``"dapi"`` a single-channel grayscale or
+                uint8 image.
+            **kwargs: Extra keyword arguments forwarded to
+                ``StarDist2D.predict_instances`` (e.g. ``prob_thresh``,
+                ``nms_thresh``, ``scale``).
+
+        Returns:
+            masks: ``int32`` label image where each nucleus has a unique ID.
+            centroids_df: DataFrame with columns ``[y_pixel, x_pixel, nucleus_id]``
+                containing the centroid of each detected nucleus.
+        """
+        from csbdeep.utils import normalize as csb_normalize
+
+        # Normalize image to [0, 1] as expected by StarDist
+        if self.modality == "he":
+            # H&E: normalize per-channel
+            img_norm = csb_normalize(image, 1, 99.8, axis=(0, 1))
+        else:
+            # Fluorescence: normalize globally
+            if image.ndim == 3:
+                # Take first channel if multi-channel
+                image = image[..., 0]
+            img_norm = csb_normalize(image, 1, 99.8)
+
+        masks, details = self._model.predict_instances(img_norm, **kwargs)
+        masks = np.asarray(masks, dtype=np.int32)
+
+        max_label = int(masks.max())
+        if max_label <= 0:
+            centroids_df = pd.DataFrame(
+                columns=["y_pixel", "x_pixel", "nucleus_id"]
+            )
+        else:
+            labels = np.arange(1, max_label + 1, dtype=np.int32)
+            com = center_of_mass(
+                np.ones_like(masks, dtype=np.float32),
+                labels=masks,
+                index=labels,
+            )
+            centroids_df = pd.DataFrame(
+                {
+                    "y_pixel": [float(c[0]) for c in com],
+                    "x_pixel": [float(c[1]) for c in com],
+                    "nucleus_id": labels,
+                }
+            )
+
+        logging.info(
+            "StarDist segmented %d nuclei from %s image (%s)",
+            len(centroids_df),
+            self.modality,
+            image.shape[:2],
+        )
+        return masks, centroids_df
+
+
+def run_nuclei_segmentation(
+    image: np.ndarray,
+    modality: str = "he",
+    **kwargs,
+) -> Tuple[np.ndarray, pd.DataFrame]:
+    """Convenience function: segment nuclei with StarDist.
+
+    Args:
+        image: Input image (RGB uint8 for H&E, grayscale for DAPI).
+        modality: ``"he"`` or ``"dapi"``.
+        **kwargs: Forwarded to ``StarDistSegmenter.segment()``.
+
+    Returns:
+        masks: ``int32`` label image.
+        centroids_df: DataFrame with ``[y_pixel, x_pixel, nucleus_id]``.
+    """
+    segmenter = StarDistSegmenter(modality=modality)
+    return segmenter.segment(image, **kwargs)
+
+
+def run_cellpose_nuclei_segmentation(
+    image_rgb_uint8: np.ndarray,
+    use_gpu: bool = False,
+    diameter: Optional[float] = None,
+    flow_threshold: float = 0.4,
+    cellprob_threshold: float = 0.0,
+    model=None,
+    model_type: str = "nuclei",
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Deprecated: use ``run_nuclei_segmentation(image, modality='dapi')`` instead.
+
+    This wrapper calls StarDist under the hood and converts the output to the
+    legacy ``(masks, centroids_xy)`` format expected by old callers.
+    """
+    warnings.warn(
+        "run_cellpose_nuclei_segmentation() is deprecated. "
+        "Use run_nuclei_segmentation(image, modality='dapi') instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    masks, centroids_df = run_nuclei_segmentation(image_rgb_uint8, modality="dapi")
+
+    # Convert centroids_df to legacy (x, y) array format
+    if len(centroids_df) == 0:
+        centroids_xy = np.zeros((0, 2), dtype=np.float64)
+    else:
+        centroids_xy = np.column_stack([
+            centroids_df["x_pixel"].to_numpy(dtype=np.float64),
+            centroids_df["y_pixel"].to_numpy(dtype=np.float64),
+        ])
+
+    return masks, centroids_xy
 
 
 def detect_spot_diameter_pixels(
@@ -89,7 +242,7 @@ def detect_spot_diameter_pixels(
             )
         diameter_px = spot_diameter_um / pixel_size_um
         logging.info(
-            "Using explicit spot diameter: %.1f µm = %.1f pixels (pixel_size=%.4f µm/px)",
+            "Using explicit spot diameter: %.1f um = %.1f pixels (pixel_size=%.4f um/px)",
             spot_diameter_um, diameter_px, pixel_size_um
         )
         return diameter_px
@@ -125,7 +278,7 @@ def detect_spot_diameter_pixels(
         diameter_um = PLATFORM_SPOT_DIAMETERS_UM[platform]
         diameter_px = diameter_um / pixel_size_um
         logging.info(
-            "Detected platform '%s': spot diameter = %.1f µm = %.1f pixels",
+            "Detected platform '%s': spot diameter = %.1f um = %.1f pixels",
             platform, diameter_um, diameter_px
         )
         return diameter_px
@@ -138,9 +291,9 @@ def detect_spot_diameter_pixels(
         "  3. Set adata.uns['platform'] to a known platform: "
         f"{list(PLATFORM_SPOT_DIAMETERS_UM.keys())}\n\n"
         "Common spot diameters:\n"
-        "  - Visium: 55 µm diameter, 100 µm center-to-center spacing\n"
-        "  - Visium HD: 8 µm bins (contiguous)\n"
-        "  - Xenium pseudo-Visium: typically 55 µm to match Visium geometry"
+        "  - Visium: 55 um diameter, 100 um center-to-center spacing\n"
+        "  - Visium HD: 8 um bins (contiguous)\n"
+        "  - Xenium pseudo-Visium: typically 55 um to match Visium geometry"
     )
 
 
@@ -160,7 +313,7 @@ def _get_first_library_payload(adata) -> Dict:
 
 
 def _prepare_rgb_uint8(image: np.ndarray) -> np.ndarray:
-    """Ensure image is uint8 RGB for robust Cellpose input."""
+    """Ensure image is uint8 RGB for consistent input to segmentation models."""
     if image.ndim == 2:
         image = np.stack([image, image, image], axis=-1)
     if image.ndim != 3 or image.shape[-1] not in (3, 4):
@@ -258,174 +411,6 @@ def get_resolution_image_and_scale(
     return fullres_approx, effective_scale
 
 
-def run_cellpose_nuclei_segmentation(
-    image_rgb_uint8: np.ndarray,
-    use_gpu: bool = False,
-    diameter: Optional[float] = None,
-    flow_threshold: float = 0.4,
-    cellprob_threshold: float = 0.0,
-    model=None,
-    model_type: str = "nuclei",
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Run Cellpose nuclei model and return mask labels + centroid array."""
-    if model is None:
-        model = _build_cellpose_model(use_gpu=use_gpu, model_type=model_type)
-
-    eval_out = model.eval(
-        image_rgb_uint8,
-        channels=[0, 0],
-        diameter=diameter,
-        flow_threshold=flow_threshold,
-        cellprob_threshold=cellprob_threshold,
-    )
-    if isinstance(eval_out, tuple):
-        masks = eval_out[0]
-    else:
-        masks = eval_out
-
-    masks = np.asarray(masks)
-    if masks.ndim != 2:
-        raise ValueError(f"Cellpose masks should be 2D label image, got shape {masks.shape}.")
-
-    max_label = int(masks.max())
-    if max_label <= 0:
-        centroids = np.zeros((0, 2), dtype=np.float64)
-    else:
-        # center_of_mass returns (row, col) -> convert to (x, y).
-        labels = np.arange(1, max_label + 1, dtype=np.int32)
-        com = center_of_mass(np.ones_like(masks, dtype=np.float32), labels=masks, index=labels)
-        centroids = np.array([(float(c[1]), float(c[0])) for c in com], dtype=np.float64)
-
-    return masks, centroids
-
-
-def _build_cellpose_model(use_gpu: bool = False, model_type: str = "nuclei"):
-    try:
-        from cellpose import models
-    except Exception as exc:
-        raise ImportError(
-            "Cellpose is required for segmentation. Install with `pip install \"citegeist[imaging]\"` "
-            "or `pip install cellpose scikit-image`."
-        ) from exc
-
-    # Support both legacy Cellpose API (`Cellpose`) and newer API (`CellposeModel`).
-    if hasattr(models, "Cellpose"):
-        return models.Cellpose(gpu=use_gpu, model_type=model_type)
-    if hasattr(models, "CellposeModel"):
-        try:
-            return models.CellposeModel(gpu=use_gpu, model_type=model_type)
-        except TypeError:
-            return models.CellposeModel(gpu=use_gpu, pretrained_model=model_type)
-    raise AttributeError("cellpose.models has neither `Cellpose` nor `CellposeModel`; unsupported Cellpose version.")
-
-
-def _count_nuclei_from_patch_centroids(
-    centroids_xy: np.ndarray,
-    local_spot_center_xy: Tuple[float, float],
-    spot_radius_px: float,
-) -> int:
-    if centroids_xy.size == 0:
-        return 0
-    dx = centroids_xy[:, 0] - float(local_spot_center_xy[0])
-    dy = centroids_xy[:, 1] - float(local_spot_center_xy[1])
-    dist_sq = dx * dx + dy * dy
-    return int(np.sum(dist_sq <= (float(spot_radius_px) ** 2)))
-
-
-def _compute_patch_bounds(cx: float, cy: float, patch_radius_px: float, width: int, height: int) -> Tuple[int, int, int, int]:
-    x0 = max(0, int(np.floor(cx - patch_radius_px)))
-    x1 = min(width, int(np.ceil(cx + patch_radius_px)))
-    y0 = max(0, int(np.floor(cy - patch_radius_px)))
-    y1 = min(height, int(np.ceil(cy + patch_radius_px)))
-    return x0, x1, y0, y1
-
-
-def _segment_fullres_by_spot_patches(
-    image_rgb_uint8: np.ndarray,
-    spot_centers_fullres: np.ndarray,
-    spot_radius_px: float,
-    spot_names: pd.Index,
-    use_gpu: bool = False,
-    diameter: Optional[float] = None,
-    flow_threshold: float = 0.4,
-    cellprob_threshold: float = 0.0,
-    patch_radius_multiplier: float = 1.5,
-    patch_workers: int = 4,
-) -> Tuple[pd.Series, np.ndarray]:
-    """Segment fullres image by spot-local patches and count nuclei per spot."""
-    if patch_radius_multiplier < 1.0:
-        raise ValueError("patch_radius_multiplier must be >= 1.0.")
-    if patch_workers < 1:
-        raise ValueError("patch_workers must be >= 1.")
-
-    h, w = int(image_rgb_uint8.shape[0]), int(image_rgb_uint8.shape[1])
-    patch_radius_px = float(spot_radius_px) * float(patch_radius_multiplier)
-
-    def _process_indices(indices: List[int]) -> Tuple[List[Tuple[int, int]], List[np.ndarray]]:
-        model = _build_cellpose_model(use_gpu=use_gpu)
-        local_counts: List[Tuple[int, int]] = []
-        local_centroids_global: List[np.ndarray] = []
-        for idx in indices:
-            cx, cy = spot_centers_fullres[idx]
-            x0, x1, y0, y1 = _compute_patch_bounds(cx, cy, patch_radius_px, w, h)
-            if x1 <= x0 or y1 <= y0:
-                local_counts.append((idx, 0))
-                continue
-            patch = image_rgb_uint8[y0:y1, x0:x1]
-            if patch.size == 0:
-                local_counts.append((idx, 0))
-                continue
-            _, centroids_local = run_cellpose_nuclei_segmentation(
-                image_rgb_uint8=patch,
-                use_gpu=use_gpu,
-                diameter=diameter,
-                flow_threshold=flow_threshold,
-                cellprob_threshold=cellprob_threshold,
-                model=model,
-            )
-            local_center = (float(cx - x0), float(cy - y0))
-            count = _count_nuclei_from_patch_centroids(
-                centroids_xy=centroids_local,
-                local_spot_center_xy=local_center,
-                spot_radius_px=spot_radius_px,
-            )
-            local_counts.append((idx, count))
-            if centroids_local.size > 0:
-                centroids_global = centroids_local.copy()
-                centroids_global[:, 0] += float(x0)
-                centroids_global[:, 1] += float(y0)
-                local_centroids_global.append(centroids_global)
-        return local_counts, local_centroids_global
-
-    n_spots = spot_centers_fullres.shape[0]
-    all_idx = list(range(n_spots))
-    chunk_size = max(1, int(np.ceil(n_spots / float(patch_workers))))
-    chunks = [all_idx[i : i + chunk_size] for i in range(0, n_spots, chunk_size)]
-
-    counts = np.zeros(n_spots, dtype=np.int64)
-    centroids_parts: List[np.ndarray] = []
-
-    if patch_workers == 1:
-        res_counts, res_centroids = _process_indices(chunks[0])
-        for idx, c in res_counts:
-            counts[idx] = c
-        centroids_parts.extend(res_centroids)
-    else:
-        with ThreadPoolExecutor(max_workers=patch_workers) as ex:
-            futures = [ex.submit(_process_indices, chunk) for chunk in chunks]
-            for fut in futures:
-                res_counts, res_centroids = fut.result()
-                for idx, c in res_counts:
-                    counts[idx] = c
-                centroids_parts.extend(res_centroids)
-
-    if len(centroids_parts) > 0:
-        centroids_all = np.vstack(centroids_parts)
-    else:
-        centroids_all = np.zeros((0, 2), dtype=np.float64)
-    return pd.Series(counts, index=spot_names, name="nuclei_count_raw"), centroids_all
-
-
 def assign_nuclei_centroids_to_spots(
     centroids_xy: np.ndarray,
     spot_centers_xy: np.ndarray,
@@ -492,19 +477,17 @@ def normalize_nuclei_counts_for_prior(
 def compute_spot_nuclei_counts_from_adata(
     adata,
     resolution_mode: str = "hires",
-    use_gpu: bool = False,
-    diameter: Optional[float] = None,
-    flow_threshold: float = 0.4,
-    cellprob_threshold: float = 0.0,
     max_fullres_side: int = 9000,
-    fullres_patch_mode: bool = False,
-    fullres_patch_radius_multiplier: float = 1.5,
-    fullres_patch_workers: int = 4,
     spot_diameter_um: Optional[float] = None,
     pixel_size_um: Optional[float] = None,
+    modality: str = "he",
+    **stardist_kwargs,
 ) -> SegmentationResult:
     """
-    End-to-end segmentation + centroid assignment for an AnnData Visium object.
+    End-to-end nuclei segmentation + centroid assignment for an AnnData Visium object.
+
+    Uses StarDist to segment nuclei from the histology image, then assigns
+    each detected nucleus to the nearest Visium spot within the spot radius.
 
     Spot diameter is determined by (in order of priority):
     1. spot_diameter_um parameter (explicit, requires pixel_size_um)
@@ -512,21 +495,17 @@ def compute_spot_nuclei_counts_from_adata(
     3. Platform-based detection from adata.uns['platform'] (requires pixel_size_um)
 
     Args:
-        adata: AnnData with spatial coordinates and histology images
-        resolution_mode: Image resolution to use ('lowres', 'hires', 'fullres')
-        use_gpu: Whether to use GPU for Cellpose
-        diameter: Cellpose diameter parameter (nucleus size, not spot size)
-        flow_threshold: Cellpose flow threshold
-        cellprob_threshold: Cellpose cell probability threshold
-        max_fullres_side: Max image dimension for fullres fallback
-        fullres_patch_mode: Use per-spot patch segmentation for fullres
-        fullres_patch_radius_multiplier: Patch size as multiple of spot radius
-        fullres_patch_workers: Number of parallel workers for patch mode
-        spot_diameter_um: Explicit spot diameter in microns (e.g., 55.0 for Visium)
-        pixel_size_um: Microns per pixel in coordinate frame (required for um-based params)
+        adata: AnnData with spatial coordinates and histology images.
+        resolution_mode: Image resolution to use ('lowres', 'hires', 'fullres').
+        max_fullres_side: Max image dimension for fullres fallback.
+        spot_diameter_um: Explicit spot diameter in microns (e.g., 55.0 for Visium).
+        pixel_size_um: Microns per pixel in coordinate frame (required for um-based params).
+        modality: StarDist modality - ``"he"`` for H&E or ``"dapi"`` for fluorescence.
+        **stardist_kwargs: Extra arguments forwarded to ``StarDistSegmenter.segment()``
+            (e.g. ``prob_thresh``, ``nms_thresh``, ``scale``).
 
     Returns:
-        SegmentationResult with nuclei counts per spot
+        SegmentationResult with nuclei counts per spot.
     """
     if "spatial" not in adata.obsm:
         raise ValueError("AnnData missing `obsm['spatial']`; cannot map nuclei to spots.")
@@ -546,37 +525,29 @@ def compute_spot_nuclei_counts_from_adata(
 
     spot_centers_fullres = np.asarray(adata.obsm["spatial"], dtype=np.float64)
 
-    if resolution_mode == "fullres" and fullres_patch_mode and np.isclose(fullres_to_image_scale, 1.0):
-        spot_radius_px = float(spot_diam_fullres) / 2.0
-        raw_counts, centroids_xy = _segment_fullres_by_spot_patches(
-            image_rgb_uint8=image,
-            spot_centers_fullres=spot_centers_fullres,
-            spot_radius_px=spot_radius_px,
-            spot_names=adata.obs_names,
-            use_gpu=use_gpu,
-            diameter=diameter,
-            flow_threshold=flow_threshold,
-            cellprob_threshold=cellprob_threshold,
-            patch_radius_multiplier=fullres_patch_radius_multiplier,
-            patch_workers=fullres_patch_workers,
-        )
-        masks = np.zeros((1, 1), dtype=np.int32)
+    # StarDist processes the full image in one call (no patch mode needed)
+    masks, centroids_df = run_nuclei_segmentation(
+        image=image, modality=modality, **stardist_kwargs
+    )
+
+    # Convert centroids_df (y_pixel, x_pixel) to xy array for spot assignment
+    if len(centroids_df) == 0:
+        centroids_xy = np.zeros((0, 2), dtype=np.float64)
     else:
-        masks, centroids_xy = run_cellpose_nuclei_segmentation(
-            image_rgb_uint8=image,
-            use_gpu=use_gpu,
-            diameter=diameter,
-            flow_threshold=flow_threshold,
-            cellprob_threshold=cellprob_threshold,
-        )
-        spot_centers_xy = spot_centers_fullres * float(fullres_to_image_scale)
-        spot_radius_px = (spot_diam_fullres * float(fullres_to_image_scale)) / 2.0
-        raw_counts = assign_nuclei_centroids_to_spots(
-            centroids_xy=centroids_xy,
-            spot_centers_xy=spot_centers_xy,
-            spot_radius_px=spot_radius_px,
-            spot_names=adata.obs_names,
-        )
+        centroids_xy = np.column_stack([
+            centroids_df["x_pixel"].to_numpy(dtype=np.float64),
+            centroids_df["y_pixel"].to_numpy(dtype=np.float64),
+        ])
+
+    spot_centers_xy = spot_centers_fullres * float(fullres_to_image_scale)
+    spot_radius_px = (spot_diam_fullres * float(fullres_to_image_scale)) / 2.0
+    raw_counts = assign_nuclei_centroids_to_spots(
+        centroids_xy=centroids_xy,
+        spot_centers_xy=spot_centers_xy,
+        spot_radius_px=spot_radius_px,
+        spot_names=adata.obs_names,
+    )
+
     return SegmentationResult(
         masks=masks,
         centroids_xy=centroids_xy,
@@ -601,7 +572,7 @@ def save_segmentation_artifacts(
 
     outputs: Dict[str, str] = {"nuclei_counts_csv": str(counts_path)}
     if save_masks:
-        masks_path = out / f"{sample_name}_cellpose_masks_{result.resolution_mode}.npy"
+        masks_path = out / f"{sample_name}_stardist_masks_{result.resolution_mode}.npy"
         np.save(masks_path, result.masks)
-        outputs["cellpose_masks_npy"] = str(masks_path)
+        outputs["stardist_masks_npy"] = str(masks_path)
     return outputs

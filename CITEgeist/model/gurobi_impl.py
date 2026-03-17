@@ -2878,7 +2878,7 @@ def solve_discrete_cell_counts(
         marker_names: List of marker names (length M)
         assignment_matrix: (M, T) binary matrix where A[m,t]=1 if marker m belongs to type t
         cell_type_names: List of cell type names (length T)
-        nuclei_counts: (N,) integer nuclei count per spot from Cellpose segmentation
+        nuclei_counts: (N,) integer nuclei count per spot from nuclei segmentation
         beta_values: (M,) per-marker scaling factors from previous EM iteration
         alpha_values: (M,) per-marker baselines (optional, defaults to zeros)
         max_nuclei_cap: Above this nuclei count, use continuous relaxation + rounding
@@ -3326,7 +3326,7 @@ def optimize_discrete_cell_assignment_em(
         marker_names: List of marker names (length M)
         assignment_matrix: (M, T) binary matrix where A[m,t]=1 if marker m belongs to type t
         cell_type_names: List of cell type names (length T)
-        nuclei_counts: (N,) integer nuclei count per spot from Cellpose segmentation
+        nuclei_counts: (N,) integer nuclei count per spot from nuclei segmentation
         max_em_iterations: Maximum EM iterations (default: 20)
         beta_convergence_tol: Convergence tolerance for beta change (default: 1e-3)
         beta_min: Minimum allowed beta value (default: 0.1)

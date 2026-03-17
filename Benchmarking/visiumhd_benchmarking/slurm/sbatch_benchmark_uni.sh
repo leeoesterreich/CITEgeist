@@ -30,6 +30,9 @@ set -e
 # Clean up LD_LIBRARY_PATH to avoid GLIBC conflicts
 export LD_LIBRARY_PATH=""
 
+# Allow TensorFlow to grow GPU memory (needed by StarDist/csbdeep)
+export TF_FORCE_GPU_ALLOW_GROWTH=true
+
 # Set cache directories
 export HF_HOME=/ihome/alee/alc376/.cache/huggingface
 export TORCH_HOME=/ihome/alee/alc376/.cache/torch

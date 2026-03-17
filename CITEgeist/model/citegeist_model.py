@@ -540,22 +540,28 @@ class CitegeistModel:
             f"scale_mode={scale_mode}, no per-spot normalization."
         )
 
-    def compute_spot_nuclei_counts_cellpose(
+    def compute_spot_nuclei_counts(
         self,
         resolution_mode: str = "hires",
-        use_gpu: bool = False,
-        diameter: Optional[float] = None,
-        flow_threshold: float = 0.4,
-        cellprob_threshold: float = 0.0,
         max_fullres_side: int = 9000,
         save_masks: bool = True,
+        modality: str = "he",
+        **stardist_kwargs,
     ) -> pd.Series:
         """
-        Compute per-spot nuclei counts from Visium histology using Cellpose.
+        Compute per-spot nuclei counts from Visium histology using StarDist.
 
         Writes the following columns to both gene/protein AnnData .obs (when present):
             - nuclei_count_raw
             - nuclei_count_target
+
+        Args:
+            resolution_mode: Image resolution to use ('lowres', 'hires', 'fullres').
+            max_fullres_side: Max image dimension for fullres fallback.
+            save_masks: Whether to save StarDist mask arrays to disk.
+            modality: StarDist modality - ``"he"`` for H&E or ``"dapi"`` for fluorescence.
+            **stardist_kwargs: Extra arguments forwarded to ``StarDistSegmenter.segment()``
+                (e.g. ``prob_thresh``, ``nms_thresh``, ``scale``).
 
         Returns:
             pd.Series: Raw nuclei counts indexed by spot.
@@ -566,16 +572,14 @@ class CitegeistModel:
         if source_adata is None:
             source_adata = self.adata
         if source_adata is None:
-            raise ValueError("No AnnData available to run Cellpose segmentation.")
+            raise ValueError("No AnnData available to run nuclei segmentation.")
 
         seg_result = compute_spot_nuclei_counts_from_adata(
             adata=source_adata,
             resolution_mode=resolution_mode,
-            use_gpu=use_gpu,
-            diameter=diameter,
-            flow_threshold=flow_threshold,
-            cellprob_threshold=cellprob_threshold,
             max_fullres_side=max_fullres_side,
+            modality=modality,
+            **stardist_kwargs,
         )
         target = normalize_nuclei_counts_for_prior(seg_result.nuclei_count_raw)
 
@@ -603,7 +607,7 @@ class CitegeistModel:
             "outputs": output_paths,
         }
         logging.info(
-            "Computed nuclei counts from Cellpose (%s): nuclei=%d, spots=%d.",
+            "Computed nuclei counts from StarDist (%s): nuclei=%d, spots=%d.",
             resolution_mode,
             int(seg_result.nuclei_count_raw.sum()),
             int(seg_result.nuclei_count_raw.shape[0]),
@@ -727,7 +731,7 @@ class CitegeistModel:
             if nuclei_target_col not in self.antibody_capture_adata.obs.columns:
                 raise ValueError(
                     f"Nuclei prior requested but column '{nuclei_target_col}' not found in antibody_capture_adata.obs. "
-                    "Run compute_spot_nuclei_counts_cellpose() first."
+                    "Run compute_spot_nuclei_counts() first."
                 )
             target_series = self.antibody_capture_adata.obs.loc[spot_names, nuclei_target_col]
             spot_abundance_target = target_series.to_numpy(dtype=float)
@@ -1082,7 +1086,7 @@ class CitegeistModel:
         Args:
             proportions_df: DataFrame with cell type columns and proportion values (0-1).
                 Output from run_cell_proportion_model().
-            nuclei_counts: Series with nuclei count per spot (from Cellpose or similar).
+            nuclei_counts: Series with nuclei count per spot (from StarDist or similar).
 
         Returns:
             DataFrame with cell type columns and integer count values per spot.
@@ -1091,7 +1095,7 @@ class CitegeistModel:
         Example:
             >>> # Run continuous model first
             >>> global_props, finetuned_props = model.run_cell_proportion_model()
-            >>> # Get nuclei counts from Cellpose
+            >>> # Get nuclei counts from StarDist segmentation
             >>> nuclei_counts = pd.Series({'spot_1': 10, 'spot_2': 8, ...})
             >>> # Discretize
             >>> cell_counts = model.discretize_proportions(finetuned_props, nuclei_counts)
@@ -1188,7 +1192,7 @@ class CitegeistModel:
         Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
 
         This method replaces run_cell_proportion_model() when nuclei counts are
-        available from Cellpose segmentation. Instead of estimating continuous
+        available from nuclei segmentation (e.g. StarDist). Instead of estimating continuous
         proportions, it assigns integer cell counts per type per spot.
 
         Args:
@@ -1258,7 +1262,7 @@ class CitegeistModel:
             else:
                 raise ValueError(
                     "nuclei_counts not provided and 'nuclei_count' not found in adata.obs. "
-                    "Run Cellpose segmentation first or provide nuclei_counts argument."
+                    "Run compute_spot_nuclei_counts() first or provide nuclei_counts argument."
                 )
 
         # Validate nuclei counts align with spots
@@ -1977,7 +1981,7 @@ class CitegeistModel:
             - run_cell_expression_pass1() has been called (Module 3c spot mode)
 
         Args:
-            mask: Cellpose label mask with nucleus labels
+            mask: Label mask with nucleus labels (e.g. from StarDist)
             nuclei_spot_map: DataFrame mapping nucleus_id to spot_id
             modality: REQUIRED. "dapi" or "he" — determines assignment method.
             patches_dir: Directory with per-spot patch .npy files.

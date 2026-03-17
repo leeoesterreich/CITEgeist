@@ -21,9 +21,12 @@
 #   SAMPLE=TP12-880 sbatch sbatch_benchmark.sh
 #
 # To skip certain steps (resume from checkpoint):
-#   SKIP_FLAGS="--skip-cellpose --skip-features" sbatch sbatch_benchmark.sh
+#   SKIP_FLAGS="--skip-segmentation --skip-features" sbatch sbatch_benchmark.sh
 
 set -e
+
+# Allow TensorFlow to grow GPU memory (needed by StarDist/csbdeep)
+export TF_FORCE_GPU_ALLOW_GROWTH=true
 
 # Load modules
 module load gurobi/12.0.3

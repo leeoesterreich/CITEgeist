@@ -72,10 +72,10 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
     model.load_cell_profile_dict(CELL_PROFILES_NESTED)
 
     if modality == "he":
-        nuclei_counts = model.compute_spot_nuclei_counts_cellpose(
+        nuclei_counts = model.compute_spot_nuclei_counts(
             resolution_mode="hires", use_gpu=False, save_masks=True,
         )
-        logger.info(f"Cellpose: {nuclei_counts.sum():.0f} total nuclei across {len(nuclei_counts)} spots")
+        logger.info(f"Segmentation: {nuclei_counts.sum():.0f} total nuclei across {len(nuclei_counts)} spots")
 
     model.run_cell_proportion_model(validation_warn_only=True)
     model.run_cell_expression_pass1()

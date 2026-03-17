@@ -1,4 +1,4 @@
-"""Tests for Cellpose H&E segmentation."""
+"""Tests for StarDist H&E segmentation."""
 import sys
 from pathlib import Path
 import numpy as np
@@ -9,96 +9,92 @@ _src_dir = Path(__file__).parent
 if str(_src_dir) not in sys.path:
     sys.path.insert(0, str(_src_dir))
 
-from run_cellpose_he import (
-    preprocess_he_for_cellpose,
+from run_segmentation_he import (
+    preprocess_he_for_stardist,
     segment_tile,
     stitch_masks,
     extract_centroids,
 )
 
 
-def test_preprocess_he_for_cellpose():
-    """Test H&E preprocessing for Cellpose."""
+def test_preprocess_he_for_stardist():
+    """Test H&E preprocessing for StarDist."""
     # Mock RGB H&E image
     he_image = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
 
-    processed = preprocess_he_for_cellpose(he_image)
+    processed = preprocess_he_for_stardist(he_image)
 
-    # Cellpose expects grayscale or specific channel format
-    assert processed.ndim == 2 or processed.shape[-1] in [1, 2, 3]
-    assert processed.dtype == np.float32 or processed.dtype == np.uint8
-
-
-def test_preprocess_he_grayscale_input():
-    """Test preprocessing handles grayscale input."""
-    gray_image = np.random.randint(0, 255, (100, 100), dtype=np.uint8)
-
-    processed = preprocess_he_for_cellpose(gray_image)
-
-    assert processed.ndim == 2
+    # StarDist expects RGB uint8
+    assert processed.ndim == 3
+    assert processed.shape[-1] == 3
     assert processed.dtype == np.uint8
 
 
-def test_preprocess_he_inverts_nuclei():
-    """Test that preprocessing inverts so nuclei become bright."""
-    # Create image with dark nuclei (typical H&E)
-    he_image = np.ones((100, 100, 3), dtype=np.uint8) * 200  # Light background
-    he_image[40:60, 40:60, :] = 50  # Dark nucleus region
+def test_preprocess_he_grayscale_input():
+    """Test preprocessing handles grayscale input by converting to RGB."""
+    gray_image = np.random.randint(0, 255, (100, 100), dtype=np.uint8)
 
-    processed = preprocess_he_for_cellpose(he_image)
+    processed = preprocess_he_for_stardist(gray_image)
 
-    # After inversion, nucleus region should be brighter than background
-    nucleus_region = processed[40:60, 40:60]
-    background_region = processed[0:20, 0:20]
+    # Should be converted to 3-channel
+    assert processed.ndim == 3
+    assert processed.shape == (100, 100, 3)
+    assert processed.dtype == np.uint8
 
-    assert nucleus_region.mean() > background_region.mean()
+
+def test_preprocess_he_preserves_rgb():
+    """Test that preprocessing preserves RGB H&E images."""
+    he_image = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+
+    processed = preprocess_he_for_stardist(he_image)
+
+    # Should be unchanged for uint8 RGB input
+    np.testing.assert_array_equal(processed, he_image)
 
 
 def test_segment_tile():
-    """Test single tile segmentation (mock, no actual Cellpose)."""
-    # This test validates the interface, actual Cellpose tested in integration
+    """Test single tile segmentation (mock, no actual StarDist)."""
     tile = np.random.randint(0, 255, (512, 512, 3), dtype=np.uint8)
 
-    # Mock implementation for unit test
     from unittest.mock import patch, MagicMock
+    import pandas as pd
 
-    mock_model = MagicMock()
-    mock_model.eval.return_value = (
+    mock_segmenter = MagicMock()
+    mock_segmenter.segment.return_value = (
         np.zeros((512, 512), dtype=np.int32),  # masks
-        None,  # flows
-        None,  # styles
+        pd.DataFrame(columns=['y_pixel', 'x_pixel', 'nucleus_id']),  # centroids
     )
 
-    with patch('run_cellpose_he.get_cellpose_model', return_value=mock_model):
-        masks = segment_tile(tile, diameter=30)
+    with patch('run_segmentation_he.get_segmenter', return_value=mock_segmenter):
+        masks = segment_tile(tile)
 
     assert masks.shape == (512, 512)
     assert masks.dtype in [np.int32, np.int64, np.uint32]
 
 
-def test_segment_tile_calls_cellpose_correctly():
-    """Test that segment_tile calls Cellpose with correct parameters."""
+def test_segment_tile_calls_stardist_correctly():
+    """Test that segment_tile calls StarDist with correct parameters."""
     from unittest.mock import patch, MagicMock
+    import pandas as pd
 
     tile = np.random.randint(0, 255, (256, 256, 3), dtype=np.uint8)
 
-    mock_model = MagicMock()
-    mock_model.eval.return_value = (
+    mock_segmenter = MagicMock()
+    mock_segmenter.segment.return_value = (
         np.zeros((256, 256), dtype=np.int32),
-        None,
-        None,
+        pd.DataFrame(columns=['y_pixel', 'x_pixel', 'nucleus_id']),
     )
 
-    with patch('run_cellpose_he.get_cellpose_model', return_value=mock_model):
-        segment_tile(tile, diameter=40)
+    with patch('run_segmentation_he.get_segmenter', return_value=mock_segmenter):
+        segment_tile(tile, prob_thresh=0.5, nms_thresh=0.3)
 
-    # Verify eval was called once
-    mock_model.eval.assert_called_once()
+    # Verify segment was called once
+    mock_segmenter.segment.assert_called_once()
 
-    # Check diameter was passed
-    call_kwargs = mock_model.eval.call_args[1]
-    assert call_kwargs['diameter'] == 40
-    assert call_kwargs['channels'] == [0, 0]  # Grayscale
+    # Check kwargs were passed through
+    call_kwargs = mock_segmenter.segment.call_args[1]
+    assert call_kwargs['prob_thresh'] == 0.5
+    assert call_kwargs['nms_thresh'] == 0.3
 
 
 def test_stitch_masks():
@@ -191,16 +187,16 @@ def test_stitch_masks_large_output():
 
 
 class TestIntegration:
-    """Integration tests (skip if Cellpose unavailable or model weights not cached)."""
+    """Integration tests (skip if StarDist unavailable or model weights not cached)."""
 
     @pytest.mark.slow
     @pytest.mark.integration
     def test_full_pipeline_small_image(self):
         """Test full segmentation pipeline on small synthetic image."""
-        # Skip if Cellpose is not available
-        cellpose = pytest.importorskip("cellpose", reason="Cellpose not installed")
+        # Skip if StarDist is not available
+        pytest.importorskip("stardist", reason="StarDist not installed")
 
-        from run_cellpose_he import segment_tile
+        from run_segmentation_he import segment_tile
 
         # Create simple synthetic image with circular nuclei
         image = np.ones((128, 128, 3), dtype=np.uint8) * 200
@@ -208,11 +204,11 @@ class TestIntegration:
         # Add some dark circles (nuclei)
         y, x = np.ogrid[:128, :128]
         for cy, cx in [(32, 32), (96, 96), (32, 96)]:
-            mask = (y - cy) ** 2 + (x - cx) ** 2 <= 100
-            image[mask] = 50
+            circle = (y - cy) ** 2 + (x - cx) ** 2 <= 100
+            image[circle] = 50
 
-        # This will actually call Cellpose
-        masks = segment_tile(image, diameter=20, gpu=False)
+        # This will actually call StarDist
+        masks = segment_tile(image, modality='he')
 
         assert masks.shape == (128, 128)
         assert masks.dtype in [np.int32, np.int64]

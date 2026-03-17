@@ -301,7 +301,7 @@ CITEgeist is organized into 5 modules that form a complete spatial multi-omics a
 
 **Files**: `CITEgeist/model/gurobi_impl.py`, `CITEgeist/model/citegeist_model.py`, `CITEgeist/model/segmentation.py`
 
-**Purpose**: When nuclei counts are available (from Cellpose segmentation or Xenium cell mapping), assign discrete integer cell counts per type instead of continuous proportions.
+**Purpose**: When nuclei counts are available (from StarDist segmentation or Xenium cell mapping), assign discrete integer cell counts per type instead of continuous proportions.
 
 **Method**:
 - **E-step**: Integer Quadratic Programming (IQP) solver assigns discrete cell identities
@@ -323,7 +323,7 @@ CITEgeist is organized into 5 modules that form a complete spatial multi-omics a
 
 **Usage**:
 ```python
-# Requires nuclei counts (from Cellpose or Xenium n_cells)
+# Requires nuclei counts (from StarDist or Xenium n_cells)
 model.preprocess_antibody_discrete()  # NOT preprocess_antibody()
 cell_counts_df = model.run_discrete_cell_assignment(nuclei_counts=nuclei_series)
 model.run_cell_expression_pass1(use_discrete_mode=True, cell_counts=cell_counts_df)

@@ -37,7 +37,7 @@ def solve_detection_estimation(
 
     Args:
         X: (n_spots, n_markers) antibody signal matrix.
-        nuclei_counts: (n_spots,) from Cellpose segmentation.
+        nuclei_counts: (n_spots,) from nuclei segmentation.
         profile: (n_types, n_markers) binary assignment matrix.
         marker_groups: Dict mapping cell_type -> marker indices.
         max_iter: Maximum EM iterations.
