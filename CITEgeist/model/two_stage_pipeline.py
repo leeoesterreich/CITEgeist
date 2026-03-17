@@ -7,7 +7,7 @@ Stage 2: Use VAE embeddings + learned prototypes for within-spot assignment
 Usage:
     pipeline = TwoStagePipeline(vae=vae, cell_types=cell_types)
 
-    # Run Stage 1 externally (existing benchmark_hybrid_cellpose.py)
+    # Run Stage 1 externally (existing hybrid benchmark pipeline)
     stage1_props, stage1_counts = run_hybrid_benchmark(...)
 
     # Run Stage 2

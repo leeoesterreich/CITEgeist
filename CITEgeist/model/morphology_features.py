@@ -1,4 +1,4 @@
-"""Nuclear morphology feature extraction from Cellpose masks and image patches."""
+"""Nuclear morphology feature extraction from segmentation masks and image patches."""
 import numpy as np
 import pandas as pd
 from skimage.measure import regionprops_table, regionprops, label
@@ -91,7 +91,7 @@ def extract_cell_features(
     where each label corresponds to a nucleus-cell pair.
 
     Args:
-        nucleus_mask: 2D labeled array of nuclei (from Cellpose)
+        nucleus_mask: 2D labeled array of nuclei (from segmentation)
         cell_mask: 2D labeled array of cells (from watershed)
 
     Returns:

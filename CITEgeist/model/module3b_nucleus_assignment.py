@@ -1,6 +1,7 @@
 """Module 3b: Per-Nucleus Cell Type Assignment.
 
 Assigns individual nuclei to cell types using spot-level proportions.
+Nuclei are detected via StarDist segmentation (see segmentation.py).
 
 Four assignment methods are available:
 1. Random (default): Random assignment within spots, respecting cell type counts.
