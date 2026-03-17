@@ -105,7 +105,24 @@ def load_image_and_segment(sample_name, modality):
         else:
             logger.info(f"Running StarDist on tissue crop ({fullres_crop.shape})")
             segmenter = StarDistSegmenter(modality="he")
-            masks = segmenter.segment(fullres_crop)
+            # Visium fullres ~0.8um/px, StarDist trained on 40x ~0.25um/px
+            # Scale factor = 0.8/0.25 ≈ 2.5 to match expected nucleus size
+            # Use spot diameter to compute: model expects ~30px nuclei,
+            # actual nuclei ~spot_diameter/5 pixels
+            pixel_size_um = 55.0 / spot_diameter  # um per pixel
+            stardist_scale = pixel_size_um / 0.25  # rescale to ~0.25 um/px
+            logger.info(f"StarDist scale factor: {stardist_scale:.2f} "
+                        f"(pixel size: {pixel_size_um:.3f} um/px)")
+            h, w = fullres_crop.shape[:2]
+            # Scale up image dims for tiling calculation
+            scaled_h, scaled_w = int(h * stardist_scale), int(w * stardist_scale)
+            n_tiles_y = max(1, scaled_h // 1024)
+            n_tiles_x = max(1, scaled_w // 1024)
+            masks, _centroids_df = segmenter.segment(
+                fullres_crop,
+                scale=stardist_scale,
+                n_tiles=(n_tiles_y, n_tiles_x, 1),
+            )
             np.save(module3_dir / f"{sample_name}_stardist_masks_tissue.npy", masks)
             n_nuclei = len(np.unique(masks)) - 1
             logger.info(f"StarDist found {n_nuclei} nuclei in tissue crop")
