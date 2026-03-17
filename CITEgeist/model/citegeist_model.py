@@ -741,6 +741,8 @@ class CitegeistModel:
                 float(np.median(spot_abundance_target)),
             )
 
+        recon_error = None  # Will be set by per-marker optimization path
+
         if per_marker_beta:
             # ====== NEW PER-MARKER BETA APPROACH ======
             logging.info("Using per-marker beta optimization (preserves marker-level signal variation)")
@@ -754,7 +756,7 @@ class CitegeistModel:
                 logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
                             f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
 
-                Y_values, beta_values, marker_beta_dict, alpha_values = optimize_cell_proportions_per_marker(
+                Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
                     marker_level_data=marker_level_data,
                     marker_names=marker_names,
                     assignment_matrix=assignment_matrix,
@@ -924,6 +926,11 @@ class CitegeistModel:
 
         global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
         finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
+
+        # Add per-spot reconstruction error if available (from per-marker beta optimization)
+        if recon_error is not None:
+            recon_series = pd.Series(recon_error, index=spot_names, name="recon_error")
+            global_cell_type_proportions_df["recon_error"] = recon_series
 
         global_cell_type_proportions_df.to_csv(
             os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_global_results.csv")
@@ -1569,13 +1576,6 @@ class CitegeistModel:
             continuous_relaxation=continuous_relaxation,
             lambda_gex_reg=lambda_gex_reg,
             enrichment_smoothing=enrichment_smoothing,  # 0.2 = 80/20, 0.0 = none
-            # NEW parameters for module enrichment and KL regularization
-            anchor_genes=anchor_genes,
-            anchor_weights=anchor_weights,  # Pass per-gene correlation weights
-            module_weight=module_weight if (use_marker_guidance or use_module_enrichment) else 0.0,
-            use_kl_regularization=use_kl_regularization,
-            kl_temperature=kl_temperature,
-            lambda_kl=lambda_kl,
         )
 
         # Get dimensions for NaN imputation and consistency checks

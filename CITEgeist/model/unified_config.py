@@ -1,5 +1,6 @@
 """Shared configuration for the unified PC-MIL pipeline."""
 
+import os
 from pathlib import Path
 
 # === Cell Type Profile (9 types, K=9) ===
@@ -49,7 +50,7 @@ PATIENT_SAMPLES = [
 ]
 
 # === Paths ===
-DATA_DIR = Path("/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files")
+DATA_DIR = Path(os.environ.get("CITEGEIST_DATA_DIR", "data/processed_files"))
 OUTPUT_BASE = Path("output/unified_pipeline")
 
 # === Training Defaults ===

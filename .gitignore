@@ -27,8 +27,6 @@ share/python-wheels/
 MANIFEST
 
 # PyInstaller
-#  Usually these files are written by a python script from a template
-#  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
 
@@ -55,78 +53,6 @@ cover/
 *.mo
 *.pot
 
-# Django stuff:
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-
-# Flask stuff:
-instance/
-.webassets-cache
-
-# Scrapy stuff:
-.scrapy
-
-# Sphinx documentation
-docs/_build/
-
-# PyBuilder
-.pybuilder/
-target/
-
-# Jupyter Notebook
-.ipynb_checkpoints
-
-# IPython
-profile_default/
-ipython_config.py
-
-
-# Images
-images/*
-
-# Intermediate files
-intermediate_files/*
-# pyenv
-#   For a library or package, you might want to ignore these files since the code is
-#   intended to run in multiple environments; otherwise, check them in:
-# .python-version
-
-# pipenv
-#   According to pypa/pipenv#598, it is recommended to include Pipfile.lock in version control.
-#   However, in case of collaboration, if having platform-specific dependencies or dependencies
-#   having no cross-platform support, pipenv may install dependencies that don't work, or not
-#   install all needed dependencies.
-#Pipfile.lock
-
-# poetry
-#   Similar to Pipfile.lock, it is generally recommended to include poetry.lock in version control.
-#   This is especially recommended for binary packages to ensure reproducibility, and is more
-#   commonly ignored for libraries.
-#   https://python-poetry.org/docs/basic-usage/#commit-your-poetrylock-file-to-version-control
-#poetry.lock
-
-# pdm
-#   Similar to Pipfile.lock, it is generally recommended to include pdm.lock in version control.
-#pdm.lock
-#   pdm stores project-wide configurations in .pdm.toml, but it is recommended to not include it
-#   in version control.
-#   https://pdm.fming.dev/latest/usage/project/#working-with-version-control
-.pdm.toml
-.pdm-python
-.pdm-build/
-
-# PEP 582; used by e.g. github.com/David-OConnor/pyflow and github.com/pdm-project/pdm
-__pypackages__/
-
-# Celery stuff
-celerybeat-schedule
-celerybeat.pid
-
-# SageMath parsed files
-*.sage.py
-
 # Environments
 .env
 .venv
@@ -136,15 +62,12 @@ ENV/
 env.bak/
 venv.bak/
 
-# Spyder project settings
-.spyderproject
-.spyproject
+# Jupyter Notebook
+.ipynb_checkpoints
 
-# Rope project settings
-.ropeproject
-
-# mkdocs documentation
-/site
+# IPython
+profile_default/
+ipython_config.py
 
 # mypy
 .mypy_cache/
@@ -160,48 +83,43 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# ============================================
+# Data files (too large for git)
+# ============================================
 
-
-# Ignore .h5ad files
+# AnnData objects
 *.h5ad
 
-# Ignore .h5seurat files
+# Seurat objects
 *.h5seurat
 *.h5Seurat
 
-# Ignore model files
+# HDF5 data files
+*.h5
+
+# Model weights
 *.pth
 *.pt
 
-# Ignore .RData files
+# R data
 *.RData
 
-# Prevent duplicate folder issues (see CONSOLIDATION_LOG.md)
-# Use Benchmarking/simulation_benchmarking/ instead
-benchmarking/
-# Use Benchmarking/simulation_generation/ instead
-simulation/
-# Archived duplicates
-_archive_duplicates/
-
-# Git worktrees
-.worktrees/
-
-# ============================================
-# Large files exclusions (GitHub LFS threshold: 100MB)
-# ============================================
+# Gurobi solver files
+*.mps
+*.lp
+*.sol
 
 # Checkpoint files
 checkpoints/
 *.npz
 
-# Raw data downloads (GEO, etc.)
+# Numpy arrays
+*.npy
+
+# Parquet files
+*.parquet
+
+# Raw data archives
 *.tar
 *.tar.gz
 
@@ -209,88 +127,27 @@ checkpoints/
 *_layer_pass1.csv
 *_layer_pass2.csv
 
-# Gurobi model files
-*.mps
-*.lp
-*.sol
-
-# Reference data (downloaded from GEO, too large for git)
-Benchmarking/xenium_benchmarking/reference_data/GSE*/processed*/
-Benchmarking/xenium_benchmarking/reference_data/GSE*/raw/
-
-# Simulation replicates (generated data)
-replicates/
-
-# Large output directories
-output/
-CITEgeist/examples/output*/
-examples/output*/
-
-# Midkine raw data (GEO downloads)
-midkine/*.tar
-midkine/*.gz
-midkine/*.bedgraph.gz
-midkine/GSE*_RAW*
-
-# ============================================
-# Tool and cache directories
-# ============================================
-
-# Claude Code
-.claude/
-.claude-home/
-
-# npm cache
-.npm-cache/
-
-# SLURM logs (transient)
-slurm_log/
-*/slurm_log/
-**/slurm_log/
-
-# scResolve outputs (large intermediate files)
-Benchmarking/*/scResolve/
-scResolve/
-
-# Test results (generated outputs)
-test_results/
-test_results_*/
-test_validation_output/
-
-# Model archives
-model_archive/
-
-# HDF5 data files
-*.h5
-
-# Session and log files
-*.session
-*.session.*
-merged_config.toml*
-
-# Benchmark output directories (regenerable)
-Benchmarking/xenium_benchmarking/*/output*/
-Benchmarking/xenium_benchmarking/*/reference_model*/
-Benchmarking/simulation_benchmarking/*/output*/
-
-# Numpy checkpoint files
-*.npy
-
-# Parquet files (large outputs)
-*.parquet
-
 # Prism files (GraphPad)
 *.prism
 
 # Word documents (use markdown source)
 *.docx
 
-# Keep figures but exclude certain patterns
-# (figures/*.png are kept for manuscript)
+# ============================================
+# Generated outputs (regenerable)
+# ============================================
 
-# Large annotation files
-Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_annotations.csv
-Benchmarking/xenium_benchmarking/evaluation/results/sctype_annotation/sctype_scores.csv
+# Images
+images/*
 
-# Generated audit reports
-Benchmarking/audit_report.csv
+# Intermediate files
+intermediate_files/*
+
+# Output directories
+output/
+
+# Simulation replicates
+replicates/
+
+# Log files
+*.log

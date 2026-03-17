@@ -80,21 +80,24 @@ from .anchored_program_discovery import (
     discover_joint_programs,
 )
 
-# Module 3b: Single-cell resolution
-from .watershed_segmentation import watershed_from_nuclei
-from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
-from .soft_label_classifier import SoftLabelClassifier
-from .hungarian_assignment import assign_nuclei_to_types
-from .constrained_assignment import (
-    ConstrainedAssignment,
-    COARSE_MAPPING,
-    extract_patch_features,
-    hungarian_assign,
-    random_assign,
-)
-from .module3b_nucleus_assignment import run_nucleus_assignment, run_nucleus_assignment_mil, NucleusAssignmentResult
-from .cell_level_gex import distribute_gex_to_cells
-from .single_cell_output import create_single_cell_adata
+# Module 3b: Single-cell resolution (requires scikit-image, torch)
+try:
+    from .watershed_segmentation import watershed_from_nuclei
+    from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
+    from .soft_label_classifier import SoftLabelClassifier
+    from .hungarian_assignment import assign_nuclei_to_types
+    from .constrained_assignment import (
+        ConstrainedAssignment,
+        COARSE_MAPPING,
+        extract_patch_features,
+        hungarian_assign,
+        random_assign,
+    )
+    from .module3b_nucleus_assignment import run_nucleus_assignment, run_nucleus_assignment_mil, NucleusAssignmentResult
+    from .cell_level_gex import distribute_gex_to_cells
+    from .single_cell_output import create_single_cell_adata
+except ImportError:
+    pass  # Single-cell resolution requires optional dependencies (scikit-image, torch)
 
 # Module 3 Enhancement: Multimodal refinement
 from .multimodal_refinement import (
@@ -119,40 +122,43 @@ from .cross_sample_integration import (
     save_integration_results,
 )
 
-# Stage 2: Two-stage VAE-guided assignment
-from .stage2_projection import Stage2ProjectionHead
-from .stage2_prototypes import Stage2Prototypes
-from .stage2_model import Stage2Model
-from .stage2_trainer import Stage2Trainer
-from .stage2_high_purity import (
-    find_high_purity_spots,
-    collect_embeddings_by_type,
-    compute_type_centroids,
-)
-from .two_stage_pipeline import TwoStagePipeline
-from .stage2_pipeline import Stage2Pipeline
+# Stage 2: Two-stage VAE-guided assignment (requires torch)
+try:
+    from .stage2_projection import Stage2ProjectionHead
+    from .stage2_prototypes import Stage2Prototypes
+    from .stage2_model import Stage2Model
+    from .stage2_trainer import Stage2Trainer
+    from .stage2_high_purity import (
+        find_high_purity_spots,
+        collect_embeddings_by_type,
+        compute_type_centroids,
+    )
+    from .two_stage_pipeline import TwoStagePipeline
+    from .stage2_pipeline import Stage2Pipeline
 
-# Module 3b MIL: Single-cell assignment via attention
-from .morphology_backbone import MorphologyBackbone, DAPIBackbone, HEBackbone
-from .single_cell_mil import SingleCellMIL, mil_loss, train_mil
+    # Module 3b MIL: Single-cell assignment via attention
+    from .morphology_backbone import MorphologyBackbone, DAPIBackbone, HEBackbone
+    from .single_cell_mil import SingleCellMIL, mil_loss, train_mil
 
-# H&E Morphology Support: ViT + MIL for single-cell assignment
-from .vit_extractor import ViTFeatureExtractor, load_uni_extractor
-from .proportion_mil import ProportionGuidedMIL, proportion_loss, entropy_regularization
+    # H&E Morphology Support: ViT + MIL for single-cell assignment
+    from .vit_extractor import ViTFeatureExtractor, load_uni_extractor
+    from .proportion_mil import ProportionGuidedMIL, proportion_loss, entropy_regularization
 
-# SSL ViT for Nucleus Morphology
-from .vit_encoder import ViTEncoder, create_vit_small
-from .ssl_utils import (
-    MAEAugmentation,
-    DINOMultiCrop,
-    random_masking,
-    patchify,
-    unpatchify,
-)
-# DEPRECATED: MAE underperforms SimCLR in constrained setting
-from .mae import MAE, MAEDecoder
-# DEPRECATED: DINO training collapsed; use SimCLR via DAPIBackbone
-from .dino import DINO, DINOHead, create_dino_model
+    # SSL ViT for Nucleus Morphology
+    from .vit_encoder import ViTEncoder, create_vit_small
+    from .ssl_utils import (
+        MAEAugmentation,
+        DINOMultiCrop,
+        random_masking,
+        patchify,
+        unpatchify,
+    )
+    # DEPRECATED: MAE underperforms SimCLR in constrained setting
+    from .mae import MAE, MAEDecoder
+    # DEPRECATED: DINO training collapsed; use SimCLR via DAPIBackbone
+    from .dino import DINO, DINOHead, create_dino_model
+except ImportError:
+    pass  # Vision/SSL/MIL modules require torch, timm, etc.
 
 # Deprecated modules list — kept for backward compatibility but superseded
 _DEPRECATED = [

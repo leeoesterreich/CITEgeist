@@ -56,7 +56,7 @@ from model import (
 # =============================================================================
 # Gurobi license handled via module load gurobi/12.0.3
 LICENSE_FILE = None  # Will use environment variable from module
-DATA_FOLDER = "/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
+DATA_FOLDER = os.environ.get("CITEGEIST_DATA_DIR", "data/processed_files")
 SAMPLE_NAME = "HCC22-088-P4-S2_1i_rep"
 SAMPLE_PATH = os.path.join(DATA_FOLDER, SAMPLE_NAME, "outs")
 OUTPUT_DIR = Path("output_vignette4_mdk")
@@ -185,7 +185,7 @@ def run_spatial_analysis():
             model.register_gurobi(grb_license)
         else:
             # Try default locations
-            for path in ["/ihome/crc/install/gurobi/gurobi1203/gurobi.lic",
+            for path in [os.environ.get("GRB_LICENSE_FILE", ""),
                         os.path.expanduser("~/gurobi.lic")]:
                 if os.path.exists(path):
                     model.register_gurobi(path)
