@@ -27,6 +27,15 @@ The RNA-only pipeline was developed as an alternative to the protein-based (CITE
 
 The protein-based pipeline (`marker_interest.py`, `spatial_colocalization.py`) remains the recommended approach for CITEgeist analysis.
 
+### Dead Code Cleanup Backups (Archived: March 2026)
+
+**Files:**
+- `spatial_colocalization_pre_cleanup_2026-03-17.py` - Full backup before removing ~1,400 lines of dead code
+- `gurobi_impl_pre_cleanup_2026-03-17.py` - Full backup before removing ~450 lines of dead code
+
+**Reason for archiving:**
+Pre-cleanup snapshots. The binary `discover_profiles()` was superseded by `discover_profiles_continuous()` (86-100% GT coverage vs 57-86%). The tree-first hierarchical approach was replaced by flat-first + posthoc hierarchy. Classification functions and debug utilities in gurobi_impl were experimental and never integrated into the pipeline.
+
 ### Previously Archived Files
 
 - `auto_profile_discovery.py` - Early automated profile discovery approach
