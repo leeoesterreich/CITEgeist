@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from CITEgeist.model.marker_interest import identify_interesting_markers
 from CITEgeist.model.spatial_colocalization import (
     analyze_marker_colocalization,
-    discover_hierarchical_profiles,
+    discover_hierarchical_profiles_continuous,
     discover_profiles_continuous,  # Default - more robust than FDR-based
 )
 
@@ -237,7 +237,7 @@ def run_simulated_hierarchical_benchmark(
     logger.info("MODULE 2b: HIERARCHICAL Profile Discovery")
     logger.info("-" * 60)
 
-    hierarchical_result = discover_hierarchical_profiles(
+    hierarchical_result = discover_hierarchical_profiles_continuous(
         coloc_result=coloc_result,
         antibody_expression=X_protein,
         marker_names=marker_names,
