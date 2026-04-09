@@ -192,9 +192,20 @@ def extract_patches(image, centroids_df, modality, patch_size=224):
 
         patch = image[y1:y2, x1:x2]
 
-        if modality == "dapi" and patch.shape[2] == 2:
-            pad = np.zeros((patch_size, patch_size, 1), dtype=patch.dtype)
-            patch = np.concatenate([patch, pad], axis=2)
+        if modality == "dapi":
+            # Ensure DAPI patches are 3-channel so the ImageNet ViT-S encoder
+            # receives the expected input shape (H, W, 3).
+            if len(patch.shape) == 2:
+                # (H, W) grayscale — replicate to (H, W, 3)
+                patch = np.stack([patch, patch, patch], axis=-1)
+            elif patch.shape[2] == 1:
+                # (H, W, 1) — replicate single channel to (H, W, 3)
+                patch = np.repeat(patch, 3, axis=-1)
+            elif patch.shape[2] == 2:
+                # (H, W, 2) DAPI+boundary — pad with zero channel to (H, W, 3)
+                pad = np.zeros((patch_size, patch_size, 1), dtype=patch.dtype)
+                patch = np.concatenate([patch, pad], axis=2)
+            # (H, W, 3) already — no-op
 
         patches.append(patch)
         valid_ids.append(int(row["nucleus_id"]))

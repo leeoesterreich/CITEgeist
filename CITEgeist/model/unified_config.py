@@ -6,7 +6,7 @@ from pathlib import Path
 # === Cell Type Profile (9 types, K=9) ===
 # Nested format for Module 3 (validated by validate_cell_profile_dict)
 CELL_PROFILES_NESTED = {
-    "Cancer": {"Major": ["EPCAM-1"]},
+    "Epithelial": {"Major": ["EPCAM-1"]},
     "Macrophages": {"Major": ["CD68-1", "CD163-1"]},
     "CD8_T_Cells": {"Major": ["CD3E-1", "CD8A-1"]},
     "CD4_T_Cells": {"Major": ["CD4-1"]},
@@ -22,7 +22,7 @@ K = len(CELL_TYPE_NAMES)  # 9
 
 # === RNA Marker Validation Dictionary ===
 RNA_MARKERS = {
-    "Cancer": ["EPCAM"],
+    "Epithelial": ["EPCAM", "KRT8", "KRT18"],
     "Macrophages": ["CD68", "CD163", "CSF1R"],
     "CD8_T_Cells": ["CD8A", "CD8B", "GZMB"],
     "CD4_T_Cells": ["CD4", "IL7R", "CCR7"],

@@ -7,49 +7,42 @@ spatial transcriptomics data using CITE-seq profiles.
 # Standard library imports
 import logging
 import os
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 # Third-party imports
 import numpy as np
 import pandas as pd
-import pyarrow.parquet as pq
 import scanpy as sc
-import scipy.sparse
-from scipy.ndimage import gaussian_filter
+
+try:
+    import pyarrow.parquet as pq
+except ImportError:  # pragma: no cover - exercised only in reduced environments
+    pq = None
 
 # Local imports
-from .gurobi_impl import (
+# Production-path imports (cuOPT backend)
+from .deconvolution.cuopt_impl import (
     compute_global_prior,
     compute_marker_exclusivity,
-    estimate_true_expression_cell,
-    finetune_cell_proportions,
-    finetune_cell_proportions_per_marker,
     map_antibodies_to_profiles,
     map_antibodies_to_profiles_v2,
     normalize_counts,
-    optimize_cell_proportions,
     optimize_cell_proportions_per_marker,
-    optimize_discrete_cell_assignment_em,
-    optimize_gene_expression,
 )
 from .utils import (
     assert_neighborhood_size,
     cleanup_memory,
     compute_optimal_radius,
-    export_anndata_layers,
-    get_neighbors_with_fixed_radius,
     setup_logging,
     validate_cell_profile_dict,
 )
-from .segmentation import (
+from .morphology.segmentation import (
     compute_spot_nuclei_counts_from_adata,
     normalize_nuclei_counts_for_prior,
     save_segmentation_artifacts,
 )
-from .module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult  # noqa: F401
-from .cell_level_gex import distribute_gex_to_cells
-from .single_cell_output import create_single_cell_adata
-from .multimodal_refinement import multimodal_em_refinement
+from .assignment.module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult  # noqa: F401
+from .deconvolution.reference_model import ReferenceProfile, train_reference as _train_reference
 
 
 RESOLUTION_DEFAULTS = {
@@ -60,7 +53,7 @@ RESOLUTION_DEFAULTS = {
         "coloc_neighbor_k": 6,
         "coloc_multi_scale_k": [6, 12, 24, 48, 64],
         "laplacian_k": 8,
-        "lambda_spatial": 0.1,
+        "lambda_spatial": 0.0,
         "lambda_sparse": 0.0,
         "pass2_library_slack": 1.0,
     },
@@ -71,11 +64,20 @@ RESOLUTION_DEFAULTS = {
         "coloc_neighbor_k": 30,
         "coloc_multi_scale_k": [20, 40, 60, 80, 100],
         "laplacian_k": 50,
-        "lambda_spatial": 0.01,
+        "lambda_spatial": 0.0,
         "lambda_sparse": 0.1,
         "pass2_library_slack": 1.5,
     },
 }
+
+
+def _require_pyarrow(feature_name: str) -> None:
+    """Raise a clear error when parquet support is requested without pyarrow."""
+    if pq is None:
+        raise ImportError(
+            f"{feature_name} requires optional parquet support. Install `pyarrow` "
+            "or use the project's conda environment before using parquet I/O."
+        )
 
 
 class CitegeistModel:
@@ -366,6 +368,10 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
+        # Preserve raw counts for SACE (requires unnormalized data)
+        if "raw_counts" not in self.gene_expression_adata.layers:
+            self.gene_expression_adata.layers["raw_counts"] = self.gene_expression_adata.X.copy()
+
         # Normalize while preserving counts
         self.gene_expression_adata = normalize_counts(self.gene_expression_adata, target_sum=target_sum)
 
@@ -402,11 +408,14 @@ class CitegeistModel:
         )
         matrix = np.asarray(matrix)
 
-        # Step 2: Validate initial data (no NaNs or Infs at start)
+        # Step 2: Store raw counts before any transformation (for cellularity QP)
+        self.antibody_capture_adata.layers["raw_counts"] = matrix.copy()
+
+        # Step 3: Validate initial data (no NaNs or Infs at start)
         if np.isnan(matrix).any() or np.isinf(matrix).any():
             raise ValueError("Antibody capture matrix contains NaN or Inf values before preprocessing.")
 
-        # Step 3: Winsorize to cap extreme values
+        # Step 4: Winsorize to cap extreme values
         matrix = self.winsorize(matrix, lower_percentile=5, upper_percentile=95)
 
         column_sums = matrix.sum(axis=0)
@@ -614,6 +623,44 @@ class CitegeistModel:
         )
         return seg_result.nuclei_count_raw
 
+    def train_reference(
+        self,
+        reference_adata: sc.AnnData,
+        cell_type_col: str = "cell_type",
+        n_markers_per_type: int = 20,
+        de_method: str = "wilcoxon",
+        type_mapping: Optional[Dict[str, str]] = None,
+    ) -> "ReferenceProfile":
+        """Train NB reference profiles from annotated scRNA-seq.
+
+        Must be called after preprocess_gex() so the spatial gene universe
+        is available for filtering.
+
+        Args:
+            reference_adata: Annotated scRNA-seq AnnData with raw counts in .X.
+            cell_type_col: Column in .obs with cell type annotations.
+            n_markers_per_type: Number of top DE marker genes per type.
+            de_method: scanpy DE method ("wilcoxon" or "t-test").
+            type_mapping: Optional dict mapping reference type names to
+                CITEgeist type names.
+
+        Returns:
+            Frozen ReferenceProfile for use in run_cell_proportion_model().
+        """
+        if not self.preprocessed_gex:
+            raise RuntimeError("Must call preprocess_gex() before train_reference().")
+
+        spatial_genes = list(self.gene_expression_adata.var_names)
+
+        return _train_reference(
+            reference_adata=reference_adata,
+            cell_type_col=cell_type_col,
+            spatial_genes=spatial_genes,
+            n_markers_per_type=n_markers_per_type,
+            de_method=de_method,
+            type_mapping=type_mapping,
+        )
+
     def run_cell_proportion_model(
         self,
         radius=None,
@@ -628,12 +675,10 @@ class CitegeistModel:
         min_celltype_threshold=0.01,
         redundancy_threshold=0.1,
         validation_warn_only=False,
-        skip_finetuning=False,
-        # Laplacian smoothing parameters
-        lambda_laplacian=0.1,
+        # Laplacian smoothing: small weight reduces spatial error clustering (+0.002 r)
+        lambda_laplacian=0.03,
         laplacian_k=8,
         # Per-marker beta parameters
-        per_marker_beta=True,
         beta_min=0.1,
         beta_max=2.0,
         lambda_coverage=1.0,
@@ -641,48 +686,161 @@ class CitegeistModel:
         use_nuclei_prior=False,
         nuclei_prior_lambda=1.0,
         nuclei_target_col="nuclei_count_target",
+        nuclei_prior_bounds=None,  # Override row-sum bounds, e.g. (0.1, 5.0)
+        # Cellularity-aware Laplacian (bilateral smoothing)
+        use_cellularity_laplacian=False,
+        cellularity_col=None,  # Column in antibody_capture_adata.obs with raw nuclei counts
+        cellularity_sigma=0.5,  # Bandwidth for cellularity similarity kernel
+        # IQP→QP cascade: sparsity mask from discrete assignment
+        sparsity_mask=None,  # (N, T) array of per-spot-per-type upper bounds
+        # GMM detection gating: run per-type GMM to identify absent types (r=0.766)
+        use_detection_gating=True,
+        detection_gate_ub=0.01,  # UB for gated-out types (lowered from 0.05: structural FP reduction)
+        # GEX-informed detection (requires use_detection_gating=True)
+        use_gex_detection=True,
+        gex_detection_k=10,
+        gex_detection_min_corr=0.15,
+        fusion_mode="union",
+        # Iterative sparsity refinement (opt-in)
+        refine_sparsity=False,
+        refine_suppress_threshold=0.02,
+        refine_rescue_threshold=0.08,
+        # Entropy-weighted markers (opt-in)
+        use_entropy_weights=False,
+        entropy_weight_alpha=1.0,
+        # Direct per-marker weight override (dict: marker_name -> weight, default 1.0 for unlisted)
+        marker_weight_dict=None,
+        # Confusion penalty (opt-in): penalize confused type pairs
+        lambda_confusion=0.0,
+        confusion_pairs_manual=None,  # List of (type_name_a, type_name_b) tuples, or None for auto-detect
+        confusion_corr_threshold=-0.25,
+        # Cellularity-scaled QP (count-space solver)
+        nuclei_counts=None,  # pd.Series of per-spot nuclei counts
+        cellularity_slack=0.3,  # δ fraction for hard constraints
+        lambda_cellularity=1.0,  # soft penalty weight for count-sum deviation
         # Cell classification parameters (cell resolution only)
         use_gating=None,
         priority_dict=None,
         threshold_method="auto",
         use_negative_gates=False,
+        # Method selection
+        method="qp",  # "qp" (cuOPT, default), "nb" (Gurobi-free NB), or "per_type_beta"
+        # Per-type beta params (ignored when method != "per_type_beta")
+        sigma_scale=1.0,
+        # NB-specific params (ignored when method="qp")
+        nb_device="cpu",
+        nb_n_iter=100,
+        nb_use_detection=True,
+        nb_detection_threshold=0.5,
+        nb_gpu_adam_steps=200,
+        # Morphology prior (refinement)
+        morphology_prior=None,
+        morphology_patches=None,
+        morphology_cell_to_spot=None,
+        lambda_morphology=0.1,
+        morphology_device="cpu",
+        # NB reference refinement (optional scRNA-seq integration)
+        reference=None,  # ReferenceProfile from train_reference()
+        kappa=10.0,  # Dirichlet prior concentration for NB refinement
     ):
         """
         Orchestrates the cell proportion optimization workflow.
-        Delegates optimization to `optimize_cell_proportions` and `finetune_cell_proportions` in `gurobi_impl.py`.
 
         Args:
             tolerance (float): Convergence tolerance for EM algorithm
             max_iterations (int): Maximum number of iterations
             lambda_reg (float): Regularization strength
             alpha (float): L1-L2 tradeoff factor (0 = L2, 1 = L1)
-            max_workers (int, optional): Maximum number of parallel workers for finetuning
-            checkpoint_interval (int): Number of spots between checkpoints during finetuning
             unknown_threshold (float): Maximum allowed mean proportion for Unknown cell type (default: 0.05 = 5%)
             min_celltype_threshold (float): Minimum required mean proportion for defined cell types (default: 0.01 = 1%)
             redundancy_threshold (float): Maximum allowed fraction of redundant cell types (default: 0.1 = 10%)
-            skip_finetuning (bool): If True, skip the finetuning step and return global proportions only
-            lambda_laplacian (float): Weight for Laplacian spatial smoothing (default: 0.1, 0 to disable)
+            lambda_laplacian (float): Weight for Laplacian spatial smoothing (default: 0.0, disabled)
             laplacian_k (int): Number of neighbors for Laplacian graph (default: 8)
-            per_marker_beta (bool): If True (default), use per-marker beta learning which preserves
-                marker-level signal variation. If False, use legacy per-celltype beta with marker averaging.
             beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.1)
             beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
-            lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. 0 = symmetric,
-                1 = linear inverse, 2 = aggressive. Default: 1.0
-            use_nuclei_prior (bool): If True, add soft prior encouraging per-spot total
-                abundance to match nuclei-derived targets from `nuclei_target_col`.
-            nuclei_prior_lambda (float): Weight of soft abundance prior.
-            nuclei_target_col (str): .obs column containing normalized abundance target.
+            lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. Default: 1.0
         """
+
+        # --- Detection gating guard ---
+        # GMM detection gating is critical for accurate proportions (r=0.766 vs 0.36 without).
+        # Disabling it is almost always a mistake in benchmarks and production.
+        if not use_detection_gating:
+            import warnings
+            warnings.warn(
+                "use_detection_gating=False: GMM detection gating is disabled. "
+                "This typically degrades proportion accuracy (r drops ~0.40). "
+                "Only disable for ablation studies or debugging.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        # --- Two-pass morphology orchestration ---
+        if morphology_patches is not None and morphology_prior is None:
+            if morphology_cell_to_spot is None:
+                raise ValueError("morphology_cell_to_spot required when morphology_patches provided")
+
+            # Pass 1: Base proportions (no morphology)
+            logging.info("Morphology two-pass: Pass 1 (base proportions)...")
+            self.run_cell_proportion_model(
+                method=method,
+                radius=radius, tolerance=tolerance, max_iterations=max_iterations,
+                lambda_reg=lambda_reg, alpha=alpha, lambda_laplacian=lambda_laplacian,
+                laplacian_k=laplacian_k, beta_min=beta_min, beta_max=beta_max,
+                lambda_coverage=lambda_coverage, nuclei_counts=nuclei_counts,
+                use_detection_gating=use_detection_gating, detection_gate_ub=detection_gate_ub,
+                nb_device=nb_device, nb_n_iter=nb_n_iter, nb_gpu_adam_steps=nb_gpu_adam_steps,
+            )
+            p_base = self.results["cell_prop"].values
+            self.results["cell_prop_base"] = self.results["cell_prop"].copy()
+
+            # Stage 0: Compute morphology prior via LLP
+            from .morphology.morphology_prior import compute_morphology_prior
+            detection_mask = self.results.get("detection_masks", None)
+            num_spots = len(self.results["cell_prop"])
+
+            logging.info("Morphology two-pass: computing morphology prior (LLP)...")
+            morphology_prior = compute_morphology_prior(
+                patches=morphology_patches,
+                cell_to_spot=morphology_cell_to_spot,
+                oracle_props=p_base,
+                num_types=p_base.shape[1],
+                num_spots=num_spots,
+                n_epochs=100,
+                device=morphology_device,
+                detection_mask=detection_mask,
+            )
+            logging.info("Morphology two-pass: prior computed, running Pass 2 (refinement)...")
+            # Fall through to solver dispatch below with morphology_prior set
+
+        if morphology_prior is not None:
+            self.results["morphology_prior"] = morphology_prior
+
+        # --- Method dispatch ---
+        if method == "nb":
+            return self._run_nb_proportion_model(
+                device=nb_device,
+                n_iter=nb_n_iter,
+                use_detection=nb_use_detection,
+                detection_threshold=nb_detection_threshold,
+                gpu_adam_steps=nb_gpu_adam_steps,
+                nuclei_counts=nuclei_counts,
+                lambda_laplacian=lambda_laplacian,
+                laplacian_k=laplacian_k,
+                morphology_prior=morphology_prior,
+                lambda_morphology=lambda_morphology,
+            )
+        elif method not in ("qp", "per_type_beta"):
+            raise ValueError(f"Unknown method '{method}'. Use 'qp', 'nb', or 'per_type_beta'.")
+
+        # --- QP path (cuOPT backend) ---
 
         # Use resolution preset for laplacian_k if caller used default
         if laplacian_k == 8 and self.resolution == "cell":
             laplacian_k = self.resolution_params["laplacian_k"]
 
-        # Use resolution preset for lambda_laplacian if caller used default
+        # Use resolution preset for lambda_laplacian if caller used old default
         if lambda_laplacian == 0.1 and self.resolution == "cell":
-            lambda_laplacian = self.resolution_params["lambda_spatial"]
+            lambda_laplacian = self.resolution_params["lambda_spatial"]  # now 0.0
 
         if radius is None:
             # Auto-detect optimal radius from spatial coordinates
@@ -722,10 +880,34 @@ class CitegeistModel:
                 coords=coords,
             )
 
+        # === Cellularity-informed spot weighting ===
+        # Compute spot weights from nuclei counts: sqrt(N/median(N))
+        # Dense spots have more reliable protein signal → weight reconstruction more
+        cellularity_spot_weights = None
+        cellularity_array = None
+        if nuclei_counts is not None:
+            from .assignment.cellularity_utils import prepare_cellularity
+            spot_names_for_cell = self.antibody_capture_adata.obs_names
+            cellularity_array = prepare_cellularity(nuclei_counts, spot_names_for_cell)
+            median_N = np.median(cellularity_array)
+            cellularity_spot_weights = np.sqrt(cellularity_array / max(median_N, 1.0))
+            logging.info(
+                "Cellularity spot weights: median N=%.1f, weight range=[%.2f, %.2f]",
+                median_N, cellularity_spot_weights.min(), cellularity_spot_weights.max(),
+            )
+
         spot_names = self.antibody_capture_adata.obs_names
         spot_abundance_target = None
         lambda_abundance_prior = 0.0
+        row_sum_bounds = None  # default (0.9, 1.2) inside solvers
         if use_nuclei_prior:
+            import warnings
+            warnings.warn(
+                "use_nuclei_prior is deprecated and will be removed in a future version. "
+                "Use nuclei_counts= parameter instead for cellularity-scaled QP deconvolution.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
             if self.antibody_capture_adata is None:
                 raise ValueError("Antibody capture data must be loaded to use nuclei prior.")
             if nuclei_target_col not in self.antibody_capture_adata.obs.columns:
@@ -738,28 +920,316 @@ class CitegeistModel:
             if np.isnan(spot_abundance_target).any() or np.isinf(spot_abundance_target).any():
                 raise ValueError(f"Invalid values in nuclei target column '{nuclei_target_col}'.")
             lambda_abundance_prior = float(nuclei_prior_lambda)
+            row_sum_bounds = nuclei_prior_bounds if nuclei_prior_bounds is not None else (0.25, 2.5)
             logging.info(
-                "Using nuclei abundance prior: lambda=%.3f, target_col='%s', median=%.3f",
+                "Using nuclei abundance prior: lambda=%.3f, target_col='%s', median=%.3f, "
+                "row_sum_bounds=(%.2f, %.2f)",
                 lambda_abundance_prior,
                 nuclei_target_col,
                 float(np.median(spot_abundance_target)),
+                row_sum_bounds[0],
+                row_sum_bounds[1],
             )
+
+        # Extract cellularity for Laplacian edge weighting (independent of abundance prior)
+        cellularity_laplacian_array = None
+        if use_cellularity_laplacian:
+            col = cellularity_col or nuclei_target_col
+            if col in self.antibody_capture_adata.obs.columns:
+                cellularity_laplacian_array = self.antibody_capture_adata.obs.loc[spot_names, col].to_numpy(dtype=float)
+                logging.info(
+                    "Cellularity-aware Laplacian: col='%s', sigma=%.2f, "
+                    "median=%.1f, range=[%.0f, %.0f]",
+                    col, cellularity_sigma,
+                    float(np.median(cellularity_laplacian_array)),
+                    float(np.min(cellularity_laplacian_array)),
+                    float(np.max(cellularity_laplacian_array)),
+                )
+            else:
+                logging.warning(
+                    "use_cellularity_laplacian=True but column '%s' not found. "
+                    "Falling back to standard Laplacian.", col,
+                )
 
         recon_error = None  # Will be set by per-marker optimization path
 
-        if per_marker_beta:
-            # ====== NEW PER-MARKER BETA APPROACH ======
-            logging.info("Using per-marker beta optimization (preserves marker-level signal variation)")
+        # Per-marker beta optimization (preserves marker-level signal variation)
+        logging.info("Using per-marker beta optimization (preserves marker-level signal variation)")
 
-            # Get marker-level data instead of averaged profiles
-            marker_level_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
-                self.antibody_capture_adata, self.cell_profile_dict
+        # Get marker-level data instead of averaged profiles
+        marker_level_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
+            self.antibody_capture_adata, self.cell_profile_dict
+        )
+
+        # For per_type_beta: expand to all 17 markers from MARKER_TYPE_TABLE.
+        # Keep the 7-Major assignment_matrix for detection gating (unchanged).
+        if method == "per_type_beta":
+            from .deconvolution.emission_init import build_marker_config, MARKER_TYPE_TABLE, _strip_suffix
+            available = [_strip_suffix(v) for v in self.antibody_capture_adata.var_names]
+            ptb_markers, ptb_active_mask, ptb_type_names = build_marker_config(available)
+
+            if len(ptb_markers) > len(marker_names):
+                # Extract full 17-marker data from antibody adata
+                ab_data = self.antibody_capture_adata.X
+                ab_data = ab_data.toarray() if hasattr(ab_data, "toarray") else np.asarray(ab_data)
+                var_canonical = [_strip_suffix(v) for v in self.antibody_capture_adata.var_names]
+                canon_to_idx = {}
+                for idx, cn in enumerate(var_canonical):
+                    if cn not in canon_to_idx:
+                        canon_to_idx[cn] = idx
+
+                ptb_col_idx = [canon_to_idx[m] for m in ptb_markers if m in canon_to_idx]
+                ptb_markers_found = [m for m in ptb_markers if m in canon_to_idx]
+
+                ptb_data = ab_data[:, ptb_col_idx].astype(np.float64)
+                # Column-max normalize (same as map_antibodies_to_profiles_v2)
+                col_max = np.max(ptb_data, axis=0)
+                col_max[col_max == 0] = 1e-6
+                ptb_data = ptb_data / col_max
+
+                logging.info(
+                    "Per-type beta: expanded markers %d -> %d (%s)",
+                    len(marker_names), len(ptb_markers_found),
+                    ", ".join(set(ptb_markers_found) - set(marker_names)),
+                )
+                # Replace marker data for the optimizer (detection still uses original assignment_matrix)
+                marker_level_data = ptb_data
+                marker_names = ptb_markers_found
+                cell_type_names = ptb_type_names
+
+        # Cellularity correction: divide marker data by log(N+1)/log(median(N)+1)
+        # so dense spots need proportionally more signal. Proven +0.020 r on Xenium.
+        if cellularity_array is not None:
+            median_N = float(np.median(cellularity_array))
+            log_scale = np.log(cellularity_array + 1.0) / np.log(median_N + 1.0)
+            log_scale = np.maximum(log_scale, 0.3)  # floor to avoid division by tiny N
+            marker_level_data = marker_level_data / log_scale[:, np.newaxis]
+            logging.info(
+                "Cellularity correction (S/logN): median_N=%.1f, "
+                "scale range=[%.3f, %.3f]",
+                median_N, log_scale.min(), log_scale.max(),
             )
 
-            try:
-                logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
-                            f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
+        # GMM detection gating: identify absent types per spot
+        if use_detection_gating and sparsity_mask is None:
+            from .deconvolution.detection import detect_cell_types, build_detection_marker_groups
 
+            active_mask = assignment_matrix.T > 0  # (T, M)
+            marker_groups = build_detection_marker_groups(active_mask, cell_type_names)
+
+            # Map marker indices to raw antibody columns
+            raw_ab = self.antibody_capture_adata.layers.get(
+                "raw_counts", self.antibody_capture_adata.X
+            )
+            raw_ab = raw_ab.toarray() if hasattr(raw_ab, "toarray") else np.asarray(raw_ab)
+
+            def _strip_suffix(name):
+                """Strip -1 suffix from antibody names (e.g., CD68-1 -> CD68)."""
+                return name[:-2] if name.endswith("-1") else name
+
+            var_names = list(self.antibody_capture_adata.var_names)
+            m2raw = {}
+            for idx, vn in enumerate(var_names):
+                c = _strip_suffix(vn)
+                if c not in m2raw:
+                    m2raw[c] = idx
+
+            mapped_groups = {}
+            for ct, m_indices in marker_groups.items():
+                raw_idx = [m2raw[_strip_suffix(marker_names[mi])]
+                           for mi in m_indices if _strip_suffix(marker_names[mi]) in m2raw]
+                if raw_idx:
+                    mapped_groups[ct] = raw_idx
+
+            detected = detect_cell_types(
+                raw_ab, mapped_groups, threshold=0.5,
+                log_transform=True, adaptive_threshold=True,
+            )
+
+            # Persist raw boolean detection mask for downstream Bayesian assignment
+            detection_mask_bool = np.ones((marker_level_data.shape[0], len(cell_type_names)), dtype=bool)
+            detected_types_list = list(mapped_groups.keys())
+            for k, ct in enumerate(detected_types_list):
+                if ct in cell_type_names:
+                    t_idx = cell_type_names.index(ct)
+                    detection_mask_bool[:, t_idx] = detected[:, k]
+            # Ensure at least 2 types detected per spot (same rescue as sparsity_mask)
+            for i in range(marker_level_data.shape[0]):
+                if detection_mask_bool[i].sum() < 2:
+                    detection_mask_bool[i] = True
+            self.results["detection_mask_bool"] = detection_mask_bool
+            logging.info("Persisted detection_mask_bool: %d spots, %d types, %.1f%% gated",
+                         marker_level_data.shape[0], len(cell_type_names),
+                         100.0 * (~detection_mask_bool).sum() / (marker_level_data.shape[0] * len(cell_type_names)))
+
+            N_spots = marker_level_data.shape[0]
+            T = len(cell_type_names)
+            sparsity_mask = np.ones((N_spots, T), dtype=np.float64)
+            detected_types = list(mapped_groups.keys())
+            for k, ct in enumerate(detected_types):
+                if ct in cell_type_names:
+                    t_idx = cell_type_names.index(ct)
+                    if cellularity_array is not None:
+                        # Cellularity-informed gate: can't have less than 1 cell
+                        # gate_ub_i = min(detection_gate_ub, 1/N_i)
+                        per_spot_ub = np.minimum(detection_gate_ub,
+                                                 1.0 / np.maximum(cellularity_array, 1.0))
+                        sparsity_mask[~detected[:, k], t_idx] = per_spot_ub[~detected[:, k]]
+                    else:
+                        sparsity_mask[~detected[:, k], t_idx] = detection_gate_ub
+
+            # Ensure at least 2 types open per spot
+            for i in range(N_spots):
+                if (sparsity_mask[i] > detection_gate_ub).sum() < 2:
+                    sparsity_mask[i] = 1.0
+
+            n_gated = (sparsity_mask < 1.0).sum()
+            logging.info(
+                "Detection gating: %d/%d (%.1f%%) spot-type pairs gated (ub=%.2f)",
+                n_gated, N_spots * T, 100.0 * n_gated / (N_spots * T),
+                detection_gate_ub,
+            )
+
+        # GEX-informed detection fusion
+        if use_gex_detection and use_detection_gating and sparsity_mask is not None:
+            from .deconvolution.detection_refinement import (
+                compute_gene_type_correlations,
+                detect_cell_types_gex,
+                fuse_detection_masks,
+            )
+
+            gex_X = self.gene_expression_adata.X
+            gex_X = gex_X.toarray() if hasattr(gex_X, "toarray") else np.asarray(gex_X)
+            gene_names_list = list(self.gene_expression_adata.var_names)
+
+            ab_names_stripped = [_strip_suffix(n) for n in var_names]
+            H = compute_gene_type_correlations(
+                gex_X, raw_ab, ab_names_stripped,
+                self.cell_profile_dict, cell_type_names,
+            )
+            self.results["gex_detection_corr"] = H
+
+            gex_detected = detect_cell_types_gex(
+                gex_X, H, gene_names_list, cell_type_names,
+                k=gex_detection_k, min_corr=gex_detection_min_corr,
+            )
+            self.results["detection_protein"] = detection_mask_bool.copy()
+            self.results["detection_gex"] = gex_detected
+
+            # Fuse protein + GEX detection
+            fused_detected = fuse_detection_masks(
+                detection_mask_bool, gex_detected, assignment_matrix,
+                mode=fusion_mode,
+            )
+            self.results["detection_fused"] = fused_detected
+
+            # Rebuild sparsity mask from fused detection
+            sparsity_mask = np.ones((N_spots, T), dtype=np.float64)
+            detected_types = list(mapped_groups.keys())
+            for k_idx, ct in enumerate(detected_types):
+                if ct in cell_type_names:
+                    t_idx = cell_type_names.index(ct)
+                    if cellularity_array is not None:
+                        per_spot_ub = np.minimum(detection_gate_ub,
+                                                 1.0 / np.maximum(cellularity_array, 1.0))
+                        sparsity_mask[~fused_detected[:, t_idx], t_idx] = per_spot_ub[~fused_detected[:, t_idx]]
+                    else:
+                        sparsity_mask[~fused_detected[:, t_idx], t_idx] = detection_gate_ub
+
+            for i in range(N_spots):
+                if (sparsity_mask[i] > detection_gate_ub).sum() < 2:
+                    sparsity_mask[i] = 1.0
+
+            # Update detection_mask_bool to reflect fusion
+            detection_mask_bool = fused_detected
+            self.results["detection_mask_bool"] = detection_mask_bool
+
+            n_gated_fused = (sparsity_mask < 1.0).sum()
+            logging.info(
+                "GEX-fused detection: %d/%d (%.1f%%) spot-type pairs gated",
+                n_gated_fused, N_spots * T, 100.0 * n_gated_fused / (N_spots * T),
+            )
+
+        # Marker weighting: explicit dict > entropy weights > uniform (None)
+        marker_weight = None
+        if marker_weight_dict is not None:
+            marker_weight = np.array(
+                [marker_weight_dict.get(m, 1.0) for m in marker_names], dtype=np.float64
+            )
+            self.results["marker_weight_source"] = "explicit"
+        elif use_entropy_weights:
+            from .deconvolution.detection_refinement import compute_marker_entropy_weights
+            marker_weight = compute_marker_entropy_weights(
+                marker_level_data, marker_names, alpha=entropy_weight_alpha,
+            )
+            self.results["marker_weight_source"] = "entropy"
+        if marker_weight is not None:
+            self.results["marker_weights"] = dict(zip(marker_names, marker_weight.tolist()))
+
+        try:
+            logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
+                        f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
+
+            if method == "per_type_beta":
+                # --- Per-type beta EM path ---
+                from .deconvolution.emission_init import initialize_beta_matrix, build_beta_prior_sigma
+                from .deconvolution.cuopt_impl import optimize_cell_proportions_per_type_beta
+
+                # Build beta init from marker-level data
+                raw_for_init = marker_level_data  # already cellularity-corrected if applicable
+                median_N = float(np.median(cellularity_array)) if cellularity_array is not None else 1.0
+                beta_init = initialize_beta_matrix(
+                    raw_counts=raw_for_init,
+                    markers=marker_names,
+                    type_names=cell_type_names,
+                    median_N=median_N,
+                )
+                prior_sigma = build_beta_prior_sigma(
+                    markers=marker_names,
+                    type_names=cell_type_names,
+                    sigma_scale=sigma_scale,
+                )
+                logging.info(
+                    "Per-type beta: beta_init shape=%s, prior_sigma shape=%s, sigma_scale=%.2f",
+                    beta_init.shape, prior_sigma.shape, sigma_scale,
+                )
+
+                Y_values, beta_final, marker_beta_matrix_dict, alpha_values, recon_error, objective_history = (
+                    optimize_cell_proportions_per_type_beta(
+                        marker_level_data=marker_level_data,
+                        marker_names=marker_names,
+                        cell_type_names=cell_type_names,
+                        beta_init=beta_init,
+                        prior_sigma=prior_sigma,
+                        tolerance=tolerance,
+                        max_iterations=max_iterations,
+                        lambda_reg=lambda_reg,
+                        alpha_elastic=alpha,
+                        beta_max=beta_max,
+                        lambda_laplacian=lambda_laplacian,
+                        coords=coords,
+                        laplacian_k=laplacian_k,
+                        row_sum_bounds=row_sum_bounds,
+                        sparsity_mask=sparsity_mask,
+                        spot_weights=cellularity_spot_weights,
+                        marker_weight=marker_weight,
+                    )
+                )
+
+                # Store per_type_beta-specific results
+                self.results["marker_beta_matrix"] = marker_beta_matrix_dict
+                self.results["objective_history"] = objective_history
+
+                # Create scalar marker_beta_dict for backward compat (max across types)
+                marker_beta_dict = {m: max(marker_beta_matrix_dict[m].values())
+                                    for m in marker_beta_matrix_dict}
+                # beta_values as 1-D array for downstream compat
+                beta_values = np.array([marker_beta_dict[m] for m in marker_names], dtype=np.float64)
+
+                logging.info("Per-type beta EM converged in %d iterations, final obj=%.4f",
+                             len(objective_history), objective_history[-1] if objective_history else float("nan"))
+
+            else:
                 Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
                     marker_level_data=marker_level_data,
                     marker_names=marker_names,
@@ -782,17 +1252,209 @@ class CitegeistModel:
                     lambda_coverage=lambda_coverage,
                     spot_abundance_target=spot_abundance_target,
                     lambda_abundance_prior=lambda_abundance_prior,
+                    row_sum_bounds=row_sum_bounds,
+                    cellularity=cellularity_laplacian_array,
+                    cellularity_sigma=cellularity_sigma,
+                    sparsity_mask=sparsity_mask,
+                    spot_weights=cellularity_spot_weights,
+                    marker_weight=marker_weight,
                 )
 
-                # Store marker betas and baselines for downstream analysis
-                self.results["marker_beta"] = marker_beta_dict
-                marker_alpha_dict = {marker_names[i]: alpha_values[i] for i in range(len(marker_names))}
-                self.results["marker_alpha"] = marker_alpha_dict
-                for m_idx, m_name in enumerate(marker_names):
-                    if alpha_values[m_idx] > 0.05:
-                        logging.info(f"  Marker baseline: {m_name} = {alpha_values[m_idx]:.3f}")
+            # Post-QP subcell cleanup: zero out GMM-gated types below 1/(2*N_i)
+            # Only applies to types the GMM flagged as absent — detected types are protected
+            if cellularity_array is not None and sparsity_mask is not None:
+                min_prop = 0.5 / np.maximum(cellularity_array, 1.0)  # (N_spots,)
+                gated = sparsity_mask < 1.0  # (N_spots, T) — True where GMM said absent
+                subcell_mask = gated & (Y_values < min_prop[:, np.newaxis])
+                n_zeroed = subcell_mask.sum()
+                if n_zeroed > 0:
+                    Y_values[subcell_mask] = 0.0
+                    row_sums = Y_values.sum(axis=1, keepdims=True)
+                    row_sums = np.maximum(row_sums, 1e-10)
+                    Y_values = Y_values / row_sums
+                    logging.info(
+                        "Subcell cleanup: zeroed %d/%d (%.1f%%) entries below 1/(2N)",
+                        n_zeroed, Y_values.size, 100.0 * n_zeroed / Y_values.size,
+                    )
 
-                # Compute marker exclusivity scores for finetuning
+            # Iterative sparsity refinement: re-solve with QP-informed mask
+            if refine_sparsity and sparsity_mask is not None:
+                from .deconvolution.detection_refinement import refine_sparsity_from_proportions
+
+                sparsity_mask_pass1 = sparsity_mask.copy()
+                refined_mask = refine_sparsity_from_proportions(
+                    Y_values, sparsity_mask, cellularity_array,
+                    suppress_threshold=refine_suppress_threshold,
+                    rescue_threshold=refine_rescue_threshold,
+                    detection_gate_ub=detection_gate_ub,
+                )
+
+                n_changes = int((refined_mask != sparsity_mask).sum())
+                logging.info(
+                    "Sparsity refinement: %d/%d mask entries changed (%.1f%%)",
+                    n_changes, N_spots * T, 100.0 * n_changes / (N_spots * T),
+                )
+
+                if n_changes > 0:
+                    logging.info("Re-solving QP with refined sparsity mask (Pass 2)...")
+                    Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = \
+                        optimize_cell_proportions_per_marker(
+                            marker_level_data=marker_level_data,
+                            marker_names=marker_names,
+                            assignment_matrix=assignment_matrix,
+                            cell_type_names=cell_type_names,
+                            tolerance=tolerance,
+                            max_iterations=max_iterations,
+                            lambda_reg=lambda_reg,
+                            alpha=alpha,
+                            beta_min=beta_min,
+                            beta_max=beta_max,
+                            unknown_threshold=unknown_threshold,
+                            min_celltype_threshold=min_celltype_threshold,
+                            redundancy_threshold=redundancy_threshold,
+                            warn_only=validation_warn_only,
+                            lambda_laplacian=lambda_laplacian,
+                            coords=coords,
+                            laplacian_k=laplacian_k,
+                            lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
+                            lambda_coverage=lambda_coverage,
+                            spot_abundance_target=spot_abundance_target,
+                            lambda_abundance_prior=lambda_abundance_prior,
+                            row_sum_bounds=row_sum_bounds,
+                            cellularity=cellularity_laplacian_array,
+                            cellularity_sigma=cellularity_sigma,
+                            sparsity_mask=refined_mask,
+                            spot_weights=cellularity_spot_weights,
+                            marker_weight=marker_weight,
+                        )
+
+                    # Re-run subcell cleanup with refined mask
+                    if cellularity_array is not None:
+                        min_prop = 0.5 / np.maximum(cellularity_array, 1.0)
+                        gated = refined_mask < 1.0
+                        subcell_mask = gated & (Y_values < min_prop[:, np.newaxis])
+                        n_zeroed = subcell_mask.sum()
+                        if n_zeroed > 0:
+                            Y_values[subcell_mask] = 0.0
+                            row_sums = Y_values.sum(axis=1, keepdims=True)
+                            row_sums = np.maximum(row_sums, 1e-10)
+                            Y_values = Y_values / row_sums
+
+                    sparsity_mask = refined_mask
+
+                self.results["sparsity_mask_pass1"] = sparsity_mask_pass1
+                self.results["sparsity_mask_refined"] = refined_mask
+
+            # Confusion penalty: use manual pairs or auto-detect, then re-solve
+            if lambda_confusion > 0:
+                confusion_pairs = []
+
+                if confusion_pairs_manual:
+                    # Manual pairs: convert type names to indices
+                    for (name_a, name_b) in confusion_pairs_manual:
+                        if name_a in cell_type_names and name_b in cell_type_names:
+                            idx_a = cell_type_names.index(name_a)
+                            idx_b = cell_type_names.index(name_b)
+                            confusion_pairs.append((idx_a, idx_b))
+                            logging.info("Manual confusion pair: %s ↔ %s", name_a, name_b)
+                else:
+                    # Auto-detect from proportion anti-correlations
+                    # Use proportion values directly — types that compete for the same signal
+                    corr_matrix = np.corrcoef(Y_values.T)  # (T, T)
+                    for i in range(T):
+                        for j in range(i + 1, T):
+                            if corr_matrix[i, j] < confusion_corr_threshold:
+                                confusion_pairs.append((i, j))
+                                logging.info(
+                                    "Confusion pair detected: %s ↔ %s (corr=%.3f)",
+                                    cell_type_names[i], cell_type_names[j], corr_matrix[i, j],
+                                )
+
+                if confusion_pairs:
+                    logging.info(
+                        "Re-solving QP with confusion penalty (λ=%.3f, %d pairs)...",
+                        lambda_confusion, len(confusion_pairs),
+                    )
+                    Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = \
+                        optimize_cell_proportions_per_marker(
+                            marker_level_data=marker_level_data,
+                            marker_names=marker_names,
+                            assignment_matrix=assignment_matrix,
+                            cell_type_names=cell_type_names,
+                            tolerance=tolerance,
+                            max_iterations=max_iterations,
+                            lambda_reg=lambda_reg,
+                            alpha=alpha,
+                            beta_min=beta_min,
+                            beta_max=beta_max,
+                            unknown_threshold=unknown_threshold,
+                            min_celltype_threshold=min_celltype_threshold,
+                            redundancy_threshold=redundancy_threshold,
+                            warn_only=validation_warn_only,
+                            lambda_laplacian=lambda_laplacian,
+                            coords=coords,
+                            laplacian_k=laplacian_k,
+                            lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
+                            lambda_coverage=lambda_coverage,
+                            spot_abundance_target=spot_abundance_target,
+                            lambda_abundance_prior=lambda_abundance_prior,
+                            row_sum_bounds=row_sum_bounds,
+                            cellularity=cellularity_laplacian_array,
+                            cellularity_sigma=cellularity_sigma,
+                            sparsity_mask=sparsity_mask,
+                            spot_weights=cellularity_spot_weights,
+                            marker_weight=marker_weight,
+                            confusion_pairs=confusion_pairs,
+                            lambda_confusion=lambda_confusion,
+                        )
+
+                    # Re-run subcell cleanup
+                    if cellularity_array is not None and sparsity_mask is not None:
+                        min_prop = 0.5 / np.maximum(cellularity_array, 1.0)
+                        gated = sparsity_mask < 1.0
+                        subcell_mask = gated & (Y_values < min_prop[:, np.newaxis])
+                        n_zeroed = subcell_mask.sum()
+                        if n_zeroed > 0:
+                            Y_values[subcell_mask] = 0.0
+                            row_sums = Y_values.sum(axis=1, keepdims=True)
+                            row_sums = np.maximum(row_sums, 1e-10)
+                            Y_values = Y_values / row_sums
+
+                    self.results["confusion_pairs"] = [
+                        (cell_type_names[a], cell_type_names[b]) for a, b in confusion_pairs
+                    ]
+                    if not confusion_pairs_manual:
+                        self.results["confusion_corr_matrix"] = corr_matrix
+                else:
+                    logging.info("No confusion pairs found (threshold=%.2f)", confusion_corr_threshold)
+
+            # Store cellularity results (post-hoc conversion)
+            if cellularity_array is not None:
+                from .assignment.cellularity_utils import round_counts_largest_remainder
+                spot_names = self.antibody_capture_adata.obs_names
+                c_continuous = Y_values * cellularity_array[:, np.newaxis]
+                c_df = pd.DataFrame(c_continuous, index=spot_names, columns=cell_type_names)
+                self.results["cell_counts_continuous"] = c_df
+
+                int_counts = np.zeros_like(c_continuous, dtype=np.int64)
+                for i in range(len(spot_names)):
+                    int_counts[i] = round_counts_largest_remainder(
+                        c_continuous[i], round(cellularity_array[i])
+                    )
+                int_df = pd.DataFrame(int_counts, index=spot_names, columns=cell_type_names)
+                self.results["cell_counts_integer"] = int_df
+
+            # Store marker betas and baselines for downstream analysis
+            self.results["marker_beta"] = marker_beta_dict
+            marker_alpha_dict = {marker_names[i]: alpha_values[i] for i in range(len(marker_names))}
+            self.results["marker_alpha"] = marker_alpha_dict
+            for m_idx, m_name in enumerate(marker_names):
+                if alpha_values[m_idx] > 0.05:
+                    logging.info(f"  Marker baseline: {m_name} = {alpha_values[m_idx]:.3f}")
+
+            # Compute marker exclusivity scores for finetuning
+            # (skip for per_type_beta — exclusivity is encoded in the beta matrix itself)
+            if method != "per_type_beta":
                 marker_owners = []
                 for m_idx in range(assignment_matrix.shape[0]):
                     owners = [j for j in range(assignment_matrix.shape[1]) if assignment_matrix[m_idx, j] > 0]
@@ -813,120 +1475,13 @@ class CitegeistModel:
                     marker_names[i]: marker_exclusivity[i] for i in range(len(marker_names))
                 }
 
-            except ValueError as e:
-                error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
-                logging.error(error_msg)
-                raise ValueError(error_msg) from e
+        except ValueError as e:
+            error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
+            logging.error(error_msg)
+            raise ValueError(error_msg) from e
 
-            # Optionally skip finetuning
-            if skip_finetuning:
-                logging.info("Skipping finetuning step (skip_finetuning=True)")
-                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-                finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
-            else:
-                # Create finetuning output directory
-                finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
-                os.makedirs(finetune_output_dir, exist_ok=True)
-
-                if self.antibody_capture_adata is None:
-                    raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
-
-                Y_prev, beta_prev = finetune_cell_proportions_per_marker(
-                    marker_level_data=marker_level_data,
-                    marker_names=marker_names,
-                    assignment_matrix=assignment_matrix,
-                    cell_type_names=cell_type_names,
-                    initial_Y_values=Y_values,
-                    initial_beta_values=beta_values,
-                    adata=self.antibody_capture_adata,
-                    radius=radius,
-                    tolerance=tolerance,
-                    lambda_reg=lambda_reg,
-                    alpha=alpha,
-                    max_iterations=max_iterations,
-                    max_y_change=max_y_change,
-                    beta_vary=True,
-                    beta_min=beta_min,
-                    beta_max=beta_max,
-                    marker_exclusivity=marker_exclusivity,
-                    marker_alpha=alpha_values,
-                    max_workers=max_workers,
-                    checkpoint_interval=checkpoint_interval,
-                    output_dir=finetune_output_dir,
-                    rerun=True,
-                    spot_abundance_target=spot_abundance_target,
-                    lambda_abundance_prior=lambda_abundance_prior,
-                )
-
-                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-                finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
-
-        else:
-            # ====== LEGACY PER-CELLTYPE BETA APPROACH ======
-            logging.info("Using legacy per-celltype beta optimization (averages markers per cell type)")
-
-            profile_based_antibody_data, cell_type_names = map_antibodies_to_profiles(
-                self.antibody_capture_adata, self.cell_profile_dict
-            )
-
-            try:
-                logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
-                            f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
-
-                Y_values, beta_values = optimize_cell_proportions(
-                    profile_based_antibody_data,
-                    cell_type_names,
-                    unknown_threshold=unknown_threshold,
-                    min_celltype_threshold=min_celltype_threshold,
-                    redundancy_threshold=redundancy_threshold,
-                    warn_only=validation_warn_only,
-                    lambda_laplacian=lambda_laplacian,
-                    coords=coords,
-                    laplacian_k=laplacian_k,
-                    spot_abundance_target=spot_abundance_target,
-                    lambda_abundance_prior=lambda_abundance_prior,
-                )
-            except ValueError as e:
-                error_msg = f"Cell proportion validation failed for sample '{self.sample_name}': {str(e)}"
-                logging.error(error_msg)
-                raise ValueError(error_msg) from e
-
-            # Optionally skip finetuning
-            if skip_finetuning:
-                logging.info("Skipping finetuning step (skip_finetuning=True)")
-                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-                finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
-            else:
-                # Create finetuning output directory
-                finetune_output_dir = os.path.join(self.output_folder, "cell_prop_finetuning")
-                os.makedirs(finetune_output_dir, exist_ok=True)
-
-                if self.antibody_capture_adata is None:
-                    raise ValueError("Antibody capture data has not been split. Run `split_adata` first.")
-
-                Y_prev, beta_prev = finetune_cell_proportions(
-                    profile_based_antibody_data,
-                    cell_type_names,
-                    Y_values,
-                    beta_values,
-                    self.antibody_capture_adata,
-                    radius=radius,
-                    max_workers=max_workers,
-                    checkpoint_interval=checkpoint_interval,
-                    output_dir=finetune_output_dir,
-                    rerun=True,
-                    beta_vary=True,
-                    tolerance=tolerance,
-                    max_iterations=max_iterations,
-                    lambda_reg=lambda_reg,
-                    alpha=alpha,
-                    max_y_change=max_y_change,
-                    spot_abundance_target=spot_abundance_target,
-                    lambda_abundance_prior=lambda_abundance_prior,
-                )
-
-                global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
-                finetuned_cell_type_proportions_df = pd.DataFrame(Y_prev, index=spot_names, columns=cell_type_names)
+        global_cell_type_proportions_df = pd.DataFrame(Y_values, index=spot_names, columns=cell_type_names)
+        finetuned_cell_type_proportions_df = global_cell_type_proportions_df.copy()
 
         global_cell_type_proportions_df = global_cell_type_proportions_df.sort_index()
         finetuned_cell_type_proportions_df = finetuned_cell_type_proportions_df.sort_index()
@@ -946,129 +1501,120 @@ class CitegeistModel:
         # Store to self.results for use by run_cell_expression_pass1
         self.results["cell_prop"] = finetuned_cell_type_proportions_df
 
+        # Store base proportions for Bayesian assignment prior (pre-morphology)
+        if "cell_prop_base" not in self.results:
+            self.results["cell_prop_base"] = self.results["cell_prop"].copy()
+
+        # --- Optional NB refinement with scRNA-seq reference ---
+        if reference is not None:
+            logging.info("Running NB proportion refinement with scRNA-seq reference (kappa=%.1f)", kappa)
+            from .deconvolution.reference_model import refine_proportions_nb
+            import torch
+
+            # Store protein-only proportions for comparison
+            self.results["cell_prop_protein"] = self.results["cell_prop"].copy()
+
+            # Extract marker gene counts from spatial data
+            marker_genes_in_spatial = [
+                g for g in reference.gene_names
+                if g in self.gene_expression_adata.var_names
+            ]
+            if len(marker_genes_in_spatial) < len(reference.gene_names):
+                logging.warning(
+                    "Only %d/%d reference marker genes found in spatial data",
+                    len(marker_genes_in_spatial), len(reference.gene_names),
+                )
+
+            # Get raw counts for marker genes
+            gex_adata = self.gene_expression_adata
+            raw_counts = gex_adata.layers.get("raw_counts", gex_adata.X)
+            marker_idx = [
+                list(gex_adata.var_names).index(g) for g in marker_genes_in_spatial
+            ]
+            if hasattr(raw_counts, "toarray"):
+                spot_marker_counts = raw_counts[:, marker_idx].toarray()
+            else:
+                spot_marker_counts = np.asarray(raw_counts[:, marker_idx])
+
+            # Build reference subset matching available genes
+            ref_gene_idx = [
+                reference.gene_names.index(g) for g in marker_genes_in_spatial
+            ]
+            ref_mu_subset = reference.mu[:, ref_gene_idx]
+            ref_alpha_subset = reference.alpha[ref_gene_idx]
+
+            # Map reference types to proportion columns
+            prop_df = self.results["cell_prop"]
+            all_cols = list(prop_df.columns)
+            ref_type_cols = [t for t in reference.type_names if t in all_cols]
+            if len(ref_type_cols) < len(reference.type_names):
+                logging.warning(
+                    "Reference types not in proportions (frozen): %s",
+                    set(reference.type_names) - set(all_cols),
+                )
+
+            pi_protein_full = prop_df.values
+            covered_idx = [all_cols.index(t) for t in ref_type_cols]
+            uncovered_idx = [i for i in range(len(all_cols)) if i not in covered_idx]
+            pi_covered = pi_protein_full[:, covered_idx]
+
+            # Reorder ref mu/alpha to match ref_type_cols order
+            ref_type_order = [reference.type_names.index(t) for t in ref_type_cols]
+
+            ref_subset = ReferenceProfile(
+                mu=ref_mu_subset[ref_type_order],
+                alpha=ref_alpha_subset,
+                gene_names=marker_genes_in_spatial,
+                type_names=ref_type_cols,
+                de_results=reference.de_results,
+                n_cells_per_type=reference.n_cells_per_type,
+            )
+
+            # Determine device
+            device = "cpu"
+            try:
+                if torch.cuda.is_available():
+                    device = "cuda"
+            except Exception:
+                pass
+
+            # Compute residual mass for uncovered types (stays fixed)
+            uncovered_mass = pi_protein_full[:, uncovered_idx].sum(axis=1, keepdims=True)  # (N, 1)
+            covered_mass = 1.0 - uncovered_mass  # (N, 1)
+
+            # Normalize covered proportions to their own simplex before refinement
+            covered_sum = pi_covered.sum(axis=1, keepdims=True)
+            pi_covered_norm = pi_covered / (covered_sum + 1e-10)
+
+            pi_refined_covered = refine_proportions_nb(
+                spot_counts=spot_marker_counts,
+                pi_protein=pi_covered_norm,
+                reference=ref_subset,
+                kappa=kappa,
+                device=device,
+            )
+
+            # Scale refined covered types back to residual mass (uncovered stays fixed)
+            pi_refined_full = pi_protein_full.copy()
+            for i, col_idx in enumerate(covered_idx):
+                pi_refined_full[:, col_idx] = pi_refined_covered[:, i] * covered_mass.ravel()
+
+            refined_df = pd.DataFrame(
+                pi_refined_full, index=prop_df.index, columns=prop_df.columns
+            )
+            self.results["cell_prop"] = refined_df
+            self.results["cell_prop_base"] = refined_df.copy()
+
+            # Save to CSV
+            refined_df.to_csv(
+                os.path.join(
+                    self.output_folder,
+                    f"{self.sample_name}_cell_prop_refined_results.csv",
+                )
+            )
+            logging.info("NB refinement complete. Refined proportions stored in self.results['cell_prop'].")
+
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
-
-    def run_multimodal_refinement(
-        self,
-        n_anchors: int = 20,
-        min_correlation: float = 0.3,
-        min_anchors_per_type: int = 5,
-        lambda_prior: float = 1.0,
-        max_iterations: int = 20,
-        tolerance: float = 1e-4,
-        sparse_aware: bool = True,
-        min_expressing_spots: int = 20,
-    ) -> pd.DataFrame:
-        """
-        Run Pass 1.5 + Pass 2 EM multimodal refinement.
-
-        Uses RNA expression to refine protein-based proportions, addressing
-        cells with RNA signal but low protein expression.
-
-        Prerequisites:
-            - run_cell_proportion_model() must be called first (Pass 1)
-            - GEX data must be preprocessed
-
-        Args:
-            n_anchors: Maximum anchor genes per cell type (default: 20, cap)
-            min_correlation: Initial minimum Spearman rho for anchor selection (default: 0.3)
-            min_anchors_per_type: Minimum anchors required per cell type (default: 5, floor).
-                If fewer genes pass min_correlation, threshold is lowered adaptively.
-            lambda_prior: Trust in protein prior vs RNA (default: 1.0)
-            max_iterations: Maximum EM iterations (default: 20)
-            tolerance: Convergence tolerance (default: 1e-4)
-            sparse_aware: If True, compute correlations only on expressing spots (default: True)
-            min_expressing_spots: Minimum spots with expression for anchor selection (default: 20)
-
-        Returns:
-            DataFrame with refined cell type proportions
-        """
-        if not hasattr(self, "cell_prop_global_results") and "cell_prop" not in self.results:
-            raise ValueError("Must run run_cell_proportion_model() first (Pass 1)")
-
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression data not loaded")
-
-        logging.info("=" * 60)
-        logging.info("Running Multimodal Refinement (Pass 1.5 + Pass 2 EM)")
-        logging.info("=" * 60)
-
-        # Get GEX matrix
-        GEX = self.gene_expression_adata.X
-        if hasattr(GEX, "toarray"):
-            GEX = GEX.toarray()
-        GEX = np.array(GEX, dtype=np.float64)
-
-        gene_names = list(self.gene_expression_adata.var_names)
-        spot_names = list(self.gene_expression_adata.obs_names)
-
-        # Get Y_protein from Pass 1 results
-        if "cell_prop" in self.results and self.results["cell_prop"] is not None:
-            cell_prop_df = self.results["cell_prop"]
-        else:
-            raise ValueError("Cell proportions not found in results. Run run_cell_proportion_model() first.")
-
-        cell_type_names = [c for c in cell_prop_df.columns if c not in ["spot_id"]]
-        Y_protein = cell_prop_df[cell_type_names].values
-
-        logging.info(f"Input: {len(spot_names)} spots, {len(gene_names)} genes, {len(cell_type_names)} cell types")
-
-        # Run multimodal EM
-        Y_refined, E_final, anchors = multimodal_em_refinement(
-            GEX=GEX,
-            Y_protein=Y_protein,
-            gene_names=gene_names,
-            cell_type_names=cell_type_names,
-            n_anchors=n_anchors,
-            min_correlation=min_correlation,
-            min_anchors_per_type=min_anchors_per_type,
-            lambda_prior=lambda_prior,
-            max_iterations=max_iterations,
-            tolerance=tolerance,
-            sparse_aware=sparse_aware,
-            min_expressing_spots=min_expressing_spots,
-        )
-
-        # Store results
-        self.cell_prop_refined_results = pd.DataFrame(
-            Y_refined,
-            index=spot_names,
-            columns=cell_type_names,
-        )
-        self.expression_profiles = pd.DataFrame(
-            E_final,
-            index=cell_type_names,
-            columns=gene_names,
-        )
-        self.anchor_genes = anchors
-
-        # Log anchor gene summary
-        logging.info("Anchor genes per cell type:")
-        for ct, genes in anchors.items():
-            logging.info(f"  {ct}: {genes[:5]}{'...' if len(genes) > 5 else ''}")
-
-        # Save results
-        import json
-        from pathlib import Path
-
-        output_folder = Path(self.output_folder)
-        output_path = output_folder / f"{self.sample_name}_cell_prop_refined_results.csv"
-        self.cell_prop_refined_results.to_csv(output_path)
-        logging.info(f"Saved refined proportions to {output_path}")
-
-        anchors_path = output_folder / f"{self.sample_name}_anchor_genes.json"
-        with open(anchors_path, "w") as f:
-            json.dump(anchors, f, indent=2)
-        logging.info(f"Saved anchor genes to {anchors_path}")
-
-        return self.cell_prop_refined_results
-
-    def _run_cell_classification(self, **kwargs):
-        """Archived — gating-based cell classification module removed."""
-        raise NotImplementedError(
-            "Gating-based cell classification has been archived. "
-            "Use spot-resolution QP deconvolution (use_gating=False) instead."
-        )
 
     def discretize_proportions(
         self,
@@ -1166,488 +1712,55 @@ class CitegeistModel:
 
         return cell_counts
 
-    def run_discrete_cell_assignment(
-        self,
-        nuclei_counts: Optional[pd.Series] = None,
-        max_em_iterations: int = 20,
-        beta_convergence_tol: float = 1e-3,
-        max_nuclei_cap: int = 30,
-        beta_min: float = 0.1,
-        beta_max: float = 2.0,
-        timeout_per_spot: float = 60.0,
-        lambda_sparse: float = 0.0,
-        prior_proportions: Optional[np.ndarray] = None,
-        lambda_prior: float = 0.0,
-        global_solve: bool = True,
-        global_time_limit: float = 300.0,
-        global_mip_gap: float = 0.05,
-        continuous_prior: Optional[np.ndarray] = None,
-        lambda_continuous: float = 0.0,
-        constraint_slack: int = 0,
-        lambda_reg: float = 0.0,
-        alpha_elastic: float = 0.5,
-        use_marker_weighting: bool = False,
-    ) -> pd.DataFrame:
-        """
-        Phase 1 Alternative: Assign discrete cell identities using IQP with EM.
-
-        This method replaces run_cell_proportion_model() when nuclei counts are
-        available from nuclei segmentation (e.g. StarDist). Instead of estimating continuous
-        proportions, it assigns integer cell counts per type per spot.
-
-        Args:
-            nuclei_counts: Series with spot names as index and integer nuclei
-                counts as values. If None, looks for 'nuclei_count' in
-                antibody_capture_adata.obs.
-            max_em_iterations: Maximum EM iterations (default: 20)
-            beta_convergence_tol: Convergence tolerance for beta (default: 1e-3)
-            max_nuclei_cap: Above this count, use continuous relaxation (default: 30)
-            beta_min: Minimum beta value (default: 0.1)
-            beta_max: Maximum beta value (default: 2.0)
-            timeout_per_spot: Max seconds per spot optimization (default: 60)
-            lambda_sparse: Sparsity regularization weight (default: 0.0). Higher
-                values encourage fewer active cell types per spot. Typical range
-                is 0.0 to 1.0.
-            prior_proportions: Optional array of expected global proportions per
-                cell type (length = n_cell_types). If provided along with
-                lambda_prior > 0, regularizes assignments towards these proportions.
-                Can be estimated from raw marker signals or from continuous mode.
-            lambda_prior: Prior regularization weight (default: 0.0). Higher values
-                pull assignments towards prior_proportions. Typical range is 0.0-1.0.
-                This helps prevent rare cell type over-inflation caused by scaling.
-            global_solve: If True (default), use global IQP solver for joint
-                optimization across all spots. If False, use per-spot IQP
-                (original behavior). Global solve enforces globally consistent
-                marker-celltype relationships.
-            global_time_limit: Time limit for global solver in seconds (default: 300).
-            global_mip_gap: Acceptable MIP gap for global solver (default: 0.05).
-            continuous_prior: (N, T) array of continuous proportions from continuous
-                optimization. If provided with lambda_continuous > 0, the discrete
-                IQP will be regularized toward these proportions. This enables a
-                hybrid approach: run continuous first, then discretize.
-            lambda_continuous: Weight for continuous prior regularization (default: 0.0).
-                Higher values make discrete solution closer to continuous. Typical
-                range is 10.0-100.0 for strong regularization.
-            constraint_slack: Allow ±slack cells deviation from nuclei count (default: 0).
-                Setting to 1 allows the optimizer more flexibility like continuous model.
-            lambda_reg: Elastic net regularization weight on proportions (default: 0.0).
-            alpha_elastic: L1/L2 trade-off for elastic net (0=L2, 1=L1, default: 0.5).
-            use_marker_weighting: Weight errors by marker coverage (default: False).
-
-        Returns:
-            DataFrame with cell type columns and integer count values per spot.
-
-        Note:
-            Requires preprocess_antibody_discrete() to be called first (not
-            preprocess_antibody()) to preserve cellularity signal.
-        """
-        if self.antibody_capture_adata is None:
-            raise ValueError("Antibody capture data not available. Run split_adata() first.")
-
-        if not self.preprocessed_antibody:
-            raise ValueError(
-                "Antibody data not preprocessed. Run preprocess_antibody_discrete() first. "
-                "Note: Use preprocess_antibody_discrete(), NOT preprocess_antibody(), "
-                "to preserve cellularity signal for discrete assignment."
-            )
-
-        if self.cell_profile_dict is None:
-            raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
-
-        # Get nuclei counts
-        if nuclei_counts is None:
-            if 'nuclei_count' in self.antibody_capture_adata.obs.columns:
-                nuclei_counts = self.antibody_capture_adata.obs['nuclei_count'].astype(int)
-                logging.info(f"Using nuclei_count from adata.obs: {nuclei_counts.sum()} total nuclei")
-            else:
-                raise ValueError(
-                    "nuclei_counts not provided and 'nuclei_count' not found in adata.obs. "
-                    "Run compute_spot_nuclei_counts() first or provide nuclei_counts argument."
-                )
-
-        # Validate nuclei counts align with spots
-        spot_names = self.antibody_capture_adata.obs_names
-        if not nuclei_counts.index.equals(spot_names):
-            # Try to reindex
-            if set(nuclei_counts.index) >= set(spot_names):
-                nuclei_counts = nuclei_counts.loc[spot_names]
-            else:
-                missing = set(spot_names) - set(nuclei_counts.index)
-                raise ValueError(f"nuclei_counts missing {len(missing)} spots: {list(missing)[:5]}...")
-
-        nuclei_array = nuclei_counts.values.astype(int)
-
-        # Get marker-level data using existing function (imported at module level)
-        marker_level_data, marker_names, assignment_matrix, cell_type_names = map_antibodies_to_profiles_v2(
-            self.antibody_capture_adata, self.cell_profile_dict
-        )
-
-        logging.info(f"Running discrete cell assignment: {len(spot_names)} spots, "
-                    f"{len(marker_names)} markers, {len(cell_type_names)} cell types")
-        logging.info(f"Total nuclei: {nuclei_array.sum()}, mean per spot: {nuclei_array.mean():.2f}")
-        if lambda_sparse > 0:
-            logging.info(f"Sparsity regularization enabled: lambda_sparse={lambda_sparse}")
-        if lambda_prior > 0 and prior_proportions is not None:
-            logging.info(f"Prior regularization enabled: lambda_prior={lambda_prior}")
-            logging.info(f"Prior proportions: {dict(zip(cell_type_names, prior_proportions))}")
-
-        # Log if using continuous prior (hybrid approach)
-        if continuous_prior is not None and lambda_continuous > 0:
-            logging.info(f"Using continuous prior with lambda_continuous={lambda_continuous}")
-            logging.info(f"Continuous prior shape: {continuous_prior.shape}")
-
-        # Run EM optimization
-        c_values, beta_values, marker_beta_dict, alpha_values = optimize_discrete_cell_assignment_em(
-            marker_level_data=marker_level_data,
-            marker_names=marker_names,
-            assignment_matrix=assignment_matrix,
-            cell_type_names=cell_type_names,
-            nuclei_counts=nuclei_array,
-            max_em_iterations=max_em_iterations,
-            beta_convergence_tol=beta_convergence_tol,
-            beta_min=beta_min,
-            beta_max=beta_max,
-            max_nuclei_cap=max_nuclei_cap,
-            timeout_per_spot=timeout_per_spot,
-            lambda_sparse=lambda_sparse,
-            prior_proportions=prior_proportions,
-            lambda_prior=lambda_prior,
-            global_solve=global_solve,
-            global_time_limit=global_time_limit,
-            global_mip_gap=global_mip_gap,
-            continuous_prior=continuous_prior,
-            lambda_continuous=lambda_continuous,
-            constraint_slack=constraint_slack,
-            lambda_reg=lambda_reg,
-            alpha_elastic=alpha_elastic,
-            use_marker_weighting=use_marker_weighting,
-        )
-
-        # Store results
-        self.results["marker_beta"] = marker_beta_dict
-        self.results["marker_alpha"] = {marker_names[i]: alpha_values[i] for i in range(len(marker_names))}
-        self.results["discrete_cell_counts"] = c_values
-        self.results["nuclei_counts"] = nuclei_array
-
-        # Create DataFrame
-        cell_counts_df = pd.DataFrame(
-            c_values,
-            index=spot_names,
-            columns=cell_type_names,
-        )
-
-        # Compute proportions for Phase 2 compatibility
-        row_sums = c_values.sum(axis=1, keepdims=True)
-        row_sums = np.maximum(row_sums, 1)  # Avoid division by zero
-        proportions = c_values / row_sums
-        cell_prop_df = pd.DataFrame(proportions, index=spot_names, columns=cell_type_names)
-        self.results["cell_prop"] = cell_prop_df
-
-        # Save outputs
-        counts_path = os.path.join(self.output_folder, f"{self.sample_name}_discrete_cell_counts.csv")
-        cell_counts_df.to_csv(counts_path)
-        logging.info(f"Saved discrete cell counts to {counts_path}")
-
-        prop_path = os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_discrete.csv")
-        cell_prop_df.to_csv(prop_path)
-        logging.info(f"Saved derived proportions to {prop_path}")
-
-        # Log summary
-        total_per_type = c_values.sum(axis=0)
-        logging.info("Cell type distribution:")
-        for t, ct_name in enumerate(cell_type_names):
-            pct = 100 * total_per_type[t] / c_values.sum() if c_values.sum() > 0 else 0
-            logging.info(f"  {ct_name}: {total_per_type[t]} cells ({pct:.1f}%)")
-
-        return cell_counts_df
-
     def run_cell_expression_pass1(
         self,
-        radius=None,
-        alpha=0.5,
-        global_enrichment_weight=0.5,
-        local_enrichment_weight=0.5,
-        max_workers=None,
-        checkpoint_interval=100,
-        output_dir="checkpoints",
-        rerun=True,
-        continuous_relaxation=True,
-        lambda_gex_reg=0.01,
-        enrichment_smoothing=0.0,  # Testing: no smoothing
-        cell_counts: Optional[pd.DataFrame] = None,
-        use_discrete_mode: bool = False,
-        # NEW parameters for module enrichment and KL regularization
-        use_module_enrichment: bool = True,
-        use_marker_guidance: bool = False,  # Disabled - baseline approach works better
-        module_weight: float = 0.5,
-        use_kl_regularization: bool = True,
-        kl_temperature: float = 0.3,
-        lambda_kl: float = 0.1,
-        n_anchor_genes: Tuple[int, int] = (5, 10),
+        cell_assignments=None,
+        cell_spot_map=None,
+        sace_max_iter: int = 1,
+        sace_n_0: float = 10.0,
+        sace_bandwidth=None,
     ):
         """
-        Run first pass of gene expression deconvolution.
+        Run gene expression deconvolution using SACE (Spatially-Adaptive Compositional EM).
 
         Args:
-            radius (float): Radius for neighbor detection
-            alpha (float): Weight for spatial regularization
-            global_enrichment_weight (float): Weight for global expression enrichment (0-1)
-            local_enrichment_weight (float): Weight for local expression enrichment (0-1)
-            max_workers (int, optional): Maximum number of parallel workers
-            checkpoint_interval (int): Number of spots between checkpoints
-            output_dir (str): Directory for checkpoints
-            rerun (bool): Whether to rerun if results exist
-            cell_counts (pd.DataFrame, optional): Integer cell counts per type from
-                run_discrete_cell_assignment(). If provided with use_discrete_mode=True,
-                uses counts as fixed multipliers instead of proportions.
-            use_discrete_mode (bool): If True, use discrete cell counts instead of
-                continuous proportions for deconvolution. Requires cell_counts or
-                'discrete_cell_counts' in self.results.
-            use_module_enrichment (bool): If True, use anchor genes for module-aware enrichment.
-            use_marker_guidance (bool): If True, use adaptive marker-guided enrichment
-                instead of proportion-only enrichment. Recommended for improved weak gene
-                allocation. Takes precedence over use_module_enrichment. Default True.
-            module_weight (float): Weight for module-aware enrichment (0-1).
-            use_kl_regularization (bool): If True, use KL-divergence instead of L2 regularization.
-            kl_temperature (float): Temperature for softmax target (lower = sharper).
-            lambda_kl (float): Weight for KL penalty term.
-            n_anchor_genes (Tuple[int, int]): (min_anchors, max_anchors) per cell type.
+            cell_assignments (dict): Dict[cell_id -> type_name] from cell_assignment.py.
+            cell_spot_map (DataFrame): Mapping of cells to spots with cell_id, spot_barcode, x, y columns.
+            sace_max_iter (int): Maximum EM iterations (default 1, recommended).
+            sace_n_0 (float): Shrinkage prior strength (default 10.0).
+            sace_bandwidth (float, optional): Kernel bandwidth (None=auto).
 
         Returns:
             Dict[str, Any]: {
                 'spotwise_profiles': Dict[int, np.ndarray],
-                'dimensions': Tuple[int, int, int]
+                'dimensions': None
             }
         """
         if not self.preprocessed_gex:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
-        # Auto-detect radius if not specified
-        if radius is None:
-            source_adata = self.gene_expression_adata or self.antibody_capture_adata
-            if source_adata is None:
-                raise ValueError("No AnnData available for radius auto-detection")
-            radius = compute_optimal_radius(source_adata)
-            logging.info(f"Auto-detected radius: {radius:.2f} (3 rings)")
-
-        logging.info("Starting Pass 1: Error minimization with enrichment weights...")
-
-        if self.gene_expression_adata is None:
-            raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
-
-        # Handle discrete mode vs continuous mode
-        if use_discrete_mode:
-            logging.info("Using discrete mode: cell counts as fixed multipliers")
-
-            # Get cell counts
-            if cell_counts is not None:
-                discrete_counts = cell_counts.values
-            elif "discrete_cell_counts" in self.results:
-                discrete_counts = self.results["discrete_cell_counts"]
-            else:
-                raise ValueError(
-                    "Discrete mode requires cell_counts argument or "
-                    "'discrete_cell_counts' in self.results. "
-                    "Run run_discrete_cell_assignment() first."
-                )
-
-            # For discrete mode, we still need proportions for the optimizer
-            # but we'll use counts as the effective weights
-            total_counts = discrete_counts.sum(axis=1, keepdims=True)
-            total_counts = np.maximum(total_counts, 1)  # Avoid division by zero
-            cell_props_values = discrete_counts / total_counts
-
-            # Log discrete mode info
-            zero_count_spots = np.where(discrete_counts.sum(axis=1) == 0)[0]
-            if len(zero_count_spots) > 0:
-                logging.warning(
-                    f"Found {len(zero_count_spots)} spots with zero cells. "
-                    f"These will be skipped in deconvolution."
-                )
-        else:
-            if "cell_prop" not in self.results or self.results["cell_prop"] is None:
-                raise ValueError("Cell proportions not computed. Run cell proportion model first.")
-
-            cell_props_values = self.results["cell_prop"].values
-
-        # Diagnostic check for low or zero cell proportions
-        total_props_per_spot = cell_props_values.sum(axis=1)
-        zero_prop_spots = np.where(total_props_per_spot < 1e-9)[0]
-
-        if len(zero_prop_spots) > 0:
-            logging.warning(
-                f"Found {len(zero_prop_spots)} spots with zero or negligible total cell proportions. "
-                f"Deconvolution for these spots may fail and their profiles will be imputed as zeros. "
-                f"Example spot indices: {zero_prop_spots[:5]}"
+        if cell_assignments is None or cell_spot_map is None:
+            raise ValueError(
+                "SACE requires cell_assignments (Dict[cell_id -> type_name]) "
+                "and cell_spot_map (DataFrame with cell_id, spot_barcode, x, y columns). "
+                "Run cell_assignment.assign_cells() first to obtain these."
             )
+        logging.info("Using SACE GEX deconvolution (1.7s, no solver required)")
 
-        # Discover anchor genes if using marker guidance or module enrichment
-        # use_marker_guidance takes precedence for A/B testing purposes
-        anchor_genes = None
-        anchor_weights = None
-        enable_anchor_discovery = (use_marker_guidance or use_module_enrichment) and not (self.resolution == "cell")
-        if enable_anchor_discovery:
-            from .gex_modules import discover_anchor_genes
-
-            gene_expr_matrix = self.gene_expression_adata.X
-            if scipy.sparse.issparse(gene_expr_matrix):
-                gene_expr_matrix = gene_expr_matrix.toarray()
-
-            anchor_genes, anchor_thresholds, anchor_weights = discover_anchor_genes(
-                gene_expression=gene_expr_matrix,
-                cell_proportions=cell_props_values,
-                min_anchors=n_anchor_genes[0],
-                max_anchors=n_anchor_genes[1],
-            )
-
-            total_anchors = sum(len(v) for v in anchor_genes.values())
-            logging.info(f"Discovered {total_anchors} anchor genes across {len(anchor_genes)} cell types")
-            for t, genes in anchor_genes.items():
-                ct_name = list(self.cell_profile_dict.keys())[t] if self.cell_profile_dict else f"Type_{t}"
-                logging.info(f"  {ct_name}: {len(genes)} anchors (r>={anchor_thresholds[t]:.2f})")
-
-        if self.resolution == "cell":
-            # Cell-level: estimate true expression per cell (not deconvolution)
-            logging.info("Cell-level mode: using true count estimation instead of deconvolution")
-
-            # Get gene expression data
-            gex_data = self.gene_expression_adata.X
-            if hasattr(gex_data, 'toarray'):
-                gex_data = gex_data.toarray()
-            gex_data = np.asarray(gex_data, dtype=np.float64)
-
-            # Get spatial coordinates
-            cell_coords = self.gene_expression_adata.obsm.get('spatial', None)
-            if cell_coords is None:
-                cell_coords = self.antibody_capture_adata.obsm.get('spatial', None)
-            if cell_coords is None:
-                raise ValueError("No spatial coordinates found for cell-level expression estimation")
-
-            # Build enrichment weights from cell type assignments
-            n_types = cell_props_values.shape[1]
-            n_genes = gex_data.shape[1]
-            dominant_type = np.argmax(cell_props_values, axis=1)
-
-            enrichment = np.ones((n_types, n_genes)) * 0.1
-            for ct_idx in range(n_types):
-                ct_cells = np.where(dominant_type == ct_idx)[0]
-                if len(ct_cells) > 0:
-                    ct_mean = gex_data[ct_cells].mean(axis=0)
-                    global_mean = gex_data.mean(axis=0) + 1e-10
-                    enrichment[ct_idx] = ct_mean / global_mean
-
-            X_true = estimate_true_expression_cell(
-                X_obs=gex_data,
-                Y_assignments=cell_props_values,
-                coords=cell_coords,
-                enrichment_weights=enrichment,
-                library_slack=self.resolution_params["pass2_library_slack"],
-                lambda_spatial=self.resolution_params["lambda_spatial"],
-                spatial_k=self.resolution_params["neighbor_k"],
-                max_workers=max_workers,
-            )
-
-            # Store results in same format as spot-level for downstream compatibility
-            N = X_true.shape[0]
-            T = n_types
-            M = n_genes
-            spotwise_gene_expression_profiles = {}
-            for i in range(N):
-                # For cell-level: all expression assigned to dominant type
-                profile = np.zeros((T, M))
-                dt = dominant_type[i]
-                profile[dt, :] = X_true[i, :]
-                spotwise_gene_expression_profiles[i] = profile
-
-            self.results["gene_expression"] = spotwise_gene_expression_profiles
-            logging.info(f"Cell-level expression estimation complete for {N} cells")
-            return
-
-        spotwise_profiles = optimize_gene_expression(
-            sample_name=self.sample_name,
-            deconvolution_expression_data=self.gene_expression_adata.X,
-            cell_type_numbers_array=cell_props_values,
-            filtered_adata=self.gene_expression_adata,
-            radius=radius,
-            global_enrichment_weight=global_enrichment_weight,
-            local_enrichment_weight=local_enrichment_weight,
-            global_prior=None,  # No prior in pass 1
-            lambda_prior_weight=0.0,  # No prior weight in pass 1
-            max_workers=max_workers,
-            checkpoint_interval=checkpoint_interval,
-            output_dir=output_dir,
-            rerun=rerun,
-            continuous_relaxation=continuous_relaxation,
-            lambda_gex_reg=lambda_gex_reg,
-            enrichment_smoothing=enrichment_smoothing,  # 0.2 = 80/20, 0.0 = none
+        # Delegate to run_sace_allocation
+        spot_type_gex, cell_adata, diagnostics = self.run_sace_allocation(
+            cell_assignments=cell_assignments,
+            cell_spot_map=cell_spot_map,
+            n_0=sace_n_0,
+            bandwidth=sace_bandwidth,
+            max_iter=sace_max_iter,
         )
 
-        # Get dimensions for NaN imputation and consistency checks
-        N = self.gene_expression_adata.shape[0]  # number of spots
-        T = cell_props_values.shape[1]  # number of cell types
-        M = self.gene_expression_adata.shape[1]  # number of genes
-        dimensions = (N, T, M)
+        # Store in the canonical key for backward compatibility
+        self.results["gene_expression_pass1"] = spot_type_gex
+        self.results["sace_cell_adata"] = cell_adata
 
-        # Impute spots that failed to converge (NaN spots)
-        nan_spots = [i for i in range(N) if i not in spotwise_profiles]
-        if nan_spots:
-            logging.info(f"Found {len(nan_spots)} spots that failed to converge. Starting imputation...")
-
-            imputed_count = 0
-            zero_profile = np.zeros((T, M), dtype=float)
-
-            for spot_idx in nan_spots:
-                # Prioritize imputing with zeros if cell proportions are negligible
-                if total_props_per_spot[spot_idx] < 1e-9:
-                    spotwise_profiles[spot_idx] = zero_profile
-                    logging.info(f"Imputed spot {spot_idx} with a zero profile due to negligible cell proportions.")
-                    imputed_count += 1
-                    continue
-
-                # Otherwise, use neighbor-based imputation
-                neighbor_indices = get_neighbors_with_fixed_radius(
-                    spot_idx, self.gene_expression_adata, radius=radius, include_center=False
-                )
-
-                # Corrected key usage: use integer keys consistently
-                neighbor_profiles = [spotwise_profiles[i] for i in neighbor_indices if i in spotwise_profiles]
-
-                if neighbor_profiles:
-                    imputed_profile = np.nanmean(neighbor_profiles, axis=0)
-                    spotwise_profiles[spot_idx] = imputed_profile
-                    logging.info(f"Imputed spot {spot_idx} using {len(neighbor_profiles)} neighbors.")
-                    imputed_count += 1
-                else:
-                    logging.warning(
-                        f"No valid neighbors found to impute spot {spot_idx}. It will be filled with zeros as a fallback."
-                    )
-                    spotwise_profiles[spot_idx] = zero_profile  # Fallback to prevent downstream errors
-                    imputed_count += 1
-
-            logging.info(f"Finished imputation. {imputed_count}/{len(nan_spots)} failed spots were imputed.")
-
-        # Final check for any remaining NaNs, though the logic above should prevent this
-        final_nan_spots = [i for i in range(N) if i not in spotwise_profiles]
-        if final_nan_spots:
-            logging.error(
-                f"FATAL: {len(final_nan_spots)} spots could not be imputed: {final_nan_spots[:10]}. Check imputation logic."
-            )
-            # This case should ideally not be reached. Raising an error might be appropriate.
-            raise RuntimeError("Failed to impute all necessary spot profiles.")
-
-        # Store first pass results
-        self.results["gene_expression_pass1"] = spotwise_profiles
-
-        # Save and evaluate results
-        parquet_path = os.path.join(self.output_folder, f"{self.sample_name}_gene_expression_pass1.parquet")
-        self._save_profiles_to_parquet(spotwise_profiles, parquet_path)
-
-        self.append_gex_to_adata(pass_number=1)
-
-        layer_dir = os.path.join(self.output_folder, f"{self.sample_name}_pass1/layers")
-        export_anndata_layers(self.gene_expression_adata, layer_dir, pass_number=1)
-
-        return {"spotwise_profiles": spotwise_profiles, "dimensions": dimensions}
+        return {"spotwise_profiles": spot_type_gex, "dimensions": None}
 
     def compute_expression_prior(
         self,
@@ -1726,6 +1839,7 @@ class CitegeistModel:
 
     def _save_profiles_to_parquet(self, profiles, path):
         """Helper method to save profiles to parquet format with consistent naming."""
+        _require_pyarrow("Saving profiles to parquet")
         if not profiles:
             logging.warning("No profiles to save.")
             return
@@ -1812,6 +1926,7 @@ class CitegeistModel:
         """
         Append gene expression layers from a Parquet file back into the gene_expression_adata object.
         """
+        _require_pyarrow("Appending parquet-backed gene expression")
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
 
@@ -1949,352 +2064,781 @@ class CitegeistModel:
             raise ValueError("Cell profile dict has not been loaded. Run 'load_cell_profile_dict' first.")
         assert_neighborhood_size(self.gene_expression_adata, self.cell_profile_dict, radius=radius, num_spots=5)
 
-    def run_single_cell_resolution(
+    def assign_cells(
         self,
-        mask: np.ndarray,
-        nuclei_spot_map: pd.DataFrame,
-        modality: str,
-        patches_dir: Optional[str] = None,
-        nuclei_counts: Optional[pd.Series] = None,
-        # DAPI-specific
-        purity_threshold: float = 0.5,
-        # H&E-specific
-        backbone_checkpoint: Optional[str] = None,
-        mil_checkpoint: Optional[str] = None,
-        n_epochs: int = 100,
-        lambda_prior: float = 1.0,
-        # Common
-        batch_size: int = 64,
+        nuclei_counts: 'pd.Series',
+        cell_to_spot: np.ndarray,
+        cell_ids: np.ndarray = None,
+        morphology_embeddings: np.ndarray = None,
+        patches: np.ndarray = None,
+        encoder_checkpoint: str = None,
+        morphology_weight: float = 0.5,
+        random_state: int = 42,
         device: str = "cpu",
-        cell_mask: Optional[np.ndarray] = None,
-        save_output: bool = True,
-    ) -> 'ad.AnnData':
-        """
-        Run single-cell resolution pipeline (Module 3b + 3c cell mode).
+        assignment_method: str = "hungarian",
+        detection_mask: np.ndarray = None,
+        proportion_prior: np.ndarray = None,
+        morph_scores_precomputed: np.ndarray = None,
+    ) -> 'pd.DataFrame':
+        """Assign individual cells to types using proportions + optional morphology.
 
-        Dispatches to modality-specific assignment:
-        - "dapi": Constrained Hungarian with DAPI+boundary morphology features
-        - "he": MIL with backbone embeddings (ImageNet ViT or SimCLR)
-
-        Requires:
-            - run_cell_proportion_model() has been called (Module 3a)
-            - run_cell_expression_pass1() has been called (Module 3c spot mode)
+        Post-processing step that runs after run_cell_proportion_model().
+        Discretizes spot-level proportions into per-cell type assignments,
+        optionally using morphology embeddings as a soft prior via
+        prototype-contrastive LLP.
 
         Args:
-            mask: Label mask with nucleus labels (e.g. from StarDist)
-            nuclei_spot_map: DataFrame mapping nucleus_id to spot_id
-            modality: REQUIRED. "dapi" or "he" — determines assignment method.
-            patches_dir: Directory with per-spot patch .npy files.
-                Required for both modalities.
-            nuclei_counts: Optional nuclei counts per spot.
-                If None, computed from nuclei_spot_map.
-            purity_threshold: (DAPI only) Minimum dominant proportion for
-                high-purity training spots (default 0.5)
-            backbone_checkpoint: (H&E only) Path to pre-trained backbone.
-            mil_checkpoint: (H&E only) Path to pre-trained MIL weights.
-            n_epochs: (H&E only) MIL training epochs.
-            lambda_prior: (H&E only) Proportion prior weight for Hungarian.
-            batch_size: Batch size for feature extraction.
-            device: PyTorch device for inference.
-            cell_mask: Optional cell mask for morphology features.
-            save_output: Whether to save output h5ad file.
+            nuclei_counts: Per-spot nuclei counts.
+            cell_to_spot: (C,) int array mapping each cell to a spot index
+                (positional into self.results["cell_prop"]).
+            cell_ids: (C,) cell/nucleus identifiers. Defaults to integer indices.
+            morphology_embeddings: (C, 384) precomputed embeddings, or None.
+            patches: (C, ch, 96, 96) DAPI patches for embedding extraction, or None.
+            encoder_checkpoint: SimCLR checkpoint path (required if patches provided).
+            morphology_weight: Nudge strength (0=none, 1=full). Default 0.5.
+            random_state: Seed for deterministic no-morphology assignment.
+            device: Torch device for morphology scoring (e.g. "cpu" or "cuda").
+                Default "cpu".
 
         Returns:
-            AnnData with single-cell expression
+            DataFrame (C rows): spot_id, cell_id, per-type scores, assigned_type, confidence.
         """
-        import anndata as ad
-        from .module3b_nucleus_assignment import (
-            run_nucleus_assignment_constrained,
-            run_nucleus_assignment_mil,
-        )
+        from .assignment.cell_assignment import assign_cells as _assign_cells
 
-        # Validate modality
-        if modality not in ("dapi", "he"):
-            raise ValueError(
-                f"modality must be 'dapi' or 'he', got '{modality}'. "
-                "DAPI uses constrained Hungarian assignment; "
-                "H&E uses MIL-based assignment."
-            )
-
-        # Validate patches_dir
-        if patches_dir is None:
-            raise ValueError("patches_dir is required for morphology-based assignment.")
-        if not os.path.isdir(patches_dir):
-            raise FileNotFoundError(f"patches_dir does not exist: {patches_dir}")
-
-        # Validate prerequisites
-        if 'cell_prop' not in self.results and 'cell_prop_finetuned_results' not in self.results:
-            raise RuntimeError("Must run run_cell_proportion_model() first (Module 3a)")
-        if 'gene_expression_pass1' not in self.results:
-            raise RuntimeError("Must run run_cell_expression_pass1() first (Module 3c)")
-
-        # Get proportions (prefer finetuned if available)
-        if 'cell_prop_finetuned_results' in self.results:
-            proportions = self.results['cell_prop_finetuned_results'].copy()
-        else:
-            proportions = self.results['cell_prop'].copy()
-
-        if 'spot_id' not in proportions.columns:
-            proportions['spot_id'] = proportions.index
-
-        # Get cell types
-        cell_types = [c for c in proportions.columns if c != 'spot_id']
-
-        # Compute nuclei counts if not provided
-        if nuclei_counts is None:
-            nuclei_counts = nuclei_spot_map.groupby('spot_id').size()
-
-        # --- Dispatch to modality-specific assignment ---
-        if modality == "dapi":
-            logging.info("Module 3b: Constrained Hungarian assignment (DAPI morphology)")
-            assignment_result = run_nucleus_assignment_constrained(
-                patches_dir=patches_dir,
-                nuclei_spot_map=nuclei_spot_map,
-                proportions=proportions,
-                nuclei_counts=nuclei_counts,
-                cell_types=cell_types,
-                purity_threshold=purity_threshold,
-            )
-
-        else:  # he
-            logging.info("Module 3b: MIL-based assignment (H&E backbone)")
-            from .morphology_backbone import HEBackbone
-            import glob as glob_mod
-
-            backbone = HEBackbone(checkpoint=backbone_checkpoint, device=device)
-
-            # Extract embeddings per spot
-            embeddings = {}
-            nuclei_spot_records = []
-
-            patch_files = sorted(glob_mod.glob(os.path.join(patches_dir, "*_patches.npy")))
-            logging.info("Found %d patch files in %s", len(patch_files), patches_dir)
-
-            for pf in patch_files:
-                spot_id = os.path.basename(pf).replace("_patches.npy", "")
-                patches = np.load(pf)
-                if len(patches) == 0:
-                    continue
-
-                emb = backbone.extract_numpy(patches, batch_size=batch_size, device=device)
-                embeddings[spot_id] = emb
-
-                nuc_id_file = os.path.join(patches_dir, f"{spot_id}_nucleus_ids.npy")
-                if os.path.exists(nuc_id_file):
-                    nuc_ids = np.load(nuc_id_file)
-                else:
-                    nuc_ids = [f"{spot_id}_{i}" for i in range(len(patches))]
-
-                for nid in nuc_ids:
-                    nuclei_spot_records.append({
-                        'nucleus_id': nid,
-                        'spot_id': spot_id,
-                    })
-
-            he_nuclei_spot_map = pd.DataFrame(nuclei_spot_records)
-            logging.info("Extracted embeddings for %d spots, %d nuclei",
-                         len(embeddings), len(he_nuclei_spot_map))
-
-            assignment_result = run_nucleus_assignment_mil(
-                embeddings=embeddings,
-                nuclei_spot_map=he_nuclei_spot_map,
-                proportions=proportions,
-                nuclei_counts=nuclei_counts,
-                cell_types=cell_types,
-                n_epochs=n_epochs,
-                lambda_prior=lambda_prior,
-                mil_checkpoint=mil_checkpoint,
-                device=device,
-            )
-            # Use the H&E-discovered nuclei map for downstream GEX distribution
-            nuclei_spot_map = he_nuclei_spot_map
-
-        # --- Build deconvolved GEX DataFrame ---
-        spotwise_profiles = self.results['gene_expression_pass1']
-
-        if self.cell_profile_dict is None:
-            raise ValueError("Cell profile dictionary not loaded.")
-
-        cell_type_names = list(self.cell_profile_dict.keys())
-        gene_names = self.gene_expression_adata.var_names
-        spot_names = self.gene_expression_adata.obs_names
-
-        rows = []
-        indices = []
-        for spot_idx, spot_name in enumerate(spot_names):
-            if spot_idx in spotwise_profiles:
-                profile = spotwise_profiles[spot_idx]  # (T, M) array
-                for ct_idx, ct_name in enumerate(cell_type_names):
-                    indices.append(f"{spot_name}:::{ct_name}")
-                    rows.append(profile[ct_idx, :])
-
-        deconvolved_gex = pd.DataFrame(rows, index=indices, columns=gene_names)
-
-        # --- Distribute GEX to cells ---
-        logging.info("Running Module 3c: Cell-level GEX distribution")
-        cell_gex = distribute_gex_to_cells(
-            deconvolved_gex=deconvolved_gex,
-            assignments=assignment_result.assignments,
-            nucleus_spot_map=nuclei_spot_map,
-        )
-
-        # --- Create output AnnData ---
-        adata_sc = create_single_cell_adata(
-            cell_gex=cell_gex,
-            morphology_features=assignment_result.morphology_features,
-            assignments=assignment_result.assignments,
-            sample_name=self.sample_name,
-            classifier=assignment_result.classifier,
-            assignment_method=assignment_result.method,
-        )
-
-        # Store result
-        self.results['single_cell_adata'] = adata_sc
-        self.results['nucleus_assignment'] = assignment_result
-
-        # Save output
-        if save_output:
-            output_path = os.path.join(self.output_folder, f"{self.sample_name}_single_cell.h5ad")
-            adata_sc.write_h5ad(output_path)
-            logging.info(f"Saved single-cell AnnData to {output_path}")
-
-        return adata_sc
-
-    def run_single_cell_assignment(
-        self,
-        patches_dir: str,
-        nuclei_counts: pd.Series,
-        modality: str = "he",
-        backbone_checkpoint: Optional[str] = None,
-        mil_checkpoint: Optional[str] = None,
-        lambda_prior: float = 1.0,
-        n_epochs: int = 100,
-        batch_size: int = 64,
-        device: str = "cpu",
-    ) -> pd.DataFrame:
-        """
-        Module 3b: Assign individual nuclei to cell types using MIL.
-
-        Requires Module 3 (run_cell_proportion_model) to have been run first.
-        Uses a modality-specific backbone to extract nucleus embeddings,
-        trains a MIL head on spot-level proportions, then runs proportion-weighted
-        Hungarian assignment.
-
-        Args:
-            patches_dir: Directory containing per-spot nucleus patches.
-                Expected structure: {spot_id}_patches.npy files
-            nuclei_counts: Series mapping spot_id -> number of nuclei
-            modality: "dapi" (2ch, 96x96 SimCLR) or "he" (3ch, 224x224 ImageNet ViT)
-            backbone_checkpoint: Path to pre-trained backbone (SimCLR for DAPI,
-                SSL fine-tuned for H&E). If None, uses untrained backbone.
-            mil_checkpoint: Path to pre-trained MIL weights. If None, trains
-                from scratch using Module 3 proportions.
-            lambda_prior: Weight for proportion prior in Hungarian assignment
-            n_epochs: MIL training epochs (ignored if mil_checkpoint provided)
-            batch_size: Batch size for backbone feature extraction
-            device: PyTorch device for backbone and MIL inference
-
-        Returns:
-            DataFrame with columns: nucleus_id, spot_id, cell_type
-
-        .. deprecated::
-            Use ``run_single_cell_resolution(modality=...)`` instead, which
-            produces a full single-cell AnnData with deconvolved GEX.
-        """
-        import warnings
-        warnings.warn(
-            "run_single_cell_assignment() is deprecated. "
-            "Use run_single_cell_resolution(modality=...) instead, "
-            "which produces a full single-cell AnnData with deconvolved GEX.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        from .morphology_backbone import DAPIBackbone, HEBackbone
-        from .module3b_nucleus_assignment import run_nucleus_assignment_mil
-        import glob
-
-        # Validate Module 3 has been run
-        if 'cell_prop_finetuned_results' not in self.results:
+        if "cell_prop" not in self.results:
             raise RuntimeError(
-                "Module 3 must be run first (run_cell_proportion_model). "
-                "No finetuned proportions found."
+                "run_cell_proportion_model() must be called before assign_cells(). "
+                "No 'cell_prop' found in results."
             )
 
-        proportions_df = self.results['cell_prop_finetuned_results']
-        cell_types = [c for c in proportions_df.columns if c != 'spot_id']
+        # Auto-populate for Bayesian assignment
+        if assignment_method == "bayesian":
+            if detection_mask is None:
+                detection_mask = self.results.get("detection_mask_bool")
+                if detection_mask is None:
+                    raise RuntimeError(
+                        "No detection mask available. Run run_cell_proportion_model() "
+                        "with use_detection_gating=True first."
+                    )
+            if proportion_prior is None:
+                base = self.results.get("cell_prop_base", self.results.get("cell_prop"))
+                if base is not None:
+                    proportion_prior = base.values if hasattr(base, 'values') else base
 
-        logging.info("Module 3b: Single-cell assignment via MIL (%s backbone)", modality)
+        existing_int = self.results.get("cell_counts_integer", None)
 
-        # Initialize backbone
-        if modality == "dapi":
-            backbone = DAPIBackbone(checkpoint=backbone_checkpoint, device=device)
-        elif modality == "he":
-            backbone = HEBackbone(checkpoint=backbone_checkpoint, device=device)
-        else:
-            raise ValueError(f"Unknown modality: {modality}. Use 'dapi' or 'he'.")
-
-        # Extract embeddings per spot
-        embeddings = {}
-        nuclei_spot_records = []
-
-        patch_files = sorted(glob.glob(os.path.join(patches_dir, "*_patches.npy")))
-        logging.info("Found %d patch files in %s", len(patch_files), patches_dir)
-
-        for pf in patch_files:
-            spot_id = os.path.basename(pf).replace("_patches.npy", "")
-            patches = np.load(pf)  # (N, C, H, W)
-            if len(patches) == 0:
-                continue
-
-            emb = backbone.extract_numpy(patches, batch_size=batch_size, device=device)
-            embeddings[spot_id] = emb
-
-            for i in range(len(patches)):
-                nuclei_spot_records.append({
-                    'nucleus_id': f"{spot_id}_{i}",
-                    'spot_id': spot_id,
-                })
-
-        nuclei_spot_map = pd.DataFrame(nuclei_spot_records)
-        logging.info("Extracted embeddings for %d spots, %d nuclei",
-                      len(embeddings), len(nuclei_spot_map))
-
-        # Run MIL assignment
-        result = run_nucleus_assignment_mil(
-            embeddings=embeddings,
-            nuclei_spot_map=nuclei_spot_map,
-            proportions=proportions_df,
+        result = _assign_cells(
+            cell_prop=self.results["cell_prop"],
             nuclei_counts=nuclei_counts,
-            cell_types=cell_types,
-            n_epochs=n_epochs,
-            lambda_prior=lambda_prior,
-            mil_checkpoint=mil_checkpoint,
+            cell_to_spot=cell_to_spot,
+            cell_ids=cell_ids,
+            morphology_embeddings=morphology_embeddings,
+            patches=patches,
+            encoder_checkpoint=encoder_checkpoint,
+            morphology_weight=morphology_weight,
+            existing_integer_counts=existing_int,
+            output_folder=getattr(self, 'output_folder', None),
+            sample_name=getattr(self, 'sample_name', 'sample'),
+            device=device,
+            random_state=random_state,
+            assignment_method=assignment_method,
+            detection_mask=detection_mask,
+            proportion_prior=proportion_prior,
+            morph_scores_precomputed=morph_scores_precomputed,
+        )
+
+        self.results["cell_assignments"] = result
+        self.results["cell_types_hard"] = result["assigned_type"].values
+
+        if morphology_embeddings is not None or patches is not None:
+            cell_types = self.results["cell_prop"].columns.tolist()
+            self.results["morphology_scores"] = result[cell_types].values
+
+        logging.info("Assigned %d cells to %d types", len(result), len(self.results["cell_prop"].columns))
+
+        return result
+
+    def run_sace_allocation(
+        self,
+        cell_assignments,
+        cell_spot_map,
+        n_0=10.0,
+        bandwidth=None,
+        max_iter=1,
+        tol=1e-4,
+    ):
+        """Run SACE per-cell GEX allocation.
+
+        Requires run_cell_proportion_model() to have been called first.
+        Optionally uses run_cell_expression_pass1() output for initialization.
+
+        Note: max_iter=1 is the recommended default. Xenium benchmark shows
+        EM spatial smoothing (max_iter>1) overfits: percell r drops 0.310→0.300
+        across 5 regions while log-likelihood increases. The single-E-step
+        initialization with confounded profiles already captures the between-type
+        signal; additional iterations smooth away useful local variation.
+
+        Args:
+            cell_assignments: Dict[cell_id -> type_name] from cell_assignment.py.
+            cell_spot_map: DataFrame with cell_id/nucleus_id, spot_barcode/spot_id,
+                spot_idx, x/x_pixel, y/y_pixel columns. Column naming is flexible.
+            n_0: Shrinkage prior strength.
+            bandwidth: Kernel bandwidth (None=auto).
+            max_iter: Maximum EM iterations.
+            tol: Convergence threshold.
+
+        Returns:
+            Tuple of (spot_type_gex, cell_adata, diagnostics).
+        """
+        from .gex.sace_gex import run_sace
+
+        if "cell_prop" not in self.results:
+            raise ValueError("Run run_cell_proportion_model() first.")
+
+        # Use raw counts (SACE requires unnormalized data)
+        adata = self.gene_expression_adata
+        if "raw_counts" in adata.layers:
+            raw_X = adata.layers["raw_counts"]
+        else:
+            logging.warning("No raw_counts layer found — using .X (may be normalized)")
+            raw_X = adata.X
+
+        # Adapt column naming: accept nucleus_id/spot_id as aliases
+        csm = cell_spot_map.copy()
+        if "nucleus_id" in csm.columns and "cell_id" not in csm.columns:
+            csm = csm.rename(columns={"nucleus_id": "cell_id"})
+        if "spot_id" in csm.columns and "spot_barcode" not in csm.columns:
+            csm = csm.rename(columns={"spot_id": "spot_barcode"})
+        if "x_pixel" in csm.columns and "x" not in csm.columns:
+            csm = csm.rename(columns={"x_pixel": "x", "y_pixel": "y"})
+        # Ensure spot_idx exists
+        if "spot_idx" not in csm.columns:
+            spot_names = list(adata.obs_names)
+            spot_to_idx = {s: i for i, s in enumerate(spot_names)}
+            csm["spot_idx"] = csm["spot_barcode"].map(spot_to_idx)
+            csm = csm.dropna(subset=["spot_idx"])
+            csm["spot_idx"] = csm["spot_idx"].astype(int)
+
+        # Align antibody data to the (possibly filtered) GEX spots.
+        # filter_gex() subsets gene_expression_adata but not antibody_capture_adata,
+        # so antibody may have more spots than GEX.
+        ab_data = None
+        ab_names = None
+        if hasattr(self, 'antibody_capture_adata') and self.antibody_capture_adata is not None:
+            ab_adata = self.antibody_capture_adata
+            ab_names = list(ab_adata.var_names)
+            # Subset antibody to GEX spots
+            gex_spots = set(adata.obs_names)
+            ab_mask = ab_adata.obs_names.isin(gex_spots)
+            if ab_mask.sum() < len(adata):
+                logging.warning(
+                    "Only %d/%d GEX spots found in antibody data — "
+                    "skipping marker-guided SACE init",
+                    ab_mask.sum(), len(adata),
+                )
+            else:
+                ab_sub = ab_adata[ab_mask]
+                # Reorder to match GEX spot order
+                ab_sub = ab_sub[adata.obs_names]
+                ab_raw = ab_sub.layers.get("raw_counts", ab_sub.X)
+                ab_data = np.asarray(ab_raw)
+                logging.info(
+                    "Aligned antibody data: %d spots × %d markers",
+                    ab_data.shape[0], ab_data.shape[1],
+                )
+
+        spot_type_gex, cell_adata, diagnostics = run_sace(
+            spot_counts=raw_X,
+            proportions=self.results["cell_prop"],
+            cell_assignments=cell_assignments,
+            cell_spot_map=csm,
+            spot_coords=adata.obsm["spatial"],
+            gene_names=list(adata.var_names),
+            spotwise_profiles_init=self.results.get("gene_expression_pass1"),
+            n_0=n_0,
+            bandwidth=bandwidth,
+            max_iter=max_iter,
+            tol=tol,
+            antibody_data=ab_data,
+            antibody_names=ab_names,
+            cell_profile_dict=getattr(self, 'cell_profile_dict', None),
+        )
+
+        self.results["sace_spot_type_gex"] = spot_type_gex
+        self.results["sace_cell_adata"] = cell_adata
+        self.results["sace_diagnostics"] = diagnostics
+
+        return spot_type_gex, cell_adata, diagnostics
+
+    def run_module3_5_functional_annotation(
+        self,
+        functional_marker_table=None,
+        max_iter=200,
+        lr=0.01,
+        early_stopping_patience=20,
+        holdout_fraction=0.1,
+        device="cpu",
+        lambda_sigma=2.0,
+        gmm_min_proportion=0.05,
+        min_spots=20,
+        m1_result=None,
+        m2_result=None,
+        profile_discovery_result=None,
+        coverage_threshold=0.75,
+    ):
+        """Module 3.5: Functional protein annotation.
+
+        Learns per-type emission rates for functional markers via NB MLE
+        (frozen QP proportions), then GMM-gates to call positive/negative
+        states using observed-to-expected ratio.
+
+        Requires run_cell_proportion_model() to have been called first.
+
+        Args:
+            functional_marker_table: Dict of marker -> {function, active_types}.
+                Defaults to DEFAULT_FUNCTIONAL_TABLE.
+            max_iter: Max NB optimization iterations.
+            lr: Adam learning rate.
+            early_stopping_patience: Early stopping patience.
+            holdout_fraction: Fraction held out for early stopping.
+            device: PyTorch device.
+            lambda_sigma: Prior sigma for active lambda pairs.
+            gmm_min_proportion: Min cell-type proportion for GMM inclusion.
+            min_spots: Min spots for a (type,marker) pair to be estimated.
+
+        Returns:
+            Dict with functional_lambda, functional_intensity,
+            functional_gates, functional_summary.
+        """
+        from .annotation.functional_annotation import (
+            DEFAULT_FUNCTIONAL_TABLE,
+            build_active_mask,
+            learn_functional_emissions,
+            gate_functional_markers,
+            compute_spatial_statistics,
+        )
+
+        if "cell_prop" not in self.results:
+            raise ValueError("Run run_cell_proportion_model() first.")
+
+        if functional_marker_table is None:
+            functional_marker_table = DEFAULT_FUNCTIONAL_TABLE
+
+        proportions = self.results["cell_prop"]
+        cell_types = list(proportions.columns)
+
+        # Find functional markers present in the antibody panel
+        ab_adata = self.antibody_capture_adata
+        panel_markers = list(ab_adata.var_names)
+
+        # Try direct match first, then try stripping -1 suffix
+        functional_markers = [m for m in functional_marker_table if m in panel_markers]
+        marker_to_panel = {m: m for m in functional_markers}
+
+        if len(functional_markers) == 0:
+            panel_stripped = {}
+            for pm in panel_markers:
+                stripped = pm[:-2] if pm.endswith("-1") else pm
+                panel_stripped[stripped] = pm
+            functional_markers = [m for m in functional_marker_table if m in panel_stripped]
+            marker_to_panel = {m: panel_stripped[m] for m in functional_markers}
+
+        logging.info("Module 3.5: %d/%d functional markers found in panel",
+                     len(functional_markers), len(functional_marker_table))
+
+        if len(functional_markers) == 0:
+            raise ValueError("No functional markers found in antibody panel. "
+                             f"Panel markers: {panel_markers[:10]}...")
+
+        # Extract raw counts for functional markers (NB needs integer counts)
+        panel_names = [marker_to_panel[m] for m in functional_markers]
+        if "raw_counts" in ab_adata.layers:
+            ab_raw = ab_adata[:, panel_names].layers["raw_counts"]
+        else:
+            logging.warning("No raw_counts layer — using .X (may be CLR-normalized)")
+            ab_raw = ab_adata[:, panel_names].X
+        if hasattr(ab_raw, "toarray"):
+            ab_raw = ab_raw.toarray()
+        observed = np.asarray(ab_raw, dtype=np.float32)
+
+        # Build active mask
+        active_mask = build_active_mask(functional_markers, cell_types, functional_marker_table)
+
+        # Size factors: fixed from antibody total counts
+        total_ab = np.asarray(ab_adata.X.sum(axis=1)).flatten() if hasattr(ab_adata.X, "toarray") else ab_adata.X.sum(axis=1)
+        total_ab = np.asarray(total_ab, dtype=np.float64).flatten()
+        median_ab = np.median(total_ab[total_ab > 0]) if (total_ab > 0).any() else 1.0
+        size_factors = np.clip(total_ab / max(median_ab, 1.0), 0.1, 10.0).astype(np.float32)
+
+        # Learn emission rates
+        nb_results = learn_functional_emissions(
+            observed=observed,
+            proportions=proportions.values,
+            active_mask=active_mask,
+            size_factors=size_factors,
+            max_iter=max_iter,
+            lr=lr,
+            early_stopping_patience=early_stopping_patience,
+            holdout_fraction=holdout_fraction,
+            lambda_sigma=lambda_sigma,
             device=device,
         )
 
-        # Convert to DataFrame
-        records = []
-        for nid, ctype in result.assignments.items():
-            matching = nuclei_spot_map.loc[
-                nuclei_spot_map['nucleus_id'] == nid, 'spot_id'
+        # GMM gating (ratio-based)
+        intensity_df, gates_df, summary = gate_functional_markers(
+            observed=observed,
+            proportions=proportions.values,
+            lam=nb_results["lambda"],
+            background=nb_results["background"],
+            size_factors=size_factors,
+            active_mask=active_mask,
+            cell_types=cell_types,
+            functional_markers=functional_markers,
+            gmm_min_proportion=gmm_min_proportion,
+            min_spots=min_spots,
+        )
+        # Assign spot barcodes as index so projection can join on spot_id
+        gates_df.index = proportions.index
+        intensity_df.index = proportions.index
+
+        # Spatial statistics
+        spot_coords = self.gene_expression_adata.obsm["spatial"]
+        active_pairs = [
+            (ct, m) for t_idx, ct in enumerate(cell_types)
+            for m_idx, m in enumerate(functional_markers)
+            if active_mask[t_idx, m_idx] > 0.5
+        ]
+        spatial_stats = compute_spatial_statistics(gates_df, spot_coords, active_pairs)
+
+        # Merge spatial stats into summary
+        for pair, stats in spatial_stats.items():
+            if pair in summary:
+                summary[pair].update(stats)
+
+        # Store results
+        lam_df = pd.DataFrame(nb_results["lambda"], index=cell_types, columns=functional_markers)
+        self.results["functional_lambda"] = lam_df
+        self.results["functional_intensity"] = intensity_df
+        self.results["functional_gates"] = gates_df
+        self.results["functional_summary"] = summary
+
+        # Save to output folder
+        if self.output_folder:
+            lam_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_lambda.csv"))
+            intensity_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_intensity.csv"), index=False)
+            gates_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_gates.csv"), index=False)
+
+            import json
+            summary_ser = {f"{k[0]}:{k[1]}": v for k, v in summary.items()}
+            with open(os.path.join(self.output_folder, f"{self.sample_name}_functional_summary.json"), "w") as f:
+                json.dump(summary_ser, f, indent=2)
+
+        n_sig = sum(1 for s in spatial_stats.values() if s.get("morans_p", 1.0) < 0.05)
+        logging.info("Module 3.5 complete: %d markers, %d active pairs, %d spatially significant",
+                     len(functional_markers), len(active_pairs), n_sig)
+
+        results = {
+            "functional_lambda": lam_df,
+            "functional_intensity": intensity_df,
+            "functional_gates": gates_df,
+            "functional_summary": summary,
+        }
+
+        # Optional coverage gap analysis (fires only when M1/M2 results are provided)
+        if m1_result is not None or m2_result is not None:
+            from .annotation.coverage_check import check_module_coverage
+            coverage = check_module_coverage(
+                m1_result=m1_result,
+                m2_result=m2_result,
+                cell_profile_dict=getattr(self, "cell_profile_dict", {}),
+                functional_marker_table=functional_marker_table or {},
+                profile_discovery_result=profile_discovery_result,
+                colocalization_threshold=coverage_threshold,
+            )
+            for line in coverage.warning_lines:
+                logging.warning(line)
+            if coverage.n_warnings > 0 and self.output_folder:
+                coverage.to_csv(self.output_folder)
+                logging.info(
+                    "Coverage check saved to %s/coverage_check_*.csv", self.output_folder
+                )
+            results["coverage_check"] = coverage
+
+        return results
+
+    def run_functional_annotation(self, *args, **kwargs):
+        """Compatibility wrapper for the Module 3.5 functional annotation entrypoint."""
+        return self.run_module3_5_functional_annotation(*args, **kwargs)
+
+    def run_sace_protein(
+        self,
+        cell_assignments: Dict[str, str],
+        cell_spot_map: "pd.DataFrame",
+        module3_5_candidates_df: Optional["pd.DataFrame"] = None,
+        functional_table: Optional[Dict] = None,
+        max_iter: int = 1,
+        n_0: float = 10.0,
+        bandwidth: Optional[float] = None,
+        bimodality_threshold: float = 1.5,
+        posterior_threshold: float = 0.5,
+        min_high_component_log_mean: float = 1.0,
+    ):
+        """Per-cell functional protein deconvolution via SACE.
+
+        Allocates spot-level functional protein counts to individual cells
+        using the same SACE machinery as GEX, then GMM-gates each cell.
+
+        Preconditions:
+            - run_cell_proportion_model() called (proportions available)
+            - assign_cells() called (cell_assignments and cell_spot_map available)
+
+        Args:
+            cell_assignments: Dict[cell_id -> type_name] from assign_cells().
+            cell_spot_map: DataFrame with cell_id, spot_barcode, spot_idx, x, y.
+            module3_5_candidates_df: Optional DataFrame with parent_type and
+                functional_marker columns for custom active mask.
+            functional_table: Optional dict in DEFAULT_FUNCTIONAL_TABLE format
+                (marker -> {"active_types": [...]}). If provided, replaces
+                DEFAULT_FUNCTIONAL_TABLE. Use to pass M1-filtered per-sample tables.
+            max_iter: SACE EM iterations (1 = init-only allocation, recommended).
+            n_0: SACE shrinkage prior strength.
+            bandwidth: Kernel bandwidth (None=auto).
+            bimodality_threshold: Forwarded to gmm_gate_cells(); separation
+                multiplier on pooled_std (default 1.5).
+            posterior_threshold: Forwarded to gmm_gate_cells(); min posterior
+                probability to call a cell positive (default 0.5).
+            min_high_component_log_mean: Forwarded to gmm_gate_cells(); high
+                component log-mean must exceed this or gate is suppressed
+                (default 1.0, calibrated on Xenium RCC Region 0).
+
+        Returns:
+            Dict with:
+                cell_protein: (N_cells, M_func) ndarray
+                protein_names: list of marker names
+                protein_gates_df: DataFrame with gate columns
+                gmm_summary: per-pair gating summary
+                sace_diagnostics: SACE convergence info
+        """
+        from .gex.sace_gex import run_sace
+        from .annotation.functional_annotation import (
+            DEFAULT_FUNCTIONAL_TABLE,
+            build_active_mask,
+            gmm_gate_cells,
+        )
+
+        if "cell_prop" not in self.results:
+            raise ValueError(
+                "run_cell_proportion_model() must be called before run_sace_protein()."
+            )
+
+        # --- 1. Identify unused functional markers ---
+        if not hasattr(self, 'cell_profile_dict') or self.cell_profile_dict is None:
+            raise ValueError(
+                "cell_profile_dict must be loaded before run_sace_protein()."
+            )
+
+        consumed = set()
+        for ct_info in self.cell_profile_dict.values():
+            for key in ("Major", "Soft"):
+                consumed.update(ct_info.get(key, []))
+
+        panel_markers = list(self.antibody_capture_adata.var_names)
+
+        # Handle -1 suffix: "CD68-1" -> "CD68" for matching, but preserve
+        # names that naturally end in "-1" like "PD-1"
+        def _canon(name):
+            if name.endswith("-1") and not name.endswith("PD-1"):
+                return name[:-2]
+            return name
+
+        panel_stripped = {_canon(m): m for m in panel_markers}
+
+        unused_panel_names = []
+        for canon, original in panel_stripped.items():
+            if canon not in consumed:
+                unused_panel_names.append(original)
+
+        unused_canon = [_canon(m) for m in unused_panel_names]
+
+        logging.info(
+            "SACE protein: %d unused markers out of %d panel markers",
+            len(unused_canon), len(panel_markers),
+        )
+
+        if len(unused_canon) == 0:
+            logging.warning("All panel markers consumed by QP; no markers for SACE protein.")
+            return {}
+
+        # --- 2. Build active mask ---
+        cell_types = list(self.results["cell_prop"].columns)
+
+        if module3_5_candidates_df is not None:
+            type_marker_pairs = []
+            for _, row in module3_5_candidates_df.iterrows():
+                ct = row["parent_type"]
+                marker = row["functional_marker"]
+                if _canon(marker) in unused_canon or marker in unused_canon:
+                    type_marker_pairs.append((ct, _canon(marker)))
+            active_mask = build_active_mask(
+                unused_canon, cell_types,
+                functional_table={
+                    m: {"active_types": [ct for ct2, m2 in type_marker_pairs
+                                         if m2 == m for ct in [ct2]]}
+                    for m in unused_canon
+                },
+            )
+        else:
+            active_mask = build_active_mask(
+                unused_canon, cell_types,
+                functional_table if functional_table is not None else DEFAULT_FUNCTIONAL_TABLE,
+            )
+
+        logging.info(
+            "SACE protein active mask: %d active pairs out of %d possible",
+            int(active_mask.sum()), active_mask.size,
+        )
+
+        # --- 3. Extract raw protein counts ---
+        ab_adata = self.antibody_capture_adata
+        gex_spots = set(self.gene_expression_adata.obs_names)
+
+        # Subset and reorder antibody to match GEX spots
+        ab_mask = ab_adata.obs_names.isin(gex_spots)
+        ab_sub = ab_adata[ab_mask]
+        ab_sub = ab_sub[self.gene_expression_adata.obs_names]
+
+        # Extract raw counts for unused markers
+        try:
+            col_idx = [list(ab_sub.var_names).index(m) for m in unused_panel_names]
+        except ValueError as e:
+            logging.error(
+                "SACE protein: marker not found in antibody panel — %s. "
+                "Cannot extract protein counts.", e
+            )
+            return {}
+
+        raw_layer = ab_sub.layers.get("raw_counts", ab_sub.X)
+        raw = raw_layer[:, col_idx] if hasattr(raw_layer, '__getitem__') else raw_layer
+        spot_protein = np.asarray(raw, dtype=np.float64)
+
+        # --- 4. Adapt cell_spot_map columns ---
+        csm = cell_spot_map.copy()
+        if "nucleus_id" in csm.columns and "cell_id" not in csm.columns:
+            csm = csm.rename(columns={"nucleus_id": "cell_id"})
+        if "spot_id" in csm.columns and "spot_barcode" not in csm.columns:
+            csm = csm.rename(columns={"spot_id": "spot_barcode"})
+        if "x_pixel" in csm.columns and "x" not in csm.columns:
+            csm = csm.rename(columns={"x_pixel": "x", "y_pixel": "y"})
+        if "spot_idx" not in csm.columns:
+            spot_names = list(self.gene_expression_adata.obs_names)
+            spot_to_idx = {s: i for i, s in enumerate(spot_names)}
+            csm["spot_idx"] = csm["spot_barcode"].map(spot_to_idx)
+            csm = csm.dropna(subset=["spot_idx"])
+            csm["spot_idx"] = csm["spot_idx"].astype(int)
+
+        # --- 5. Build warm-start from functional_lambda if available ---
+        spotwise_init = None
+        prev_lam = self.results.get("functional_lambda")
+        if prev_lam is not None:
+            M = len(unused_canon)
+            init_profile = np.zeros((len(cell_types), M), dtype=np.float64)
+            for m_idx, canon in enumerate(unused_canon):
+                if canon in prev_lam.columns:
+                    init_profile[:, m_idx] = prev_lam[canon].values
+            row_sums = init_profile.sum(axis=1, keepdims=True)
+            row_sums = np.where(row_sums > 0, row_sums, 1.0)
+            init_profile_norm = init_profile / row_sums
+
+            N_spots = spot_protein.shape[0]
+            spotwise_init = {s: init_profile_norm.copy() for s in range(N_spots)}
+            logging.info("SACE protein: warm-starting from functional_lambda")
+
+        # --- 6. Call run_sace() ---
+        spot_type_protein, cell_adata, diagnostics = run_sace(
+            spot_counts=spot_protein,
+            proportions=self.results["cell_prop"],
+            cell_assignments=cell_assignments,
+            cell_spot_map=csm,
+            spot_coords=self.gene_expression_adata.obsm["spatial"],
+            gene_names=unused_canon,
+            spotwise_profiles_init=spotwise_init,
+            n_0=n_0,
+            bandwidth=bandwidth,
+            max_iter=max_iter,
+        )
+
+        # Extract per-cell protein from cell_adata.X
+        cell_protein = np.asarray(cell_adata.X, dtype=np.float32)
+        cell_type_arr = np.array(cell_adata.obs["cell_type"].values)
+
+        # --- 7. Post-hoc active mask: zero out inactive (type, marker) pairs ---
+        type_to_idx = {ct: i for i, ct in enumerate(cell_types)}
+        type_indices = np.array([type_to_idx.get(ct, -1) for ct in cell_type_arr])
+        valid = type_indices >= 0
+        # Build per-cell mask: (N_cells, M) — active_mask is (T, M)
+        row_idx = np.where(valid, type_indices, 0)
+        cell_active = active_mask[row_idx]  # (N_cells, M)
+        cell_active[~valid] = 1  # unknown types: preserve all values
+        cell_protein = np.where(cell_active.astype(bool), cell_protein, np.nan)
+
+        # --- 8. GMM gating ---
+        gates_df, gmm_summary = gmm_gate_cells(
+            cell_protein=cell_protein,
+            cell_types=cell_type_arr,
+            type_names=cell_types,
+            marker_names=unused_canon,
+            active_mask=active_mask,
+            bimodality_threshold=bimodality_threshold,
+            posterior_threshold=posterior_threshold,
+            min_high_component_log_mean=min_high_component_log_mean,
+        )
+        # Align gate index to cell_adata index
+        gates_df.index = cell_adata.obs.index
+
+        # --- 9. Store results ---
+        self.results["sace_cell_protein"] = cell_protein
+        self.results["sace_protein_names"] = unused_canon
+        self.results["sace_protein_gates"] = gates_df
+        self.results["sace_protein_gmm_summary"] = gmm_summary
+        self.results["sace_protein_diagnostics"] = diagnostics
+
+        logging.info(
+            "SACE protein complete: %d cells x %d markers, %d active pairs gated",
+            cell_protein.shape[0], cell_protein.shape[1], len(gmm_summary),
+        )
+
+        # Save outputs if output_folder configured
+        if self.output_folder:
+            np.save(
+                os.path.join(self.output_folder,
+                             f"{self.sample_name}_cell_protein.npy"),
+                cell_protein,
+            )
+            gates_df.to_csv(
+                os.path.join(self.output_folder,
+                             f"{self.sample_name}_protein_gates.csv"),
+            )
+            logging.info("SACE protein outputs saved to %s", self.output_folder)
+
+        return {
+            "cell_protein": cell_protein,
+            "protein_names": unused_canon,
+            "protein_gates_df": gates_df,
+            "gmm_summary": gmm_summary,
+            "sace_diagnostics": diagnostics,
+        }
+
+    def run_protein_subtype_split(
+        self,
+        cell_assignments: Dict[str, str],
+        cell_spot_map: "pd.DataFrame",
+        validated_pairs: Optional[List[Tuple[str, str]]] = None,
+        min_subtype_cells: int = 50,
+    ) -> Tuple[Dict[str, str], "pd.DataFrame"]:
+        """Split cell types into protein-gate-defined subtypes for SACE GEX.
+
+        Intended to run after ``run_sace_protein()`` and before ``run_sace()``
+        (GEX deconvolution).  Splits cell assignments and spot-level proportions
+        using per-cell binary gate calls from SACE protein allocation.
+
+        Only pairs whose gates were fired as ``gmm_bimodal`` (not suppressed as
+        weak_signal or insufficient) are eligible for splitting.
+
+        Args:
+            cell_assignments: Dict[cell_id → type_name] from assign_cells().
+            cell_spot_map: DataFrame with cell_id and spot_id columns.
+            validated_pairs: List of (type, marker) pairs to split.  Defaults to
+                the biologically motivated exhaustion/activation pairs:
+                T cells×{LAG-3,PD-1}, Macrophages×PD-L1.
+                Only pairs with gmm_bimodal gates are actually applied.
+            min_subtype_cells: Minimum cells in each subtype to proceed (default 50).
+
+        Returns:
+            Tuple of (updated_cell_assignments, updated_proportions_df).
+            Also stores results in self.results["subtype_assignments"] and
+            self.results["subtype_proportions"].
+
+        Raises:
+            ValueError: If run_sace_protein() has not been called.
+        """
+        from .annotation.subtype_splitting import split_by_protein_gates  # pylint: disable=import-outside-toplevel
+
+        if "sace_protein_gates" not in self.results:
+            raise ValueError(
+                "run_sace_protein() must be called before run_protein_subtype_split()."
+            )
+        if "cell_prop" not in self.results:
+            raise ValueError(
+                "run_cell_proportion_model() must be called before run_protein_subtype_split()."
+            )
+
+        protein_gates_df = self.results["sace_protein_gates"]
+        gmm_summary = self.results.get("sace_protein_gmm_summary", {})
+        proportions = self.results["cell_prop"].copy()
+
+        if validated_pairs is None:
+            validated_pairs = [
+                ("T cells", "LAG-3"),
+                ("T cells", "PD-1"),
+                ("Macrophages", "PD-L1"),
             ]
-            sid = matching.iloc[0] if len(matching) > 0 else "unknown"
-            records.append({
-                'nucleus_id': nid,
-                'spot_id': sid,
-                'cell_type': ctype,
-            })
 
-        assignments_df = pd.DataFrame(records)
+        # Filter to pairs that actually fired gmm_bimodal — don't split on weak signal
+        bimodal_pairs = [
+            (ct, mk) for ct, mk in validated_pairs
+            if gmm_summary.get((ct, mk), {}).get("gating_method") == "gmm_bimodal"
+        ]
+        if not bimodal_pairs:
+            logging.info(
+                "run_protein_subtype_split: no gmm_bimodal pairs found among %s; "
+                "returning original assignments unchanged.",
+                validated_pairs,
+            )
+            return cell_assignments, proportions
 
-        # Store in results
-        self.results['single_cell_assignments'] = assignments_df
-        self.results['single_cell_attention'] = result.assignment_probs
+        logging.info(
+            "run_protein_subtype_split: splitting on %d bimodal pairs: %s",
+            len(bimodal_pairs), bimodal_pairs,
+        )
 
-        # Save to output
-        output_path = os.path.join(self.output_folder, 'single_cell_assignments.csv')
-        assignments_df.to_csv(output_path, index=False)
-        logging.info("Saved %d assignments to %s", len(assignments_df), output_path)
+        updated_assignments, updated_proportions = split_by_protein_gates(
+            cell_assignments=cell_assignments,
+            protein_gates_df=protein_gates_df,
+            proportions=proportions,
+            cell_spot_map=cell_spot_map,
+            validated_pairs=bimodal_pairs,
+            min_subtype_cells=min_subtype_cells,
+        )
 
-        return assignments_df
+        self.results["subtype_assignments"] = updated_assignments
+        self.results["subtype_proportions"] = updated_proportions
+
+        logging.info(
+            "run_protein_subtype_split: %d types now; original %d",
+            len(updated_proportions.columns),
+            len(proportions.columns),
+        )
+
+        return updated_assignments, updated_proportions
+
+    def build_validated_module3_5_annotations(self, assignments_df=None, benchmark_summary=None):
+        """Build validated Module 3.5 annotations from SACE protein output.
+
+        If SACE protein has been run, annotations are already per-cell in
+        self.results['sace_protein_gates']. This method exists for backward
+        compatibility and to apply benchmark validation gating.
+        """
+        gates = self.results.get("sace_protein_gates")
+        if gates is not None:
+            self.results["projected_functional_calls"] = gates
+            return gates
+
+        logging.warning(
+            "build_validated_module3_5_annotations: no SACE protein output found. "
+            "Run run_sace_protein() first."
+        )
+        return None
+
+    def build_validated_functional_annotations(self, assignments_df, benchmark_summary):
+        """Compatibility wrapper for the Module 3.5 projection entrypoint."""
+        return self.build_validated_module3_5_annotations(assignments_df, benchmark_summary)

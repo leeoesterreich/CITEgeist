@@ -83,23 +83,6 @@ force_grid_wrap = 0
 use_parentheses = true
 ensure_newline_before_comments = true
 
-[tool.pytest.ini_options]
-testpaths = ["CITEgeist/tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--verbose",
-    "--cov=CITEgeist",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "--cov-report=xml",
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-]
-
 [tool.mypy]
 python_version = "3.10"
 warn_return_any = true
@@ -126,26 +109,6 @@ module = [
     "gurobipy.*",
 ]
 ignore_missing_imports = true
-
-[tool.coverage.run]
-source = ["CITEgeist"]
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "*/__init__.py",
-    "*/Benchmarking/*",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "@abstractmethod",
-]
 
 [tool.bandit]
 exclude_dirs = [

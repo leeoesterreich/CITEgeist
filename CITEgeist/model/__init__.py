@@ -1,312 +1,161 @@
 """
 CITEgeist model package - spatial transcriptomics deconvolution using CITE-seq.
 """
-# Expose key classes and functions for easy access
 
-from .citegeist_model import CitegeistModel, RESOLUTION_DEFAULTS
-from .gurobi_impl import (
-    map_antibodies_to_profiles,
-    optimize_cell_proportions,
-    optimize_gene_expression,
-    estimate_true_expression_cell,
-)
+from __future__ import annotations
 
-# GEX module-aware enrichment functions
-from .gex_modules import (
-    discover_anchor_genes,
-    compute_module_aware_enrichment,
-    compute_softmax_target,
-    compute_kl_penalty_coefficients,
-)
-from .utils import cleanup_memory, save_results_to_output, setup_logging, validate_cell_profile_dict
+from importlib import import_module
+from typing import Any
 
-# Cell type detection (Stage 1 of detection + estimation model)
-from .detection import detect_cell_types
 
-# Masked IQP solver (Stage 2 of detection + estimation model)
-from .masked_iqp import solve_masked_iqp
-
-# Combined detection + estimation pipeline
-from .detection_estimation import solve_detection_estimation
-
-# New marker analysis modules
-from .marker_interest import MarkerInterest, MarkerInterestResult, identify_interesting_markers
-from .spatial_colocalization import (
-    MarkerPairColocalization,
-    ColocalizationResult,
-    analyze_marker_colocalization,
-    LineageDendrogram,
-    ProfileDiscoveryResult,
-    discover_profiles_continuous,
-    # Singleton rescue
-    rescue_singletons,
-    # Module 2c: Profile selection
-    ProfileSelectionResult,
-    select_profiles,
-    # Module 2b enhancement: Hierarchical profile discovery
-    ProfileTreeNode,
-    ProfileTree,
-    HierarchicalProfileResult,
-    discover_hierarchical_profiles_continuous,
-)
-
-# Module 4: Protein-anchored program discovery
-from .anchored_program_discovery import (
-    SpatialSubpopulation,
-    SpatialProgram,
-    AnchoredProgramResult,
-    AnchoredProgramDiscoveryResult,
-    detect_spatial_subpopulations,
-    discover_anchored_programs,  # Legacy: uses raw expression + contrastive
-    discover_programs_from_layers,  # Recommended: uses deconvolved layers from Module 3
-    store_results_in_adata,
-    # Helper functions for deconvolved layers
-    stack_deconvolved_layers,
-    unstack_program_results,
-    extract_celltype_expression,
-    # Module 4b: Bivariate program relationships
-    ProgramPairRelationship,
-    BivariateProgramResult,
-    analyze_program_relationships,
-    # Module 4c: Region-aware program analysis
-    analyze_program_regions,
-    compare_programs_by_region,
-    extract_program_context_genes,
-    # Module 4 Joint: Cross-cell-type program discovery
-    JointProgram,
-    JointDiscoveryResult,
-    discover_joint_programs,
-)
-
-# Module 3b: Single-cell resolution (requires scikit-image, torch)
-try:
-    from .watershed_segmentation import watershed_from_nuclei
-    from .morphology_features import extract_nucleus_features, extract_cell_features, largest_remainder_discretize
-    from .soft_label_classifier import SoftLabelClassifier
-    from .hungarian_assignment import assign_nuclei_to_types
-    from .constrained_assignment import (
-        ConstrainedAssignment,
-        COARSE_MAPPING,
-        extract_patch_features,
-        hungarian_assign,
-        random_assign,
-    )
-    from .module3b_nucleus_assignment import run_nucleus_assignment, run_nucleus_assignment_mil, NucleusAssignmentResult
-    from .cell_level_gex import distribute_gex_to_cells
-    from .single_cell_output import create_single_cell_adata
-except ImportError:
-    pass  # Single-cell resolution requires optional dependencies (scikit-image, torch)
-
-# Module 3 Enhancement: Multimodal refinement
-from .multimodal_refinement import (
-    select_anchor_genes,
-    compute_expression_profiles,
-    refine_proportions,
-    multimodal_em_refinement,
-)
-
-# Module 5: Cross-sample integration
-from .cross_sample_integration import (
-    AlignedProgram,
-    ConservedRelationship,
-    IntegrationResult,
-    load_multi_sample_results,
-    integrate_samples,
-    align_gene_sets,
-    integrate_programs_harmony,
-    match_programs_across_samples,
-    compare_bivariate_relationships,
-    build_similarity_network,
-    save_integration_results,
-)
-
-# Stage 2: Two-stage VAE-guided assignment (requires torch)
-try:
-    from .stage2_projection import Stage2ProjectionHead
-    from .stage2_prototypes import Stage2Prototypes
-    from .stage2_model import Stage2Model
-    from .stage2_trainer import Stage2Trainer
-    from .stage2_high_purity import (
-        find_high_purity_spots,
-        collect_embeddings_by_type,
-        compute_type_centroids,
-    )
-    from .two_stage_pipeline import TwoStagePipeline
-    from .stage2_pipeline import Stage2Pipeline
-
-    # Module 3b MIL: Single-cell assignment via attention
-    from .morphology_backbone import MorphologyBackbone, DAPIBackbone, HEBackbone
-    from .single_cell_mil import SingleCellMIL, mil_loss, train_mil
-
-    # H&E Morphology Support: ViT + MIL for single-cell assignment
-    from .vit_extractor import ViTFeatureExtractor, load_uni_extractor
-    from .proportion_mil import ProportionGuidedMIL, proportion_loss, entropy_regularization
-
-    # SSL ViT for Nucleus Morphology
-    from .vit_encoder import ViTEncoder, create_vit_small
-    from .ssl_utils import (
-        MAEAugmentation,
-        DINOMultiCrop,
-        random_masking,
-        patchify,
-        unpatchify,
-    )
-    # DEPRECATED: MAE underperforms SimCLR in constrained setting
-    from .mae import MAE, MAEDecoder
-    # DEPRECATED: DINO training collapsed; use SimCLR via DAPIBackbone
-    from .dino import DINO, DINOHead, create_dino_model
-except ImportError:
-    pass  # Vision/SSL/MIL modules require torch, timm, etc.
-
-# Deprecated modules list — kept for backward compatibility but superseded
-_DEPRECATED = [
-    "MAE", "MAEDecoder",
-    "DINO", "DINOHead", "create_dino_model",
-    "ProportionGuidedMIL",  # Superseded by SingleCellMIL
-    "solve_masked_iqp",  # Discrete IQP superseded by MIL assignment
-]
-
-__all__ = [
+_EXPORTS = {
     # Core model
-    "CitegeistModel",
-    "RESOLUTION_DEFAULTS",
-    # Gurobi optimization
-    "map_antibodies_to_profiles",
-    "optimize_cell_proportions",
-    "optimize_gene_expression",
-    "estimate_true_expression_cell",
+    "CitegeistModel": (".citegeist_model", "CitegeistModel"),
+    "RESOLUTION_DEFAULTS": (".citegeist_model", "RESOLUTION_DEFAULTS"),
+    # Optimization (cuOPT backend)
+    "map_antibodies_to_profiles": (".deconvolution.cuopt_impl", "map_antibodies_to_profiles"),
+    "optimize_cell_proportions_per_marker": (".deconvolution.cuopt_impl", "optimize_cell_proportions_per_marker"),
+    "optimize_gene_expression": (".deconvolution.cuopt_impl", "optimize_gene_expression"),
+    "estimate_true_expression_cell": (".deconvolution.cuopt_impl", "estimate_true_expression_cell"),
     # GEX module-aware enrichment
-    "discover_anchor_genes",
-    "compute_module_aware_enrichment",
-    "compute_softmax_target",
-    "compute_kl_penalty_coefficients",
-    # Cell type detection (Stage 1)
-    "detect_cell_types",
-    # Masked IQP solver (Stage 2)
-    "solve_masked_iqp",
-    # Combined detection + estimation pipeline
-    "solve_detection_estimation",
+    "discover_anchor_genes": (".gex.gex_modules", "discover_anchor_genes"),
+    "compute_module_aware_enrichment": (".gex.gex_modules", "compute_module_aware_enrichment"),
+    "compute_softmax_target": (".gex.gex_modules", "compute_softmax_target"),
+    "compute_kl_penalty_coefficients": (".gex.gex_modules", "compute_kl_penalty_coefficients"),
+    # Cell type detection
+    "detect_cell_types": (".deconvolution.detection", "detect_cell_types"),
     # Utilities
-    "cleanup_memory",
-    "save_results_to_output",
-    "setup_logging",
-    "validate_cell_profile_dict",
+    "cleanup_memory": (".utils", "cleanup_memory"),
+    "save_results_to_output": (".utils", "save_results_to_output"),
+    "setup_logging": (".utils", "setup_logging"),
+    "validate_cell_profile_dict": (".utils", "validate_cell_profile_dict"),
     # Marker interest analysis
-    "MarkerInterest",
-    "MarkerInterestResult",
-    "identify_interesting_markers",
+    "MarkerInterest": (".discovery.marker_interest", "MarkerInterest"),
+    "MarkerInterestResult": (".discovery.marker_interest", "MarkerInterestResult"),
+    "identify_interesting_markers": (".discovery.marker_interest", "identify_interesting_markers"),
     # Spatial colocalization analysis
-    "MarkerPairColocalization",
-    "ColocalizationResult",
-    "analyze_marker_colocalization",
+    "MarkerPairColocalization": (".discovery.spatial_colocalization", "MarkerPairColocalization"),
+    "ColocalizationResult": (".discovery.spatial_colocalization", "ColocalizationResult"),
+    "analyze_marker_colocalization": (".discovery.spatial_colocalization", "analyze_marker_colocalization"),
     # Profile discovery
-    "LineageDendrogram",
-    "ProfileDiscoveryResult",
-    "discover_profiles_continuous",
-    # Singleton rescue
-    "rescue_singletons",
-    # Module 2c: Profile selection
-    "ProfileSelectionResult",
-    "select_profiles",
-    # Module 2b enhancement: Hierarchical profile discovery
-    "ProfileTreeNode",
-    "ProfileTree",
-    "HierarchicalProfileResult",
-    "discover_hierarchical_profiles_continuous",
+    "LineageDendrogram": (".discovery.spatial_colocalization", "LineageDendrogram"),
+    "ProfileDiscoveryResult": (".discovery.spatial_colocalization", "ProfileDiscoveryResult"),
+    "discover_profiles": (".discovery.spatial_colocalization", "discover_profiles_continuous"),
+    "discover_profiles_continuous": (".discovery.spatial_colocalization", "discover_profiles_continuous"),
+    "rescue_singletons": (".discovery.spatial_colocalization", "rescue_singletons"),
+    "ProfileSelectionResult": (".discovery.spatial_colocalization", "ProfileSelectionResult"),
+    "select_profiles": (".discovery.spatial_colocalization", "select_profiles"),
+    "select_profiles_by_reconstruction": (".discovery.spatial_colocalization", "select_profiles"),
+    "ProfileTreeNode": (".discovery.spatial_colocalization", "ProfileTreeNode"),
+    "ProfileTree": (".discovery.spatial_colocalization", "ProfileTree"),
+    "HierarchicalProfileResult": (".discovery.spatial_colocalization", "HierarchicalProfileResult"),
+    "discover_hierarchical_profiles_continuous": (
+        ".discovery.spatial_colocalization",
+        "discover_hierarchical_profiles_continuous",
+    ),
     # Module 4: Protein-anchored program discovery
-    "SpatialSubpopulation",
-    "SpatialProgram",
-    "AnchoredProgramResult",
-    "AnchoredProgramDiscoveryResult",
-    "detect_spatial_subpopulations",
-    "discover_anchored_programs",
-    "discover_programs_from_layers",
-    "store_results_in_adata",
-    "stack_deconvolved_layers",
-    "unstack_program_results",
-    "extract_celltype_expression",
-    # Module 4b: Bivariate program relationships
-    "ProgramPairRelationship",
-    "BivariateProgramResult",
-    "analyze_program_relationships",
-    # Module 4c: Region-aware program analysis
-    "analyze_program_regions",
-    "compare_programs_by_region",
-    "extract_program_context_genes",
-    # Module 4 Joint: Cross-cell-type program discovery
-    "JointProgram",
-    "JointDiscoveryResult",
-    "discover_joint_programs",
+    "SpatialSubpopulation": (".programs.anchored_program_discovery", "SpatialSubpopulation"),
+    "SpatialProgram": (".programs.anchored_program_discovery", "SpatialProgram"),
+    "AnchoredProgramResult": (".programs.anchored_program_discovery", "AnchoredProgramResult"),
+    "AnchoredProgramDiscoveryResult": (".programs.anchored_program_discovery", "AnchoredProgramDiscoveryResult"),
+    "detect_spatial_subpopulations": (".programs.anchored_program_discovery", "detect_spatial_subpopulations"),
+    "discover_anchored_programs": (".programs.anchored_program_discovery", "discover_anchored_programs"),
+    "discover_programs_from_layers": (".programs.anchored_program_discovery", "discover_programs_from_layers"),
+    "store_results_in_adata": (".programs.anchored_program_discovery", "store_results_in_adata"),
+    "stack_deconvolved_layers": (".programs.anchored_program_discovery", "stack_deconvolved_layers"),
+    "unstack_program_results": (".programs.anchored_program_discovery", "unstack_program_results"),
+    "extract_celltype_expression": (".programs.anchored_program_discovery", "extract_celltype_expression"),
+    "ProgramPairRelationship": (".programs.anchored_program_discovery", "ProgramPairRelationship"),
+    "BivariateProgramResult": (".programs.anchored_program_discovery", "BivariateProgramResult"),
+    "analyze_program_relationships": (".programs.anchored_program_discovery", "analyze_program_relationships"),
+    "analyze_program_regions": (".programs.anchored_program_discovery", "analyze_program_regions"),
+    "compare_programs_by_region": (".programs.anchored_program_discovery", "compare_programs_by_region"),
+    "extract_program_context_genes": (".programs.anchored_program_discovery", "extract_program_context_genes"),
+    "JointProgram": (".programs.anchored_program_discovery", "JointProgram"),
+    "JointDiscoveryResult": (".programs.anchored_program_discovery", "JointDiscoveryResult"),
+    "discover_joint_programs": (".programs.anchored_program_discovery", "discover_joint_programs"),
     # Module 3b: Single-cell resolution
-    "watershed_from_nuclei",
-    "extract_nucleus_features",
-    "extract_cell_features",
-    "largest_remainder_discretize",
-    "SoftLabelClassifier",
-    "assign_nuclei_to_types",
-    "run_nucleus_assignment",
-    "run_nucleus_assignment_mil",
-    "NucleusAssignmentResult",
-    "distribute_gex_to_cells",
-    "create_single_cell_adata",
-    # Module 3 Enhancement: Multimodal refinement
-    "select_anchor_genes",
-    "compute_expression_profiles",
-    "refine_proportions",
-    "multimodal_em_refinement",
+    "extract_nucleus_features": (".morphology.morphology_features", "extract_nucleus_features"),
+    "extract_cell_features": (".morphology.morphology_features", "extract_cell_features"),
+    "largest_remainder_discretize": (".morphology.morphology_features", "largest_remainder_discretize"),
+    "SoftLabelClassifier": (".morphology.soft_label_classifier", "SoftLabelClassifier"),
+    "assign_nuclei_to_types": (".assignment.hungarian_assignment", "assign_nuclei_to_types"),
+    "run_nucleus_assignment": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment"),
+    "run_nucleus_assignment_mil": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment_mil"),
+    "run_nucleus_assignment_mil_em": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment_mil_em"),
+    "NucleusAssignmentResult": (".assignment.module3b_nucleus_assignment", "NucleusAssignmentResult"),
+    "distribute_gex_to_cells": (".gex.cell_level_gex", "distribute_gex_to_cells"),
+    "allocate_gex_type_reference": (".gex.cell_level_gex", "allocate_gex_type_reference"),
+    "create_single_cell_adata": (".assignment.single_cell_output", "create_single_cell_adata"),
+    # Module 3.5 benchmark/projection helpers
+    "aggregate_module3_5_results": (".annotation.module3_5_benchmark", "aggregate_module3_5_results"),
+    "CoverageCheckResult": (".annotation.coverage_check", "CoverageCheckResult"),
+    "check_module_coverage": (".annotation.coverage_check", "check_module_coverage"),
+    "should_enrich_module3_5_output": (".annotation.module3_5_projection", "should_enrich_module3_5_output"),
+    "should_enrich_single_cell_output": (".annotation.module3_5_projection", "should_enrich_single_cell_output"),
+    "normalized_validated_pairs": (".annotation.module3_5_projection", "normalized_validated_pairs"),
+    # Per-cell GEX pipeline components
+    "MarkerGenes": (".gex.gex_modules", "MarkerGenes"),
+    "GeneModule": (".gex.gex_modules", "GeneModule"),
+    "GeneModules": (".gex.gex_modules", "GeneModules"),
+    "discover_marker_genes": (".gex.gex_modules", "discover_marker_genes"),
+    "build_gene_modules": (".gex.gex_modules", "build_gene_modules"),
+    "IdentifiabilityReport": (".annotation.subtype_splitting", "IdentifiabilityReport"),
+    "audit_gate_identifiability": (".annotation.subtype_splitting", "audit_gate_identifiability"),
+    "build_subtype_proportions": (".annotation.subtype_splitting", "build_subtype_proportions"),
     # Module 5: Cross-sample integration
-    "AlignedProgram",
-    "ConservedRelationship",
-    "IntegrationResult",
-    "load_multi_sample_results",
-    "integrate_samples",
-    "align_gene_sets",
-    "integrate_programs_harmony",
-    "match_programs_across_samples",
-    "compare_bivariate_relationships",
-    "build_similarity_network",
-    "save_integration_results",
-    # Stage 2: Two-stage VAE-guided assignment
-    "Stage2ProjectionHead",
-    "Stage2Prototypes",
-    "Stage2Model",
-    "Stage2Trainer",
-    "find_high_purity_spots",
-    "collect_embeddings_by_type",
-    "compute_type_centroids",
-    "TwoStagePipeline",
-    # Stage 2 Morphology: GMM-based single-cell assignment
-    "Stage2Pipeline",
-    # Constrained single-cell assignment
-    "ConstrainedAssignment",
-    "COARSE_MAPPING",
-    "extract_patch_features",
-    "hungarian_assign",
-    "random_assign",
-    # Module 3b MIL: Morphology backbone + attention
-    "MorphologyBackbone",
-    "DAPIBackbone",
-    "HEBackbone",
-    "SingleCellMIL",
-    "mil_loss",
-    "train_mil",
-    # H&E Morphology Support: ViT + MIL
-    "ViTFeatureExtractor",
-    "load_uni_extractor",
-    "ProportionGuidedMIL",
-    "proportion_loss",
-    "entropy_regularization",
-    # SSL ViT for Nucleus Morphology
-    "ViTEncoder",
-    "create_vit_small",
-    "MAEAugmentation",
-    "DINOMultiCrop",
-    "random_masking",
-    "patchify",
-    "unpatchify",
-    "MAE",
-    "MAEDecoder",
-    "DINO",
-    "DINOHead",
-    "create_dino_model",
-]
+    "AlignedProgram": (".programs.cross_sample_integration", "AlignedProgram"),
+    "ConservedRelationship": (".programs.cross_sample_integration", "ConservedRelationship"),
+    "IntegrationResult": (".programs.cross_sample_integration", "IntegrationResult"),
+    "load_multi_sample_results": (".programs.cross_sample_integration", "load_multi_sample_results"),
+    "integrate_samples": (".programs.cross_sample_integration", "integrate_samples"),
+    "align_gene_sets": (".programs.cross_sample_integration", "align_gene_sets"),
+    "integrate_programs_harmony": (".programs.cross_sample_integration", "integrate_programs_harmony"),
+    "match_programs_across_samples": (".programs.cross_sample_integration", "match_programs_across_samples"),
+    "compare_bivariate_relationships": (".programs.cross_sample_integration", "compare_bivariate_relationships"),
+    "build_similarity_network": (".programs.cross_sample_integration", "build_similarity_network"),
+    "save_integration_results": (".programs.cross_sample_integration", "save_integration_results"),
+    # QC framework
+    "QCResult": (".qc", "QCResult"),
+    "run_qc": (".qc", "run_qc"),
+    # Per-type beta optimization
+    "optimize_cell_proportions_per_type_beta": (".deconvolution.cuopt_impl", "optimize_cell_proportions_per_type_beta"),
+    "MARKER_TYPE_TABLE": (".deconvolution.emission_init", "MARKER_TYPE_TABLE"),
+    "CELL_TYPES": (".deconvolution.emission_init", "CELL_TYPES"),
+    "build_marker_config": (".deconvolution.emission_init", "build_marker_config"),
+    "initialize_beta_matrix": (".deconvolution.emission_init", "initialize_beta_matrix"),
+    "build_beta_prior_sigma": (".deconvolution.emission_init", "build_beta_prior_sigma"),
+    # Vision/SSL backbone
+    "MorphologyBackbone": (".morphology.morphology_backbone", "MorphologyBackbone"),
+    "DAPIBackbone": (".morphology.morphology_backbone", "DAPIBackbone"),
+    "HEBackbone": (".morphology.morphology_backbone", "HEBackbone"),
+    "ViTFeatureExtractor": (".morphology.vit_extractor", "ViTFeatureExtractor"),
+    "load_uni_extractor": (".morphology.vit_extractor", "load_uni_extractor"),
+    "ViTEncoder": (".morphology.vit_encoder", "ViTEncoder"),
+    "create_vit_small": (".morphology.vit_encoder", "create_vit_small"),
+}
+
+__all__ = sorted(_EXPORTS)
+
+
+def __getattr__(name: str) -> Any:
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    try:
+        module = import_module(module_name, __name__)
+    except ImportError as exc:
+        raise ImportError(
+            f"Failed to import '{name}' from '{module_name}'. Install the optional "
+            "dependencies needed for that feature, or use `pip install -e .[dev]` "
+            "for the standard development environment."
+        ) from exc
+
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

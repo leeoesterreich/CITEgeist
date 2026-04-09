@@ -1,2 +1,0 @@
-mode,jsd_mean,jsd_std,rmse_mean,rmse_std,mae_mean,mae_std,pearson_mean,pearson_std,spearman_mean,spearman_std
-autodiscovery,0.485,0.0325,0.2229,0.0243,0.1414,0.0162,0.3479,0.0593,0.2496,0.0251

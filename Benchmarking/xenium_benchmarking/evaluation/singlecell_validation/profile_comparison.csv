@@ -1,9 +1,0 @@
-Autodiscovered,n_cells,Overlap_B cells,Overlap_CD4+ T cells,Overlap_CD8+ T cells,Overlap_Macrophages,Overlap_Endothelial,Overlap_Epithelial,Overlap_Fibroblasts
-B cells,22391,22391,98,384,74,44,0,58
-Macrophages,31406,19,20,1416,31406,601,74,1148
-T cells,49315,1185,3222,32216,2406,668,51,2875
-Exhausted T cells,22514,41,70,20371,1324,240,50,2219
-M2 Macrophages,40299,99,100,2596,26027,860,75,1286
-Endothelial,42985,60,29,1105,1130,42985,8,6581
-Epithelial,6820,7,1,271,452,26,1621,74
-EMT cells,39675,142,480,9165,5054,5866,1094,18043

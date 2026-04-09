@@ -151,3 +151,8 @@ replicates/
 
 # Log files
 *.log
+
+# midkine — intermediate analysis (only CSV result is tracked)
+midkine/
+!midkine/if_analysis/
+!midkine/if_analysis/bivariate_morans_results.csv
