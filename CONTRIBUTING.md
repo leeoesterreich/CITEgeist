@@ -120,13 +120,18 @@ mypy CITEgeist/ --ignore-missing-imports
 
 ### Running All Quality Checks
 
+**Enforced in CI (must pass before syncing to main):**
 ```bash
-# Run all checks at once
-black --check CITEgeist/
-isort --check-only CITEgeist/
-flake8 CITEgeist/
-mypy CITEgeist/
-pylint CITEgeist/
+black --check --line-length=120 CITEgeist/
+isort --check-only --profile black --line-length 120 CITEgeist/
+flake8 CITEgeist/ --max-line-length=120 --extend-ignore=E203,E501,W503,E402
+pytest tests/ -m "unit and not slow and not requires_data and not requires_cuopt"
+```
+
+**Advisory (badge reflects state; does not block merges):**
+```bash
+pylint CITEgeist/ --max-line-length=120
+mypy CITEgeist/ --ignore-missing-imports
 ```
 
 ## Testing
@@ -141,7 +146,7 @@ pytest
 pytest --cov=CITEgeist --cov-report=html
 
 # Run specific test file
-pytest CITEgeist/tests/test_citegeist_simulated.py
+pytest tests/test_smoke_canonical_benchmark.py
 
 # Run tests matching a pattern
 pytest -k "test_model"
@@ -149,10 +154,11 @@ pytest -k "test_model"
 
 ### Writing Tests
 
-- Place tests in `CITEgeist/tests/`
+- Place tests in the root `tests/` directory (not `CITEgeist/tests/` — that path is legacy and unused by pytest)
 - Name test files `test_*.py`
 - Name test functions `test_*`
 - Use descriptive names that explain what is being tested
+- Mark GPU/data-dependent tests: `@pytest.mark.requires_cuopt`, `@pytest.mark.requires_data`
 
 Example:
 ```python
@@ -164,10 +170,36 @@ def test_model_initialization():
 
 ## Pull Request Process
 
+### Branch Workflow
+
+**Internal contributors** (lab members with access to `dev-repo`):
+```bash
+# Start from dev
+git checkout dev
+git pull dev-repo dev
+
+# Create feature branch
+git checkout -b feature/your-feature-name
+
+# Push to private dev-repo
+git push dev-repo feature/your-feature-name
+```
+
+CI (`ci.yml`) runs on `dev-repo` for all pushes to `dev` and `feature/**`. Ensure `ci.yml` is green before running `scripts/sync_to_main.sh` to promote `dev` → `origin/main`. This is a process convention; GitHub does not enforce it without branch protection rules.
+
+**External contributors** (fork workflow):
+```bash
+# Fork leeoesterreich/CITEgeist on GitHub, then:
+git clone https://github.com/YOUR_USERNAME/CITEgeist.git
+cd CITEgeist
+git remote add upstream https://github.com/leeoesterreich/CITEgeist.git
+```
+
 ### 1. Create a Feature Branch
 
 ```bash
-# Update your fork
+# For internal: feature branch from dev (see above)
+# For external: update fork
 git fetch upstream
 git checkout main
 git merge upstream/main
@@ -256,7 +288,7 @@ def optimize_cell_proportions(
     regularization: float = 0.1
 ) -> Dict[str, np.ndarray]:
     """
-    Optimize cell type proportions using Gurobi.
+    Optimize cell type proportions using cuOPT QP solver.
 
     Args:
         data: Spatial expression data (n_spots x n_genes).
@@ -282,33 +314,33 @@ def optimize_cell_proportions(
 Good commit messages help track project history:
 
 ```
-Add feature: cell type deconvolution with spatial regularization
-
-- Implement Gurobi optimization for spatial constraints
-- Add tests for boundary conditions
-- Update documentation with usage examples
-
-Fixes #123
+feat: add cell type deconvolution with spatial regularization
+fix: correct barcode alignment in prop_df subset
+docs: update CONTRIBUTING with correct test directory
+refactor: simplify SACE EM loop to max_iter=1 path
+test: add unit tests for split_by_protein_gates
+chore: remove legacy Gurobi solver files
 ```
 
-Format:
-- **First line**: Brief summary (50 chars or less)
-- **Body**: Detailed explanation if needed
-- **Footer**: Reference issues/PRs
+Format: `<prefix>: <short description>` — prefix is one of `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+
+Keep the first line under 72 characters. No body required for small changes.
 
 ## Project Structure
 
 ```
 CITEgeist/
-├── CITEgeist/          # Main package
-│   ├── model/          # Core model implementation
-│   ├── tests/          # Test files
-│   └── examples/       # Example notebooks
-├── Benchmarking/       # Benchmarking code
-├── .github/            # GitHub workflows
-│   └── workflows/      # CI/CD configurations
-├── docs/               # Documentation
-└── tests/              # Additional tests
+├── CITEgeist/              # Main package
+│   ├── model/              # Core model implementation (subpackages: deconvolution, gex, assignment, etc.)
+│   └── examples/           # Patient pipeline scripts and vignettes
+├── tests/                  # Pytest target (root)
+│   ├── _archive/           # Stale tests excluded by pytest
+│   └── test_figures/       # Figure test package
+├── Benchmarking/           # Benchmarking code (not in pytest scope)
+├── .github/
+│   └── workflows/          # ci.yml (enforced), quality.yml (advisory)
+├── docs/                   # MkDocs documentation + codebase index
+└── scripts/                # sync_to_main.sh and build scripts
 ```
 
 ## Questions?

@@ -4,9 +4,8 @@
 [![License](https://img.shields.io/github/license/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE)
 [![Issues](https://img.shields.io/github/issues/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/issues)
 [![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
-[![Code Quality](https://github.com/leeoesterreich/CITEgeist/actions/workflows/code-quality.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/code-quality.yml)
-[![Tests](https://github.com/leeoesterreich/CITEgeist/actions/workflows/tests.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/tests.yml)
-[![Pylint](https://github.com/leeoesterreich/CITEgeist/actions/workflows/pylint.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/pylint.yml)
+[![CI](https://github.com/leeoesterreich/CITEgeist/actions/workflows/ci.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/ci.yml)
+[![Code Quality](https://github.com/leeoesterreich/CITEgeist/actions/workflows/quality.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/quality.yml)
 
 > Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
 
@@ -14,12 +13,12 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 
 ## 🚀 Key Features
 
-- Integration of CITE-seq and spatial transcriptomics data
-- Robust cell-type deconvolution
-- Spatial pattern analysis
-- Flexible regularization options
-- Scalable to large datasets
-- Comprehensive visualization tools
+- Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
+- GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
+- SACE per-cell gene expression allocation using Poisson-multinomial EM
+- Morphology-informed cell assignment via ViT fine-tuned with label learning from proportions (LLP)
+- Spatial gene program discovery and cross-sample integration (Modules 4–5)
+- Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
 
 ## 📚 Documentation
 
@@ -28,7 +27,7 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 - [Example Notebooks](CITEgeist/examples)
 - [Manuscript Reproducibility Hub (v5)](repro/README.md)
 
-## 🔁 Manuscript Reproducibility (v5)
+## 🔁 Manuscript Reproducibility (v8)
 
 Canonical manuscript submission reproduction now lives under `repro/`.
 
@@ -45,6 +44,7 @@ Reviewer-oriented runbook: `repro/runbooks/reviewer_quickstart.md`.
 - Python 3.10
 - 16GB RAM
 - Multi-core processor
+- NVIDIA GPU with 8GB+ VRAM (required for cuOPT QP solver, Module 3)
 - Linux, macOS, or Windows 10 with WSL2
 
 ## 🔧 Quick Installation
@@ -58,7 +58,7 @@ pip install citegeist
 For development installation:
 
 ```bash
-git clone https://github.com/alee-x/CITEgeist.git
+git clone https://github.com/leeoesterreich/CITEgeist.git
 cd CITEgeist
 pip install -e .[dev]
 ```
@@ -114,6 +114,10 @@ Or run pre-commit hooks on all files:
 ```bash
 pre-commit run --all-files
 ```
+
+**CI enforcement (blocks sync to main):** black, isort, flake8, pytest/coverage
+
+**Advisory (badge only, no merge gate):** pylint, mypy
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 

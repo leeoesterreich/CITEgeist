@@ -1,4 +1,4 @@
-<!-- codebase-index git:69fcf06d -->
+<!-- codebase-index git:6fa2fac6 -->
 # CITEgeist Codebase Index
 
 ## CITEgeist/model/
@@ -226,10 +226,6 @@
 - `build_kernel_matrix(coords, bandwidth=None, truncate_at=3.0) -> sp.csr_matrix` — Build row-normalized Gaussian spatial kernel matrix.
 - `run_sace(spot_counts, proportions, cell_assignments, cell_spot_map, spot_coords, gene_names, spotwise_profiles_init=None, n_0=10.0, bandwidth=None, max_iter=10, tol=0.0001, eps=1e-06, min_mass_threshold=1.0, damping_eta=1.0, antibody_data=None, antibody_names=None, cell_profile_dict=None) -> Tuple[Dict[int, np.ndarray], 'sc.AnnData', Dict]` — Run Spatially-Adaptive Compositional EM for per-cell GEX.
 
-### CITEgeist/model/module2_proposal_builder.py
-- `build_candidate_rank_lists(profiles, role_config, ontology_name) -> tuple[pd.DataFrame, pd.DataFrame]`
-- `class MarkerRoleConfig`
-
 ### CITEgeist/model/morphology/__init__.py
 
 ### CITEgeist/model/morphology/morphology_backbone.py
@@ -391,10 +387,6 @@
   - `to_programs_dataframe() -> pd.DataFrame` — Convert aligned programs to DataFrame.
   - `to_relationships_dataframe() -> pd.DataFrame` — Convert conserved relationships to DataFrame.
 
-### CITEgeist/model/proposal_review_loader.py
-- `build_module3_profile_dict_from_review(reviewed) -> dict[str, dict[str, list[str]]]`
-- `build_module3_5_table_from_review(reviewed) -> dict[str, dict[str, list[str]]]`
-
 ### CITEgeist/model/qc/__init__.py
 *QC module for validating CITEgeist single-cell outputs.*
 - `run_qc(*args, **kwargs)` — Orchestrate all QC checks. See report.run_qc for full signature.
@@ -531,9 +523,6 @@
 `Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_simulation_unified.py`
   → Unified simulation benchmark: StarDist + continuous proportions + SC evaluation.
 
-`Benchmarking/simulation_benchmarking/CITEgeist/src/debug_gex_allocation.py`
-  → Debug: trace GEX deconvolution enrichment + allocation for a CE-specific gene.
-
 `Benchmarking/simulation_benchmarking/CITEgeist/src/generate_cellpose_images.py`
   → Generate synthetic nuclei images from scCube simulation data.
 
@@ -558,12 +547,6 @@
 
 `Benchmarking/simulation_benchmarking/Tangram/src/run_benchmark.py`
   → Run Tangram deconvolution on Wu BRCA simulation data.
-
-`Benchmarking/simulation_benchmarking/scResolve/src/generate_synthetic_images.py`
-  → Generate synthetic images for scResolve benchmarking using actual scCube cell data.
-
-`Benchmarking/simulation_benchmarking/scResolve/src/run_benchmark.py`
-  → scResolve benchmark wrapper for simulated spatial transcriptomics data.
 
 `Benchmarking/simulation_benchmarking/src/CARD_bench_wrapper.py`
   → Benchmark CARD predictions against ground truth for simulation data.
@@ -726,9 +709,6 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_mil_assignment.py`
   → Benchmark Module 3b MIL single-cell assignment on Xenium pseudo-Visium.
 
-`Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_module2a_cpu_refactor.py`
-  → Benchmark legacy/refactor Module 2a colocalization runtimes.
-
 `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_morphology_proportions_qp.py`
   → Benchmark: morphology-informed QP proportion estimation on Xenium Region 1.
 
@@ -792,12 +772,6 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/debug_nb_standalone.py`
   → Debug NB standalone discrepancy: profile dict (10 markers) vs full panel (18 markers).
 
-`Benchmarking/xenium_benchmarking/CITEgeist/src/diag_gt_calling_validity.py`
-  → Diagnostic: GT calling validity and interaction with Module 2 / Module 3.5.
-
-`Benchmarking/xenium_benchmarking/CITEgeist/src/diagnose_stardist_overcounting.py`
-  → Diagnostic: compare StarDist nuclei counts with/without scale+prob_thresh tuning.
-
 `Benchmarking/xenium_benchmarking/CITEgeist/src/enrich_single_cell_output_with_module3_5.py`
   → Benchmark-gated enrichment helpers for Module 3.5 single-cell outputs.
 
@@ -822,9 +796,6 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/extract_vit_features.py`
   → Extract ViT-S features from Xenium nucleus patches.
 
-`Benchmarking/xenium_benchmarking/CITEgeist/src/generate_module2_candidate_reviews.py`
-  → Create ranked review artifacts from Module 2 proposals across Xenium regions.
-
 `Benchmarking/xenium_benchmarking/CITEgeist/src/generate_singlecell_figures.py`
   → Generate publication figures for single-cell demonstration.
 
@@ -845,9 +816,6 @@
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/quick_dino_vs_simclr.py`
   → Quick DINO vs SimCLR comparison on region 1, ViT-Tiny, 50 epochs.
-
-`Benchmarking/xenium_benchmarking/CITEgeist/src/rescore_module3_5_benchmark.py`
-  → Re-score Module 3.5 benchmark using updated GT calling and pair list.
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_benchmark.py`
   → CITEgeist benchmark runner for Xenium pseudo-Visium data.
@@ -893,9 +861,6 @@
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_preprocess.py`
   → Unified preprocessing for Xenium benchmark: StarDist segmentation,
-
-`Benchmarking/xenium_benchmarking/CITEgeist/src/run_qc_xenium_benchmark.py`
-  → Run benchmark-mode QC on CITEgeist Xenium results vs SingleR ground truth.
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_qp_7type_benchmark.py`
   → QP 7-type benchmark for Xenium pseudo-Visium evaluation.
@@ -1017,9 +982,6 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/validate_morphology_fixes.py`
   → Validate morphology sprint + Epithelial fixes on all 5 Xenium regions.
 
-`Benchmarking/xenium_benchmarking/CITEgeist/src/xenium_spatial_displacement.py`
-  → Spatial displacement analysis for Xenium benchmark (region 1).
-
 `Benchmarking/xenium_benchmarking/CITEgeist/tests/__init__.py`
   → Benchmarking tests
 
@@ -1068,9 +1030,6 @@
 `Benchmarking/xenium_benchmarking/evaluation/src/compute_heterogeneity_metrics.py`
   → compute_heterogeneity_metrics.py
 
-`Benchmarking/xenium_benchmarking/evaluation/src/eval_gex_cross_method.py`
-  → Cross-method GEX deconvolution evaluation on Xenium pseudo-Visium.
-
 `Benchmarking/xenium_benchmarking/evaluation/src/evaluate_benchmark.py`
   → Unified evaluation for CITEgeist Xenium benchmark.
 
@@ -1113,17 +1072,11 @@
 `Benchmarking/xenium_benchmarking/evaluation/src/generate_singler_gex_gt.py`
   → Generate SingleR-based GEX ground truth for Xenium pseudo-Visium.
 
-`Benchmarking/xenium_benchmarking/evaluation/src/investigate_coordinate_mismatch.py`
-  → Investigate coordinate mismatch between Cellpose nuclei and Xenium GT cells.
-
 `Benchmarking/xenium_benchmarking/evaluation/src/leiden_baseline_comparison.py`
   → Leiden clustering baseline for Module 1-2 discovery comparison.
 
 `Benchmarking/xenium_benchmarking/evaluation/src/module12_discovery_runner.py`
   → Module 1-2 discovery runner for comparison experiment.
-
-`Benchmarking/xenium_benchmarking/evaluation/src/reeval_kdtree_gt.py`
-  → Re-evaluate 55um pseudo-Visium predictions against SingleR GT proportions.
 
 `Benchmarking/xenium_benchmarking/evaluation/src/run_cell_evaluation_subset.py`
   → Run three-tier cell classification evaluation on the intersection of
@@ -1166,81 +1119,6 @@
 
 `Benchmarking/xenium_benchmarking/reference_data/GSE156632/src/split_tcells_to_protein7.py`
   → Derive the 7-type Xenium reference from the authoritative 6-type annotation.
-
-`Benchmarking/xenium_benchmarking/scResolve/figures/generate_gex_investigation_figure.py`
-  → Generate figure documenting scResolve GEX performance investigation.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/annotate_cells.py`
-  → Annotate scResolve segmented cells using GSE156632 reference scRNA-seq.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/annotate_cells_balanced.py`
-  → Balanced label transfer for scResolve cells using reference scRNA-seq.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/compare_multimodal_normalization.py`
-  → Compare scResolve multimodal results with different protein normalization strategies.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_rna_by_celltype.py`
-  → Diagnose scResolve RNA expression by cell type.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_rna_only_consistency.py`
-  → Diagnose scResolve RNA-only mode internal consistency.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_xenium_ground_truth.py`
-  → Diagnose Xenium ground truth RNA-protein concordance.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_cell_recovery.py`
-  → Evaluate scResolve's ability to recover individual cells from pseudo-Visium spots.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_all_regions.py`
-  → Compare GEX recovery across all deconvolution methods - ALL REGIONS.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_comparison.py`
-  → Compare GEX recovery across all deconvolution methods.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_reconstruction.py`
-  → Evaluate scResolve gene expression reconstruction quality.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_protein_recovery.py`
-  → Evaluate scResolve's ability to recover per-cell PROTEIN expression.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/extract_dapi_regions.py`
-  → Extract high-resolution DAPI crops for each pseudo-Visium region.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/extract_morphology_regions.py`
-  → Extract morphology image regions from Xenium OME-TIFF for scResolve benchmarking.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/fair_comparison.py`
-  → Fair comparison framework for scResolve vs deconvolution methods.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/gate_and_aggregate_gex.py`
-  → Gate scResolve cells by protein markers and aggregate GEX per cell type.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/generate_cell_types.py`
-  → Generate cell_types.csv from Xenium RNA cluster annotations.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/generate_synthetic_images.py`
-  → Generate synthetic images for scResolve benchmarking.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/inspect_cell_level.py`
-  → Inspect scResolve cell-level outputs to evaluate segmentation quality
-
-`Benchmarking/xenium_benchmarking/scResolve/src/monkey_patch_scresolve.py`
-  → Monkey patch for scResolve to fix compatibility with newer SpaceRanger outputs.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/resume_segmentation.py`
-  → Resume incomplete scResolve segmentation and run aggregation.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark.py`
-  → scResolve benchmark wrapper for Xenium pseudo-Visium data with real morphology.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal.py`
-  → scResolve benchmark wrapper with MULTIMODAL support (GEX + Protein).
-
-`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal_v2.py`
-  → scResolve benchmark wrapper with MULTIMODAL support (GEX + Protein) - Version 2.
-
-`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal_v3.py`
-  → scResolve benchmark wrapper with MULTIMODAL support - Version 3.
 
 `Benchmarking/xenium_pseudovisium/analyze_cluster_profiles.py`
   → Analyze protein marker profiles for each RNA cluster to create accurate cell type annotations.
@@ -1354,14 +1232,8 @@
 `tests/test_detection.py`
   → Tests for cell type detection module.
 
-`tests/test_detection_estimation.py`
-  → Tests for combined detection + estimation pipeline.
-
 `tests/test_detection_refinement.py`
   → Tests for detection refinement module (GEX detection + sparsity refinement).
-
-`tests/test_ensemble_proportions.py`
-  → CITEgeist/tests/test_ensemble_proportions.py
 
 `tests/test_figures/__init__.py`
 
@@ -1371,40 +1243,14 @@
 `tests/test_functional_annotation.py`
   → Unit tests for CITEgeist/model/functional_annotation.py (Module 3.5).
 
-`tests/test_generate_module2_candidate_reviews.py`
-
-`tests/test_gex_initialization.py`
-  → Tests for GEX initialization: anchor masks, size factors, Poisson IRLS.
-
-`tests/test_gex_nb_likelihood.py`
-  → Tests for GEX NB log-likelihood.
-
-`tests/test_gwr_gex.py`
-  → Tests for hierarchical shrinkage GEX deconvolution (gwr_gex.py).
-
 `tests/test_hungarian_assignment.py`
   → Tests for Hungarian assignment algorithm.
-
-`tests/test_hungarian_weighted.py`
-  → Tests for proportion-weighted Hungarian assignment.
 
 `tests/test_integration.py`
   → Integration tests for CITEgeist full pipeline.
 
-`tests/test_joint_nb_optimizer.py`
-  → Tests for joint NB optimizer (Stage 3).
-
-`tests/test_mae.py`
-  → Tests for Masked Autoencoder (MAE) module.
-
 `tests/test_marker_interest.py`
   → Test harness for marker_interest module.
-
-`tests/test_marker_validation.py`
-  → Tests for single-cell marker gene validation.
-
-`tests/test_masked_iqp.py`
-  → Tests for masked IQP solver.
 
 `tests/test_model.py`
   → Unit tests for CITEgeist model preprocessing and core functionality.
@@ -1412,20 +1258,11 @@
 `tests/test_module2_profile_discovery.py`
   → Test script for Module 2: Profile Discovery from Spatial Colocalization.
 
-`tests/test_module2_proposal_builder.py`
-
 `tests/test_module2b_relaxed.py`
   → Quick diagnostic to test Module 2b with relaxed parameters.
 
 `tests/test_module2c_profile_selection.py`
   → Test script for Module 2c: Reconstruction-Based Profile Selection.
-
-`tests/test_module3_5_benchmark.py`
-
-`tests/test_module3_5_migration.py`
-
-`tests/test_module3_5_prod_pipeline.py`
-  → Tests for benchmark-gated Module 3.5 orchestration.
 
 `tests/test_module3_5_projection.py`
   → Tests for Module 3.5 projection helpers.
@@ -1448,55 +1285,11 @@
 `tests/test_morphology_features.py`
   → Tests for nuclear morphology feature extraction.
 
-`tests/test_morphology_prior.py`
-  → Tests for morphology-informed proportion estimation.
-
-`tests/test_multimodal_refinement.py`
-  → Tests for multimodal refinement (Pass 1.5 + Pass 2 EM).
-
-`tests/test_nb_cold_start.py`
-  → Tests for cold-start NB deconvolution (Gurobi-free Module 3).
-
-`tests/test_nb_functional.py`
-  → Tests for nb_functional_attribution module.
-
-`tests/test_nb_gated.py`
-  → Tests for the gated NB likelihood function.
-
-`tests/test_nb_joint_model.py`
-  → Tests for the joint tri-modal model orchestrator (nb_joint_model.py).
-
-`tests/test_nb_joint_utils.py`
-  → Tests for CITEgeist.model.nb_joint_utils.
-
-`tests/test_nb_spatial_gnn.py`
-  → Tests for CITEgeist.model.nb_spatial_gnn.SpatialGNN.
-
 `tests/test_patch_extraction.py`
   → Tests for nucleus patch extraction with global normalization.
 
-`tests/test_pc_mil.py`
-  → Tests for Protein-Conditioned MIL model.
-
-`tests/test_per_cell_gex.py`
-  → Tests for Phase 4 per-cell GEX allocation with module constraints.
-
-`tests/test_profile_adapter.py`
-  → Tests for profile dict adapter between Module 3 and PC-MIL formats.
-
-`tests/test_projection_heads.py`
-  → Tests for projection heads and prototypes.
-
-`tests/test_proportion_mil.py`
-  → Tests for proportion-guided MIL.
-
-`tests/test_proposal_review_loader.py`
-
 `tests/test_prototype_contrastive.py`
   → Tests for Prototype-Contrastive LLP loss functions and model.
-
-`tests/test_prototype_learning.py`
-  → Tests for prototype learning (Stage 2).
 
 `tests/test_qc/__init__.py`
 
@@ -1530,20 +1323,8 @@
 `tests/test_segmentation.py`
   → Unit tests for segmentation utilities (non-Cellpose dependent pieces).
 
-`tests/test_simulation_benchmark.py`
-  → Tests for simulation benchmark utility functions.
-
-`tests/test_single_cell_e2e.py`
-  → End-to-end test for single-cell resolution on synthetic data.
-
-`tests/test_single_cell_integration.py`
-  → Integration tests for single-cell resolution pipeline.
-
 `tests/test_single_cell_output.py`
   → Tests for single-cell AnnData output.
-
-`tests/test_sinkhorn.py`
-  → Tests for Sinkhorn optimal transport.
 
 `tests/test_smoke_benchmark_outputs.py`
   → Smoke tests validating canonical benchmark outputs exist and meet performance thresholds.
@@ -1551,65 +1332,14 @@
 `tests/test_smoke_patient_pipeline.py`
   → End-to-end smoke test for the CITEgeist patient pipeline.
 
-`tests/test_soft_assignment.py`
-  → Tests for graded (Soft) marker assignment in map_antibodies_to_profiles_v2.
-
-`tests/test_soft_label_classifier.py`
-  → Tests for soft-label morphology classifier.
-
 `tests/test_spatial_colocalization.py`
   → Test harness for spatial_colocalization module.
-
-`tests/test_ssl_utils.py`
-  → Tests for SSL utilities module.
-
-`tests/test_stage2_high_purity.py`
-  → Tests for high-purity spot detection.
-
-`tests/test_stage2_integration.py`
-  → Integration tests for Stage 2 pipeline.
-
-`tests/test_stage2_model.py`
-  → Tests for Stage 2 complete model.
-
-`tests/test_stage2_morphology.py`
-  → Tests for Stage 2 morphology-based assignment.
-
-`tests/test_stage2_projection.py`
-  → Tests for Stage 2 projection head.
-
-`tests/test_stage2_prototypes.py`
-  → Tests for Stage 2 type prototypes.
-
-`tests/test_stage2_trainer.py`
-  → Tests for Stage 2 trainer.
 
 `tests/test_subtype_splitting.py`
   → Unit tests for subtype splitting via protein gates.
 
-`tests/test_train_vae_vicreg.py`
-  → Tests for VICReg-enhanced VAE training.
-
-`tests/test_two_stage_pipeline.py`
-  → Tests for two-stage pipeline orchestration.
-
 `tests/test_utils.py`
   → Unit tests for CITEgeist utils module.
-
-`tests/test_vae.py`
-  → Tests for VAE architecture.
-
-`tests/test_vicreg.py`
-  → Tests for VICReg loss module.
-
-`tests/test_vit_encoder.py`
-  → Tests for ViT-Small encoder for nucleus morphology patches.
-
-`tests/test_vit_extractor.py`
-  → Tests for ViT feature extraction.
-
-`tests/test_watershed_segmentation.py`
-  → Tests for watershed cell segmentation.
 
 `tests/visualize_prop_gridsearch.py`
 
@@ -1623,9 +1353,6 @@
   → Shared spatial plotting utilities for manuscript figures.
 
 `manuscript/figures/_shared/style.py`
-  → Shared style configuration for CITEgeist manuscript figures.
-
-`manuscript/figures/figure_style.py`
   → Shared style configuration for CITEgeist manuscript figures.
 
 `manuscript/figures/midkine/__init__.py`
@@ -1677,9 +1404,6 @@
 
 `examples/compute_sample.py`
 
-`examples/evaluate_sc_markers.py`
-  → Evaluate top marker genes per cell type from single-cell GEX AnnData.
-
 `examples/run_cuopt_qp_patient.py`
   → Run cuOPT QP proportions for a single patient sample.
 
@@ -1706,9 +1430,6 @@
 
 `examples/run_morphology_assignment.py`
   → H&E Morphology Single-Cell Assignment Pipeline for Patient Data.
-
-`examples/summarize_morphology.py`
-  → Generate summary report across all 12 patient samples.
 
 `examples/train_pooled_mil.py`
   → Pooled multi-sample MIL training.

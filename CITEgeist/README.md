@@ -17,10 +17,8 @@ pip install citegeist
 2. [Getting Started](#getting-started)
     - [1. Installation](#1-installation)
     - [2. Set Up the Environment](#2-set-up-the-environment)
-    - [3. Obtain Gurobi License](#3-obtain-gurobi-license)
-    - [4. Running CITEgeist](#4-running-citegeist)
+    - [3. Running CITEgeist](#3-running-citegeist)
 3. [Benchmarking and Reproducibility](#benchmarking-and-reproducibility)
-4. [Run the Analysis](#run-the-analysis)
 
 ## System Requirements
 
@@ -32,7 +30,7 @@ pip install citegeist
   - Windows 10 with WSL2
 
 - **Python**: 3.10
-- **Gurobi** [version > 3.9](https://www.gurobi.com/downloads/gurobi-software/)
+- **NVIDIA GPU** with 8GB+ VRAM (required for cuOPT QP solver)
 #### Key Python Dependencies
 - scanpy==1.10.4
 - anndata==0.11.3
@@ -40,7 +38,7 @@ pip install citegeist
 - pandas==2.2.3
 - scipy==1.13.1
 - scikit-learn==1.6.1
-- gurobipy==11.0.2 (requires license)
+- cuopt (GPU-accelerated QP; installed via conda environment — see `CITEgeist_env.yml`)
 - matplotlib==3.10.0
 - seaborn==0.13.2
 - h5py==3.12.1
@@ -51,7 +49,8 @@ It is recommended to install the dependencies in the `CITEgeist_env.yml` file fo
 
 ### Hardware Requirements
 - **RAM**: Minimum 16GB, Recommended 64GB+
-- **Storage**: 16GB minimum for installation and basic analysis
+- **GPU**: NVIDIA GPU required for Module 3 (cuOPT QP); 8GB+ VRAM, 16GB+ recommended for large datasets
+- **Storage**: 16GB minimum for installation; 100GB+ for full multi-patient runs
 - **CPU**: Multi-core processor recommended (8+ cores for optimal performance)
 
 ---
@@ -69,51 +68,60 @@ pip install citegeist
 For development installation:
 
 ```bash
-git clone https://github.com/acc383/CITEgeist.git
+git clone https://github.com/leeoesterreich/CITEgeist.git
 cd CITEgeist
 pip install -e .[dev]
 ```
 
 ### 2. Set Up the Environment
 
-- Create and activate a new conda environment:
+Create and activate the CITEgeist conda environment:
 
 ```bash
-conda create -n citegeist python=3.10
-conda activate citegeist
+conda env create -f CITEgeist_env.yml
+conda activate CITEgeist_env
 ```
 
-### 3. Obtain Gurobi License
+### 3. Running CITEgeist
 
-CITEgeist requires a Gurobi license (free for academic use):
+#### A. Python API
 
-1. Sign up for an academic license at: [https://www.gurobi.com/downloads/end-user-license-agreement-academic/](https://www.gurobi.com/downloads/end-user-license-agreement-academic/)
-2. Follow the instructions to download and install your license.
-3. Update the license file path in your code to match your local license location.
+```python
+from CITEgeist.model.citegeist_model import CitegeistModel
 
-### 4. Running CITEgeist
+model = CitegeistModel(
+    sample_name="my_sample",
+    adata=adata,                  # AnnData from sq.read.visium()
+    output_folder="output/my_sample",
+    simulation=False,             # True for simulated data
+    resolution="spot",            # "spot" (Visium) or "cell" (VisiumHD/Xenium)
+)
+model.split_adata()               # Required for real patient data (splits GEX + antibody)
+```
 
-You can run CITEgeist in two ways:
+Key constructor parameters:
+- `sample_name` (str): Sample identifier used in output filenames
+- `adata` (AnnData): Spatial data from `sq.read.visium()` — call `split_adata()` before preprocessing
+- `output_folder` (str): Directory for results; created automatically
+- `simulation` (bool): `True` for simulated data — pass `gene_expression_adata` + `antibody_capture_adata` instead of `adata`
+- `resolution` (str): `"spot"` for standard Visium, `"cell"` for single-cell resolution (VisiumHD/Xenium)
+- `resolution_overrides` (dict, optional): Override individual resolution parameters (e.g. `{"lambda_sparse": 0.2}`)
 
-#### A. Using Python Scripts
-- Expected runtime on a standard computer (16 threads, 32GB RAM):
-  - Small dataset: ~2 hours
-  - Medium dataset: ~4 hours
-  - Large dataset: ~10 hours
+**Note:** Module 3 (cuOPT QP) requires a GPU node. Runs on CPU nodes will fail silently.
 
-#### Key Parameters:
-- `radius`: Radius for neighbor detection (default: 4)
-- `lambda_reg`: Regularization strength for cell proportion estimation (default: 0.001)
-- `alpha_elastic`: Elastic net mixing parameter for cell proportion estimation (default: 0.7)
-- `max_y_change`: Maximum allowed change in Y values (default: 0.2)
+#### B. Using SLURM (HPC)
 
-#### Optional Parameters:
-- `profiling_only`: Set for cell-type proportions only.
-- `max_workers`: Number of parallel workers.
-- `checkpoint_interval`: Checkpoint saving interval.
+For large-scale analyses on HPC clusters, use the provided sbatch scripts:
 
-#### B. Using SLURM Distribution
-For large-scale analyses, you can use the provided `examples/sbatch_sample.sh` script for distributed computing.
+```bash
+sbatch CITEgeist/examples/sbatch_patient_phase1.sh   # M1→M3: discovery + deconvolution
+sbatch CITEgeist/examples/sbatch_patient_phase2.sh   # M3-post: cell assignment
+sbatch CITEgeist/examples/sbatch_patient_phase3.sh   # M3-gex: SACE GEX allocation
+sbatch CITEgeist/examples/sbatch_patient_phase4.sh   # M3.5: protein annotation
+sbatch CITEgeist/examples/sbatch_patient_phase5_validate.sh  # Validation
+```
+
+Adapt paths and `--gres=gpu:1` directives for your cluster.
 
 ---
 
@@ -123,20 +131,3 @@ For specific reproduction of benchmarking tests and detailed methodology, please
 
 ---
 
-## Run the Analysis
-
-You can either:
-
-#### A. Run the code directly:
-- Expected runtime: ~2 hours on a standard computer (16 threads, 32GB RAM).
-
-#### B. Use SLURM distribution:
-- Use the provided `examples/sbatch_sample.sh` script for distributed computing.
-
----
-
-## Additional System Requirements
-- **RAM**: 32GB (minimum)
-- **CPU**: 16 threads (recommended)
-- **Storage**: Sufficient space for your dataset
-- **Operating System**: Linux/Unix recommended (Windows users may need additional configuration)

@@ -1,9 +1,9 @@
-<!-- codebase-index git:d7fd474f -->
+<!-- codebase-index git:6fa2fac6 -->
 # Codebase Summary
 
 | Subpackage | Files | Key exports |
 |------------|-------|-------------|
-| `CITEgeist/model/` | checkpoints.py, citegeist_model.py, module2_proposal_builder.py, proposal_review_loader.py, unified_config.py, ... | CheckpointManager, CitegeistModel, MarkerRoleConfig, assert_neighborhood_size, benchmark_cell_proportions, build_candidate_rank_lists, build_module3_5_table_from_review, build_module3_profile_dict_from_review, ... |
+| `CITEgeist/model/` | checkpoints.py, citegeist_model.py, unified_config.py, utils.py | CheckpointManager, CitegeistModel, assert_neighborhood_size, benchmark_cell_proportions, calculate_expression_metrics, cleanup_memory, compute_optimal_radius, export_anndata_layers, ... |
 | `CITEgeist/model/annotation/` | coverage_check.py, functional_annotation.py, module3_5_benchmark.py, module3_5_projection.py, subtype_splitting.py | CoverageCheckResult, IdentifiabilityReport, PairBenchmarkResult, aggregate_module3_5_results, audit_gate_identifiability, build_active_mask, build_gt_binary_calls, build_subtype_proportions, ... |
 | `CITEgeist/model/assignment/` | cell_assignment.py, cellularity_utils.py, hungarian_assignment.py, module3b_nucleus_assignment.py, single_cell_output.py | NucleusAssignmentResult, assign_cells, assign_cells_to_types, assign_nuclei_to_types, bayesian_assign_cells, create_single_cell_adata, discretize_proportions, extract_embeddings, ... |
 | `CITEgeist/model/deconvolution/` | cuopt_impl.py, detection.py, detection_refinement.py, emission_init.py, reference_model.py | ReferenceProfile, build_beta_prior_sigma, build_detection_marker_groups, build_marker_config, build_spatial_laplacian, compute_adaptive_enrichment, compute_gene_type_correlations, compute_global_prior, ... |

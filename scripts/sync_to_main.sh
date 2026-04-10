@@ -52,6 +52,7 @@ ALLOWLIST=(
   ".pre-commit-config.yaml"
   ".gitignore"
   "scripts/sync_to_main.sh"
+  ".github/"
 )
 
 echo "Copying allowlisted paths from dev..."
