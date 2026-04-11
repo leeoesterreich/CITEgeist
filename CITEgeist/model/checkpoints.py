@@ -1,6 +1,7 @@
 """
 Checkpoint management for saving and resuming optimization state.
 """
+
 import logging
 from pathlib import Path
 
@@ -43,8 +44,9 @@ class CheckpointManager:
                     profiles = complete_data["profiles"]
                     if profiles.shape == (N, T, M):
                         return {i: profiles[i] for i in range(N)}
-            except Exception as e:
-                logging.error(f"Error loading complete file: {e}")
+            except (OSError, ValueError) as e:
+
+                logging.error("Error loading complete file: %s", e)
                 self._cleanup_corrupted_files()
         return None
 
@@ -78,16 +80,19 @@ class CheckpointManager:
                 if profiles.shape == (N, T, M):
                     spotwise_profiles = {i: profiles[i] for i in completed_spots if not np.any(np.isnan(profiles[i]))}
                     completed_spots = set(spotwise_profiles.keys())
-                    logging.info(f"Loaded {len(completed_spots)} valid profiles from checkpoint")
+                    logging.info("Loaded %s valid profiles from checkpoint", len(completed_spots))
                     return completed_spots, spotwise_profiles
 
-        except Exception as e:
-            logging.error(f"Error loading checkpoint: {e}")
+        except (OSError, ValueError) as e:
+
+            logging.error("Error loading checkpoint: %s", e)
             self._cleanup_corrupted_files()
 
         return set(), {}
 
-    def save_checkpoint(self, completed_spots, spotwise_profiles, N, T, M):
+    def save_checkpoint(
+        self, completed_spots, spotwise_profiles, _N, T, M
+    ):  # pylint: disable=too-many-positional-arguments
         """
         Save current progress as checkpoint.
 
@@ -120,12 +125,15 @@ class CheckpointManager:
             # Cleanup old checkpoints
             self._cleanup_old_checkpoints(checkpoint_path)
 
-            logging.info(f"Saved checkpoint after {n_completed} completed spots")
+            logging.info("Saved checkpoint after %s completed spots", n_completed)
 
-        except Exception as e:
-            logging.error(f"Failed to save checkpoint: {e}")
+        except (OSError, ValueError) as e:
 
-    def save_final_results(self, spotwise_profiles, completed_spots, N, T, M):
+            logging.error("Failed to save checkpoint: %s", e)
+
+    def save_final_results(
+        self, spotwise_profiles, completed_spots, _N, T, M
+    ):  # pylint: disable=too-many-positional-arguments
         """
         Save final results.
 
@@ -144,16 +152,17 @@ class CheckpointManager:
             final_profiles[spot_idx] = profile
 
         np.savez_compressed(final_path, profiles=final_profiles, completed_spots=np.array(list(completed_spots)))
-        logging.info(f"Saved final results with {len(completed_spots)} completed spots")
+        logging.info("Saved final results with %s completed spots", len(completed_spots))
 
     def _cleanup_corrupted_files(self):
         """Remove all checkpoint files if corruption is detected."""
         for file in self.output_dir.glob(f"{self.sample_name}_gene_expression*.npz"):
             try:
                 file.unlink()
-                logging.info(f"Deleted corrupted checkpoint: {file}")
-            except Exception as e:
-                logging.warning(f"Failed to delete {file}: {e}")
+                logging.info("Deleted corrupted checkpoint: %s", file)
+            except (OSError, ValueError) as e:
+
+                logging.warning("Failed to delete %s: %s", file, e)
 
     def _cleanup_old_checkpoints(self, current_checkpoint):
         """Remove old checkpoints, keeping only the latest."""
@@ -161,5 +170,6 @@ class CheckpointManager:
             if checkpoint != current_checkpoint:
                 try:
                     checkpoint.unlink()
-                except Exception as e:
-                    logging.warning(f"Failed to delete old checkpoint {checkpoint}: {e}")
+                except (OSError, ValueError) as e:
+
+                    logging.warning("Failed to delete old checkpoint %s: %s", checkpoint, e)

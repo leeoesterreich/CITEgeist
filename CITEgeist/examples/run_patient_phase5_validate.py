@@ -17,7 +17,6 @@ Usage:
 import argparse
 import json
 import logging
-import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -106,10 +105,7 @@ def compute_marker_enrichment(
     """
     # Get dominant type per spot
     spot_col = "spot_barcode" if "spot_barcode" in assignments_df.columns else "spot_id"
-    dominant_type = (
-        assignments_df.groupby(spot_col)["cell_type"]
-        .agg(lambda x: x.value_counts().idxmax())
-    )
+    dominant_type = assignments_df.groupby(spot_col)["cell_type"].agg(lambda x: x.value_counts().idxmax())
 
     results = []
     for cell_type, marker_genes in markers.items():
@@ -130,8 +126,16 @@ def compute_marker_enrichment(
             continue
 
         for gene in available_markers:
-            type_expr = adata[type_spots, gene].X.toarray().ravel() if hasattr(adata[type_spots, gene].X, 'toarray') else adata[type_spots, gene].X.ravel()
-            other_expr = adata[other_spots, gene].X.toarray().ravel() if hasattr(adata[other_spots, gene].X, 'toarray') else adata[other_spots, gene].X.ravel()
+            type_expr = (
+                adata[type_spots, gene].X.toarray().ravel()
+                if hasattr(adata[type_spots, gene].X, "toarray")
+                else adata[type_spots, gene].X.ravel()
+            )
+            other_expr = (
+                adata[other_spots, gene].X.toarray().ravel()
+                if hasattr(adata[other_spots, gene].X, "toarray")
+                else adata[other_spots, gene].X.ravel()
+            )
 
             mean_type = float(np.mean(type_expr))
             mean_other = float(np.mean(other_expr))
@@ -143,17 +147,19 @@ def compute_marker_enrichment(
             else:
                 stat, pval = 0.0, 1.0
 
-            results.append({
-                "cell_type": cell_type,
-                "gene": gene,
-                "mean_type": mean_type,
-                "mean_other": mean_other,
-                "log2fc": log2fc,
-                "wilcoxon_stat": float(stat),
-                "pval": float(pval),
-                "n_type_spots": len(type_spots),
-                "n_other_spots": len(other_spots),
-            })
+            results.append(
+                {
+                    "cell_type": cell_type,
+                    "gene": gene,
+                    "mean_type": mean_type,
+                    "mean_other": mean_other,
+                    "log2fc": log2fc,
+                    "wilcoxon_stat": float(stat),
+                    "pval": float(pval),
+                    "n_type_spots": len(type_spots),
+                    "n_other_spots": len(other_spots),
+                }
+            )
 
     return pd.DataFrame(results)
 
@@ -165,14 +171,12 @@ def compute_spatial_coherence(
     """Compute Moran's I for the discrete assignment map."""
     try:
         spot_col = "spot_barcode" if "spot_barcode" in assignments_df.columns else "spot_id"
-        dominant_type = (
-            assignments_df.groupby(spot_col)["cell_type"]
-            .agg(lambda x: x.value_counts().idxmax())
-        )
+        dominant_type = assignments_df.groupby(spot_col)["cell_type"].agg(lambda x: x.value_counts().idxmax())
         adata = adata[adata.obs_names.intersection(dominant_type.index)].copy()
         adata.obs["assigned_type"] = dominant_type.reindex(adata.obs_names, fill_value="Unknown")
 
         from sklearn.preprocessing import LabelEncoder
+
         le = LabelEncoder()
         adata.obs["type_int"] = le.fit_transform(adata.obs["assigned_type"].astype(str))
         adata.obsm["type_int_arr"] = adata.obs[["type_int"]].values.astype(float)
@@ -188,10 +192,10 @@ def compute_spatial_coherence(
 
 def run_phase5(phase4_dir: str, output_dir: str, data_dir: str):
     """Run validation for both variants across all patient samples."""
-    phase4_dir = Path(phase4_dir)
-    output_dir = Path(output_dir)
-    data_dir = Path(data_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    phase4_dir = Path(phase4_dir)  # type: ignore[assignment]
+    output_dir = Path(output_dir)  # type: ignore[assignment]
+    data_dir = Path(data_dir)  # type: ignore[assignment]
+    output_dir.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]
 
     all_summaries = {}
 
@@ -219,8 +223,12 @@ def run_phase5(phase4_dir: str, output_dir: str, data_dir: str):
                 # Spatial coherence
                 moran = compute_spatial_coherence(assignments_df, adata)
                 coherence_results[sample_name] = moran
-                logger.info("    %s: Moran's I = %.4f, enrichment genes = %d",
-                            sample_name, moran, len(enrichment_df) if not enrichment_df.empty else 0)
+                logger.info(
+                    "    %s: Moran's I = %.4f, enrichment genes = %d",
+                    sample_name,
+                    moran,
+                    len(enrichment_df) if not enrichment_df.empty else 0,
+                )
 
         # Aggregate enrichment
         if all_enrichment:
@@ -269,9 +277,13 @@ def run_phase5(phase4_dir: str, output_dir: str, data_dir: str):
             json.dump(coherence_results, f, indent=2)
 
         mean_moran = float(np.nanmean(list(coherence_results.values()))) if coherence_results else float("nan")
-        logger.info("[%s] fraction_correct=%.3f, mean_log2fc=%.3f, mean_morans_i=%.4f",
-                    variant, summary["overall"].get("fraction_correct", 0),
-                    summary["overall"].get("mean_log2fc", 0), mean_moran)
+        logger.info(
+            "[%s] fraction_correct=%.3f, mean_log2fc=%.3f, mean_morans_i=%.4f",
+            variant,
+            summary["overall"].get("fraction_correct", 0),  # type: ignore[attr-defined]
+            summary["overall"].get("mean_log2fc", 0),  # type: ignore[attr-defined]
+            mean_moran,
+        )
 
         all_summaries[variant] = {
             "overall": summary["overall"],
@@ -288,8 +300,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Patient Phase 5: marker gene + spatial validation")
     parser.add_argument("--phase4-dir", default="output/patient_pipeline/phase4")
     parser.add_argument("--output-dir", default="output/patient_pipeline/phase5_validation")
-    parser.add_argument("--data-dir",
-                        default="/ix1/alee/LO_LAB/General/Lab_Data/"
-                                "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
+    parser.add_argument(
+        "--data-dir",
+        default="/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
+    )
     args = parser.parse_args()
     run_phase5(args.phase4_dir, args.output_dir, args.data_dir)

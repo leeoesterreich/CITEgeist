@@ -1,0 +1,7 @@
+# Large model checkpoints — excluded from git
+*.pt
+*.pth
+*.bin
+# Keep this gitignore and any README
+!.gitignore
+!README.md

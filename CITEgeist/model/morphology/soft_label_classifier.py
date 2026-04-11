@@ -1,7 +1,9 @@
 """Soft-label classifier for morphology-to-celltype prediction."""
+
+from typing import Optional
+
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from typing import Optional
 
 
 class SoftLabelClassifier:
@@ -27,7 +29,7 @@ class SoftLabelClassifier:
         self.n_features: Optional[int] = None
         self.is_fitted = False
 
-    def fit(self, X: np.ndarray, y_soft: np.ndarray) -> 'SoftLabelClassifier':
+    def fit(self, X: np.ndarray, y_soft: np.ndarray) -> "SoftLabelClassifier":
         """
         Fit classifier on soft labels.
 
@@ -54,8 +56,8 @@ class SoftLabelClassifier:
 
         # Fit logistic regression
         self._model = LogisticRegression(
-            multi_class='multinomial',
-            solver='lbfgs',
+            multi_class="multinomial",
+            solver="lbfgs",
             C=self.C,
             max_iter=self.max_iter,
         )

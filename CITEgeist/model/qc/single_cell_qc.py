@@ -11,14 +11,18 @@ from __future__ import annotations
 import logging
 
 import matplotlib
+
 matplotlib.use("Agg")
+# pylint: disable=wrong-import-position,wrong-import-order
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
-from . import QCResult
+from ._types import QCResult
+
+# pylint: enable=wrong-import-position,wrong-import-order
 
 logger = logging.getLogger(__name__)
 
@@ -94,10 +98,8 @@ def detect_empty_cells(
     Returns:
         Boolean array — True for cells flagged as empty.
     """
-    is_empty = (metrics["total_umi"] < umi_threshold) | (
-        metrics["n_genes"] < genes_threshold
-    )
-    return is_empty.values
+    is_empty = (metrics["total_umi"] < umi_threshold) | (metrics["n_genes"] < genes_threshold)
+    return np.asarray(is_empty.values)
 
 
 def check_compartment_emptiness(
@@ -124,9 +126,7 @@ def check_compartment_emptiness(
         n_empty = is_empty[mask].sum()
         frac = n_empty / n_total
         if frac > threshold:
-            flags.append(
-                f"{ct}: {n_empty}/{n_total} ({frac:.0%}) cells below QC thresholds"
-            )
+            flags.append(f"{ct}: {n_empty}/{n_total} ({frac:.0%}) cells below QC thresholds")
     return flags
 
 
@@ -175,9 +175,7 @@ def _plot_violin_qc(
         fig, axes = plt.subplots(1, 3, figsize=(24, 7))
 
         types_sorted = sorted(cell_types.unique())
-        data_by_type = {
-            ct: metrics[cell_types.values == ct] for ct in types_sorted
-        }
+        data_by_type = {ct: metrics[cell_types.values == ct] for ct in types_sorted}
 
         for ax, col, label in zip(
             axes,
@@ -256,8 +254,7 @@ def run_single_cell_qc(
 
     n_empty = is_empty.sum()
     logger.info(
-        f"Flagged {n_empty}/{len(adata)} cells as empty "
-        f"(UMI<{umi_threshold} or genes<{genes_threshold})"
+        "Flagged %s/%s cells as empty (UMI<%s or genes<%s)", n_empty, len(adata), umi_threshold, genes_threshold
     )
 
     # Summary table
@@ -267,8 +264,7 @@ def run_single_cell_qc(
     flags = []
     if n_empty > 0:
         flags.append(
-            f"{n_empty} cells with <{umi_threshold} UMIs or "
-            f"<{genes_threshold} genes detected — flagged as empty"
+            f"{n_empty} cells with <{umi_threshold} UMIs or " f"<{genes_threshold} genes detected — flagged as empty"
         )
     flags.extend(compartment_flags)
 

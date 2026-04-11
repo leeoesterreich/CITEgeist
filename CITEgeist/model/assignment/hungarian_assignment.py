@@ -1,7 +1,9 @@
 """Hungarian algorithm for optimal nucleus-to-celltype assignment."""
+
+from typing import Dict, Optional
+
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-from typing import Dict, Optional
 
 
 def assign_nuclei_to_types(

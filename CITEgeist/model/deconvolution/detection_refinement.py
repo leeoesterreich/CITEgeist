@@ -15,6 +15,7 @@ complementary capabilities:
    the QP solver assigned negligible weight, and rescues gated types that the
    solver found significant.
 """
+
 import logging
 from typing import List, Optional
 
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Function 1: Gene-type correlation matrix
 # ---------------------------------------------------------------------------
+
 
 def compute_gene_type_correlations(
     Y: np.ndarray,
@@ -74,7 +76,7 @@ def compute_gene_type_correlations(
             n_nz = nz_mask.sum()
             if n_nz > 0:
                 H[t, nz_mask] = 1.0 / n_nz
-            logger.debug(f"{tname}: no matching markers, using uniform row")
+            logger.debug("%s: no matching markers, using uniform row", tname)
             continue
 
         # Mean protein signal for this type across its markers
@@ -105,11 +107,13 @@ def compute_gene_type_correlations(
 # Function 2: GEX-based cell type detection
 # ---------------------------------------------------------------------------
 
+
 def detect_cell_types_gex(
     Y: np.ndarray,
     H: np.ndarray,
-    gene_names: List[str],
+    _gene_names: List[str],
     type_names: List[str],
+    *,
     k: int = 10,
     min_corr: float = 0.15,
     threshold: float = 0.5,
@@ -132,7 +136,7 @@ def detect_cell_types_gex(
     Returns:
         detected: (N, T) boolean detection mask.
     """
-    N, G = Y.shape
+    N, _ = Y.shape
     T = len(type_names)
     detected = np.ones((N, T), dtype=bool)  # default all-True
 
@@ -153,10 +157,7 @@ def detect_cell_types_gex(
                 break
 
         if len(candidates) < 3:
-            logger.debug(
-                f"{type_names[t]}: only {len(candidates)} qualifying genes, "
-                f"falling back to all-True"
-            )
+            logger.debug("%s: only %s qualifying genes, falling back to all-True", type_names[t], len(candidates))
             detected[:, t] = True
             continue
 
@@ -173,8 +174,9 @@ def detect_cell_types_gex(
         )
         try:
             gmm.fit(score.reshape(-1, 1))
-        except Exception as e:
-            logger.warning(f"GMM fit failed for {type_names[t]}: {e}. All-True fallback.")
+        except (ValueError, RuntimeError) as e:
+
+            logger.warning("GMM fit failed for %s: %s. All-True fallback.", type_names[t], e)
             continue
 
         # Signal cluster = higher mean
@@ -182,7 +184,9 @@ def detect_cell_types_gex(
 
         # Adaptive threshold
         effective_threshold = _compute_adaptive_threshold(
-            gmm, signal_cluster, base_threshold=threshold,
+            gmm,
+            signal_cluster,
+            base_threshold=threshold,
         )
 
         posteriors = gmm.predict_proba(score.reshape(-1, 1))[:, signal_cluster]
@@ -190,8 +194,12 @@ def detect_cell_types_gex(
 
         n_det = detected[:, t].sum()
         logger.debug(
-            f"{type_names[t]}: {n_det}/{N} detected via GEX "
-            f"({len(candidates)} genes, thresh={effective_threshold:.2f})"
+            "%s: %s/%s detected via GEX (%s genes, thresh=%s)",
+            type_names[t],
+            n_det,
+            N,
+            len(candidates),
+            round(effective_threshold, 2),
         )
 
     return detected
@@ -200,6 +208,7 @@ def detect_cell_types_gex(
 # ---------------------------------------------------------------------------
 # Function 3: Fuse protein and GEX detection masks
 # ---------------------------------------------------------------------------
+
 
 def fuse_detection_masks(
     protein_detected: np.ndarray,
@@ -230,9 +239,7 @@ def fuse_detection_masks(
         marker_type_count = (assignment_matrix > 0).sum(axis=1)  # (M,)
         exclusive_per_type = np.zeros(T, dtype=int)
         for t in range(T):
-            exclusive_per_type[t] = np.sum(
-                (assignment_matrix[:, t] > 0) & (marker_type_count == 1)
-            )
+            exclusive_per_type[t] = np.sum((assignment_matrix[:, t] > 0) & (marker_type_count == 1))
 
         fused = np.empty((N, T), dtype=bool)
         for t in range(T):
@@ -241,10 +248,7 @@ def fuse_detection_masks(
             else:
                 fused[:, t] = protein_detected[:, t] & gex_detected[:, t]
 
-        logger.debug(
-            f"Adaptive fusion: exclusive markers per type = "
-            f"{dict(zip(range(T), exclusive_per_type))}"
-        )
+        logger.debug("Adaptive fusion: exclusive markers per type = %s", dict(zip(range(T), exclusive_per_type)))
     else:
         raise ValueError(f"Unknown mode: {mode!r}. Use 'union', 'intersection', or 'adaptive'.")
 
@@ -260,9 +264,11 @@ def fuse_detection_masks(
 # Function 4: Iterative sparsity refinement from proportions
 # ---------------------------------------------------------------------------
 
+
 def refine_sparsity_from_proportions(
     Y: np.ndarray,
     sparsity_mask: np.ndarray,
+    *,
     cellularity: Optional[np.ndarray] = None,
     suppress_threshold: float = 0.02,
     rescue_threshold: float = 0.08,
@@ -313,6 +319,7 @@ def refine_sparsity_from_proportions(
 # Function 5: Entropy-based marker weighting
 # ---------------------------------------------------------------------------
 
+
 def compute_marker_entropy_weights(
     marker_level_data: np.ndarray,
     marker_names: List[str],
@@ -350,6 +357,11 @@ def compute_marker_entropy_weights(
     weights = np.maximum(weights, weight_floor)
 
     for m in range(M):
-        logger.info("Entropy weight: %s = %.3f (H_norm=%.3f)", marker_names[m], weights[m], 1.0 - weights[m] ** (1.0 / max(alpha, 0.01)))
+        logger.info(
+            "Entropy weight: %s = %.3f (H_norm=%.3f)",
+            marker_names[m],
+            weights[m],
+            1.0 - weights[m] ** (1.0 / max(alpha, 0.01)),
+        )
 
     return weights

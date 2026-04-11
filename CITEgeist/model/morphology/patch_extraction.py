@@ -1,7 +1,9 @@
 """Nucleus patch extraction for LLP backbone training and morphology-informed cell assignment."""
-import numpy as np
-from typing import Dict, Any, Tuple
+
+from typing import Any, Dict, Tuple
+
 import cv2
+import numpy as np
 
 
 def compute_global_stats(
@@ -17,7 +19,7 @@ def compute_global_stats(
     Returns:
         Dict with normalization parameters
     """
-    if norm_method == "percentile":
+    if norm_method == "percentile":  # pylint: disable=no-else-return
         p1 = np.percentile(image, 1, axis=(1, 2))
         p99 = np.percentile(image, 99, axis=(1, 2))
         return {"method": "percentile", "p1": p1, "p99": p99}
@@ -80,11 +82,7 @@ def extract_patch(
     # Resize each channel
     resized = np.zeros((C, output_size, output_size), dtype=np.float32)
     for c in range(C):
-        resized[c] = cv2.resize(
-            patch[c],
-            (output_size, output_size),
-            interpolation=cv2.INTER_LINEAR
-        )
+        resized[c] = cv2.resize(patch[c], (output_size, output_size), interpolation=cv2.INTER_LINEAR)
 
     # Apply global normalization
     method = global_stats["method"]
@@ -127,11 +125,14 @@ def extract_patch_with_size(
     area = w * h
 
     # Log-transform for better scale (nuclei vary 10-1000 px^2)
-    size_features = np.array([
-        np.log1p(w),
-        np.log1p(h),
-        np.log1p(area),
-    ], dtype=np.float32)
+    size_features = np.array(
+        [
+            np.log1p(w),
+            np.log1p(h),
+            np.log1p(area),
+        ],
+        dtype=np.float32,
+    )
 
     patch = extract_patch(image, bbox, expansion, output_size, global_stats)
 

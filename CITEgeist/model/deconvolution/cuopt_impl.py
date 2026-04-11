@@ -3,46 +3,43 @@
 Replaces Gurobi with NVIDIA cuOPT 26.2 for GPU-accelerated
 quadratic programming. Same function signatures as gurobi_impl.py.
 """
+
 # Standard library imports
-import concurrent
 import gc
 import logging
 import os
 import time
 import traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 # Third-party imports
 import numpy as np
-import pandas as pd
 import scanpy as sc
 import scipy
-import scipy.sparse as sp
-from scipy.optimize import minimize
 from tqdm import tqdm
 
 # Local imports
 # Provide a fallback so this module can be executed directly as a script
 try:
-    from CITEgeist.model.utils import get_neighbors_with_fixed_radius
     from CITEgeist.model.checkpoints import CheckpointManager
     from CITEgeist.model.gex.gex_modules import (
-        compute_softmax_target,
         compute_kl_penalty_coefficients,
-    )
-except Exception:  # pragma: no cover - fallback for __main__ execution
-    from ..utils import get_neighbors_with_fixed_radius  # type: ignore
-    from ..checkpoints import CheckpointManager  # type: ignore
-    from ..gex.gex_modules import (  # type: ignore
         compute_softmax_target,
-        compute_kl_penalty_coefficients,
     )
+    from CITEgeist.model.utils import get_neighbors_with_fixed_radius
+except (ImportError, OSError):  # pragma: no cover - fallback for __main__ execution
+    from ..checkpoints import CheckpointManager
+    from ..gex.gex_modules import (
+        compute_kl_penalty_coefficients,
+        compute_softmax_target,
+    )
+    from ..utils import get_neighbors_with_fixed_radius
 
 try:
     from cuopt.linear_programming.problem import Problem
-except Exception:  # pragma: no cover - cuOPT needs CUDA; fails on login nodes
-    Problem = None  # type: ignore
+except (ImportError, OSError):  # pragma: no cover - cuOPT needs CUDA; fails on login nodes
+    Problem = None
 
 
 def build_spatial_laplacian(
@@ -77,16 +74,16 @@ def build_spatial_laplacian(
     Returns:
         Sparse Laplacian matrix of shape (n_spots, n_spots).
     """
-    from sklearn.neighbors import kneighbors_graph
-    from scipy.sparse.csgraph import laplacian
+    from scipy.sparse.csgraph import laplacian  # pylint: disable=import-outside-toplevel
+    from sklearn.neighbors import kneighbors_graph  # pylint: disable=import-outside-toplevel
 
     n_spots = coords.shape[0]
 
     # Build k-NN adjacency matrix (directed)
-    A = kneighbors_graph(coords, k, mode='connectivity', include_self=False)
+    A = kneighbors_graph(coords, k, mode="connectivity", include_self=False)
 
     # Symmetrize: if i is neighbor of j OR j is neighbor of i, they are connected
-    A = (A + A.T)
+    A = A + A.T
     A.data = np.clip(A.data, 0, 1)  # Binary adjacency
 
     # Apply cellularity-aware edge weighting (bilateral filtering principle)
@@ -96,24 +93,21 @@ def build_spatial_laplacian(
         log_cell = np.log(cellularity + 1.0)  # +1 to handle zeros
         A_coo = scipy.sparse.coo_matrix(A)
         log_diff_sq = (log_cell[A_coo.row] - log_cell[A_coo.col]) ** 2
-        similarity = np.exp(-log_diff_sq / (2.0 * cellularity_sigma ** 2))
-        A_weighted = scipy.sparse.coo_matrix(
-            (similarity, (A_coo.row, A_coo.col)), shape=A.shape
-        ).tocsr()
+        similarity = np.exp(-log_diff_sq / (2.0 * cellularity_sigma**2))
+        A_weighted = scipy.sparse.coo_matrix((similarity, (A_coo.row, A_coo.col)), shape=A.shape).tocsr()
         n_suppressed = int((similarity < 0.5).sum())
         logging.info(
             "Cellularity-aware Laplacian: sigma=%.2f, %d/%d edges suppressed (w<0.5)",
-            cellularity_sigma, n_suppressed, len(similarity),
+            cellularity_sigma,
+            n_suppressed,
+            len(similarity),
         )
         A = A_weighted
 
     # Compute Laplacian
     L = laplacian(A, normed=normed)
 
-    logging.debug(
-        f"Built spatial Laplacian: {n_spots} spots, k={k}, "
-        f"nnz={L.nnz}, normed={normed}"
-    )
+    logging.debug("Built spatial Laplacian: %s spots, k=%s, nnz=%s, normed=%s", n_spots, k, L.nnz, normed)
 
     return L
 
@@ -208,9 +202,9 @@ def compute_global_prior(
 
     # Log statistics
     logging.info("Prior computation statistics:")
-    logging.info(f" - Mean confidence score: {np.mean(confidence_scores):.4f}")
-    logging.info(f" - Mean prior strength: {np.mean(global_prior):.4f}")
-    logging.info(f" - % Strong signals (>0.5): {100 * np.mean(global_prior > 0.5):.2f}%")
+    logging.info(" - Mean confidence score: %s", np.mean(confidence_scores))
+    logging.info(" - Mean prior strength: %s", np.mean(global_prior))
+    logging.info(" - % Strong signals (>0.5): %s%", 100 * np.mean(global_prior > 0.5))
 
     return {
         "global_prior": global_prior,
@@ -236,7 +230,7 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
         list: List of cell type names (to ensure column order).
     """
     # Step 1: Subset data to relevant markers
-    all_markers: list[str] = [marker for profile in cell_profile_dict.values() for marker in profile['Major']]
+    all_markers: list[str] = [marker for profile in cell_profile_dict.values() for marker in profile["Major"]]
     existing_markers: list[str] = [marker for marker in all_markers if marker in adata.var_names]
 
     if len(existing_markers) == 0:
@@ -271,9 +265,9 @@ def map_antibodies_to_profiles(adata, cell_profile_dict):
                     axis=1
                 )
             else:
-                logging.warning(f"No valid markers found for profile '{profile_name}'")
+                logging.warning("No valid markers found for profile '%s'", profile_name)
         except IndexError as e:
-            logging.warning(f"Error processing markers for profile '{profile_name}': {str(e)}")
+            logging.warning("Error processing markers for profile '%s': %s", profile_name, str(e))
 
     # Step 4: Normalize with safety checks
     column_max = np.max(profile_based_antibody_data, axis=0)
@@ -346,7 +340,10 @@ def map_antibodies_to_profiles_v2(adata, cell_profile_dict):
     col_max = np.max(marker_level_data, axis=0)
     zero_cols = col_max == 0
     if np.any(zero_cols):
-        logging.warning(f"Zero columns detected for markers: {[existing_markers[i] for i, z in enumerate(zero_cols) if z]}. Adding epsilon.")
+        logging.warning(
+            "Zero columns detected for markers: %s. Adding epsilon.",
+            [existing_markers[i] for i, z in enumerate(zero_cols) if z],
+        )
         col_max[zero_cols] = 1e-6
     marker_level_data = marker_level_data / col_max
 
@@ -361,7 +358,7 @@ def map_antibodies_to_profiles_v2(adata, cell_profile_dict):
 
     marker_to_idx = {name: i for i, name in enumerate(existing_markers)}
 
-    for j, (ct_name, markers_dict) in enumerate(cell_profile_dict.items()):
+    for j, (_, markers_dict) in enumerate(cell_profile_dict.items()):
         for marker in markers_dict.get("Major", []):
             if marker in marker_to_idx:
                 assignment_matrix[marker_to_idx[marker], j] = 1.0
@@ -374,7 +371,7 @@ def map_antibodies_to_profiles_v2(adata, cell_profile_dict):
                     assignment_matrix[idx, j] = assign_weight
 
     n_soft = int(((assignment_matrix > 0) & (assignment_matrix < 1.0)).sum())
-    logging.info(f"Mapped {M} markers to {T} cell types ({n_soft} soft assignments)")
+    logging.info("Mapped %s markers to %s cell types (%s soft assignments)", M, T, n_soft)
 
     return marker_level_data, existing_markers, assignment_matrix, cell_type_names
 
@@ -440,10 +437,13 @@ def map_antibodies_to_profiles_cellularity(adata, cell_profile_dict, clip_percen
         raise ValueError("NaN values detected after robust normalization.")
 
     logging.info(
-        "Cellularity mapper: %d markers, robust-%s scaling, clip p%d, "
-        "S range [%.3f, %.3f], mean %.3f",
-        len(existing_markers), scale, clip_percentile,
-        marker_level_data.min(), marker_level_data.max(), marker_level_data.mean(),
+        "Cellularity mapper: %d markers, robust-%s scaling, clip p%d, " "S range [%.3f, %.3f], mean %.3f",
+        len(existing_markers),
+        scale,
+        clip_percentile,
+        marker_level_data.min(),
+        marker_level_data.max(),
+        marker_level_data.mean(),
     )
 
     # Step 5: Build assignment matrix (same as v2)
@@ -453,7 +453,7 @@ def map_antibodies_to_profiles_cellularity(adata, cell_profile_dict, clip_percen
     assignment_matrix = np.zeros((M, T), dtype=np.float64)
 
     marker_to_idx = {name: i for i, name in enumerate(existing_markers)}
-    for j, (ct_name, markers_dict) in enumerate(cell_profile_dict.items()):
+    for j, (_, markers_dict) in enumerate(cell_profile_dict.items()):
         major_markers = markers_dict.get("Major", [])
         for marker in major_markers:
             if marker in marker_to_idx:
@@ -462,8 +462,9 @@ def map_antibodies_to_profiles_cellularity(adata, cell_profile_dict, clip_percen
     return marker_level_data, existing_markers, assignment_matrix, cell_type_names
 
 
-def map_antibodies_raw_counts(adata, cell_profile_dict, winsorize_lower=1.0,
-                               winsorize_upper=99.0, scale="median", eps=1e-6):
+def map_antibodies_raw_counts(
+    adata, cell_profile_dict, *, winsorize_lower=1.0, winsorize_upper=99.0, scale="median", eps=1e-6
+):
     """Map raw antibody counts for cellularity-scaled QP (no CLR).
 
     Reads from adata.layers["raw_counts"] (pre-CLR raw data) and applies only
@@ -530,10 +531,14 @@ def map_antibodies_raw_counts(adata, cell_profile_dict, winsorize_lower=1.0,
         raise ValueError("NaN/Inf values in raw-count mapper output.")
 
     logging.info(
-        "Raw-count mapper: %d markers, winsor=[%.0f, %.0f], scale=%s, "
-        "S range [%.3f, %.3f], mean %.3f",
-        len(existing_markers), winsorize_lower, winsorize_upper, scale,
-        marker_level_data.min(), marker_level_data.max(), marker_level_data.mean(),
+        "Raw-count mapper: %d markers, winsor=[%.0f, %.0f], scale=%s, " "S range [%.3f, %.3f], mean %.3f",
+        len(existing_markers),
+        winsorize_lower,
+        winsorize_upper,
+        scale,
+        marker_level_data.min(),
+        marker_level_data.max(),
+        marker_level_data.mean(),
     )
 
     # Assignment matrix (same as v2)
@@ -554,7 +559,8 @@ def compute_marker_exclusivity(
     marker_level_data: np.ndarray,
     Y_values: np.ndarray,
     marker_owners: List[List[int]],
-    assignment_matrix: np.ndarray,
+    _assignment_matrix: np.ndarray,
+    *,
     floor: float = 0.3,
     epsilon: float = 1e-9,
 ) -> np.ndarray:
@@ -623,10 +629,11 @@ def compute_marker_exclusivity(
 def validate_cell_proportions(
     Y_values: np.ndarray,
     cell_type_names: List[str],
-    profile_based_antibody_data: np.ndarray = None,
+    *,
+    profile_based_antibody_data: np.ndarray = None,  # pylint: disable=unused-argument
     unknown_threshold: float = 0.05,
     min_celltype_threshold: float = 0.01,
-    redundancy_threshold: float = 0.2,
+    redundancy_threshold: float = 0.2,  # pylint: disable=unused-argument
     warn_only: bool = False,
 ) -> None:
     """
@@ -669,14 +676,14 @@ def validate_cell_proportions(
                 f"Consider adding more cell types to better characterize the tissue composition."
             )
             if warn_only:
-                logging.warning(f"[VALIDATION WARNING] {error_msg}")
+                logging.warning("[VALIDATION WARNING] %s", error_msg)
             else:
                 logging.error(error_msg)
                 raise ValueError(error_msg)
 
     # Check if any defined (non-Unknown) cell types have very low proportions
     low_proportion_celltypes = []
-    for idx, (celltype, mean_prop) in enumerate(zip(cell_type_names, mean_proportions)):
+    for celltype, mean_prop in zip(cell_type_names, mean_proportions):
         # Skip Unknown cell type in this check
         if celltype == "Unknown":
             continue
@@ -692,7 +699,7 @@ def validate_cell_proportions(
             f"Consider removing these cell types from the cell profile dictionary."
         )
         if warn_only:
-            logging.warning(f"[VALIDATION WARNING] {error_msg}")
+            logging.warning("[VALIDATION WARNING] %s", error_msg)
         else:
             logging.error(error_msg)
             raise ValueError(error_msg)
@@ -701,12 +708,12 @@ def validate_cell_proportions(
     logging.info("✓ Cell type validation passed (proportions + redundancy)")
     if "Unknown" in cell_type_names:
         unknown_idx = cell_type_names.index("Unknown")
-        logging.info(f"  - Unknown: {mean_proportions[unknown_idx]*100:.2f}% (threshold < {unknown_threshold*100:.0f}%)")
+        logging.info("  - Unknown: %s% (threshold < %s%)", mean_proportions[unknown_idx] * 100, unknown_threshold * 100)
 
     # Log cell type proportions
-    for idx, (celltype, mean_prop) in enumerate(zip(cell_type_names, mean_proportions)):
+    for celltype, mean_prop in zip(cell_type_names, mean_proportions):
         if celltype != "Unknown":
-            logging.info(f"  - {celltype}: {mean_prop*100:.2f}%")
+            logging.info("  - %s: %s%", celltype, mean_prop * 100)
 
 
 def compute_proportion_enrichment(
@@ -736,7 +743,7 @@ def compute_proportion_enrichment(
     # Handle zero expression
     total_expr = gene_expr.sum()
     if total_expr < 1e-10:
-        return np.ones(T) / T
+        return np.asarray(np.ones(T) / T)
 
     # Expression-weighted cell type proportions
     weights = gene_expr / total_expr
@@ -754,7 +761,7 @@ def compute_proportion_enrichment(
     enrichment = weighted_props / (background_props + epsilon)
 
     # Normalize to sum to 1 (NO 80/20 smoothing)
-    return enrichment / (enrichment.sum() + epsilon)
+    return np.asarray(enrichment / (enrichment.sum() + epsilon))
 
 
 def compute_marker_enrichment(
@@ -773,14 +780,14 @@ def compute_marker_enrichment(
     Returns:
         enrichment: (T,) enrichment scores summing to 1
     """
-    from scipy.stats import pearsonr
+    from scipy.stats import pearsonr  # pylint: disable=import-outside-toplevel
 
     T = anchor_expr.shape[1]
     enrichment = np.zeros(T)
 
     # Skip if gene has no variance
     if np.std(gene_expr) < 1e-10:
-        return np.ones(T) / T
+        return np.asarray(np.ones(T) / T)
 
     for t in range(T):
         anchor_t = anchor_expr[:, t]
@@ -797,9 +804,9 @@ def compute_marker_enrichment(
 
     # Normalize
     if enrichment.sum() < 1e-10:
-        return np.ones(T) / T
+        return np.asarray(np.ones(T) / T)
 
-    return enrichment / enrichment.sum()
+    return np.asarray(enrichment / enrichment.sum())
 
 
 def compute_adaptive_enrichment(
@@ -839,7 +846,7 @@ def compute_adaptive_enrichment(
     blended = (1 - anchor_weight) * prop_enrichment + anchor_weight * marker_enrichment
 
     # Normalize (should already sum to ~1, but ensure)
-    return blended / (blended.sum() + 1e-10)
+    return np.asarray(blended / (blended.sum() + 1e-10))
 
 
 def precompute_anchor_expression(
@@ -897,12 +904,13 @@ def estimate_true_expression_cell(
     Y_assignments: np.ndarray,
     coords: np.ndarray,
     enrichment_weights: np.ndarray,
+    *,
     library_slack: float = 1.5,
     lambda_enrich: float = 1.0,
     lambda_spatial: float = 0.0,
     spatial_k: int = 50,
     max_workers: Optional[int] = None,
-    checkpoint_interval: int = 500,
+    _checkpoint_interval: int = 500,
 ) -> np.ndarray:
     """
     Estimate true gene expression per cell using optimization.
@@ -940,12 +948,12 @@ def estimate_true_expression_cell(
     if unassigned_mask.any():
         n_unassigned = int(unassigned_mask.sum())
         logging.info(
-            f"Cell-level Pass 2: {n_unassigned} unassigned cells will retain "
-            f"observed expression (no deconvolution)"
+            "Cell-level Pass 2: %s unassigned cells will retain observed expression (no deconvolution)", n_unassigned
         )
 
     # Build spatial neighbor graph (k-NN)
-    from scipy.spatial import cKDTree
+    from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
+
     tree = cKDTree(coords)
     k_query = min(spatial_k + 1, N)
     _, all_neighbor_indices = tree.query(coords, k=k_query)
@@ -968,8 +976,12 @@ def estimate_true_expression_cell(
             same_type_neighbor_counts[i] = len(same_type_neighbors)
 
     logging.info(
-        f"Cell-level Pass 2: {N} cells, {M} genes, {T} types, "
-        f"library_slack={library_slack}, spatial_k={spatial_k}"
+        "Cell-level Pass 2: %s cells, %s genes, %s types, library_slack=%s, spatial_k=%s",
+        N,
+        M,
+        T,
+        library_slack,
+        spatial_k,
     )
 
     X_true = np.zeros((N, M), dtype=np.float64)
@@ -987,15 +999,15 @@ def estimate_true_expression_cell(
     # Store worker data in module-level variable for pickling
     global _cell_pass2_worker_data
     _cell_pass2_worker_data = {
-        'X_obs': X_obs,
-        'dominant_type': dominant_type,
-        'enrichment_weights': enrichment_weights,
-        'same_type_neighbor_means': same_type_neighbor_means,
-        'same_type_neighbor_counts': same_type_neighbor_counts,
-        'library_slack': library_slack,
-        'lambda_enrich': lambda_enrich,
-        'lambda_spatial': lambda_spatial,
-        'M': M,
+        "X_obs": X_obs,
+        "dominant_type": dominant_type,
+        "enrichment_weights": enrichment_weights,
+        "same_type_neighbor_means": same_type_neighbor_means,
+        "same_type_neighbor_counts": same_type_neighbor_counts,
+        "library_slack": library_slack,
+        "lambda_enrich": lambda_enrich,
+        "lambda_spatial": lambda_spatial,
+        "M": M,
     }
 
     # ThreadPoolExecutor: threads share CUDA context safely (no fork corruption)
@@ -1061,10 +1073,10 @@ def normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, ma
     adata_norm.obs["scaled_total"] = X_scaled.sum(axis=1)
 
     # Log statistics
-    logging.info(f"Normalization stats:")
-    logging.info(f"Original median total: {median_size:.2f}")
-    logging.info(f"Mean scaled total: {X_scaled.sum(axis=1).mean():.2f}")
-    logging.info(f"Max scaled value: {X_scaled.max():.2f}")
+    logging.info("Normalization stats:")
+    logging.info("Original median total: %s", median_size)
+    logging.info("Mean scaled total: %s", X_scaled.sum(axis=1).mean())
+    logging.info("Max scaled value: %s", X_scaled.max())
 
     return adata_norm
 
@@ -1095,27 +1107,27 @@ def _solve_single_cell_pass2(cell_idx: int):
         raise RuntimeError("Worker data not initialized.")
 
     try:
-        ct = wd['dominant_type'][cell_idx]
-        obs = wd['X_obs'][cell_idx]
+        ct = wd["dominant_type"][cell_idx]
+        obs = wd["X_obs"][cell_idx]
         obs_lib = obs.sum()
 
         if obs_lib < 1:
             return cell_idx, obs.copy()
 
-        enrich = wd['enrichment_weights'][ct]
-        neighbor_mean = wd['same_type_neighbor_means'][cell_idx]
-        has_neighbors = wd['same_type_neighbor_counts'][cell_idx] > 0
-        M_genes = wd['M']
-        lib_slack = wd['library_slack']
-        l_enrich = wd['lambda_enrich']
-        l_spatial = wd['lambda_spatial']
+        enrich = wd["enrichment_weights"][ct]
+        neighbor_mean = wd["same_type_neighbor_means"][cell_idx]
+        has_neighbors = wd["same_type_neighbor_counts"][cell_idx] > 0
+        M_genes = wd["M"]
+        lib_slack = wd["library_slack"]
+        l_enrich = wd["lambda_enrich"]
+        l_spatial = wd["lambda_spatial"]
 
         p = Problem()
 
         max_lib = lib_slack * obs_lib
         X_vars = {}
         for g in range(M_genes):
-            X_vars[g] = p.addVariable(lb=0.0, ub=max_lib, name=f'X_{g}')
+            X_vars[g] = p.addVariable(lb=0.0, ub=max_lib, name=f"X_{g}")
 
         # Library size constraint
         lib_sum = sum(X_vars[g] for g in range(M_genes))
@@ -1137,15 +1149,16 @@ def _solve_single_cell_pass2(cell_idx: int):
         p.solve()
 
         # Check status
-        if hasattr(p, 'Status') and p.Status not in (None, 'optimal', 'OPTIMAL', 1, 2):
+        if hasattr(p, "Status") and p.Status not in (None, "optimal", "OPTIMAL", 1, 2):
             return cell_idx, obs.copy()
 
         result = np.array([X_vars[g].getValue() for g in range(M_genes)])
         return cell_idx, result
 
-    except Exception as e:
-        logging.warning(f"Cell {cell_idx} optimization failed: {e}")
-        return cell_idx, wd['X_obs'][cell_idx].copy()
+    except (ValueError, RuntimeError) as e:
+
+        logging.warning("Cell %s optimization failed: %s", cell_idx, e)
+        return cell_idx, wd["X_obs"][cell_idx].copy()
 
 
 def deconvolute_spot_with_neighbors_with_prior(
@@ -1153,6 +1166,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     adata: sc.AnnData,
     cell_type_numbers_array: np.ndarray,
     radius: float,
+    *,
     global_prior: Optional[np.ndarray] = None,
     lambda_prior_weight: float = 0.0,
     local_enrichment_weight: float = 0.5,
@@ -1188,7 +1202,7 @@ def deconvolute_spot_with_neighbors_with_prior(
     Returns:
         np.ndarray of shape (T, M) with deconvolved expression, or None on failure.
     """
-    from scipy.special import softmax as scipy_softmax
+    from scipy.special import softmax as scipy_softmax  # pylint: disable=import-outside-toplevel
 
     # DIRECT SOFTMAX MODE: Skip optimization entirely
     # This fixes the L2 uniform spreading problem (variance_ratio 3.02 -> 1.53)
@@ -1251,21 +1265,19 @@ def deconvolute_spot_with_neighbors_with_prior(
 
             return result
 
-        except Exception as e:
-            logging.error(f"Direct softmax failed for spot {spot_idx}: {e}")
+        except (ValueError, RuntimeError) as e:
+
+            logging.error("Direct softmax failed for spot %s: %s", spot_idx, e)
             # Fall through to cuOPT optimization
 
     try:
-        neighborhood_indices = get_neighbors_with_fixed_radius(
-            spot_idx, adata, radius=int(radius), include_center=True
-        )
+        neighborhood_indices = get_neighbors_with_fixed_radius(spot_idx, adata, radius=int(radius), include_center=True)
         if not neighborhood_indices:
-            logging.error(f"No valid neighbors found for spot {spot_idx}.")
+            logging.error("No valid neighbors found for spot %s.", spot_idx)
             return None
 
         neighborhood_indices = np.array(
-            [int(idx) for idx in neighborhood_indices
-             if isinstance(idx, (int, np.integer))], dtype=int
+            [int(idx) for idx in neighborhood_indices if isinstance(idx, (int, np.integer))], dtype=int
         )
 
         # Extract expression data
@@ -1317,12 +1329,10 @@ def deconvolute_spot_with_neighbors_with_prior(
 
         for k in range(M):
             local_enrich = compute_baseline_enrichment(
-                neighborhood_expression_data, neighborhood_cell_type_numbers, k,
-                smoothing=enrichment_smoothing
+                neighborhood_expression_data, neighborhood_cell_type_numbers, k, smoothing=enrichment_smoothing
             )
             global_enrich = compute_baseline_enrichment(
-                deconvolution_expression_data, cell_type_numbers_array, k,
-                smoothing=enrichment_smoothing
+                deconvolution_expression_data, cell_type_numbers_array, k, smoothing=enrichment_smoothing
             )
             gene_specific_enrichment[k] = (
                 local_enrichment_weight * local_enrich + global_enrichment_weight * global_enrich
@@ -1340,9 +1350,9 @@ def deconvolute_spot_with_neighbors_with_prior(
             if total_counts > 0:
                 for j in range(T):
                     if continuous_relaxation:
-                        X[j, k] = p.addVariable(lb=0.0, ub=float(total_counts), name=f'X_{j}_{k}')
+                        X[j, k] = p.addVariable(lb=0.0, ub=float(total_counts), name=f"X_{j}_{k}")
                     else:
-                        X[j, k] = p.addVariable(lb=0, ub=total_counts, vtype='integer', name=f'X_{j}_{k}')
+                        X[j, k] = p.addVariable(lb=0, ub=total_counts, vtype="integer", name=f"X_{j}_{k}")
                 # Count conservation constraint
                 gene_sum = sum(X[j, k] for j in range(T))
                 p.addConstraint(gene_sum == total_counts)
@@ -1353,8 +1363,7 @@ def deconvolute_spot_with_neighbors_with_prior(
                 raise ValueError("global_prior must be a numpy array")
             if global_prior.shape != (T, M):
                 raise ValueError(
-                    f"Prior matrix shape {global_prior.shape} does not match "
-                    f"expected shape ({T}, {M})"
+                    f"Prior matrix shape {global_prior.shape} does not match " f"expected shape ({T}, {M})"
                 )
 
         # Center spot proportions (index 0 = center in neighborhood)
@@ -1386,8 +1395,8 @@ def deconvolute_spot_with_neighbors_with_prior(
 
                         # KL penalty (pulls toward target) — was subtracted in maximize,
                         # so add for minimize
-                        target_j = kl_coeffs['target_counts'][j]
-                        penalty = kl_coeffs['penalty_weight'] * (X[j, k] - target_j) * (X[j, k] - target_j)
+                        target_j = kl_coeffs["target_counts"][j]
+                        penalty = kl_coeffs["penalty_weight"] * (X[j, k] - target_j) * (X[j, k] - target_j)
                         obj += penalty
 
                         # Prior terms
@@ -1396,8 +1405,9 @@ def deconvolute_spot_with_neighbors_with_prior(
                                 prior_value = float(global_prior[j, k])
                                 # Was -prior_penalty in maximize; becomes +prior_penalty in minimize
                                 obj += lambda_prior_weight * (1 - prior_value) * X[j, k]
-                            except Exception as e:
-                                logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
+                            except (ValueError, RuntimeError) as e:
+
+                                logging.warning("Error accessing prior at [%s, %s]: %s", j, k, e)
                                 continue
                 else:
                     # L2 regularization (backward compatible)
@@ -1417,16 +1427,17 @@ def deconvolute_spot_with_neighbors_with_prior(
                             try:
                                 prior_value = float(global_prior[j, k])
                                 obj += lambda_prior_weight * (1 - prior_value) * X[j, k]
-                            except Exception as e:
-                                logging.warning(f"Error accessing prior at [{j}, {k}]: {e}")
+                            except (ValueError, RuntimeError) as e:
+
+                                logging.warning("Error accessing prior at [%s, %s]: %s", j, k, e)
                                 continue
 
         p.setObjective(obj)
         p.solve()
 
         # Check solve status
-        if hasattr(p, 'Status') and p.Status not in (None, 'optimal', 'OPTIMAL', 1, 2):
-            logging.error(f"No feasible solution found for spot {spot_idx}.")
+        if hasattr(p, "Status") and p.Status not in (None, "optimal", "OPTIMAL", 1, 2):
+            logging.error("No feasible solution found for spot %s.", spot_idx)
             return None
 
         result = np.zeros((T, M))
@@ -1437,8 +1448,8 @@ def deconvolute_spot_with_neighbors_with_prior(
                     result[j, k] = X[j, k].getValue()
         return result
 
-    except Exception as e:
-        logging.error(f"Error during deconvolution of spot {spot_idx}: {str(e)}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logging.error("Error during deconvolution of spot %s: %s", spot_idx, str(e))
         logging.error(traceback.format_exc())
         return None
 
@@ -1453,7 +1464,8 @@ def deconvolute_spot_with_neighbors_with_prior(
 
 def _build_neighbor_lists(spatial_coords: np.ndarray, radius: float) -> List[np.ndarray]:
     """Build neighbor index lists for all spots using KDTree (vectorized)."""
-    from scipy.spatial import cKDTree
+    from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
+
     tree = cKDTree(spatial_coords)
     neighbor_lists = []
     for i in range(len(spatial_coords)):
@@ -1462,7 +1474,7 @@ def _build_neighbor_lists(spatial_coords: np.ndarray, radius: float) -> List[np.
     return neighbor_lists
 
 
-def _vectorized_enrichment(
+def _vectorized_enrichment(  # pylint: disable=too-many-positional-arguments
     expr_data: np.ndarray,
     props: np.ndarray,
     celltype_freqs: np.ndarray,
@@ -1506,9 +1518,9 @@ def _vectorized_enrichment(
     result = np.zeros((N, M, T))
     for i in range(N):
         nb_idx = neighbor_lists[i]
-        nb_expr = expr_data[nb_idx]       # (n_neighbors, M)
+        nb_expr = expr_data[nb_idx]  # (n_neighbors, M)
         nb_props = normalized_props[nb_idx]  # (n_neighbors, T)
-        nb_bg = np.mean(nb_props, axis=0)    # (T,)
+        nb_bg = np.mean(nb_props, axis=0)  # (T,)
 
         local_enrichment = np.ones((M, T)) / T
         for k in range(M):
@@ -1538,6 +1550,7 @@ def _prepare_spot_qp(
     center_counts: np.ndarray,
     center_props: np.ndarray,
     enrichment: np.ndarray,
+    *,
     global_prior: Optional[np.ndarray],
     lambda_prior_weight: float,
     lambda_gex_reg: float,
@@ -1620,7 +1633,7 @@ def _softmax_target(enrichment: np.ndarray, temperature: float) -> np.ndarray:
     logits = log_e / max(temperature, 1e-6)
     logits -= logits.max()
     exp_l = np.exp(logits)
-    return exp_l / (exp_l.sum() + 1e-10)
+    return np.asarray(exp_l / (exp_l.sum() + 1e-10))
 
 
 def _solve_spot_qp(spot_data: dict) -> Optional[np.ndarray]:
@@ -1653,9 +1666,9 @@ def _solve_spot_qp(spot_data: dict) -> Optional[np.ndarray]:
                 continue
             for j in range(T):
                 if continuous:
-                    X[j, k] = p.addVariable(lb=0.0, ub=float(total), name=f'X_{j}_{k}')
+                    X[j, k] = p.addVariable(lb=0.0, ub=float(total), name=f"X_{j}_{k}")
                 else:
-                    X[j, k] = p.addVariable(lb=0, ub=total, vtype='integer', name=f'X_{j}_{k}')
+                    X[j, k] = p.addVariable(lb=0, ub=total, vtype="integer", name=f"X_{j}_{k}")
             # Count conservation
             gene_sum = sum(X[j, k] for j in range(T))
             p.addConstraint(gene_sum == total)
@@ -1673,7 +1686,7 @@ def _solve_spot_qp(spot_data: dict) -> Optional[np.ndarray]:
         p.setObjective(obj)
         p.solve()
 
-        if hasattr(p, 'Status') and p.Status not in (None, 'optimal', 'OPTIMAL', 1, 2):
+        if hasattr(p, "Status") and p.Status not in (None, "optimal", "OPTIMAL", 1, 2):
             return None
 
         result = np.zeros((T, M))
@@ -1684,8 +1697,8 @@ def _solve_spot_qp(spot_data: dict) -> Optional[np.ndarray]:
                 result[j, k] = X[j, k].getValue()
         return result
 
-    except Exception as e:
-        logging.error(f"cuOPT solve failed for spot {spot_idx}: {e}")
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        logging.error("cuOPT solve failed for spot %s: %s", spot_idx, e)
         return None
 
 
@@ -1694,6 +1707,7 @@ def optimize_gene_expression(
     deconvolution_expression_data: np.ndarray,
     cell_type_numbers_array: np.ndarray,
     filtered_adata: sc.AnnData,
+    *,
     radius: float = 2,
     global_enrichment_weight: float = 0.5,
     local_enrichment_weight: float = 0.5,
@@ -1706,9 +1720,9 @@ def optimize_gene_expression(
     continuous_relaxation: bool = True,
     lambda_gex_reg: float = 0.01,
     enrichment_smoothing: float = 0.2,
-    anchor_genes: Optional[Dict] = None,
-    anchor_weights: Optional[Dict] = None,
-    module_weight: float = 0.5,
+    _anchor_genes: Optional[Dict] = None,
+    _anchor_weights: Optional[Dict] = None,
+    _module_weight: float = 0.5,
     use_kl_regularization: bool = True,
     kl_temperature: float = 0.3,
     lambda_kl: float = 0.1,
@@ -1757,7 +1771,7 @@ def optimize_gene_expression(
     if not rerun:
         complete_results = checkpoint_mgr.check_complete_run(N, T, M)
         if complete_results is not None:
-            return complete_results  # type: ignore
+            return complete_results
         completed_spots, spotwise_gene_expression_profiles = checkpoint_mgr.load_latest_checkpoint(N, T, M)
     else:
         completed_spots = set()
@@ -1766,11 +1780,11 @@ def optimize_gene_expression(
     remaining_spots = [i for i in range(N) if i not in completed_spots]
     if not remaining_spots:
         logging.info("All spots already completed.")
-        return spotwise_gene_expression_profiles
+        return cast(Dict[str, Any], spotwise_gene_expression_profiles)
 
-    logging.info(f"Starting GEX deconvolution for {sample_name}: {len(remaining_spots)} spots remaining")
+    logging.info("Starting GEX deconvolution for %s: %s spots remaining", sample_name, len(remaining_spots))
     if use_kl_regularization:
-        logging.info(f"KL regularization (temp={kl_temperature}, lambda={lambda_kl})")
+        logging.info("KL regularization (temp=%s, lambda=%s)", kl_temperature, lambda_kl)
 
     # ── Phase 1: CPU prep (parallel) ──────────────────────────────────
     logging.info("Phase 1: Pre-extracting arrays and computing enrichment...")
@@ -1779,7 +1793,7 @@ def optimize_gene_expression(
     # Extract numpy arrays from AnnData (once)
     expr_data = deconvolution_expression_data
     if scipy.sparse.issparse(expr_data):
-        expr_data = expr_data.toarray()
+        expr_data = expr_data.toarray()  # type: ignore[attr-defined]
     expr_data = np.asarray(expr_data, dtype=np.float64)
 
     props = np.asarray(cell_type_numbers_array, dtype=np.float64)
@@ -1787,7 +1801,7 @@ def optimize_gene_expression(
 
     # Build neighbor lists via KDTree (vectorized, replaces per-spot brute-force)
     neighbor_lists = _build_neighbor_lists(spatial_coords, float(radius))
-    logging.info(f"Built neighbor lists (KDTree, radius={radius})")
+    logging.info("Built neighbor lists (KDTree, radius=%s)", radius)
 
     # Compute celltype frequencies
     celltype_freqs = props.sum(axis=0)
@@ -1795,10 +1809,15 @@ def optimize_gene_expression(
 
     # Vectorized enrichment: (N, M, T)
     all_enrichment = _vectorized_enrichment(
-        expr_data, props, celltype_freqs, neighbor_lists,
-        enrichment_smoothing, local_enrichment_weight, global_enrichment_weight,
+        expr_data,
+        props,
+        celltype_freqs,
+        neighbor_lists,
+        enrichment_smoothing,
+        local_enrichment_weight,
+        global_enrichment_weight,
     )
-    logging.info(f"Enrichment computed for {N} spots × {M} genes × {T} types")
+    logging.info("Enrichment computed for %s spots × %s genes × %s types", N, M, T)
 
     # Prepare QP coefficient arrays for remaining spots (CPU, parallel)
     workers = max_workers if max_workers is not None else min(os.cpu_count() or 4, 8)
@@ -1829,11 +1848,11 @@ def optimize_gene_expression(
                 data = future.result()
                 if data is not None:
                     spot_qp_data[idx] = data
-            except Exception as e:
-                logging.error(f"Prep failed for spot {idx}: {e}")
+            except Exception as e:  # pylint: disable=broad-exception-caught
+                logging.error("Prep failed for spot %s: %s", idx, e)
 
     prep_elapsed = time.time() - prep_start
-    logging.info(f"Phase 1 complete: {len(spot_qp_data)} spots prepped in {prep_elapsed:.1f}s")
+    logging.info("Phase 1 complete: %s spots prepped in %ss", len(spot_qp_data), prep_elapsed)
 
     # ── Phase 2: GPU solve (sequential) ───────────────────────────────
     logging.info("Phase 2: Solving QPs on GPU (sequential)...")
@@ -1854,28 +1873,41 @@ def optimize_gene_expression(
 
                         if spots_since_last_save >= checkpoint_interval:
                             checkpoint_mgr.save_checkpoint(
-                                completed_spots, spotwise_gene_expression_profiles, N, T, M,
+                                completed_spots,
+                                spotwise_gene_expression_profiles,
+                                N,
+                                T,
+                                M,
                             )
                             spots_since_last_save = 0
-                except Exception as e:
-                    logging.error(f"Solve failed for spot {spot_idx}: {e}")
+                except (OSError, ValueError) as e:
+
+                    logging.error("Solve failed for spot %s: %s", spot_idx, e)
                     continue
 
     finally:
         gc.collect()
         if spotwise_gene_expression_profiles:
             checkpoint_mgr.save_final_results(
-                spotwise_gene_expression_profiles, completed_spots, N, T, M,
+                spotwise_gene_expression_profiles,
+                completed_spots,
+                N,
+                T,
+                M,
             )
 
     solve_elapsed = time.time() - solve_start
     total = time.time() - prep_start
     logging.info(
-        f"GEX deconvolution complete: prep={prep_elapsed:.1f}s, solve={solve_elapsed:.1f}s, "
-        f"total={total:.1f}s ({len(completed_spots)}/{N} spots)"
+        "GEX deconvolution complete: prep=%ss, solve=%ss, total=%ss (%s/%s spots)",
+        round(prep_elapsed, 1),
+        round(solve_elapsed, 1),
+        round(total, 1),
+        len(completed_spots),
+        N,
     )
 
-    return spotwise_gene_expression_profiles
+    return cast(Dict[str, Any], spotwise_gene_expression_profiles)
 
 
 def optimize_cell_proportions_per_marker(
@@ -1883,6 +1915,7 @@ def optimize_cell_proportions_per_marker(
     marker_names: List[str],
     assignment_matrix: np.ndarray,
     cell_type_names: List[str],
+    *,
     tolerance: float = 1e-4,
     max_iterations: int = 50,
     lambda_reg: float = 1.0,
@@ -1912,8 +1945,8 @@ def optimize_cell_proportions_per_marker(
     lambda_morphology: float = 0.0,
     freeze_globals: bool = False,
     marker_weight: Optional[np.ndarray] = None,
-    confusion_pairs: Optional[List[Tuple[int, int]]] = None,
-    lambda_confusion: float = 0.0,
+    _confusion_pairs: Optional[List[Tuple[int, int]]] = None,
+    _lambda_confusion: float = 0.0,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray, np.ndarray]:
     """
     Perform EM-based optimization for cell type proportions with per-marker beta.
@@ -1967,9 +2000,7 @@ def optimize_cell_proportions_per_marker(
         - recon_error (np.ndarray): (N,) per-spot squared reconstruction error
     """
     if Problem is None:
-        raise ImportError(
-            "cuOPT is not installed. Install with: pip install nvidia-cuopt"
-        )
+        raise ImportError("cuOPT is not installed. Install with: pip install nvidia-cuopt")
 
     # When globals are frozen there is nothing to iterate — force single pass
     if freeze_globals:
@@ -1980,9 +2011,7 @@ def optimize_cell_proportions_per_marker(
     if spot_abundance_target is not None:
         spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
         if spot_abundance_target.shape[0] != N:
-            raise ValueError(
-                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
-            )
+            raise ValueError(f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}.")
 
     # Validate assignment matrix shape
     if assignment_matrix.shape != (M, T):
@@ -2008,9 +2037,7 @@ def optimize_cell_proportions_per_marker(
     markers_per_celltype = np.maximum(markers_per_celltype, 1.0)
 
     if lambda_coverage > 0:
-        logging.warning(
-            "lambda_coverage (asymmetric loss) not yet supported in cuOPT backend; ignoring"
-        )
+        logging.warning("lambda_coverage (asymmetric loss) not yet supported in cuOPT backend; ignoring")
 
     # Per-spot weights for heteroscedastic reconstruction (cellularity-informed)
     if spot_weights is not None:
@@ -2019,13 +2046,15 @@ def optimize_cell_proportions_per_marker(
             raise ValueError(f"spot_weights length {spot_weights.shape[0]} != N={N}")
         logging.info(
             "Cellularity spot weights enabled: median=%.2f, range=[%.2f, %.2f]",
-            float(np.median(spot_weights)), float(spot_weights.min()), float(spot_weights.max()),
+            float(np.median(spot_weights)),
+            float(spot_weights.min()),
+            float(spot_weights.max()),
         )
     else:
         spot_weights = np.ones(N, dtype=np.float64)
 
-    logging.info(f"Per-marker beta optimization (cuOPT): {N} spots, {M} markers, {T} cell types")
-    logging.info(f"Markers with assignments: {marker_has_owner.sum()}/{M}")
+    logging.info("Per-marker beta optimization (cuOPT): %s spots, %s markers, %s cell types", N, M, T)
+    logging.info("Markers with assignments: %s/%s", marker_has_owner.sum(), M)
 
     # Build spatial Laplacian if requested
     L_coo = None
@@ -2034,11 +2063,14 @@ def optimize_cell_proportions_per_marker(
         if coords.shape[0] != N:
             raise ValueError(f"coords has {coords.shape[0]} rows but data has {N} spots")
         L = build_spatial_laplacian(
-            coords, k=laplacian_k, normed=True,
-            cellularity=cellularity, cellularity_sigma=cellularity_sigma,
+            coords,
+            k=laplacian_k,
+            normed=True,
+            cellularity=cellularity,
+            cellularity_sigma=cellularity_sigma,
         )
         L_coo = L.tocoo()
-        logging.info(f"Laplacian smoothing enabled: lambda={lambda_laplacian}, k={laplacian_k}")
+        logging.info("Laplacian smoothing enabled: lambda=%s, k=%s", lambda_laplacian, laplacian_k)
     elif lambda_laplacian > 0 and coords is None:
         logging.warning("lambda_laplacian > 0 but coords not provided. Laplacian smoothing disabled.")
 
@@ -2051,7 +2083,7 @@ def optimize_cell_proportions_per_marker(
 
     iteration = 0
     while iteration < max_iterations:
-        logging.info(f"\nIteration {iteration + 1}")
+        logging.info("\nIteration %s", iteration + 1)
 
         # ===== E-step: Solve QP for Y using cuOPT =====
         p = Problem()
@@ -2063,13 +2095,15 @@ def optimize_cell_proportions_per_marker(
                 ub = 1.0
                 if sparsity_mask is not None:
                     ub = min(1.0, float(sparsity_mask[i, j]))
-                Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f'Y_{i}_{j}')
+                Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f"Y_{i}_{j}")
 
         if sparsity_mask is not None:
             n_clamped = int((sparsity_mask < 1.0).sum())
             logging.info(
                 "Sparsity mask applied: %d/%d (spot,type) pairs clamped (%.1f%%)",
-                n_clamped, N * T, 100.0 * n_clamped / (N * T),
+                n_clamped,
+                N * T,
+                100.0 * n_clamped / (N * T),
             )
 
         # Row-sum hard bounds (default [0.9, 1.2])
@@ -2105,21 +2139,21 @@ def optimize_cell_proportions_per_marker(
 
                     # (S - beta*Y)^2 = beta^2*Y^2 - 2*beta*S*Y + S^2
                     # S^2 is constant, dropped from objective
-                    obj += w * beta_m ** 2 * Y_vars[i, j] * Y_vars[i, j]
+                    obj += w * beta_m**2 * Y_vars[i, j] * Y_vars[i, j]
                     obj += w * (-2 * beta_m * S_im) * Y_vars[i, j]
 
         # Elastic net regularization on Y
         for i in range(N):
             for j in range(T):
-                obj += lambda_reg * alpha * Y_vars[i, j]                        # L1 (Y>=0)
-                obj += lambda_reg * (1 - alpha) * Y_vars[i, j] * Y_vars[i, j]   # L2
+                obj += lambda_reg * alpha * Y_vars[i, j]  # L1 (Y>=0)
+                obj += lambda_reg * (1 - alpha) * Y_vars[i, j] * Y_vars[i, j]  # L2
 
         # Sparsity penalty (negative L2 — encourages near-one-hot)
         if lambda_sparse > 0:
             for i in range(N):
                 for j in range(T):
                     obj -= lambda_sparse * Y_vars[i, j] * Y_vars[i, j]
-            logging.info(f"Sparsity penalty enabled (neg-L2): lambda_sparse={lambda_sparse}")
+            logging.info("Sparsity penalty enabled (neg-L2): lambda_sparse=%s", lambda_sparse)
 
         # Laplacian smoothing term
         if use_laplacian and L_coo is not None:
@@ -2152,11 +2186,11 @@ def optimize_cell_proportions_per_marker(
         try:
             p.solve()
         except Exception as e:
-            logging.error(f"cuOPT optimization error: {str(e)}")
+            logging.error("cuOPT optimization error: %s", str(e))
             raise ValueError("cuOPT optimization failed") from e
 
         # Check solve status (cuOPT exposes status via p.Status)
-        if hasattr(p, 'Status') and p.Status not in (None, 'optimal', 'OPTIMAL', 1, 2):
+        if hasattr(p, "Status") and p.Status not in (None, "optimal", "OPTIMAL", 1, 2):
             raise ValueError(f"cuOPT optimization did not converge (status: {p.Status})")
 
         # Extract solution
@@ -2190,7 +2224,7 @@ def optimize_cell_proportions_per_marker(
                 Y_wmean = np.dot(w, Y_combined) / w_sum
                 S_wmean = np.dot(w, S_m) / w_sum
                 Y_centered = Y_combined - Y_wmean
-                Y_wvar = np.dot(w, Y_centered ** 2)
+                Y_wvar = np.dot(w, Y_centered**2)
 
                 if Y_wvar > 1e-9:
                     beta_new[m] = np.dot(w * (S_m - S_wmean), Y_centered) / Y_wvar
@@ -2216,7 +2250,7 @@ def optimize_cell_proportions_per_marker(
         alpha_diff = np.linalg.norm(alpha_new - alpha_prev)
         Y_diff = np.linalg.norm(Y_values - Y_prev)
 
-        logging.info(f"Change in beta: {beta_diff:.6f}, alpha: {alpha_diff:.6f}, Y: {Y_diff:.6f}")
+        logging.info("Change in beta: %s, alpha: %s, Y: %s", beta_diff, alpha_diff, Y_diff)
         if beta_diff < tolerance and alpha_diff < tolerance and Y_diff < tolerance:
             logging.info("Convergence achieved.")
             break
@@ -2244,11 +2278,16 @@ def optimize_cell_proportions_per_marker(
     marker_beta_dict = {marker_names[m]: beta_new[m] for m in range(M)}
 
     # Log beta and alpha statistics
-    logging.info(f"Beta range: [{beta_new.min():.3f}, {beta_new.max():.3f}], mean: {beta_new.mean():.3f}")
-    logging.info(f"Alpha (baseline) range: [{alpha_values.min():.3f}, {alpha_values.max():.3f}], mean: {alpha_values.mean():.3f}")
+    logging.info("Beta range: [%s, %s], mean: %s", beta_new.min(), beta_new.max(), beta_new.mean())
+    logging.info(
+        "Alpha (baseline) range: [%s, %s], mean: %s",
+        alpha_values.min(),
+        alpha_values.max(),
+        alpha_values.mean(),
+    )
     for m in range(M):
         if marker_has_owner[m] and alpha_values[m] > 0.05:
-            logging.info(f"  Marker '{marker_names[m]}': alpha={alpha_values[m]:.3f}, beta={beta_new[m]:.3f}")
+            logging.info("  Marker '%s': alpha=%s, beta=%s", marker_names[m], alpha_values[m], beta_new[m])
 
     # Compute per-spot reconstruction error using final betas and alphas
     recon_error = np.zeros(N, dtype=np.float64)
@@ -2259,8 +2298,13 @@ def optimize_cell_proportions_per_marker(
         for j in marker_owners[m]:
             Y_combined_m += Y_values[:, j]
         residual = marker_level_data[:, m] - alpha_values[m] - beta_new[m] * Y_combined_m
-        recon_error += residual ** 2
-    logging.info(f"Per-spot recon error: mean={recon_error.mean():.4f}, median={np.median(recon_error):.4f}, max={recon_error.max():.4f}")
+        recon_error += residual**2
+    logging.info(
+        "Per-spot recon error: mean=%s, median=%s, max=%s",
+        recon_error.mean(),
+        np.median(recon_error),
+        recon_error.max(),
+    )
 
     return Y_values, beta_new, marker_beta_dict, alpha_values, recon_error
 
@@ -2271,6 +2315,7 @@ def _mstep_per_type_beta(
     spot_weights: np.ndarray,
     beta_init: np.ndarray,
     prior_sigma: np.ndarray,
+    *,
     lambda_alpha: float = 1.0,
     alpha_max: float = 0.8,
     beta_max: float = 2.0,
@@ -2392,7 +2437,7 @@ def _mstep_per_type_beta(
     return beta_new, alpha_new
 
 
-def _compute_per_type_beta_objective(
+def _compute_per_type_beta_objective(  # pylint: disable=too-many-positional-arguments
     marker_data: np.ndarray,
     Y_values: np.ndarray,
     beta: np.ndarray,
@@ -2411,16 +2456,13 @@ def _compute_per_type_beta_objective(
     # Reconstruction: sum_i,m w_i * (S_im - alpha_m - sum_j beta_mj * Y_ij)^2
     predicted = Y_values @ beta.T + alpha[np.newaxis, :]
     residual = marker_data - predicted
-    recon = np.sum(spot_weights[:, np.newaxis] * residual ** 2)
+    recon = np.sum(spot_weights[:, np.newaxis] * residual**2)
 
     # Elastic net on Y
-    elastic = lambda_reg * (
-        alpha_elastic * np.sum(Y_values)
-        + (1 - alpha_elastic) * np.sum(Y_values ** 2)
-    )
+    elastic = lambda_reg * (alpha_elastic * np.sum(Y_values) + (1 - alpha_elastic) * np.sum(Y_values**2))
 
     # Ridge prior on beta
-    ridge = np.sum((beta - beta_init) ** 2 / (prior_sigma ** 2 + 1e-12))
+    ridge = np.sum((beta - beta_init) ** 2 / (prior_sigma**2 + 1e-12))
 
     return float(recon + elastic + ridge)
 
@@ -2431,6 +2473,7 @@ def optimize_cell_proportions_per_type_beta(
     cell_type_names: List[str],
     beta_init: np.ndarray,
     prior_sigma: np.ndarray,
+    *,
     tolerance: float = 1e-4,
     max_iterations: int = 50,
     lambda_reg: float = 1.0,
@@ -2481,8 +2524,9 @@ def optimize_cell_proportions_per_type_beta(
         recon_error: (N,) per-spot reconstruction error.
         objective_history: List of per-iteration objective values.
     """
-    from .emission_init import MARKER_TYPE_TABLE
-    from cuopt.linear_programming.problem import Problem
+    from cuopt.linear_programming.problem import Problem  # pylint: disable=import-outside-toplevel
+
+    from .emission_init import MARKER_TYPE_TABLE  # pylint: disable=import-outside-toplevel
 
     N, M = marker_level_data.shape
     T = len(cell_type_names)
@@ -2494,8 +2538,9 @@ def optimize_cell_proportions_per_type_beta(
     L_coo = None
     use_laplacian = lambda_laplacian > 0 and coords is not None
     if use_laplacian:
-        from scipy.spatial import cKDTree
-        from scipy.sparse import coo_matrix
+        from scipy.sparse import coo_matrix  # pylint: disable=import-outside-toplevel
+        from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
+
         tree = cKDTree(coords)
         _, nn_idx = tree.query(coords, k=laplacian_k + 1)
         rows, cols, data = [], [], []
@@ -2524,7 +2569,7 @@ def optimize_cell_proportions_per_type_beta(
 
     iteration = 0
     while iteration < max_iterations:
-        logging.info(f"\n[per_type_beta] Iteration {iteration + 1}")
+        logging.info("\n[per_type_beta] Iteration %s", iteration + 1)
         t_iter_start = time.time()
 
         # ===== E-step: cuOPT QP with diagonal Hessian approximation =====
@@ -2536,7 +2581,7 @@ def optimize_cell_proportions_per_type_beta(
                 ub = 1.0
                 if sparsity_mask is not None:
                     ub = min(1.0, float(sparsity_mask[i, j]))
-                Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f'Y_{i}_{j}')
+                Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f"Y_{i}_{j}")
 
         # Row-sum constraints
         for i in range(N):
@@ -2605,17 +2650,28 @@ def optimize_cell_proportions_per_type_beta(
 
         # ===== M-step =====
         beta_new, alpha_new = _mstep_per_type_beta(
-            marker_level_data, Y_values, spot_weights,
-            beta_init, prior_sigma,
-            lambda_alpha=lambda_alpha, alpha_max=alpha_max, beta_max=beta_max,
+            marker_level_data,
+            Y_values,
+            spot_weights,
+            beta_init,
+            prior_sigma,
+            lambda_alpha=lambda_alpha,
+            alpha_max=alpha_max,
+            beta_max=beta_max,
             prev_beta=beta_values if iteration > 0 else None,
         )
 
         # ===== Convergence monitoring =====
         obj_val = _compute_per_type_beta_objective(
-            marker_level_data, Y_values, beta_new, alpha_new,
-            spot_weights, beta_init, prior_sigma,
-            lambda_reg, alpha_elastic,
+            marker_level_data,
+            Y_values,
+            beta_new,
+            alpha_new,
+            spot_weights,
+            beta_init,
+            prior_sigma,
+            lambda_reg,
+            alpha_elastic,
         )
         objective_history.append(obj_val)
 
@@ -2645,8 +2701,10 @@ def optimize_cell_proportions_per_type_beta(
                     if beta_new[m_idx, t_idx] < 0.1 * beta_init[m_idx, t_idx]:
                         logging.warning(
                             "[per_type_beta] Strong pair %s->%s collapsed: %.4f < 10%% of init %.4f",
-                            marker_names[m_idx], t_name,
-                            beta_new[m_idx, t_idx], beta_init[m_idx, t_idx],
+                            marker_names[m_idx],
+                            t_name,
+                            beta_new[m_idx, t_idx],
+                            beta_init[m_idx, t_idx],
                         )
 
         # Convergence check
@@ -2655,7 +2713,10 @@ def optimize_cell_proportions_per_type_beta(
         Y_diff = np.linalg.norm(Y_values - Y_prev)
         logging.info(
             "[per_type_beta] Obj: %.4f, d_beta: %.6f, d_alpha: %.6f, d_Y: %.6f",
-            obj_val, beta_diff, alpha_diff, Y_diff,
+            obj_val,
+            beta_diff,
+            alpha_diff,
+            Y_diff,
         )
 
         if beta_diff < tolerance and alpha_diff < tolerance and Y_diff < tolerance:
@@ -2672,16 +2733,15 @@ def optimize_cell_proportions_per_type_beta(
     # Build result dict
     marker_beta_matrix_dict = {}
     for m_idx, m_name in enumerate(marker_names):
-        marker_beta_matrix_dict[m_name] = {
-            cell_type_names[j]: float(beta_values[m_idx, j]) for j in range(T)
-        }
+        marker_beta_matrix_dict[m_name] = {cell_type_names[j]: float(beta_values[m_idx, j]) for j in range(T)}
 
     # Per-spot reconstruction error
     predicted = Y_values @ beta_values.T + alpha_values[np.newaxis, :]
     recon_error = np.sum((marker_level_data - predicted) ** 2, axis=1)
 
-    logging.info("[per_type_beta] Final recon error: mean=%.4f, median=%.4f",
-                 recon_error.mean(), np.median(recon_error))
+    logging.info(
+        "[per_type_beta] Final recon error: mean=%.4f, median=%.4f", recon_error.mean(), np.median(recon_error)
+    )
 
     return Y_values, beta_values, marker_beta_matrix_dict, alpha_values, recon_error, objective_history
 
@@ -2691,6 +2751,7 @@ def optimize_cell_proportions_per_marker_matrix(
     marker_names: List[str],
     assignment_matrix: np.ndarray,
     cell_type_names: List[str],
+    *,
     tolerance: float = 1e-4,
     max_iterations: int = 50,
     lambda_reg: float = 1.0,
@@ -2777,18 +2838,14 @@ def optimize_cell_proportions_per_marker_matrix(
         - recon_error (np.ndarray): (N,) per-spot squared reconstruction error
     """
     if Problem is None:
-        raise ImportError(
-            "cuOPT is not installed. Install with: pip install nvidia-cuopt"
-        )
+        raise ImportError("cuOPT is not installed. Install with: pip install nvidia-cuopt")
 
     N, M = marker_level_data.shape
     T = len(cell_type_names)
     if spot_abundance_target is not None:
         spot_abundance_target = np.asarray(spot_abundance_target, dtype=np.float64).reshape(-1)
         if spot_abundance_target.shape[0] != N:
-            raise ValueError(
-                f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}."
-            )
+            raise ValueError(f"spot_abundance_target length {spot_abundance_target.shape[0]} does not match N={N}.")
 
     # Validate assignment matrix shape
     if assignment_matrix.shape != (M, T):
@@ -2813,9 +2870,7 @@ def optimize_cell_proportions_per_marker_matrix(
     markers_per_celltype = np.maximum(markers_per_celltype, 1.0)
 
     if lambda_coverage > 0:
-        logging.warning(
-            "lambda_coverage (asymmetric loss) not yet supported in cuOPT backend; ignoring"
-        )
+        logging.warning("lambda_coverage (asymmetric loss) not yet supported in cuOPT backend; ignoring")
 
     # Per-spot weights for heteroscedastic reconstruction
     if spot_weights is not None:
@@ -2824,15 +2879,15 @@ def optimize_cell_proportions_per_marker_matrix(
             raise ValueError(f"spot_weights length {spot_weights.shape[0]} != N={N}")
         logging.info(
             "Cellularity spot weights enabled: median=%.2f, range=[%.2f, %.2f]",
-            float(np.median(spot_weights)), float(spot_weights.min()), float(spot_weights.max()),
+            float(np.median(spot_weights)),
+            float(spot_weights.min()),
+            float(spot_weights.max()),
         )
     else:
         spot_weights = np.ones(N, dtype=np.float64)
 
-    logging.info(
-        f"Per-marker beta optimization (cuOPT matrix): {N} spots, {M} markers, {T} cell types"
-    )
-    logging.info(f"Markers with assignments: {marker_has_owner.sum()}/{M}")
+    logging.info("Per-marker beta optimization (cuOPT matrix): %s spots, %s markers, %s cell types", N, M, T)
+    logging.info("Markers with assignments: %s/%s", marker_has_owner.sum(), M)
 
     # ===== Pre-compute weight matrix W[m, j] = 1/(n_owners * markers_per_celltype[j]) =====
     # This is STATIC — does not depend on beta/alpha
@@ -2853,11 +2908,14 @@ def optimize_cell_proportions_per_marker_matrix(
         if coords.shape[0] != N:
             raise ValueError(f"coords has {coords.shape[0]} rows but data has {N} spots")
         L = build_spatial_laplacian(
-            coords, k=laplacian_k, normed=True,
-            cellularity=cellularity, cellularity_sigma=cellularity_sigma,
+            coords,
+            k=laplacian_k,
+            normed=True,
+            cellularity=cellularity,
+            cellularity_sigma=cellularity_sigma,
         )
         L_coo = L.tocoo()
-        logging.info(f"Laplacian smoothing enabled: lambda={lambda_laplacian}, k={laplacian_k}")
+        logging.info("Laplacian smoothing enabled: lambda=%s, k=%s", lambda_laplacian, laplacian_k)
     elif lambda_laplacian > 0 and coords is None:
         logging.warning("lambda_laplacian > 0 but coords not provided. Laplacian smoothing disabled.")
 
@@ -2871,13 +2929,15 @@ def optimize_cell_proportions_per_marker_matrix(
             ub = 1.0
             if sparsity_mask is not None:
                 ub = min(1.0, float(sparsity_mask[i, j]))
-            Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f'Y_{i}_{j}')
+            Y_vars[i, j] = p.addVariable(lb=0.0, ub=ub, name=f"Y_{i}_{j}")
 
     if sparsity_mask is not None:
         n_clamped = int((sparsity_mask < 1.0).sum())
         logging.info(
             "Sparsity mask applied: %d/%d (spot,type) pairs clamped (%.1f%%)",
-            n_clamped, N * T, 100.0 * n_clamped / (N * T),
+            n_clamped,
+            N * T,
+            100.0 * n_clamped / (N * T),
         )
 
     # Row-sum hard bounds (default [0.9, 1.2])
@@ -2892,7 +2952,8 @@ def optimize_cell_proportions_per_marker_matrix(
 
     logging.info(
         "Pre-built %d variables and %d constraints (reused across EM iterations)",
-        N * T, 2 * N,
+        N * T,
+        2 * N,
     )
 
     # ===== Initialize beta and alpha =====
@@ -2904,7 +2965,7 @@ def optimize_cell_proportions_per_marker_matrix(
 
     iteration = 0
     while iteration < max_iterations:
-        logging.info(f"\nIteration {iteration + 1}")
+        logging.info("\nIteration %s", iteration + 1)
         t_iter_start = time.time()
 
         # ===== E-step: Build objective using vectorized coefficients =====
@@ -2917,7 +2978,7 @@ def optimize_cell_proportions_per_marker_matrix(
         # The marker sum is: (W_static * beta^2)[:, j].sum(axis=0) for each type j
         # This gives a (T,) vector, then broadcast with spot_weights (N,)
 
-        beta_sq = beta_values ** 2  # (M,)
+        beta_sq = beta_values**2  # (M,)
         # W_beta_sq[m, j] = W_static[m, j] * beta[m]^2
         W_beta_sq = W_static * beta_sq[:, np.newaxis]  # (M, T)
         # Sum over markers for each type: type_quad_coeff[j] = sum_m W_beta_sq[m, j]
@@ -2971,7 +3032,7 @@ def optimize_cell_proportions_per_marker_matrix(
         # Confusion penalty: discourage confused type pairs from being simultaneously high
         if confusion_pairs and lambda_confusion > 0:
             for i in range(N):
-                for (t_a, t_b) in confusion_pairs:
+                for t_a, t_b in confusion_pairs:
                     obj += lambda_confusion * Y_vars[i, t_a] * Y_vars[i, t_b]
 
         p.setObjective(obj)
@@ -2979,17 +3040,18 @@ def optimize_cell_proportions_per_marker_matrix(
         t_obj = time.time()
         logging.info(
             "  Coefficient computation: %.3fs, objective build: %.3fs",
-            t_coeff - t_iter_start, t_obj - t_coeff,
+            t_coeff - t_iter_start,
+            t_obj - t_coeff,
         )
 
         try:
             p.solve()
         except Exception as e:
-            logging.error(f"cuOPT optimization error: {str(e)}")
+            logging.error("cuOPT optimization error: %s", str(e))
             raise ValueError("cuOPT optimization failed") from e
 
         # Check solve status
-        if hasattr(p, 'Status') and p.Status not in (None, 'optimal', 'OPTIMAL', 1, 2):
+        if hasattr(p, "Status") and p.Status not in (None, "optimal", "OPTIMAL", 1, 2):
             raise ValueError(f"cuOPT optimization did not converge (status: {p.Status})")
 
         t_solve = time.time()
@@ -3021,7 +3083,7 @@ def optimize_cell_proportions_per_marker_matrix(
             Y_wmean = np.dot(w, Y_combined) / w_sum
             S_wmean = np.dot(w, S_m) / w_sum
             Y_centered = Y_combined - Y_wmean
-            Y_wvar = np.dot(w, Y_centered ** 2)
+            Y_wvar = np.dot(w, Y_centered**2)
 
             if Y_wvar > 1e-9:
                 beta_new[m] = np.dot(w * (S_m - S_wmean), Y_centered) / Y_wvar
@@ -3047,7 +3109,7 @@ def optimize_cell_proportions_per_marker_matrix(
         alpha_diff = np.linalg.norm(alpha_new - alpha_prev)
         Y_diff = np.linalg.norm(Y_values - Y_prev)
 
-        logging.info(f"Change in beta: {beta_diff:.6f}, alpha: {alpha_diff:.6f}, Y: {Y_diff:.6f}")
+        logging.info("Change in beta: %s, alpha: %s, Y: %s", beta_diff, alpha_diff, Y_diff)
         if beta_diff < tolerance and alpha_diff < tolerance and Y_diff < tolerance:
             logging.info("Convergence achieved.")
             break
@@ -3075,11 +3137,16 @@ def optimize_cell_proportions_per_marker_matrix(
     marker_beta_dict = {marker_names[m]: beta_new[m] for m in range(M)}
 
     # Log beta and alpha statistics
-    logging.info(f"Beta range: [{beta_new.min():.3f}, {beta_new.max():.3f}], mean: {beta_new.mean():.3f}")
-    logging.info(f"Alpha (baseline) range: [{alpha_values.min():.3f}, {alpha_values.max():.3f}], mean: {alpha_values.mean():.3f}")
+    logging.info("Beta range: [%s, %s], mean: %s", beta_new.min(), beta_new.max(), beta_new.mean())
+    logging.info(
+        "Alpha (baseline) range: [%s, %s], mean: %s",
+        alpha_values.min(),
+        alpha_values.max(),
+        alpha_values.mean(),
+    )
     for m in range(M):
         if marker_has_owner[m] and alpha_values[m] > 0.05:
-            logging.info(f"  Marker '{marker_names[m]}': alpha={alpha_values[m]:.3f}, beta={beta_new[m]:.3f}")
+            logging.info("  Marker '%s': alpha=%s, beta=%s", marker_names[m], alpha_values[m], beta_new[m])
 
     # Compute per-spot reconstruction error using final betas and alphas
     recon_error = np.zeros(N, dtype=np.float64)
@@ -3090,7 +3157,12 @@ def optimize_cell_proportions_per_marker_matrix(
         for j in marker_owners[m]:
             Y_combined_m += Y_values[:, j]
         residual = marker_level_data[:, m] - alpha_values[m] - beta_new[m] * Y_combined_m
-        recon_error += residual ** 2
-    logging.info(f"Per-spot recon error: mean={recon_error.mean():.4f}, median={np.median(recon_error):.4f}, max={recon_error.max():.4f}")
+        recon_error += residual**2
+    logging.info(
+        "Per-spot recon error: mean=%s, median=%s, max=%s",
+        recon_error.mean(),
+        np.median(recon_error),
+        recon_error.max(),
+    )
 
     return Y_values, beta_new, marker_beta_dict, alpha_values, recon_error

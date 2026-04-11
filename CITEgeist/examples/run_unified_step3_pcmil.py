@@ -9,11 +9,9 @@ import json
 import logging
 import os
 import sys
-from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import torch
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -21,28 +19,40 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from model.unified_config import (
-    CELL_PROFILES_NESTED, CELL_TYPE_NAMES, OUTPUT_BASE, DATA_DIR, K,
-    MAX_EPOCHS, PATIENCE, LAMBDA_RECON, LAMBDA_ENTROPY,
-    LAMBDA_DIVERSITY, LAMBDA_HUNGARIAN, RECON_WARMUP_EPOCHS,
-    PROTEIN_DROPOUT,
-)
-from model.pc_mil import PCMILModel, flatten_profile_dict, build_profile_matrix
-from model.pc_mil_training import train_pc_mil, SpotDataset
+from model.pc_mil import PCMILModel, build_profile_matrix, flatten_profile_dict
 from model.pc_mil_inference import pc_mil_infer_spot
+from model.pc_mil_training import SpotDataset, train_pc_mil
+from model.unified_config import (
+    CELL_PROFILES_NESTED,
+    CELL_TYPE_NAMES,
+    DATA_DIR,
+    LAMBDA_DIVERSITY,
+    LAMBDA_ENTROPY,
+    LAMBDA_HUNGARIAN,
+    LAMBDA_RECON,
+    MAX_EPOCHS,
+    OUTPUT_BASE,
+    PATIENCE,
+    PROTEIN_DROPOUT,
+    RECON_WARMUP_EPOCHS,
+    K,
+)
 
 
 def load_antibody_signal(sample_name, spots, all_markers):
     """Load raw antibody signal from SpaceRanger data for protein reconstruction loss."""
     import squidpy as sq
+
     sample_path = DATA_DIR / sample_name / "outs"
     if not sample_path.exists():
         logger.warning(f"SpaceRanger data not found at {sample_path}, using zeros for protein signal")
         return np.zeros((len(spots), len(all_markers)), dtype=np.float32)
 
     adata = sq.read.visium(
-        str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
-        load_images=False, gex_only=False,
+        str(sample_path),
+        counts_file="filtered_feature_bc_matrix.h5",
+        load_images=False,
+        gex_only=False,
     )
     # Split out antibody features
     if "feature_types" in adata.var.columns:
@@ -101,8 +111,7 @@ def build_spot_datasets(sample_name, features, nucleus_ids, centroids, props_df)
             continue
 
         spot_nids = spot_nuclei["nucleus_id"].values
-        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nids
-                        if int(nid) in nid_to_idx]
+        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nids if int(nid) in nid_to_idx]
         if not feat_indices:
             continue
 
@@ -149,7 +158,11 @@ def run_step3(sample_name):
 
     features, nucleus_ids, centroids, props_df = load_step2_outputs(sample_name)
     dataset, spot_barcodes, nids_per_spot = build_spot_datasets(
-        sample_name, features, nucleus_ids, centroids, props_df,
+        sample_name,
+        features,
+        nucleus_ids,
+        centroids,
+        props_df,
     )
     logger.info(f"Built dataset with {len(dataset)} spots")
 
@@ -161,18 +174,29 @@ def run_step3(sample_name):
     init_profile = torch.tensor(profile_matrix, dtype=torch.float32)
 
     model = PCMILModel(
-        image_dim=384, n_types=K, n_markers=len(all_markers),
-        image_proj_dim=64, protein_context_dim=32, hidden_dim=128,
+        image_dim=384,
+        n_types=K,
+        n_markers=len(all_markers),
+        image_proj_dim=64,
+        protein_context_dim=32,
+        hidden_dim=128,
         init_profile_matrix=init_profile,
     )
 
     history = train_pc_mil(
-        model=model, train_dataset=dataset, val_dataset=None,
-        n_epochs=MAX_EPOCHS, lr=1e-3,
-        lambda_recon=LAMBDA_RECON, lambda_entropy=LAMBDA_ENTROPY,
-        lambda_diversity=LAMBDA_DIVERSITY, lambda_hungarian=LAMBDA_HUNGARIAN,
-        patience=PATIENCE, recon_warmup_epochs=RECON_WARMUP_EPOCHS,
-        protein_dropout=PROTEIN_DROPOUT, device=device,
+        model=model,
+        train_dataset=dataset,
+        val_dataset=None,
+        n_epochs=MAX_EPOCHS,
+        lr=1e-3,
+        lambda_recon=LAMBDA_RECON,
+        lambda_entropy=LAMBDA_ENTROPY,
+        lambda_diversity=LAMBDA_DIVERSITY,
+        lambda_hungarian=LAMBDA_HUNGARIAN,
+        patience=PATIENCE,
+        recon_warmup_epochs=RECON_WARMUP_EPOCHS,
+        protein_dropout=PROTEIN_DROPOUT,
+        device=device,
         save_path=str(pcmil_dir / "model_weights.pt"),
     )
 
@@ -190,8 +214,10 @@ def run_step3(sample_name):
         detected = np.ones(K, dtype=bool)
 
         result = pc_mil_infer_spot(
-            model=model, image_features=img_feats,
-            protein_proportions=prot_props, detected_types=detected,
+            model=model,
+            image_features=img_feats,
+            protein_proportions=prot_props,
+            detected_types=detected,
             cell_type_names=CELL_TYPE_NAMES,
             nucleus_ids=nids_per_spot[i],
             barcode=spot_barcodes[i],

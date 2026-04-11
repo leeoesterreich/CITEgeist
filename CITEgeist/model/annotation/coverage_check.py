@@ -4,6 +4,7 @@ Compares Module 1 (marker interest) and Module 2 (colocalization) outputs
 against the user's current cell_profile_dict and functional_marker_table,
 flagging strongly-detected markers and pairs that have no coverage.
 """
+
 from __future__ import annotations
 
 import logging
@@ -71,6 +72,7 @@ def check_module_coverage(
     m2_result: Optional["ColocalizationResult"],
     cell_profile_dict: dict,
     functional_marker_table: dict,
+    *,
     profile_discovery_result: Optional["ProfileDiscoveryResult"] = None,
     colocalization_threshold: float = 0.75,
 ) -> "CoverageCheckResult":
@@ -97,13 +99,15 @@ def check_module_coverage(
     if m1_result is not None:
         for m in m1_result.markers:
             if (m.passed_kurtosis or m.passed_morans) and m.name not in covered:
-                uncovered_marker_rows.append({
-                    "marker": m.name,
-                    "morans_i": m.morans_i,
-                    "gmm_snr": m.gmm_snr,
-                    "kurtosis": m.kurtosis,
-                    "interest_score": m.interest_score,
-                })
+                uncovered_marker_rows.append(
+                    {
+                        "marker": m.name,
+                        "morans_i": m.morans_i,
+                        "gmm_snr": m.gmm_snr,
+                        "kurtosis": m.kurtosis,
+                        "interest_score": m.interest_score,
+                    }
+                )
                 warning_lines.append(
                     f"COVERAGE WARNING [M1]: interesting marker '{m.name}' "
                     f"(morans_i={m.morans_i:.3f}, gmm_snr={m.gmm_snr:.2f}) "
@@ -132,12 +136,14 @@ def check_module_coverage(
                 if profile is not None:
                     idx = profile_discovery_result.profiles.index(profile)
                     suggested_type = f"profile_{idx}"
-            uncovered_pair_rows.append({
-                "marker_a": pair.marker_a,
-                "marker_b": pair.marker_b,
-                "colocalization_score": pair.colocalization_score,
-                "suggested_type": suggested_type,
-            })
+            uncovered_pair_rows.append(
+                {
+                    "marker_a": pair.marker_a,
+                    "marker_b": pair.marker_b,
+                    "colocalization_score": pair.colocalization_score,
+                    "suggested_type": suggested_type,
+                }
+            )
             warning_lines.append(
                 f"COVERAGE WARNING [M2]: strong pair ('{pair.marker_a}', '{pair.marker_b}', "
                 f"score={pair.colocalization_score:.3f}) is not covered by either input dict"

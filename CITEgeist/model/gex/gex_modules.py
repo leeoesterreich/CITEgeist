@@ -19,9 +19,10 @@ logger = logging.getLogger(__name__)
 def discover_anchor_genes(
     gene_expression: np.ndarray,
     cell_proportions: np.ndarray,
+    *,
     min_anchors: int = 5,
     max_anchors: int = 10,
-    initial_min_correlation: float = 0.3,
+    _initial_min_correlation: float = 0.3,
     min_expressing_spots: float = 0.1,
 ) -> Tuple[Dict[int, List[int]], Dict[int, float], Dict[int, Dict[int, float]]]:
     """
@@ -67,17 +68,16 @@ def discover_anchor_genes(
     # Validate inputs
     if cell_proportions.shape[0] != N:
         raise ValueError(
-            f"Mismatch: gene_expression has {N} spots, "
-            f"cell_proportions has {cell_proportions.shape[0]}"
+            f"Mismatch: gene_expression has {N} spots, " f"cell_proportions has {cell_proportions.shape[0]}"
         )
 
     # Threshold sequence: 0.30 -> 0.25 -> 0.20 -> 0.15 -> 0.10
     # Progressively lower to find anchors for weak cell types
     threshold_sequence = [0.30, 0.25, 0.20, 0.15, 0.10]
 
-    anchors = {}
+    anchors = {}  # type: ignore[var-annotated]
     thresholds_used = {}
-    anchor_weights = {}
+    anchor_weights = {}  # type: ignore[var-annotated]
 
     for t in range(T):
         prop_vector = cell_proportions[:, t]
@@ -87,7 +87,7 @@ def discover_anchor_genes(
             anchors[t] = []
             thresholds_used[t] = threshold_sequence[-1]
             anchor_weights[t] = {}
-            logger.warning(f"Cell type {t}: zero variance in proportions, no anchors")
+            logger.warning("Cell type %s: zero variance in proportions, no anchors", t)
             continue
 
         # Compute correlations for all genes that pass filters
@@ -146,22 +146,24 @@ def discover_anchor_genes(
         n_anchors = len(anchors[t])
         if n_anchors < min_anchors:
             logger.warning(
-                f"Cell type {t}: only {n_anchors} anchors found "
-                f"(min={min_anchors}, threshold={selected_threshold:.2f})"
+                "Cell type %s: only %s anchors found (min=%s, threshold=%s)",
+                t,
+                n_anchors,
+                min_anchors,
+                round(selected_threshold, 2),
             )
         else:
-            logger.debug(
-                f"Cell type {t}: {n_anchors} anchors at threshold={selected_threshold:.2f}"
-            )
+            logger.debug("Cell type %s: %s anchors at threshold=%s", t, n_anchors, round(selected_threshold, 2))
 
     return anchors, thresholds_used, anchor_weights
 
 
 def compute_module_aware_enrichment(
-    spot_idx: int,
+    _spot_idx: int,
     neighborhood_expression: np.ndarray,
     base_enrichment: np.ndarray,
     anchor_genes: Dict[int, List[int]],
+    *,
     module_weight: float = 0.5,
     min_neighbors_for_corr: int = 10,
 ) -> np.ndarray:
@@ -225,10 +227,7 @@ def compute_module_aware_enrichment(
             module_scores = np.ones(T) / T  # fallback to uniform
 
         # Combine base enrichment with module signal
-        adjusted[g, :] = (
-            (1 - module_weight) * base_enrichment[g, :] +
-            module_weight * module_scores
-        )
+        adjusted[g, :] = (1 - module_weight) * base_enrichment[g, :] + module_weight * module_scores
 
         # Re-normalize to sum to 1
         row_sum = adjusted[g, :].sum()
@@ -326,6 +325,6 @@ def compute_kl_penalty_coefficients(
     penalty_weight = lambda_kl / (total_counts + 1)
 
     return {
-        'target_counts': target_counts,
-        'penalty_weight': penalty_weight,
+        "target_counts": target_counts,
+        "penalty_weight": penalty_weight,  # type: ignore[dict-item]
     }

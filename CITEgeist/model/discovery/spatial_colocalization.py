@@ -21,12 +21,12 @@ from typing import Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
 from numpy.typing import NDArray
-from scipy.cluster.hierarchy import linkage, fcluster, inconsistent
+from scipy.cluster.hierarchy import fcluster, inconsistent, linkage
 from scipy.spatial import cKDTree
 from scipy.spatial.distance import squareform
 from scipy.stats import pearsonr, spearmanr
-from joblib import Parallel, delayed
 
 # Module logger
 logger = logging.getLogger(__name__)
@@ -211,7 +211,8 @@ def _compute_correlation(
         # Use the more conservative p-value
         p_value = max(p_pearson, p_spearman)
         return float(pearson_r), float(spearman_rho), float(p_value)
-    except Exception:
+    except (ValueError, RuntimeError):
+
         return 0.0, 0.0, 1.0
 
 
@@ -348,14 +349,14 @@ def _build_spatial_weights_matrix(
     Returns:
         Row-normalized spatial weights matrix (n_spots, n_spots).
     """
-    from sklearn.neighbors import NearestNeighbors
+    from sklearn.neighbors import NearestNeighbors  # pylint: disable=import-outside-toplevel
 
     n_spots = coords.shape[0]
 
     # Find k nearest neighbors
-    nn = NearestNeighbors(n_neighbors=k + 1, algorithm='ball_tree')
+    nn = NearestNeighbors(n_neighbors=k + 1, algorithm="ball_tree")
     nn.fit(coords)
-    distances, indices = nn.kneighbors(coords)
+    _, indices = nn.kneighbors(coords)
 
     # Build sparse-ish weights matrix (dense for simplicity, could optimize later)
     W = np.zeros((n_spots, n_spots), dtype=np.float64)
@@ -425,6 +426,7 @@ def _compute_bivariate_morans_i_multiscale(
     values_b: NDArray[np.floating],
     multi_scale_neighbors: Dict[int, List[List[int]]],
     rng: np.random.Generator,
+    *,
     n_perm: int = 199,
     aggregation: str = "max",
 ) -> Tuple[float, float, Dict[int, float], Dict[int, float], int]:
@@ -457,9 +459,7 @@ def _compute_bivariate_morans_i_multiscale(
     effective_n_perm = max(49, n_perm // len(multi_scale_neighbors))
 
     for k, neighbors_k in multi_scale_neighbors.items():
-        i_val, p_val = _compute_bivariate_morans_i_pvalue(
-            values_a, values_b, neighbors_k, rng, n_perm=effective_n_perm
-        )
+        i_val, p_val = _compute_bivariate_morans_i_pvalue(values_a, values_b, neighbors_k, rng, n_perm=effective_n_perm)
         scale_values[k] = i_val
         scale_pvalues[k] = p_val
 
@@ -480,7 +480,8 @@ def _compute_bivariate_morans_i_multiscale(
         # Fisher's method for combining p-values
         pvalues_clipped = np.clip(pvalues_array, 1e-10, 1.0)
         chi2_stat = -2 * np.sum(np.log(pvalues_clipped))
-        from scipy.stats import chi2
+        from scipy.stats import chi2  # pylint: disable=import-outside-toplevel
+
         aggregated_pvalue = 1 - chi2.cdf(chi2_stat, df=2 * len(pvalues_array))
         best_scale = scales[np.argmax(values_array)]
     elif aggregation == "weighted":
@@ -520,6 +521,7 @@ def _compute_neighbor_enrichment(
     Returns:
         Tuple of (enrichment_ab, enrichment_ba, p_value).
     """
+
     def compute_enrichment_one_way(source_binary, target_binary):
         """Compute enrichment of target in neighbors of source-positive spots."""
         source_positive = np.where(source_binary)[0]
@@ -605,7 +607,7 @@ def _compute_colocalization_score(
     return 0.3 * norm_spearman + 0.3 * norm_cosine + 0.4 * norm_bivariate
 
 
-def _process_marker_pair(
+def _process_marker_pair(  # pylint: disable=too-many-positional-arguments
     i: int,
     j: int,
     analyze_names: List[str],
@@ -666,11 +668,9 @@ def _process_marker_pair(
     # Bivariate Moran's I - single-scale or multi-scale
     if multi_scale_neighbors is not None and len(multi_scale_neighbors) > 1:
         # Multi-scale analysis: compute at multiple k values and aggregate
-        bivariate_i, bivariate_pval, scale_values, scale_pvalues, best_scale = \
-            _compute_bivariate_morans_i_multiscale(
-                smooth_a, smooth_b, multi_scale_neighbors, rng,
-                n_perm=n_permutations, aggregation=multi_scale_aggregation
-            )
+        bivariate_i, bivariate_pval, scale_values, scale_pvalues, best_scale = _compute_bivariate_morans_i_multiscale(
+            smooth_a, smooth_b, multi_scale_neighbors, rng, n_perm=n_permutations, aggregation=multi_scale_aggregation
+        )
     else:
         # Single-scale (backward compatible)
         bivariate_i, bivariate_pval = _compute_bivariate_morans_i_pvalue(
@@ -811,15 +811,17 @@ def analyze_marker_colocalization(
 
     if len(marker_names) != n_markers:
         raise ValueError(
-            f"Number of marker names ({len(marker_names)}) must match "
-            f"number of columns in X ({n_markers})"
+            f"Number of marker names ({len(marker_names)}) must match " f"number of columns in X ({n_markers})"
         )
 
     # Handle duplicate marker names by making them unique
     marker_names_unique, unique_to_original = _make_names_unique(list(marker_names))
     has_duplicates = len(set(marker_names)) != len(marker_names)
     if has_duplicates and verbose:
-        logging.info(f"Found duplicate marker names, making unique: {[m for m in marker_names_unique if m != unique_to_original[m]]}")
+        logging.info(
+            "Found duplicate marker names, making unique: %s",
+            [m for m in marker_names_unique if m != unique_to_original[m]],
+        )
 
     # Filter to markers of interest
     # Use unique names for internal analysis
@@ -827,7 +829,8 @@ def analyze_marker_colocalization(
         # Match against both original and unique names
         markers_to_analyze_set = set(markers_to_analyze)
         marker_indices = [
-            i for i, (orig, uniq) in enumerate(zip(marker_names, marker_names_unique))
+            i
+            for i, (orig, uniq) in enumerate(zip(marker_names, marker_names_unique))
             if orig in markers_to_analyze_set or uniq in markers_to_analyze_set
         ]
         if len(marker_indices) == 0:
@@ -843,20 +846,17 @@ def analyze_marker_colocalization(
 
     if verbose:
         n_pairs = n_analyze * (n_analyze - 1) // 2
-        logging.info(
-            f"Analyzing colocalization for {n_analyze} markers ({n_pairs} pairs) "
-            f"across {n_spots} spots"
-        )
+        logging.info("Analyzing colocalization for %s markers (%s pairs) across %s spots", n_analyze, n_pairs, n_spots)
 
     # Build neighbor graph
     if verbose:
-        logging.info(f"Building {neighbor_k}-NN neighbor graph...")
+        logging.info("Building %s-NN neighbor graph...", neighbor_k)
     neighbors = _build_neighbor_graph(coords, neighbor_k)
 
     # Spatial smoothing for bivariate Moran's I (reduces noise, improves mixed data detection)
     if smooth_k > 0:
         if verbose:
-            logging.info(f"Applying spatial smoothing (k={smooth_k} neighbors) for bivariate Moran's I...")
+            logging.info("Applying spatial smoothing (k=%s neighbors) for bivariate Moran's I...", smooth_k)
         smooth_neighbors = _build_neighbor_graph(coords, smooth_k)
         analyze_X_smooth = np.zeros_like(analyze_X)
         for spot_idx in range(n_spots):
@@ -867,23 +867,23 @@ def analyze_marker_colocalization(
 
     # Binarize markers (kept for backwards-compatible metrics)
     if verbose:
-        logging.info(f"Binarizing markers at {signal_threshold_percentile}th percentile...")
+        logging.info("Binarizing markers at %sth percentile...", signal_threshold_percentile)
     binary = _binarize_markers(analyze_X, signal_threshold_percentile)
 
     # Compute pairwise colocalization
     total_pairs = n_analyze * (n_analyze - 1) // 2
 
     if verbose:
-        logging.info(f"Computing pairwise colocalization (continuous metrics)...")
+        logging.info("Computing pairwise colocalization (continuous metrics)...")
 
     # Generate all pair indices
     pair_indices = [(i, j) for i in range(n_analyze) for j in range(i + 1, n_analyze)]
 
     # Determine number of workers (use environment variable or default to -1 for all CPUs)
-    n_jobs = int(os.environ.get('CITEGEIST_N_JOBS', -1))
+    n_jobs = int(os.environ.get("CITEGEIST_N_JOBS", -1))
     if verbose:
         n_cpus = os.cpu_count() or 1
-        logging.info(f"Running parallel colocalization analysis with {n_cpus if n_jobs == -1 else n_jobs} workers...")
+        logging.info("Running parallel colocalization analysis with %s workers...", n_cpus if n_jobs == -1 else n_jobs)
 
     # Build multi-scale neighbor graphs if requested
     if multi_scale_k is not None and len(multi_scale_k) > 1:
@@ -891,15 +891,13 @@ def analyze_marker_colocalization(
         valid_scales = [k for k in multi_scale_k if k < n_spots]
         if len(valid_scales) < len(multi_scale_k) and verbose:
             skipped = [k for k in multi_scale_k if k >= n_spots]
-            logging.warning(f"Skipping scales {skipped} (>= n_spots={n_spots})")
+            logging.warning("Skipping scales %s (>= n_spots=%s)", skipped, n_spots)
         if len(valid_scales) > 1:
             if verbose:
-                logging.info(f"Building multi-scale neighbor graphs (k={valid_scales})...")
-            multi_scale_neighbors = {
-                k: _build_neighbor_graph(coords, k) for k in valid_scales
-            }
+                logging.info("Building multi-scale neighbor graphs (k=%s)...", valid_scales)
+            multi_scale_neighbors = {k: _build_neighbor_graph(coords, k) for k in valid_scales}
             if verbose:
-                logging.info(f"Multi-scale aggregation method: {multi_scale_aggregation}")
+                logging.info("Multi-scale aggregation method: %s", multi_scale_aggregation)
         else:
             # Fall back to single-scale if not enough valid scales
             multi_scale_neighbors = None
@@ -911,15 +909,23 @@ def analyze_marker_colocalization(
     # Run in parallel using joblib
     pairs = Parallel(n_jobs=n_jobs, verbose=0)(
         delayed(_process_marker_pair)(
-            i, j, analyze_names, analyze_X, analyze_X_smooth, binary,
-            neighbors, n_permutations, seed,
-            multi_scale_neighbors, multi_scale_aggregation
+            i,
+            j,
+            analyze_names,
+            analyze_X,
+            analyze_X_smooth,
+            binary,
+            neighbors,
+            n_permutations,
+            seed,
+            multi_scale_neighbors,
+            multi_scale_aggregation,
         )
         for i, j in pair_indices
     )
 
     if verbose:
-        logging.info(f"Processed {len(pairs)}/{total_pairs} pairs")
+        logging.info("Processed %s/%s pairs", len(pairs), total_pairs)
 
     # Sort by score
     pairs.sort(key=lambda x: x.colocalization_score, reverse=True)
@@ -933,9 +939,9 @@ def analyze_marker_colocalization(
         promiscuous = [m for m, s in marker_specificity.items() if s < 0.3]
         specific = [m for m, s in marker_specificity.items() if s > 0.6]
         if promiscuous:
-            logging.info(f"Promiscuous markers (Gini < 0.3): {promiscuous}")
+            logging.info("Promiscuous markers (Gini < 0.3): %s", promiscuous)
         if specific:
-            logging.info(f"Highly specific markers (Gini > 0.6): {specific[:5]}...")
+            logging.info("Highly specific markers (Gini > 0.6): %s...", specific[:5])
 
     result = ColocalizationResult(
         pairs=pairs,
@@ -949,8 +955,10 @@ def analyze_marker_colocalization(
         top_pair = pairs[0] if pairs else None
         if top_pair:
             logging.info(
-                f"Top colocalization: {top_pair.marker_a} <-> {top_pair.marker_b} "
-                f"(score={top_pair.colocalization_score:.3f})"
+                "Top colocalization: %s <-> %s (score=%s)",
+                top_pair.marker_a,
+                top_pair.marker_b,
+                round(top_pair.colocalization_score, 3),
             )
 
     return result
@@ -971,10 +979,10 @@ class LineageDendrogram:
 
     def get_newick(self) -> str:
         """Convert to Newick format for visualization."""
-        from scipy.cluster.hierarchy import to_tree
+        from scipy.cluster.hierarchy import to_tree  # pylint: disable=import-outside-toplevel
 
         def _to_newick(node, labels):
-            if node.is_leaf():
+            if node.is_leaf():  # pylint: disable=no-else-return
                 return labels[node.id]
             else:
                 left = _to_newick(node.get_left(), labels)
@@ -1000,12 +1008,14 @@ class ProfileDiscoveryResult:
         """Convert profiles to DataFrame."""
         records = []
         for i, profile in enumerate(self.profiles):
-            records.append({
-                "profile_id": i,
-                "n_markers": len(profile),
-                "markers": ", ".join(sorted(profile)),
-                "is_singleton": len(profile) == 1,
-            })
+            records.append(
+                {
+                    "profile_id": i,
+                    "n_markers": len(profile),
+                    "markers": ", ".join(sorted(profile)),
+                    "is_singleton": len(profile) == 1,
+                }
+            )
         return pd.DataFrame(records)
 
     def get_profile_for_marker(self, marker: str) -> Optional[List[str]]:
@@ -1153,7 +1163,7 @@ def _compute_nmf_weights(
     Returns:
         Dict mapping child_id -> {marker: weight}
     """
-    from sklearn.decomposition import NMF
+    from sklearn.decomposition import NMF  # pylint: disable=import-outside-toplevel
 
     if node.is_leaf or len(node.children) == 0:
         return {}
@@ -1179,24 +1189,22 @@ def _compute_nmf_weights(
     n_components = max(1, n_components)
 
     try:
-        nmf = NMF(n_components=n_components, init='nndsvda', max_iter=200, random_state=42)
-        W = nmf.fit_transform(X_node)  # (n_spots, n_components)
+        nmf = NMF(n_components=n_components, init="nndsvda", max_iter=200, random_state=42)
+        _ = nmf.fit_transform(X_node)  # (n_spots, n_components)
         H = nmf.components_  # (n_components, n_markers_in_node)
 
         # Map components to children based on which markers they load on
         # H[k, j] = how much component k contributes to marker j
 
         # Build list of markers in node order (matching X_node columns)
-        markers_in_node = [all_markers[i] for i in range(len(all_markers))
-                          if all_markers[i] in marker_to_idx]
+        markers_in_node = [all_markers[i] for i in range(len(all_markers)) if all_markers[i] in marker_to_idx]
 
         # For each child, find which component best matches its markers
         child_to_component = {}
 
         for child_idx, child in enumerate(node.children):
             child_markers = child.get_all_markers()
-            child_marker_indices = [markers_in_node.index(m) for m in child_markers
-                                    if m in markers_in_node]
+            child_marker_indices = [markers_in_node.index(m) for m in child_markers if m in markers_in_node]
 
             if len(child_marker_indices) == 0:
                 child_to_component[child.node_id] = child_idx % n_components
@@ -1232,8 +1240,9 @@ def _compute_nmf_weights(
 
         return weights
 
-    except Exception as e:
-        logger.warning(f"NMF failed at node {node.node_id}: {e}")
+    except (ValueError, RuntimeError) as e:
+
+        logger.warning("NMF failed at node %s: %s", node.node_id, e)
         # Fallback: equal weights
         weights = {}
         for child in node.children:
@@ -1292,7 +1301,7 @@ def _apply_fdr_correction(
     if np.any(below_threshold):
         # FDR found significant pairs
         max_k = np.max(np.where(below_threshold)[0])
-        significant_sorted_indices = sorted_indices[:max_k + 1]
+        significant_sorted_indices = sorted_indices[: max_k + 1]
 
         is_significant = np.zeros(n, dtype=bool)
         is_significant[significant_sorted_indices] = True
@@ -1314,9 +1323,14 @@ def _apply_fdr_correction(
         is_significant = pvalues <= min_pval
 
         logging.warning(
-            f"FDR correction found 0 significant pairs, but {n_below_alpha} have p < {alpha}. "
-            f"Permutation resolution (min_p={min_pval:.4f}) may be insufficient for "
-            f"{n} tests. Falling back to raw p-value threshold (p <= {min_pval:.4f})."
+            "FDR correction found 0 significant pairs, but %s have p < %s. "
+            "Permutation resolution (min_p=%s) may be insufficient for "
+            "%s tests. Falling back to raw p-value threshold (p <= %s).",
+            n_below_alpha,
+            alpha,
+            round(min_pval, 4),
+            n,
+            round(min_pval, 4),
         )
 
         filtered_pairs = [p for p, sig in zip(pairs, is_significant) if sig]
@@ -1524,7 +1538,7 @@ def _find_gap_threshold_gmm(
         - threshold: Gap value separating "normal" from "large" gaps
         - is_large: Boolean array indicating which gaps are "large"
     """
-    from sklearn.mixture import GaussianMixture
+    from sklearn.mixture import GaussianMixture  # pylint: disable=import-outside-toplevel
 
     gaps = gaps[np.isfinite(gaps) & (gaps > 0)]
     if len(gaps) < 4:
@@ -1541,7 +1555,7 @@ def _find_gap_threshold_gmm(
         try:
             gmm = GaussianMixture(
                 n_components=k,
-                covariance_type='full',
+                covariance_type="full",
                 random_state=seed,
                 n_init=3,
                 max_iter=200,
@@ -1553,7 +1567,8 @@ def _find_gap_threshold_gmm(
                 best_bic = bic
                 best_gmm = gmm
                 best_k = k
-        except Exception:
+        except (ValueError, RuntimeError):
+
             continue
 
     if best_gmm is None or best_k == 1:
@@ -1578,7 +1593,7 @@ def _find_gap_threshold_gmm(
 def _split_dendrogram_by_gaps(
     linkage_matrix: NDArray[np.floating],
     markers: List[str],
-    seed: int = 1234,
+    seed: int = 1234,  # pylint: disable=unused-argument
     min_gap_ratio: float = 2.0,
 ) -> List[List[str]]:
     """
@@ -1616,7 +1631,7 @@ def _split_dendrogram_by_gaps(
     max_gap = gaps[max_gap_idx]
 
     # Compare to median gap (excluding the max)
-    other_gaps = np.concatenate([gaps[:max_gap_idx], gaps[max_gap_idx+1:]])
+    other_gaps = np.concatenate([gaps[:max_gap_idx], gaps[max_gap_idx + 1 :]])
     if len(other_gaps) == 0:
         return [markers]
 
@@ -1638,8 +1653,9 @@ def _split_dendrogram_by_gaps(
     cut_distance = distances[max_gap_idx + 1] - 1e-10
 
     try:
-        clusters = fcluster(linkage_matrix, t=cut_distance, criterion='distance')
-    except Exception:
+        clusters = fcluster(linkage_matrix, t=cut_distance, criterion="distance")
+    except (ValueError, RuntimeError, TypeError):
+
         return [markers]
 
     # Group markers by cluster
@@ -1656,9 +1672,9 @@ def _split_dendrogram_by_gaps(
         return [markers]
 
     # Log the split for debugging
-    logging.info(f"  Gap-split at merge {max_gap_idx} (gap={max_gap:.3f}, {max_gap/median_gap:.1f}x median)")
+    logging.info("  Gap-split at merge %s (gap=%s, %sx median)", max_gap_idx, max_gap, max_gap / median_gap)
     for i, lin in enumerate(lineages):
-        logging.info(f"    Lineage {i+1}: {lin}")
+        logging.info("    Lineage %s: %s", i + 1, lin)
 
     # Recursively check each lineage for further splits (max 1 level deep)
     final_lineages = []
@@ -1666,8 +1682,6 @@ def _split_dendrogram_by_gaps(
         if len(lineage) <= 4:
             final_lineages.append(lineage)
         else:
-            # Build sub-dendrogram and check for one more split
-            lin_dist = _build_distance_matrix(lineage, [])  # Empty pairs = max distance
             # Actually we need the pairs, but we don't have access here
             # Just keep as single lineage for now
             final_lineages.append(lineage)
@@ -1699,7 +1713,7 @@ def _dynamic_tree_cut(
     if n_markers == 2:
         # Two markers - check if they should be one cluster or two
         # Use the merge distance - if very low, same cluster
-        if linkage_matrix[0, 2] < 0.5:  # distance < 0.5 means score > 0.5
+        if linkage_matrix[0, 2] < 0.5:  # distance < 0.5 means score > 0.5  # pylint: disable=no-else-return
             return np.array([0, 0])
         else:
             return np.array([0, 1])
@@ -1728,19 +1742,20 @@ def _dynamic_tree_cut(
         cut_distance = distances[max_gap_idx + 1] - 1e-10
 
         try:
-            clusters = fcluster(linkage_matrix, t=cut_distance, criterion='distance')
+            clusters = fcluster(linkage_matrix, t=cut_distance, criterion="distance")
             # Only accept if we don't create singletons
             cluster_sizes = np.bincount(clusters)
-            if np.min(cluster_sizes) >= 2:
+            if np.min(cluster_sizes) >= 2:  # pylint: disable=no-else-return
                 return clusters
             else:
                 # Would create singletons - keep as single cluster
                 return np.zeros(n_markers, dtype=int)
-        except Exception:
+        except (ValueError, RuntimeError, TypeError):
+
             return np.zeros(n_markers, dtype=int)
 
     # For larger lineages (6+ markers), use adaptive GMM-based method
-    n_components, threshold, is_large = _find_gap_threshold_gmm(gaps)
+    n_components, _, is_large = _find_gap_threshold_gmm(gaps)
 
     if n_components > 1 and np.any(is_large):
         # Cut at the largest gap
@@ -1752,21 +1767,22 @@ def _dynamic_tree_cut(
         cut_distance = distances[primary_cut_idx + 1] - 1e-10
 
         try:
-            clusters = fcluster(linkage_matrix, t=cut_distance, criterion='distance')
+            clusters = fcluster(linkage_matrix, t=cut_distance, criterion="distance")
             return clusters
-        except Exception:
+        except (ValueError, RuntimeError):
+
             pass
 
     # Fallback for large lineages: use inconsistency-based method
     # But penalize creating many small clusters
     try:
-        incons = inconsistent(linkage_matrix, d=2)
+        inconsistent(linkage_matrix, d=2)  # validate linkage before searching
         best_t = 1.0
         best_score = -np.inf
 
         for t in np.linspace(0.5, 2.0, 16):
             try:
-                clusters = fcluster(linkage_matrix, t=t, criterion='inconsistent', depth=2)
+                clusters = fcluster(linkage_matrix, t=t, criterion="inconsistent", depth=2)
                 n_clusters = len(set(clusters))
                 cluster_sizes = np.bincount(clusters)
                 min_cluster_size = np.min(cluster_sizes)
@@ -1779,24 +1795,25 @@ def _dynamic_tree_cut(
                     score = 0.1  # Penalize creating singletons
                 else:
                     # Prefer fewer, larger clusters
-                    score = min_cluster_size / n_markers
+                    score = float(min_cluster_size) / n_markers
 
                 if score > best_score:
                     best_score = score
                     best_t = t
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 continue
 
-        clusters = fcluster(linkage_matrix, t=best_t, criterion='inconsistent', depth=2)
+        clusters = fcluster(linkage_matrix, t=best_t, criterion="inconsistent", depth=2)
         return clusters
-    except Exception:
+    except (ValueError, RuntimeError, TypeError):
+
         # Ultimate fallback - keep as single cluster
         return np.zeros(n_markers, dtype=int)
 
 
 def _compute_modularity(
     profiles: List[List[str]],
-    pairs: List[MarkerPairColocalization],
+    _pairs: List[MarkerPairColocalization],
     significant_pairs: List[MarkerPairColocalization],
 ) -> float:
     """
@@ -1827,13 +1844,13 @@ def _compute_modularity(
 
     for pair in significant_pairs:
         weight = pair.colocalization_score
-        total_weight += weight
+        total_weight += weight  # type: ignore[assignment]
 
         p1 = marker_to_profile.get(pair.marker_a, -1)
         p2 = marker_to_profile.get(pair.marker_b, -1)
 
         if p1 == p2 and p1 != -1:
-            within += weight
+            within += weight  # type: ignore[assignment]
 
     if total_weight == 0:
         return 0.0
@@ -1901,8 +1918,8 @@ def discover_profiles_continuous(
     n_markers = len(all_markers)
 
     if verbose:
-        logging.info(f"Discovering profiles (continuous weighting) from {len(pairs)} marker pairs...")
-        logging.info(f"Distance metric: {distance_metric}, top_k: {top_k}")
+        logging.info("Discovering profiles (continuous weighting) from %s marker pairs...", len(pairs))
+        logging.info("Distance metric: %s, top_k: %s", distance_metric, top_k)
 
     if n_markers < 2:
         return ProfileDiscoveryResult(
@@ -1952,8 +1969,10 @@ def discover_profiles_continuous(
     if verbose:
         upper_tri = dist_matrix[np.triu_indices(n_markers, k=1)]
         logging.info(
-            f"Distance matrix: min={upper_tri.min():.3f}, "
-            f"median={np.median(upper_tri):.3f}, max={upper_tri.max():.3f}"
+            "Distance matrix: min=%s, median=%s, max=%s",
+            round(upper_tri.min(), 3),
+            round(np.median(upper_tri), 3),
+            round(upper_tri.max(), 3),
         )
 
     # Step 2: Optional mutual top-k distance masking
@@ -1992,28 +2011,33 @@ def discover_profiles_continuous(
         n_kept = n_total_pairs - n_masked
         if verbose:
             logging.info(
-                f"Mutual top-{top_k} masking: {n_kept}/{n_total_pairs} pairs kept "
-                f"(specificity-weighted: {marker_specificity is not None})"
+                "Mutual top-%s masking: %s/%s pairs kept (specificity-weighted: %s)",
+                top_k,
+                n_kept,
+                n_total_pairs,
+                marker_specificity is not None,
             )
 
     # Step 3: Hierarchical clustering over all markers
     condensed_dist = squareform(dist_matrix)
-    Z = linkage(condensed_dist, method='average')
+    Z = linkage(condensed_dist, method="average")
 
     if verbose:
         merge_distances = Z[:, 2]
         logging.info(
-            f"Linkage: {len(Z)} merges, "
-            f"distances [{merge_distances.min():.3f} ... {merge_distances.max():.3f}]"
+            "Linkage: %s merges, distances [%s ... %s]",
+            len(Z),
+            round(merge_distances.min(), 3),
+            round(merge_distances.max(), 3),
         )
 
     # Step 4: Gap-based lineage splitting
     lineages = _split_dendrogram_by_gaps(Z, all_markers, seed=seed)
 
     if verbose:
-        logging.info(f"Gap analysis: {len(lineages)} lineages")
+        logging.info("Gap analysis: %s lineages", len(lineages))
         for i, lin in enumerate(lineages):
-            logging.info(f"  Lineage {i + 1} ({len(lin)} markers): {lin}")
+            logging.info("  Lineage %s (%s markers): %s", i + 1, len(lin), lin)
 
     # Step 5: Dynamic tree cutting within each lineage
     profiles = []
@@ -2041,7 +2065,7 @@ def discover_profiles_continuous(
         lin_marker_indices = [marker_to_idx[m] for m in lineage_markers]
         lin_dist = dist_matrix[np.ix_(lin_marker_indices, lin_marker_indices)]
         lin_condensed = squareform(lin_dist)
-        lin_Z = linkage(lin_condensed, method='average')
+        lin_Z = linkage(lin_condensed, method="average")
 
         lineage_dendrograms[lineage_idx] = LineageDendrogram(
             markers=lineage_markers,
@@ -2069,7 +2093,7 @@ def discover_profiles_continuous(
     n_meaningful_edges = sum(1 for p in pairs if p.colocalization_score > 0.5)
 
     if verbose:
-        logging.info(f"Discovered {len(profiles)} profiles, modularity = {modularity:.3f}")
+        logging.info("Discovered %s profiles, modularity = %s", len(profiles), modularity)
 
     result = ProfileDiscoveryResult(
         profiles=profiles,
@@ -2210,8 +2234,8 @@ def _compute_spatial_variance_explained(
         return 0.0
 
     try:
-        from libpysal.weights import KNN as LibPySAL_KNN
-        from esda.moran import Moran
+        from esda.moran import Moran  # pylint: disable=import-outside-toplevel
+        from libpysal.weights import KNN as LibPySAL_KNN  # pylint: disable=import-outside-toplevel
     except ImportError:
         logger.warning("libpysal/esda not available - returning 0")
         return 0.0
@@ -2219,9 +2243,10 @@ def _compute_spatial_variance_explained(
     # Build spatial weights
     try:
         W = LibPySAL_KNN.from_array(coords, k=neighbor_k)
-        W.transform = 'r'  # Row-standardize
-    except Exception as e:
-        logger.warning(f"Could not build spatial weights: {e}")
+        W.transform = "r"  # Row-standardize
+    except (ImportError, OSError) as e:
+
+        logger.warning("Could not build spatial weights: %s", e)
         return 0.0
 
     # Compute total spatial variance in the data (baseline)
@@ -2233,7 +2258,8 @@ def _compute_spatial_variance_explained(
         try:
             mi = Moran(col, W)
             total_spatial_var += np.var(col) * abs(mi.I)
-        except Exception:
+        except (ValueError, RuntimeError):
+
             continue
 
     if total_spatial_var < 1e-10:
@@ -2248,7 +2274,8 @@ def _compute_spatial_variance_explained(
         try:
             mi = Moran(activity, W)
             explained_var += np.var(activity) * abs(mi.I)
-        except Exception:
+        except (ValueError, RuntimeError):
+
             continue
 
     return min(1.0, explained_var / total_spatial_var)
@@ -2274,15 +2301,16 @@ def _compute_proportion_smoothness(
         return 0.0
 
     try:
-        from libpysal.weights import KNN as LibPySAL_KNN
-        from esda.moran import Moran
+        from esda.moran import Moran  # pylint: disable=import-outside-toplevel
+        from libpysal.weights import KNN as LibPySAL_KNN  # pylint: disable=import-outside-toplevel
     except ImportError:
         return 0.0
 
     try:
         W = LibPySAL_KNN.from_array(coords, k=neighbor_k)
-        W.transform = 'r'
-    except Exception:
+        W.transform = "r"
+    except (ImportError, OSError):
+
         return 0.0
 
     morans = []
@@ -2293,13 +2321,14 @@ def _compute_proportion_smoothness(
         try:
             mi = Moran(activity, W)
             morans.append(mi.I)
-        except Exception:
+        except (ImportError, OSError):
+
             continue
 
     return float(np.mean(morans)) if morans else 0.0
 
 
-def _score_profile_spatial_contribution(
+def _score_profile_spatial_contribution(  # pylint: disable=too-many-positional-arguments
     X: NDArray[np.floating],
     coords: NDArray[np.floating],
     marker_names: List[str],
@@ -2313,15 +2342,11 @@ def _score_profile_spatial_contribution(
     Returns the increase in spatial variance explained when adding this profile.
     """
     # Current variance explained
-    current_ve = _compute_spatial_variance_explained(
-        X, coords, marker_names, selected_profiles, neighbor_k
-    )
+    current_ve = _compute_spatial_variance_explained(X, coords, marker_names, selected_profiles, neighbor_k)
 
     # Variance explained with new profile
     new_profiles = selected_profiles + [profile]
-    new_ve = _compute_spatial_variance_explained(
-        X, coords, marker_names, new_profiles, neighbor_k
-    )
+    new_ve = _compute_spatial_variance_explained(X, coords, marker_names, new_profiles, neighbor_k)
 
     return new_ve - current_ve
 
@@ -2330,6 +2355,7 @@ def rescue_singletons(
     profiles: List[List[str]],
     signal_masks: NDArray[np.bool_],
     signal_mask_marker_names: List[str],
+    *,
     min_unique_coverage: float = 0.3,
     min_signal_fraction: float = 0.05,
     verbose: bool = False,
@@ -2401,13 +2427,16 @@ def rescue_singletons(
             coexpr_count = np.zeros(n_spots, dtype=int)
             for col in profile_cols:
                 coexpr_count += signal_masks[:, col].astype(int)
-            explained |= (coexpr_count >= 2)
+            explained |= coexpr_count >= 2
 
     n_explained = explained.sum()
     if verbose:
         logging.info(
-            f"Explained territory (co-expression): {n_explained}/{n_spots} spots "
-            f"({n_explained / n_spots:.1%}) covered by {len(multi_marker)} multi-marker profiles"
+            "Explained territory (co-expression): %s/%s spots (%s%%) covered by %s multi-marker profiles",
+            n_explained,
+            n_spots,
+            round(n_explained / n_spots * 100, 1),
+            len(multi_marker),
         )
 
     # Evaluate each singleton
@@ -2417,7 +2446,7 @@ def rescue_singletons(
         marker = profile[0]
         if marker not in marker_to_col:
             if verbose:
-                logging.info(f"  Singleton [{marker}]: not in signal masks, dropping")
+                logging.info("  Singleton [%s]: not in signal masks, dropping", marker)
             dropped.append(marker)
             continue
 
@@ -2428,7 +2457,7 @@ def rescue_singletons(
 
         if n_signal == 0:
             if verbose:
-                logging.info(f"  Singleton [{marker}]: no signal spots, dropping")
+                logging.info("  Singleton [%s]: no signal spots, dropping", marker)
             dropped.append(marker)
             continue
 
@@ -2441,8 +2470,11 @@ def rescue_singletons(
         if verbose:
             status = "KEEP" if keep else "DROP"
             logging.info(
-                f"  Singleton [{marker}]: signal_fraction={signal_fraction:.3f}, "
-                f"unique_coverage={unique_coverage:.3f} -> {status}"
+                "  Singleton [%s]: signal_fraction=%s, unique_coverage=%s -> %s",
+                marker,
+                round(signal_fraction, 3),
+                round(unique_coverage, 3),
+                status,
             )
 
         if keep:
@@ -2454,8 +2486,7 @@ def rescue_singletons(
 
     if verbose:
         logging.info(
-            f"Singleton rescue: {len(rescued)} kept, {len(dropped)} dropped "
-            f"(total profiles: {len(result)})"
+            "Singleton rescue: %s kept, %s dropped (total profiles: %s)", len(rescued), len(dropped), len(result)
         )
 
     return result
@@ -2466,12 +2497,13 @@ def select_profiles(
     coords: NDArray[np.floating],
     marker_names: List[str],
     profiles: List[List[str]],
-    interesting_markers: List[str],
-    colocalization_result: "ColocalizationResult",
+    _interesting_markers: List[str],
+    *,
+    _colocalization_result: "ColocalizationResult",
     min_spatial_explained: float = 0.90,
     min_protein_explained: float = 0.90,
     max_profiles: int = 15,
-    min_profiles: int = 5,
+    _min_profiles: int = 5,
     neighbor_k: int = 8,
     verbose: bool = False,
 ) -> ProfileSelectionResult:
@@ -2506,10 +2538,10 @@ def select_profiles(
         ProfileSelectionResult with selected profiles and metrics
     """
     if verbose:
-        logger.info(f"Module 2c: Selecting from {len(profiles)} candidate profiles")
-        logger.info(f"  Target spatial variance: {min_spatial_explained:.0%}")
-        logger.info(f"  Target protein variance: {min_protein_explained:.0%}")
-        logger.info(f"  Selection: by rank until BOTH targets met")
+        logger.info("Module 2c: Selecting from %s candidate profiles", len(profiles))
+        logger.info("  Target spatial variance: %s%%", round(min_spatial_explained * 100))
+        logger.info("  Target protein variance: %s%%", round(min_protein_explained * 100))
+        logger.info("  Selection: by rank until BOTH targets met")
 
     if len(profiles) == 0:
         return ProfileSelectionResult(
@@ -2523,7 +2555,7 @@ def select_profiles(
         )
 
     selected: List[List[str]] = []
-    remaining = [list(p) if isinstance(p, (set, frozenset)) else p for p in profiles]
+    remaining = [list(p) if isinstance(p, (set, frozenset)) else p for p in profiles]  # type: ignore[unreachable]
     variance_explained_list = []
     smoothness_list = []
     marginal_gains_list = []
@@ -2536,9 +2568,7 @@ def select_profiles(
         best_idx = -1
 
         for idx, profile in enumerate(remaining):
-            gain = _score_profile_spatial_contribution(
-                X, coords, marker_names, profile, selected, neighbor_k
-            )
+            gain = _score_profile_spatial_contribution(X, coords, marker_names, profile, selected, neighbor_k)
             if gain > best_gain:
                 best_gain = gain
                 best_profile = profile
@@ -2554,31 +2584,28 @@ def select_profiles(
         remaining.pop(best_idx)
 
         # Compute metrics - dual variance checkpoints
-        current_spatial_ve = _compute_spatial_variance_explained(
-            X, coords, marker_names, selected, neighbor_k
-        )
-        current_protein_ve = _compute_protein_variance_explained(
-            X, marker_names, selected
-        )
-        current_smooth = _compute_proportion_smoothness(
-            X, coords, marker_names, selected, neighbor_k
-        )
+        current_spatial_ve = _compute_spatial_variance_explained(X, coords, marker_names, selected, neighbor_k)
+        current_protein_ve = _compute_protein_variance_explained(X, marker_names, selected)
+        current_smooth = _compute_proportion_smoothness(X, coords, marker_names, selected, neighbor_k)
 
         variance_explained_list.append(current_spatial_ve)
         smoothness_list.append(current_smooth)
         marginal_gains_list.append(best_gain)
 
         if verbose:
-            print(f"  [{i+1}] Added {best_profile} (gain: {best_gain:.3%}, "
-                  f"spatial: {current_spatial_ve:.1%}, protein: {current_protein_ve:.1%})")
+            print(
+                f"  [{i+1}] Added {best_profile} (gain: {best_gain:.3%}, "
+                f"spatial: {current_spatial_ve:.1%}, protein: {current_protein_ve:.1%})"
+            )
 
         # Check if BOTH variance targets reached (dual checkpoint)
         spatial_met = current_spatial_ve >= min_spatial_explained
         protein_met = current_protein_ve >= min_protein_explained
 
         if spatial_met and protein_met:
-            stopping_reason = (f"Both targets reached "
-                             f"(spatial: {current_spatial_ve:.0%}, protein: {current_protein_ve:.0%})")
+            stopping_reason = (
+                f"Both targets reached " f"(spatial: {current_spatial_ve:.0%}, protein: {current_protein_ve:.0%})"
+            )
             break
 
     return ProfileSelectionResult(
@@ -2587,7 +2614,7 @@ def select_profiles(
         variance_explained=np.array(variance_explained_list),
         proportion_smoothness=np.array(smoothness_list),
         stopping_reason=stopping_reason,
-        all_profiles=[list(p) if isinstance(p, (set, frozenset)) else p for p in profiles],
+        all_profiles=[list(p) if isinstance(p, (set, frozenset)) else p for p in profiles],  # type: ignore[unreachable]
         marginal_gains=np.array(marginal_gains_list),
     )
 
@@ -2640,7 +2667,7 @@ def _detect_adaptive_threshold(
     if len(edge_ratios) < 3:
         return fallback
 
-    edge_ratios = np.array(sorted(edge_ratios))
+    edge_ratios = np.array(sorted(edge_ratios))  # type: ignore[assignment]
 
     # Find largest gap in the distribution
     # Only consider gaps in the range [0.75, 0.95] - outside this range is unlikely to be useful
@@ -2662,8 +2689,13 @@ def _detect_adaptive_threshold(
         detected_threshold = best_gap[1]  # Use midpoint of gap
 
         if verbose:
-            logger.info(f"Auto-detected threshold: {detected_threshold:.3f} "
-                       f"(gap of {best_gap[0]:.3f} between {best_gap[2]:.3f} and {best_gap[3]:.3f})")
+            logger.info(
+                "Auto-detected threshold: %s (gap of %s between %s and %s)",
+                round(detected_threshold, 3),
+                round(best_gap[0], 3),
+                round(best_gap[2], 3),
+                round(best_gap[3], 3),
+            )
 
         return detected_threshold
 
@@ -2675,11 +2707,11 @@ def _detect_adaptive_threshold(
         percentile_threshold = np.percentile(edge_ratios, 25)
         if 0.75 <= percentile_threshold <= 0.95:
             if verbose:
-                logger.info(f"Auto-detected threshold (25th percentile): {percentile_threshold:.3f}")
-            return percentile_threshold
+                logger.info("Auto-detected threshold (25th percentile): %s", round(percentile_threshold, 3))
+            return percentile_threshold  # type: ignore[return-value]
 
     if verbose:
-        logger.info(f"No clear gap found, using fallback threshold: {fallback}")
+        logger.info("No clear gap found, using fallback threshold: %s", fallback)
     return fallback
 
 
@@ -2687,12 +2719,13 @@ def discover_hierarchical_profiles_continuous(
     coloc_result: ColocalizationResult,
     antibody_expression: NDArray[np.floating],
     marker_names: List[str],
-    coords: NDArray[np.floating],
-    improvement_threshold: float = 0.05,
-    sharing_ratio: float = 0.5,
-    sharing_min_I: float = 0.2,
-    max_depth: int = 5,
-    neighbor_k: int = 6,
+    _coords: NDArray[np.floating],
+    *,
+    _improvement_threshold: float = 0.05,
+    _sharing_ratio: float = 0.5,
+    _sharing_min_I: float = 0.2,
+    _max_depth: int = 5,
+    _neighbor_k: int = 6,
     top_k: int = 3,
     distance_metric: str = "colocalization_score",
     verbose: bool = True,
@@ -2746,24 +2779,21 @@ def discover_hierarchical_profiles_continuous(
         flat_profiles[f"singleton_{i}"] = [singleton]
 
     if verbose:
-        logger.info(f"Stage 1: {len(flat_result.profiles)} multi-marker profiles, "
-                     f"{len(flat_result.singletons)} singletons")
+        logger.info(
+            "Stage 1: %s multi-marker profiles, %s singletons", len(flat_result.profiles), len(flat_result.singletons)
+        )
 
     # ── Stage 2: Post-hoc hierarchy ───────────────────────────────────────
     tree, shared_markers = _build_posthoc_hierarchy(flat_profiles)
 
     if verbose:
-        logger.info(f"Stage 2: tree depth {tree.n_levels}, "
-                     f"{len(shared_markers)} shared markers")
+        logger.info("Stage 2: tree depth %s, %s shared markers", tree.n_levels, len(shared_markers))
 
     # Compute reconstruction error
-    final_error = _compute_final_reconstruction_error(
-        antibody_expression, marker_names, list(flat_profiles.values())
-    )
+    final_error = _compute_final_reconstruction_error(antibody_expression, marker_names, list(flat_profiles.values()))
 
     if verbose:
-        logger.info(f"Discovered {len(flat_profiles)} profiles, "
-                     f"reconstruction error: {final_error:.4f}")
+        logger.info("Discovered %s profiles, reconstruction error: %s", len(flat_profiles), round(final_error, 4))
 
     return HierarchicalProfileResult(
         tree=tree,
@@ -2780,17 +2810,17 @@ def _filter_coloc_result_for_markers(
 ) -> ColocalizationResult:
     """Filter colocalization result to only include specified markers."""
     marker_set = set(markers)
-    filtered_pairs = [
-        p for p in coloc_result.pairs
-        if p.marker_a in marker_set and p.marker_b in marker_set
-    ]
+    filtered_pairs = [p for p in coloc_result.pairs if p.marker_a in marker_set and p.marker_b in marker_set]
     return ColocalizationResult(
         pairs=filtered_pairs,
         marker_names=markers,
         n_spots=coloc_result.n_spots,
         neighbor_k=coloc_result.neighbor_k,
-        marker_specificity={m: coloc_result.marker_specificity.get(m, 0.5)
-                          for m in markers} if coloc_result.marker_specificity else None,
+        marker_specificity=(
+            {m: coloc_result.marker_specificity.get(m, 0.5) for m in markers}
+            if coloc_result.marker_specificity
+            else None
+        ),
     )
 
 
@@ -2819,7 +2849,7 @@ def _compute_final_reconstruction_error(
     profiles: List[List[str]],
 ) -> float:
     """Compute overall reconstruction error for final profiles."""
-    from scipy.optimize import nnls
+    from scipy.optimize import nnls  # pylint: disable=import-outside-toplevel
 
     if len(profiles) == 0:
         return 1.0
@@ -2852,10 +2882,18 @@ def _compute_final_reconstruction_error(
             y_pred = P @ coeffs
             error = np.mean((y - y_pred) ** 2)
             total_error += error
-        except Exception:
+        except (ValueError, RuntimeError, TypeError):
+
             total_error += 1.0
 
     return total_error / max(len(all_markers), 1)
+
+
+def _compute_tree_depth(node: "ProfileTreeNode") -> int:
+    """Compute maximum depth of tree."""
+    if node.is_leaf:
+        return node.depth + 1
+    return max(_compute_tree_depth(c) for c in node.children)
 
 
 def _build_posthoc_hierarchy(
@@ -2875,8 +2913,8 @@ def _build_posthoc_hierarchy(
         Tuple of (ProfileTree, shared_markers_dict).
         shared_markers_dict maps marker -> list of profile names that contain it.
     """
-    from scipy.cluster.hierarchy import linkage, to_tree
-    from scipy.spatial.distance import squareform
+    from scipy.cluster.hierarchy import linkage, to_tree  # pylint: disable=import-outside-toplevel
+    from scipy.spatial.distance import squareform  # pylint: disable=import-outside-toplevel
 
     profile_names = list(flat_profiles.keys())
     profile_sets = [set(markers) for markers in flat_profiles.values()]
@@ -2895,12 +2933,17 @@ def _build_posthoc_hierarchy(
             node = ProfileTreeNode(
                 node_id=profile_names[0],
                 markers=flat_profiles[profile_names[0]],
-                children=[], parent_id=None, depth=0,
+                children=[],
+                parent_id=None,
+                depth=0,
             )
         else:
             node = ProfileTreeNode(
-                node_id="root", markers=[], children=[],
-                parent_id=None, depth=0,
+                node_id="root",
+                markers=[],
+                children=[],
+                parent_id=None,
+                depth=0,
             )
         return ProfileTree(root=node, n_levels=1), shared_markers
 
@@ -2917,7 +2960,7 @@ def _build_posthoc_hierarchy(
 
     # Hierarchical clustering
     condensed = squareform(D)
-    Z = linkage(condensed, method='average')
+    Z = linkage(condensed, method="average")
     scipy_root = to_tree(Z)
 
     # Convert scipy tree to ProfileTree
@@ -2927,14 +2970,19 @@ def _build_posthoc_hierarchy(
             return ProfileTreeNode(
                 node_id=profile_names[idx],
                 markers=flat_profiles[profile_names[idx]],
-                children=[], parent_id=parent_id, depth=depth,
+                children=[],
+                parent_id=parent_id,
+                depth=depth,
             )
         node_id = f"internal_{node.id}"
         left = _convert(node.get_left(), depth + 1, node_id)
         right = _convert(node.get_right(), depth + 1, node_id)
         return ProfileTreeNode(
-            node_id=node_id, markers=[], children=[left, right],
-            parent_id=parent_id, depth=depth,
+            node_id=node_id,
+            markers=[],
+            children=[left, right],
+            parent_id=parent_id,
+            depth=depth,
         )
 
     root = _convert(scipy_root)
@@ -2949,4 +2997,3 @@ def _build_posthoc_hierarchy(
 #: Alias kept for tests/scripts that import ``discover_profiles`` by the old
 #: name before the function was renamed to ``discover_profiles_continuous``.
 discover_profiles = discover_profiles_continuous
-

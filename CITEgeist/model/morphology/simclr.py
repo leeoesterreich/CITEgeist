@@ -18,7 +18,7 @@ import torch.nn.functional as F
 try:
     from .vit_encoder import ViTEncoder
 except ImportError:
-    from vit_encoder import ViTEncoder
+    from vit_encoder import ViTEncoder  # type: ignore[no-redef]
 
 
 class SimCLRProjector(nn.Module):
@@ -65,6 +65,7 @@ class SimCLR(nn.Module):
 
     def __init__(
         self,
+        *,
         in_channels: int = 2,
         img_size: int = 96,
         patch_size: int = 16,
@@ -141,7 +142,7 @@ class SimCLR(nn.Module):
 
         # Mask out self-similarity (diagonal)
         mask = torch.eye(2 * batch_size, device=z.device, dtype=torch.bool)
-        sim.masked_fill_(mask, float('-inf'))
+        sim.masked_fill_(mask, float("-inf"))
 
         # Positive pairs: z1[i] with z2[i] and vice versa
         # For z1[i], positive is at index batch_size + i
@@ -151,10 +152,9 @@ class SimCLR(nn.Module):
         pos_mask[batch_size:, :batch_size] = torch.eye(batch_size, device=z.device)
 
         # Labels: index of positive pair for each sample
-        labels = torch.cat([
-            torch.arange(batch_size, 2 * batch_size, device=z.device),
-            torch.arange(batch_size, device=z.device)
-        ])
+        labels = torch.cat(
+            [torch.arange(batch_size, 2 * batch_size, device=z.device), torch.arange(batch_size, device=z.device)]
+        )
 
         # Cross entropy loss
         loss = F.cross_entropy(sim, labels)
@@ -176,6 +176,7 @@ class SimCLR(nn.Module):
 
 
 def create_simclr_model(
+    *,
     in_channels: int = 2,
     img_size: int = 96,
     patch_size: int = 16,

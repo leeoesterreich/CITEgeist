@@ -44,7 +44,7 @@ def _compute_adaptive_threshold(
     """
     w_signal = gmm.weights_[signal_cluster]
 
-    if w_signal < 0.3:
+    if w_signal < 0.3:  # pylint: disable=no-else-return
         # Very rare type - GMM found true separation, be sensitive
         return 0.3
     elif w_signal < 0.5:
@@ -61,6 +61,7 @@ def _compute_adaptive_threshold(
 def detect_cell_types(
     X: np.ndarray,
     marker_groups: Dict[str, List[int]],
+    *,
     threshold: float = 0.5,
     random_state: int = 42,
     log_transform: bool = True,
@@ -118,15 +119,16 @@ def detect_cell_types(
         # Fit 2-component GMM
         gmm = GaussianMixture(
             n_components=2,
-            covariance_type='full',
+            covariance_type="full",
             random_state=random_state,
             n_init=3,  # multiple initializations for stability
         )
 
         try:
             gmm.fit(marker_data)
-        except Exception as e:
-            logger.warning(f"GMM fit failed for {cell_type}: {e}. Marking all as not detected.")
+        except (ValueError, RuntimeError) as e:
+
+            logger.warning("GMM fit failed for %s: %s. Marking all as not detected.", cell_type, e)
             continue
 
         # Identify signal cluster (higher mean across markers)
@@ -135,9 +137,7 @@ def detect_cell_types(
 
         # Compute threshold (adaptive or fixed)
         if adaptive_threshold:
-            effective_threshold = _compute_adaptive_threshold(
-                gmm, signal_cluster, base_threshold=threshold
-            )
+            effective_threshold = _compute_adaptive_threshold(gmm, signal_cluster, base_threshold=threshold)
         else:
             effective_threshold = threshold
 
@@ -150,8 +150,13 @@ def detect_cell_types(
         n_detected = detected[:, k].sum()
         w_signal = gmm.weights_[signal_cluster]
         logger.debug(
-            f"{cell_type}: {n_detected}/{n_spots} spots detected ({100*n_detected/n_spots:.1f}%), "
-            f"signal_weight={w_signal:.2f}, threshold={effective_threshold:.2f}"
+            "%s: %s/%s spots detected (%s%%), signal_weight=%s, threshold=%s",
+            cell_type,
+            n_detected,
+            n_spots,
+            round(100 * n_detected / n_spots, 1),
+            round(w_signal, 2),
+            round(effective_threshold, 2),
         )
 
     return detected
@@ -177,15 +182,14 @@ def build_detection_marker_groups(
     Returns:
         Dict mapping type_name -> list of marker column indices.
     """
-    T, M = active_mask.shape
+    T, _ = active_mask.shape
     marker_groups = {}
     for t in range(T):
         active_markers = list(np.where(active_mask[t])[0])
         if not active_markers:
             continue
         exclusive = [m for m in active_markers if active_mask[:, m].sum() == 1]
-        pairwise = [m for m in active_markers
-                    if active_mask[:, m].sum() == 2 and m not in exclusive]
+        pairwise = [m for m in active_markers if active_mask[:, m].sum() == 2 and m not in exclusive]
         if len(exclusive) >= 2 and pairwise:
             marker_groups[type_names[t]] = exclusive + pairwise
         elif exclusive:

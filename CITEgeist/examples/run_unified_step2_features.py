@@ -8,7 +8,6 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 
 os.environ.setdefault("TF_FORCE_GPU_ALLOW_GROWTH", "true")
 
@@ -23,9 +22,9 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from model.unified_config import OUTPUT_BASE, VIT_MODEL, PATCH_SIZE, DATA_DIR
-from model.vit_extractor import ViTFeatureExtractor
 from model.segmentation import StarDistSegmenter
+from model.unified_config import DATA_DIR, OUTPUT_BASE, PATCH_SIZE, VIT_MODEL
+from model.vit_extractor import ViTFeatureExtractor
 
 
 def load_image_and_segment(sample_name, modality):
@@ -34,9 +33,11 @@ def load_image_and_segment(sample_name, modality):
     seg_dir.mkdir(parents=True, exist_ok=True)
 
     if modality == "he":
-        import squidpy as sq
         import json as _json
+
+        import squidpy as sq
         from PIL import Image
+
         Image.MAX_IMAGE_PIXELS = None  # Fullres images can be large
 
         sample_path = DATA_DIR / sample_name / "outs"
@@ -65,8 +66,7 @@ def load_image_and_segment(sample_name, modality):
         crop_y2 = min(img_h, int(tissue_rows.max()) + pad)
         crop_x1 = max(0, int(tissue_cols.min()) - pad)
         crop_x2 = min(img_w, int(tissue_cols.max()) + pad)
-        logger.info(f"Tissue crop: [{crop_y1}:{crop_y2}, {crop_x1}:{crop_x2}] "
-                     f"(full image: {img_h}x{img_w})")
+        logger.info(f"Tissue crop: [{crop_y1}:{crop_y2}, {crop_x1}:{crop_x2}] " f"(full image: {img_h}x{img_w})")
 
         # Crop fullres to tissue region only
         fullres_crop = np.array(fullres_raw.crop((crop_x1, crop_y1, crop_x2, crop_y2)))
@@ -79,8 +79,10 @@ def load_image_and_segment(sample_name, modality):
 
         # Load spot coordinates — need load_images=True for obsm['spatial']
         adata = sq.read.visium(
-            str(sample_path), counts_file="filtered_feature_bc_matrix.h5",
-            load_images=True, gex_only=True,
+            str(sample_path),
+            counts_file="filtered_feature_bc_matrix.h5",
+            load_images=True,
+            gex_only=True,
         )
         # obsm['spatial'] is (col, row) = (x, y) in fullres pixel coords
         raw_coords = adata.obsm["spatial"]
@@ -111,8 +113,7 @@ def load_image_and_segment(sample_name, modality):
             # actual nuclei ~spot_diameter/5 pixels
             pixel_size_um = 55.0 / spot_diameter  # um per pixel
             stardist_scale = pixel_size_um / 0.25  # rescale to ~0.25 um/px
-            logger.info(f"StarDist scale factor: {stardist_scale:.2f} "
-                        f"(pixel size: {pixel_size_um:.3f} um/px)")
+            logger.info(f"StarDist scale factor: {stardist_scale:.2f} " f"(pixel size: {pixel_size_um:.3f} um/px)")
             h, w = fullres_crop.shape[:2]
             # Scale up image dims for tiling calculation
             scaled_h, scaled_w = int(h * stardist_scale), int(w * stardist_scale)
@@ -128,6 +129,7 @@ def load_image_and_segment(sample_name, modality):
             logger.info(f"StarDist found {n_nuclei} nuclei in tissue crop")
             # Free TF memory
             import tensorflow as tf
+
             tf.keras.backend.clear_session()
             del segmenter
 
@@ -211,8 +213,9 @@ def extract_patches(image, centroids_df, modality, patch_size=224):
         valid_ids.append(int(row["nucleus_id"]))
 
     patches_arr = np.array(patches)
-    logger.info(f"Extracted {len(patches_arr)} patches "
-                f"({len(centroids_df) - len(patches_arr)} skipped, out of bounds)")
+    logger.info(
+        f"Extracted {len(patches_arr)} patches " f"({len(centroids_df) - len(patches_arr)} skipped, out of bounds)"
+    )
     return patches_arr, valid_ids
 
 
@@ -241,10 +244,14 @@ def run_step2(sample_name, modality="he"):
         return
 
     masks, centroids_df, image, spatial_coords, barcodes, spot_radius_px = load_image_and_segment(
-        sample_name, modality,
+        sample_name,
+        modality,
     )
     centroids_df = assign_nuclei_to_spots(
-        centroids_df, spatial_coords, barcodes, spot_radius=spot_radius_px,
+        centroids_df,
+        spatial_coords,
+        barcodes,
+        spot_radius=spot_radius_px,
     )
     patches, valid_ids = extract_patches(image, centroids_df, modality, PATCH_SIZE)
 

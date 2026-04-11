@@ -1,15 +1,16 @@
 """
 Utility functions for CITEgeist including neighbor detection and validation.
 """
+
 import gc
 import logging
 import os
 from typing import Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
-import matplotlib.pyplot as plt
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import pearsonr
 from sklearn.metrics import mean_absolute_error, mean_squared_error
@@ -50,7 +51,7 @@ def setup_logging(output_folder, sample_name):
     logging.info("Logging initialized.")
 
 
-### 📏 **Spatial Neighbor Functions**
+# Spatial Neighbor Functions
 
 
 def compute_optimal_radius(
@@ -87,18 +88,14 @@ def compute_optimal_radius(
 
     if coords is None:
         logger.warning(
-            f"No spatial coordinates in adata.obsm['spatial']. "
-            f"Using fallback spacing: {fallback_spacing}"
+            "No spatial coordinates in adata.obsm['spatial']. " "Using fallback spacing: %s", fallback_spacing
         )
         spot_spacing = fallback_spacing
     elif coords.shape[0] < min_spots:
-        logger.warning(
-            f"Only {coords.shape[0]} spots (< {min_spots}). "
-            f"Using fallback spacing: {fallback_spacing}"
-        )
+        logger.warning("Only %s spots (< %s). Using fallback spacing: %s", coords.shape[0], min_spots, fallback_spacing)
         spot_spacing = fallback_spacing
     else:
-        from scipy.spatial import cKDTree
+        from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
 
         # Filter out non-finite coordinates
         valid_mask = np.all(np.isfinite(coords), axis=1)
@@ -106,8 +103,7 @@ def compute_optimal_radius(
 
         if valid_coords.shape[0] < min_spots:
             logger.warning(
-                f"Only {valid_coords.shape[0]} valid coordinates. "
-                f"Using fallback spacing: {fallback_spacing}"
+                "Only %s valid coordinates. Using fallback spacing: %s", valid_coords.shape[0], fallback_spacing
             )
             spot_spacing = fallback_spacing
         else:
@@ -119,8 +115,9 @@ def compute_optimal_radius(
             spot_spacing = float(np.median(nn_distances))
 
             logger.info(
-                f"Detected spot spacing: {spot_spacing:.2f} units "
-                f"(median of {len(nn_distances)} nearest-neighbor distances)"
+                "Detected spot spacing: %s units (median of %s nearest-neighbor distances)",
+                round(spot_spacing, 2),
+                len(nn_distances),
             )
 
     # Compute radius for n rings
@@ -129,8 +126,7 @@ def compute_optimal_radius(
     radius = spot_spacing * (n_rings + 0.05)
 
     logger.info(
-        f"Computed optimal radius: {radius:.2f} ({n_rings} rings, "
-        f"spot_spacing={spot_spacing:.2f})"
+        "Computed optimal radius: %s (%s rings, spot_spacing=%s)", round(radius, 2), n_rings, round(spot_spacing, 2)
     )
 
     return radius
@@ -181,15 +177,13 @@ def get_neighbors_with_fixed_radius(
     - List of indices representing the central spot and its neighbors.
     """
     # Find neighbors within the given radius
-    central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
-        spot_index, adata, radius
-    )
+    _, _, spot_index, neighbors = find_fixed_radius_neighbors(spot_index, adata, radius)
 
     # Optionally include the central spot itself
     if include_center:
         neighbors = [spot_index] + neighbors
 
-    logging.debug(f"Total neighbors for spot {spot_index} within radius {radius}: {neighbors}")
+    logging.debug("Total neighbors for spot %s within radius %s: %s", spot_index, radius, neighbors)
     return neighbors
 
 
@@ -205,7 +199,7 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
     Returns:
         None: Displays a series of spatial plots showing neighbors.
     """
-    import random
+    import random  # pylint: disable=import-outside-toplevel
 
     # Select random spots
     random_spots = random.sample(range(adata.shape[0]), min(num_spots, adata.shape[0]))
@@ -220,9 +214,7 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
 
     for spot_index in random_spots:
         # Find neighbors within the given radius
-        central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
-            spot_index, adata, radius
-        )
+        central_spot_names, neighbor_spots_names, spot_index, _ = find_fixed_radius_neighbors(spot_index, adata, radius)
 
         # Create a temporary column to highlight spots
         adata.obs["highlight"] = "Other spots"
@@ -245,7 +237,7 @@ def plot_neighbors_with_fixed_radius(adata, radius=50, num_spots=5):
 
 def assert_neighborhood_size(adata, cell_profile_dict, radius=50, num_spots=5):
     """ """
-    import random
+    import random  # pylint: disable=import-outside-toplevel
 
     # Select random spots
     random_spots = random.sample(range(adata.shape[0]), min(num_spots, adata.shape[0]))
@@ -254,16 +246,12 @@ def assert_neighborhood_size(adata, cell_profile_dict, radius=50, num_spots=5):
 
     for spot_index in random_spots:
         # Find neighbors within the given radius
-        central_spot_names, neighbor_spots_names, spot_index, neighbors = find_fixed_radius_neighbors(
-            spot_index, adata, radius
-        )
+        central_spot_names, neighbor_spots_names, spot_index, _ = find_fixed_radius_neighbors(spot_index, adata, radius)
 
     central_spot_names = list(central_spot_names) if not isinstance(central_spot_names, list) else central_spot_names
     neighbor_spots_names = (
         list(neighbor_spots_names) if not isinstance(neighbor_spots_names, list) else neighbor_spots_names
     )
-
-    neighborhood_size = len(central_spot_names + neighbor_spots_names)
 
     assert all(
         x <= len(cell_profile_dict) for x in neighborhood_sizes
@@ -367,7 +355,7 @@ def export_anndata_layers(adata, output_dir, pass_number=None):
             output_file = os.path.join(target_dir, f"{cell_type}_layer.csv")
 
         df.to_csv(output_file)
-        logging.info(f"Exported layer '{layer_name}' to '{output_file}'")
+        logging.info("Exported layer '%s' to '%s'", layer_name, output_file)
 
 
 def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="range", pass_number=None):
@@ -396,10 +384,10 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
     if pass_number is not None:
         predictions_dir = os.path.join(predictions_dir, f"pass{pass_number}")
 
-    logging.info(f"Ground truth directory: {ground_truth_dir}")
-    logging.info(f"Ground truth files: {sorted(os.listdir(ground_truth_dir))}")
-    logging.info(f"Layer directory: {predictions_dir}")
-    logging.info(f"Layer files: {sorted(os.listdir(predictions_dir))}")
+    logging.info("Ground truth directory: %s", ground_truth_dir)
+    logging.info("Ground truth files: %s", sorted(os.listdir(ground_truth_dir)))
+    logging.info("Layer directory: %s", predictions_dir)
+    logging.info("Layer files: %s", sorted(os.listdir(predictions_dir)))
 
     # Get sorted lists of files with pass number handling
     gt_files = sorted([f for f in os.listdir(ground_truth_dir) if f.endswith("_GT.csv")])
@@ -462,9 +450,9 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
     matched_gt_names = set(gt for gt in pred_to_gt_map.values() if gt is not None)
     missed_profiles = [gt for gt in gt_cell_types if gt not in matched_gt_names]
 
-    logging.info(f"Matched profiles: {len(matched_pred_names)}")
-    logging.info(f"Spurious profiles (pred only): {spurious_profiles}")
-    logging.info(f"Missed profiles (gt only): {missed_profiles}")
+    logging.info("Matched profiles: %s", len(matched_pred_names))
+    logging.info("Spurious profiles (pred only): %s", spurious_profiles)
+    logging.info("Missed profiles (gt only): %s", missed_profiles)
 
     # Helper function to calculate metrics for a pair of dataframes
     def _calculate_pair_metrics(gt_df, pred_df, cell_type, normalize):
@@ -473,7 +461,7 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         common_spots = gt_df.columns.intersection(pred_df.columns)
 
         if len(common_genes) == 0 or len(common_spots) == 0:
-            logging.warning(f"No common genes or spots for {cell_type}. Skipping.")
+            logging.warning("No common genes or spots for %s. Skipping.", cell_type)
             return None
 
         # Subset and normalize data
@@ -509,7 +497,7 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         pred_filepath = os.path.join(predictions_dir, pred_cell_types[pred_name])
 
         if not os.path.exists(pred_filepath):
-            logging.warning(f"Prediction file for {gt_name} not found. Skipping.")
+            logging.warning("Prediction file for %s not found. Skipping.", gt_name)
             continue
 
         # Load data
@@ -519,8 +507,9 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         metrics = _calculate_pair_metrics(gt_df, pred_df, gt_name, normalize)
         if metrics is not None:
             metrics_per_cell_type[gt_name] = metrics
-            logging.info(f"Metrics for {gt_name}: RMSE={metrics['RMSE']:.4f}, "
-                        f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f}")
+            logging.info(
+                "Metrics for %s: RMSE=%s, NRMSE=%s, MAE=%s", gt_name, metrics["RMSE"], metrics["NRMSE"], metrics["MAE"]
+            )
 
     # Process spurious profiles (predictions without ground truth)
     # These should be compared against zero - any allocation is wrong
@@ -539,9 +528,13 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         if metrics is not None:
             # Mark as spurious in the key
             metrics_per_cell_type[f"[SPURIOUS] {pred_name}"] = metrics
-            logging.warning(f"Spurious profile {pred_name}: RMSE={metrics['RMSE']:.4f}, "
-                           f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f} "
-                           "(compared against zero)")
+            logging.warning(
+                "Spurious profile %s: RMSE=%s, NRMSE=%s, MAE=%s (compared against zero)",
+                pred_name,
+                metrics["RMSE"],
+                metrics["NRMSE"],
+                metrics["MAE"],
+            )
 
     # Process missed profiles (ground truth without predictions)
     # These are compared against zero predictions - missed cell types
@@ -560,18 +553,22 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         if metrics is not None:
             # Mark as missed in the key
             metrics_per_cell_type[f"[MISSED] {gt_name}"] = metrics
-            logging.warning(f"Missed profile {gt_name}: RMSE={metrics['RMSE']:.4f}, "
-                           f"NRMSE={metrics['NRMSE']:.4f}, MAE={metrics['MAE']:.4f} "
-                           "(predicted as zero)")
+            logging.warning(
+                "Missed profile %s: RMSE=%s, NRMSE=%s, MAE=%s (predicted as zero)",
+                gt_name,
+                metrics["RMSE"],
+                metrics["NRMSE"],
+                metrics["MAE"],
+            )
 
     # Store tracking info as special keys
-    metrics_per_cell_type['_spurious_profiles'] = spurious_profiles
-    metrics_per_cell_type['_missed_profiles'] = missed_profiles
+    metrics_per_cell_type["_spurious_profiles"] = spurious_profiles
+    metrics_per_cell_type["_missed_profiles"] = missed_profiles
 
     return metrics_per_cell_type
 
 
-### 📊 **Spatial Diagnostic Plotting Functions**
+# Spatial Diagnostic Plotting Functions
 
 
 def plot_marker_processing_stages(
@@ -580,7 +577,8 @@ def plot_marker_processing_stages(
     raw_values: np.ndarray,
     signal_prob: np.ndarray,
     corrected_values: np.ndarray,
-    smoothed_values: np.ndarray,
+    *,
+    _smoothed_values: np.ndarray,
     zscore_values: np.ndarray,
     morans_i: float,
     p_value: float,
@@ -637,72 +635,67 @@ def plot_marker_processing_stages(
     fig, axes = plt.subplots(1, 5, figsize=(25, 5))
 
     # Common colorbar settings
-    cbar_kwargs = {'shrink': 0.8, 'pad': 0.02}
+    cbar_kwargs = {"shrink": 0.8, "pad": 0.02}
 
     # Panel 1: Raw expression with signal probability as edge color
     ax = axes[0]
     # Main scatter: raw values
-    scatter1 = ax.scatter(
-        coords[:, 0], coords[:, 1],
-        c=raw_values, cmap='viridis',
-        s=spot_size, edgecolors='none'
-    )
-    ax.set_title(f"1. Raw Expression", fontsize=11, weight='bold')
-    ax.set_xlabel('X coordinate')
-    ax.set_ylabel('Y coordinate')
-    ax.set_aspect('equal')
-    plt.colorbar(scatter1, ax=ax, label='Expression', **cbar_kwargs)
+    scatter1 = ax.scatter(coords[:, 0], coords[:, 1], c=raw_values, cmap="viridis", s=spot_size, edgecolors="none")
+    ax.set_title("1. Raw Expression", fontsize=11, weight="bold")
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
+    ax.set_aspect("equal")
+    plt.colorbar(scatter1, ax=ax, label="Expression", **cbar_kwargs)
 
     # Panel 2: Signal probability (P(signal | x))
     ax = axes[1]
     scatter2 = ax.scatter(
-        coords[:, 0], coords[:, 1],
-        c=signal_prob, cmap='RdYlBu_r',
-        s=spot_size, edgecolors='none',
-        vmin=0, vmax=1
+        coords[:, 0], coords[:, 1], c=signal_prob, cmap="RdYlBu_r", s=spot_size, edgecolors="none", vmin=0, vmax=1
     )
-    ax.set_title(f"2. P(signal | x)\n(GMM Classification)", fontsize=11, weight='bold')
-    ax.set_xlabel('X coordinate')
-    ax.set_ylabel('Y coordinate')
-    ax.set_aspect('equal')
-    plt.colorbar(scatter2, ax=ax, label='Signal Probability', **cbar_kwargs)
+    ax.set_title("2. P(signal | x)\n(GMM Classification)", fontsize=11, weight="bold")
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
+    ax.set_aspect("equal")
+    plt.colorbar(scatter2, ax=ax, label="Signal Probability", **cbar_kwargs)
 
     # Panel 3: Background-corrected (X * P(signal))
     ax = axes[2]
     scatter3 = ax.scatter(
-        coords[:, 0], coords[:, 1],
-        c=corrected_values, cmap='viridis',
-        s=spot_size, edgecolors='none'
+        coords[:, 0], coords[:, 1], c=corrected_values, cmap="viridis", s=spot_size, edgecolors="none"
     )
-    ax.set_title(f"3. Background Corrected\n(X × P(signal))", fontsize=11, weight='bold')
-    ax.set_xlabel('X coordinate')
-    ax.set_ylabel('Y coordinate')
-    ax.set_aspect('equal')
-    plt.colorbar(scatter3, ax=ax, label='Corrected', **cbar_kwargs)
+    ax.set_title("3. Background Corrected\n(X × P(signal))", fontsize=11, weight="bold")
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
+    ax.set_aspect("equal")
+    plt.colorbar(scatter3, ax=ax, label="Corrected", **cbar_kwargs)
 
     # Panel 4: Smoothed + Z-scored
     ax = axes[3]
     # Use diverging colormap for Z-scores centered at 0
     vmax_z = max(abs(np.nanmin(zscore_values)), abs(np.nanmax(zscore_values)))
     scatter4 = ax.scatter(
-        coords[:, 0], coords[:, 1],
-        c=zscore_values, cmap='RdBu_r',
-        s=spot_size, edgecolors='none',
-        vmin=-vmax_z, vmax=vmax_z
+        coords[:, 0],
+        coords[:, 1],
+        c=zscore_values,
+        cmap="RdBu_r",
+        s=spot_size,
+        edgecolors="none",
+        vmin=-vmax_z,
+        vmax=vmax_z,
     )
-    ax.set_title(f"4. Smoothed + Z-scored\n(for Moran's I)", fontsize=11, weight='bold')
-    ax.set_xlabel('X coordinate')
-    ax.set_ylabel('Y coordinate')
-    ax.set_aspect('equal')
-    plt.colorbar(scatter4, ax=ax, label='Z-score', **cbar_kwargs)
+    ax.set_title("4. Smoothed + Z-scored\n(for Moran's I)", fontsize=11, weight="bold")
+    ax.set_xlabel("X coordinate")
+    ax.set_ylabel("Y coordinate")
+    ax.set_aspect("equal")
+    plt.colorbar(scatter4, ax=ax, label="Z-score", **cbar_kwargs)
 
     # Panel 5: Verdict
     ax = axes[4]
-    ax.axis('off')
+    ax.axis("off")
 
     # Verdict text with color
-    verdict_color = '#228B22' if passed else '#DC143C'  # Forest green or crimson
-    verdict_text = 'PASSED' if passed else 'FILTERED'
+    verdict_color = "#228B22" if passed else "#DC143C"  # Forest green or crimson
+    verdict_text = "PASSED" if passed else "FILTERED"
 
     # Build info text
     info_lines = [
@@ -715,21 +708,36 @@ def plot_marker_processing_stages(
         info_lines.append(f"Signal fraction = {signal_fraction:.3f}")
 
     # Display verdict box
-    ax.text(0.5, 0.75, verdict_text, ha='center', va='center',
-            fontsize=24, color=verdict_color, weight='bold',
-            transform=ax.transAxes)
+    ax.text(
+        0.5,
+        0.75,
+        verdict_text,
+        ha="center",
+        va="center",
+        fontsize=24,
+        color=verdict_color,
+        weight="bold",
+        transform=ax.transAxes,
+    )
 
     # Display stats
-    info_text = '\n'.join(info_lines)
-    ax.text(0.5, 0.35, info_text, ha='center', va='center',
-            fontsize=12, family='monospace',
-            transform=ax.transAxes,
-            bbox=dict(boxstyle='round,pad=0.5', facecolor='lightgray', alpha=0.3))
+    info_text = "\n".join(info_lines)
+    ax.text(
+        0.5,
+        0.35,
+        info_text,
+        ha="center",
+        va="center",
+        fontsize=12,
+        family="monospace",
+        transform=ax.transAxes,
+        bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.3),
+    )
 
-    ax.set_title("5. Verdict", fontsize=11, weight='bold')
+    ax.set_title("5. Verdict", fontsize=11, weight="bold")
 
     # Main title
-    fig.suptitle(f"Marker: {marker_name}", fontsize=14, weight='bold', y=1.02)
+    fig.suptitle(f"Marker: {marker_name}", fontsize=14, weight="bold", y=1.02)
 
     plt.tight_layout()
 
@@ -738,7 +746,7 @@ def plot_marker_processing_stages(
     if output_dir and not os.path.exists(output_dir):
         os.makedirs(output_dir, exist_ok=True)
 
-    fig.savefig(output_path, dpi=dpi, bbox_inches='tight')
+    fig.savefig(output_path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
-    logging.info(f"Saved processing stages plot for {marker_name}: {output_path}")
+    logging.info("Saved processing stages plot for %s: %s", marker_name, output_path)

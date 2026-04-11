@@ -1,4 +1,4 @@
-<!-- codebase-index git:6fa2fac6 -->
+<!-- codebase-index git:ca608868 -->
 # CITEgeist Codebase Index
 
 ## CITEgeist/model/
@@ -78,8 +78,8 @@
 - `class CheckpointManager` — Manages loading and saving of optimization checkpoints.
   - `check_complete_run(N, T, M)` — Check if a complete run exists.
   - `load_latest_checkpoint(N, T, M)` — Load the latest valid checkpoint.
-  - `save_checkpoint(completed_spots, spotwise_profiles, N, T, M)` — Save current progress as checkpoint.
-  - `save_final_results(spotwise_profiles, completed_spots, N, T, M)` — Save final results.
+  - `save_checkpoint(completed_spots, spotwise_profiles, _N, T, M)` — Save current progress as checkpoint.
+  - `save_final_results(spotwise_profiles, completed_spots, _N, T, M)` — Save final results.
 
 ### CITEgeist/model/citegeist_model.py
 *Main CitegeistModel class for spatial transcriptomics deconvolution.*
@@ -97,7 +97,7 @@
   - `preprocess_antibody_discrete(winsorize_lower=5, winsorize_upper=95, scale_per_marker=True, scale_mode='per_marker') -> None` — Preprocess antibody data for discrete cell assignment.
   - `compute_spot_nuclei_counts(resolution_mode='hires', max_fullres_side=9000, save_masks=True, modality='he', **stardist_kwargs) -> pd.Series` — Compute per-spot nuclei counts from Visium histology using StarDist.
   - `train_reference(reference_adata, cell_type_col='cell_type', n_markers_per_type=20, de_method='wilcoxon', type_mapping=None) -> 'ReferenceProfile'` — Train NB reference profiles from annotated scRNA-seq.
-  - `run_cell_proportion_model(radius=None, tolerance=0.0001, max_iterations=20, lambda_reg=1, alpha=0.5, max_y_change=0.4, max_workers=None, checkpoint_interval=100, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.1, validation_warn_only=False, lambda_laplacian=0.03, laplacian_k=8, beta_min=0.1, beta_max=2.0, lambda_coverage=1.0, use_nuclei_prior=False, nuclei_prior_lambda=1.0, nuclei_target_col='nuclei_count_target', nuclei_prior_bounds=None, use_cellularity_laplacian=False, cellularity_col=None, cellularity_sigma=0.5, sparsity_mask=None, use_detection_gating=True, detection_gate_ub=0.01, use_gex_detection=True, gex_detection_k=10, gex_detection_min_corr=0.15, fusion_mode='union', refine_sparsity=False, refine_suppress_threshold=0.02, refine_rescue_threshold=0.08, use_entropy_weights=False, entropy_weight_alpha=1.0, marker_weight_dict=None, lambda_confusion=0.0, confusion_pairs_manual=None, confusion_corr_threshold=-0.25, nuclei_counts=None, cellularity_slack=0.3, lambda_cellularity=1.0, use_gating=None, priority_dict=None, threshold_method='auto', use_negative_gates=False, method='qp', sigma_scale=1.0, nb_device='cpu', nb_n_iter=100, nb_use_detection=True, nb_detection_threshold=0.5, nb_gpu_adam_steps=200, morphology_prior=None, morphology_patches=None, morphology_cell_to_spot=None, lambda_morphology=0.1, morphology_device='cpu', reference=None, kappa=10.0)` — Orchestrates the cell proportion optimization workflow.
+  - `run_cell_proportion_model(radius=None, tolerance=0.0001, max_iterations=20, lambda_reg=1, alpha=0.5, _max_y_change=0.4, _max_workers=None, _checkpoint_interval=100, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.1, validation_warn_only=False, lambda_laplacian=0.03, laplacian_k=8, beta_min=0.1, beta_max=2.0, lambda_coverage=1.0, use_nuclei_prior=False, nuclei_prior_lambda=1.0, nuclei_target_col='nuclei_count_target', nuclei_prior_bounds=None, use_cellularity_laplacian=False, cellularity_col=None, cellularity_sigma=0.5, sparsity_mask=None, use_detection_gating=True, detection_gate_ub=0.01, use_gex_detection=True, gex_detection_k=10, gex_detection_min_corr=0.15, fusion_mode='union', refine_sparsity=False, refine_suppress_threshold=0.02, refine_rescue_threshold=0.08, use_entropy_weights=False, entropy_weight_alpha=1.0, marker_weight_dict=None, lambda_confusion=0.0, confusion_pairs_manual=None, confusion_corr_threshold=-0.25, nuclei_counts=None, _cellularity_slack=0.3, _lambda_cellularity=1.0, use_gating=None, priority_dict=None, threshold_method='auto', use_negative_gates=False, method='qp', sigma_scale=1.0, nb_device='cpu', nb_n_iter=100, nb_use_detection=True, nb_detection_threshold=0.5, nb_gpu_adam_steps=200, morphology_prior=None, morphology_patches=None, morphology_cell_to_spot=None, lambda_morphology=0.1, morphology_device='cpu', reference=None, kappa=10.0)` — Orchestrates the cell proportion optimization workflow.
   - `discretize_proportions(proportions_df, nuclei_counts) -> pd.DataFrame` — Convert continuous cell type proportions to integer cell counts.
   - `run_cell_expression_pass1(cell_assignments=None, cell_spot_map=None, sace_max_iter=1, sace_n_0=10.0, sace_bandwidth=None)` — Run gene expression deconvolution using SACE (Spatially-Adaptive Compositional EM).
   - `compute_expression_prior(spotwise_profiles_pass1, cell_type_numbers_array, lambda_prior=1.0, min_expression_threshold=0.1) -> Dict[str, Any]` — Compute global prior from pass 1 results.
@@ -112,7 +112,7 @@
   - `run_functional_annotation(*args, **kwargs)` — Compatibility wrapper for the Module 3.5 functional annotation entrypoint.
   - `run_sace_protein(cell_assignments, cell_spot_map, module3_5_candidates_df=None, functional_table=None, max_iter=1, n_0=10.0, bandwidth=None, bimodality_threshold=1.5, posterior_threshold=0.5, min_high_component_log_mean=1.0)` — Per-cell functional protein deconvolution via SACE.
   - `run_protein_subtype_split(cell_assignments, cell_spot_map, validated_pairs=None, min_subtype_cells=50) -> Tuple[Dict[str, str], 'pd.DataFrame']` — Split cell types into protein-gate-defined subtypes for SACE GEX.
-  - `build_validated_module3_5_annotations(assignments_df=None, benchmark_summary=None)` — Build validated Module 3.5 annotations from SACE protein output.
+  - `build_validated_module3_5_annotations(_assignments_df=None, _benchmark_summary=None)` — Build validated Module 3.5 annotations from SACE protein output.
   - `build_validated_functional_annotations(assignments_df, benchmark_summary)` — Compatibility wrapper for the Module 3.5 projection entrypoint.
 
 ### CITEgeist/model/deconvolution/__init__.py
@@ -125,17 +125,17 @@
 - `map_antibodies_to_profiles_v2(adata, cell_profile_dict)` — Map antibody capture data while preserving marker-level granularity.
 - `map_antibodies_to_profiles_cellularity(adata, cell_profile_dict, clip_percentile=99, scale='median')` — Map antibody data for cellularity-scaled QP, preserving between-spot amplitude.
 - `map_antibodies_raw_counts(adata, cell_profile_dict, winsorize_lower=1.0, winsorize_upper=99.0, scale='median', eps=1e-06)` — Map raw antibody counts for cellularity-scaled QP (no CLR).
-- `compute_marker_exclusivity(marker_level_data, Y_values, marker_owners, assignment_matrix, floor=0.3, epsilon=1e-09) -> np.ndarray` — Compute per-marker exclusivity scores measuring discriminative power.
+- `compute_marker_exclusivity(marker_level_data, Y_values, marker_owners, _assignment_matrix, floor=0.3, epsilon=1e-09) -> np.ndarray` — Compute per-marker exclusivity scores measuring discriminative power.
 - `validate_cell_proportions(Y_values, cell_type_names, profile_based_antibody_data=None, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.2, warn_only=False) -> None` — Validate cell type proportions after Stage 1 optimization.
 - `compute_proportion_enrichment(gene_expr, cell_type_props, celltype_frequencies=None) -> np.ndarray` — Compute proportion-based enrichment WITHOUT smoothing.
 - `compute_marker_enrichment(gene_expr, anchor_expr, anchor_weights) -> np.ndarray` — Compute marker-guided enrichment via correlation with anchor genes.
 - `compute_adaptive_enrichment(prop_enrichment, marker_enrichment, max_variance=0.1) -> np.ndarray` — Adaptively blend proportion and marker enrichment based on proportion variance.
 - `precompute_anchor_expression(gene_expression, anchor_genes, anchor_weights) -> Tuple[np.ndarray, np.ndarray]` — Precompute weighted mean anchor expression per cell type.
-- `estimate_true_expression_cell(X_obs, Y_assignments, coords, enrichment_weights, library_slack=1.5, lambda_enrich=1.0, lambda_spatial=0.0, spatial_k=50, max_workers=None, checkpoint_interval=500) -> np.ndarray` — Estimate true gene expression per cell using optimization.
+- `estimate_true_expression_cell(X_obs, Y_assignments, coords, enrichment_weights, library_slack=1.5, lambda_enrich=1.0, lambda_spatial=0.0, spatial_k=50, max_workers=None, _checkpoint_interval=500) -> np.ndarray` — Estimate true gene expression per cell using optimization.
 - `normalize_counts(adata, target_sum=10000, exclude_highly_expressed=False, max_fraction=0.05)` — Normalize counts while preserving integer values and relative proportions.
 - `deconvolute_spot_with_neighbors_with_prior(spot_idx, adata, cell_type_numbers_array, radius, global_prior=None, lambda_prior_weight=0.0, local_enrichment_weight=0.5, global_enrichment_weight=0.5, continuous_relaxation=True, lambda_gex_reg=0.01, enrichment_smoothing=0.2, use_kl_regularization=True, kl_temperature=0.3, lambda_kl=0.1) -> Optional[np.ndarray]` — Deconvolute a spot with its neighbors, using enrichment weights and optional prior.
-- `optimize_gene_expression(sample_name, deconvolution_expression_data, cell_type_numbers_array, filtered_adata, radius=2, global_enrichment_weight=0.5, local_enrichment_weight=0.5, global_prior=None, lambda_prior_weight=0.0, max_workers=None, checkpoint_interval=100, output_dir='checkpoints', rerun=False, continuous_relaxation=True, lambda_gex_reg=0.01, enrichment_smoothing=0.2, anchor_genes=None, anchor_weights=None, module_weight=0.5, use_kl_regularization=True, kl_temperature=0.3, lambda_kl=0.1) -> Dict[str, Any]` — Optimize gene expression: prep-cook pattern (CPU-parallel prep + sequential GPU solve).
-- `optimize_cell_proportions_per_marker(marker_level_data, marker_names, assignment_matrix, cell_type_names, tolerance=0.0001, max_iterations=50, lambda_reg=1.0, alpha=0.5, normalize_beta=True, beta_min=0.1, beta_max=2.0, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.2, warn_only=False, lambda_laplacian=0.0, coords=None, laplacian_k=8, lambda_sparse=0.0, alpha_max=0.8, lambda_alpha=1.0, lambda_coverage=1.0, spot_abundance_target=None, lambda_abundance_prior=0.0, row_sum_bounds=None, cellularity=None, cellularity_sigma=0.5, sparsity_mask=None, spot_weights=None, morphology_prior=None, lambda_morphology=0.0, freeze_globals=False, marker_weight=None, confusion_pairs=None, lambda_confusion=0.0) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray, np.ndarray]` — Perform EM-based optimization for cell type proportions with per-marker beta.
+- `optimize_gene_expression(sample_name, deconvolution_expression_data, cell_type_numbers_array, filtered_adata, radius=2, global_enrichment_weight=0.5, local_enrichment_weight=0.5, global_prior=None, lambda_prior_weight=0.0, max_workers=None, checkpoint_interval=100, output_dir='checkpoints', rerun=False, continuous_relaxation=True, lambda_gex_reg=0.01, enrichment_smoothing=0.2, _anchor_genes=None, _anchor_weights=None, _module_weight=0.5, use_kl_regularization=True, kl_temperature=0.3, lambda_kl=0.1) -> Dict[str, Any]` — Optimize gene expression: prep-cook pattern (CPU-parallel prep + sequential GPU solve).
+- `optimize_cell_proportions_per_marker(marker_level_data, marker_names, assignment_matrix, cell_type_names, tolerance=0.0001, max_iterations=50, lambda_reg=1.0, alpha=0.5, normalize_beta=True, beta_min=0.1, beta_max=2.0, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.2, warn_only=False, lambda_laplacian=0.0, coords=None, laplacian_k=8, lambda_sparse=0.0, alpha_max=0.8, lambda_alpha=1.0, lambda_coverage=1.0, spot_abundance_target=None, lambda_abundance_prior=0.0, row_sum_bounds=None, cellularity=None, cellularity_sigma=0.5, sparsity_mask=None, spot_weights=None, morphology_prior=None, lambda_morphology=0.0, freeze_globals=False, marker_weight=None, _confusion_pairs=None, _lambda_confusion=0.0) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray, np.ndarray]` — Perform EM-based optimization for cell type proportions with per-marker beta.
 - `optimize_cell_proportions_per_type_beta(marker_level_data, marker_names, cell_type_names, beta_init, prior_sigma, tolerance=0.0001, max_iterations=50, lambda_reg=1.0, alpha_elastic=0.5, beta_max=2.0, alpha_max=0.8, lambda_alpha=1.0, lambda_laplacian=0.0, coords=None, laplacian_k=8, row_sum_bounds=None, sparsity_mask=None, spot_weights=None, marker_weight=None) -> Tuple[np.ndarray, np.ndarray, Dict[str, Dict[str, float]], np.ndarray, np.ndarray, List[float]]` — EM-based optimization with per-type-per-marker beta matrix.
 - `optimize_cell_proportions_per_marker_matrix(marker_level_data, marker_names, assignment_matrix, cell_type_names, tolerance=0.0001, max_iterations=50, lambda_reg=1.0, alpha=0.5, normalize_beta=True, beta_min=0.1, beta_max=2.0, unknown_threshold=0.05, min_celltype_threshold=0.01, redundancy_threshold=0.2, warn_only=False, lambda_laplacian=0.0, coords=None, laplacian_k=8, lambda_sparse=0.0, alpha_max=0.8, lambda_alpha=1.0, lambda_coverage=1.0, spot_abundance_target=None, lambda_abundance_prior=0.0, row_sum_bounds=None, cellularity=None, cellularity_sigma=0.5, sparsity_mask=None, spot_weights=None, marker_weight=None, confusion_pairs=None, lambda_confusion=0.0) -> Tuple[np.ndarray, np.ndarray, Dict[str, float], np.ndarray, np.ndarray]` — Matrix-formulated version of optimize_cell_proportions_per_marker.
 
@@ -147,7 +147,7 @@
 ### CITEgeist/model/deconvolution/detection_refinement.py
 *Detection refinement: GEX-based detection and iterative sparsity tuning.*
 - `compute_gene_type_correlations(Y, antibody_data, antibody_names, cell_profile_dict, type_names) -> np.ndarray` — Compute correlation between each gene and each cell type's protein signal.
-- `detect_cell_types_gex(Y, H, gene_names, type_names, k=10, min_corr=0.15, threshold=0.5) -> np.ndarray` — Detect cell type presence per spot using gene expression signatures.
+- `detect_cell_types_gex(Y, H, _gene_names, type_names, k=10, min_corr=0.15, threshold=0.5) -> np.ndarray` — Detect cell type presence per spot using gene expression signatures.
 - `fuse_detection_masks(protein_detected, gex_detected, assignment_matrix, mode='adaptive') -> np.ndarray` — Fuse protein-based and GEX-based detection masks.
 - `refine_sparsity_from_proportions(Y, sparsity_mask, cellularity=None, suppress_threshold=0.02, rescue_threshold=0.08, detection_gate_ub=0.01) -> np.ndarray` — Refine detection upper bounds using Pass 1 proportion estimates.
 - `compute_marker_entropy_weights(marker_level_data, marker_names, alpha=1.0, eps=1e-10, weight_floor=0.1) -> np.ndarray` — Compute per-marker weights based on expression entropy.
@@ -182,8 +182,8 @@
 - `analyze_marker_colocalization(X, coords, marker_names, markers_to_analyze=None, neighbor_k=6, smooth_k=6, signal_threshold_percentile=75.0, n_permutations=999, seed=1234, verbose=True, multi_scale_k=[6, 12, 24, 48, 64], multi_scale_aggregation='max') -> ColocalizationResult` — Analyze pairwise spatial colocalization between markers.
 - `discover_profiles_continuous(colocalization_result, top_k=5, distance_metric='colocalization_score', seed=1234, verbose=True) -> ProfileDiscoveryResult` — Discover cell type profiles using continuous edge weighting (no FDR gate).
 - `rescue_singletons(profiles, signal_masks, signal_mask_marker_names, min_unique_coverage=0.3, min_signal_fraction=0.05, verbose=False) -> List[List[str]]` — Filter singletons by unique spatial coverage.
-- `select_profiles(X, coords, marker_names, profiles, interesting_markers, colocalization_result, min_spatial_explained=0.9, min_protein_explained=0.9, max_profiles=15, min_profiles=5, neighbor_k=8, verbose=False) -> ProfileSelectionResult` — Module 2c: Select profiles by dual variance contribution.
-- `discover_hierarchical_profiles_continuous(coloc_result, antibody_expression, marker_names, coords, improvement_threshold=0.05, sharing_ratio=0.5, sharing_min_I=0.2, max_depth=5, neighbor_k=6, top_k=3, distance_metric='colocalization_score', verbose=True) -> HierarchicalProfileResult` — Discover hierarchical profiles using flat-first, hierarchy-second approach.
+- `select_profiles(X, coords, marker_names, profiles, _interesting_markers, _colocalization_result, min_spatial_explained=0.9, min_protein_explained=0.9, max_profiles=15, _min_profiles=5, neighbor_k=8, verbose=False) -> ProfileSelectionResult` — Module 2c: Select profiles by dual variance contribution.
+- `discover_hierarchical_profiles_continuous(coloc_result, antibody_expression, marker_names, _coords, _improvement_threshold=0.05, _sharing_ratio=0.5, _sharing_min_I=0.2, _max_depth=5, _neighbor_k=6, top_k=3, distance_metric='colocalization_score', verbose=True) -> HierarchicalProfileResult` — Discover hierarchical profiles using flat-first, hierarchy-second approach.
 - `class MarkerPairColocalization` — Colocalization metrics for a pair of markers.
 - `class ColocalizationResult` — Results container for colocalization analysis.
   - `to_dataframe() -> pd.DataFrame` — Convert to ranked DataFrame sorted by colocalization_score descending.
@@ -216,15 +216,19 @@
 
 ### CITEgeist/model/gex/gex_modules.py
 *GEX module-aware enrichment and KL regularization for gene expression deconvolution.*
-- `discover_anchor_genes(gene_expression, cell_proportions, min_anchors=5, max_anchors=10, initial_min_correlation=0.3, min_expressing_spots=0.1) -> Tuple[Dict[int, List[int]], Dict[int, float], Dict[int, Dict[int, float]]]` — Discover anchor genes for each cell type based on correlation with proportions.
-- `compute_module_aware_enrichment(spot_idx, neighborhood_expression, base_enrichment, anchor_genes, module_weight=0.5, min_neighbors_for_corr=10) -> np.ndarray` — Compute module-aware enrichment by correlating genes with anchors in neighborhood.
+- `discover_anchor_genes(gene_expression, cell_proportions, min_anchors=5, max_anchors=10, _initial_min_correlation=0.3, min_expressing_spots=0.1) -> Tuple[Dict[int, List[int]], Dict[int, float], Dict[int, Dict[int, float]]]` — Discover anchor genes for each cell type based on correlation with proportions.
+- `compute_module_aware_enrichment(_spot_idx, neighborhood_expression, base_enrichment, anchor_genes, module_weight=0.5, min_neighbors_for_corr=10) -> np.ndarray` — Compute module-aware enrichment by correlating genes with anchors in neighborhood.
 - `compute_softmax_target(enrichment, temperature=0.3) -> np.ndarray` — Compute softmax target distribution from enrichment scores.
 - `compute_kl_penalty_coefficients(target_distribution, total_counts, lambda_kl=0.1) -> Dict[str, np.ndarray]` — Compute coefficients for KL-divergence penalty in Gurobi objective.
 
 ### CITEgeist/model/gex/sace_gex.py
 *Spatially-Adaptive Compositional EM (SACE) for per-cell GEX deconvolution.*
 - `build_kernel_matrix(coords, bandwidth=None, truncate_at=3.0) -> sp.csr_matrix` — Build row-normalized Gaussian spatial kernel matrix.
-- `run_sace(spot_counts, proportions, cell_assignments, cell_spot_map, spot_coords, gene_names, spotwise_profiles_init=None, n_0=10.0, bandwidth=None, max_iter=10, tol=0.0001, eps=1e-06, min_mass_threshold=1.0, damping_eta=1.0, antibody_data=None, antibody_names=None, cell_profile_dict=None) -> Tuple[Dict[int, np.ndarray], 'sc.AnnData', Dict]` — Run Spatially-Adaptive Compositional EM for per-cell GEX.
+- `run_sace(spot_counts, proportions, cell_assignments, cell_spot_map, spot_coords, gene_names, spotwise_profiles_init=None, n_0=10.0, bandwidth=None, max_iter=10, tol=0.0001, eps=1e-06, min_mass_threshold=1.0, damping_eta=1.0, antibody_data=None, antibody_names=None, cell_profile_dict=None) -> Tuple[Dict[int, np.ndarray], sc.AnnData, Dict]` — Run Spatially-Adaptive Compositional EM for per-cell GEX.
+
+### CITEgeist/model/module2_proposal_builder.py
+- `build_candidate_rank_lists(profiles, role_config, ontology_name) -> tuple[pd.DataFrame, pd.DataFrame]`
+- `class MarkerRoleConfig`
 
 ### CITEgeist/model/morphology/__init__.py
 
@@ -278,7 +282,7 @@
 ### CITEgeist/model/morphology/segmentation.py
 *StarDist-based nuclei segmentation utilities for Visium-style datasets.*
 - `run_nuclei_segmentation(image, modality='he', **kwargs) -> Tuple[np.ndarray, pd.DataFrame]` — Convenience function: segment nuclei with StarDist.
-- `run_cellpose_nuclei_segmentation(image_rgb_uint8, use_gpu=False, diameter=None, flow_threshold=0.4, cellprob_threshold=0.0, model=None, model_type='nuclei') -> Tuple[np.ndarray, np.ndarray]` — Deprecated: use ``run_nuclei_segmentation(image, modality='dapi')`` instead.
+- `run_cellpose_nuclei_segmentation(image_rgb_uint8, _use_gpu=False, _diameter=None, _flow_threshold=0.4, _cellprob_threshold=0.0, _model=None, _model_type='nuclei') -> Tuple[np.ndarray, np.ndarray]` — Deprecated: use ``run_nuclei_segmentation(image, modality='dapi')`` instead.
 - `estimate_pixel_size_um(adata, spot_diameter_um=55.0) -> Optional[float]` — Estimate microns-per-pixel from Visium scalefactors.
 - `detect_spot_diameter_pixels(adata, pixel_size_um=None, spot_diameter_um=None) -> float` — Auto-detect spot diameter in pixels for nuclei-to-spot assignment.
 - `get_resolution_image_and_scale(adata, resolution_mode='hires', max_fullres_side=9000) -> Tuple[np.ndarray, float]` — Return segmentation image and fullres->image coordinate scale.
@@ -376,7 +380,7 @@
 - `align_gene_sets(results_by_sample) -> Tuple[Dict[Tuple[str, str], NDArray], List[str], pd.DataFrame]` — Align gene sets across samples by creating a union of all genes.
 - `integrate_programs_harmony(aligned_W, metadata, n_components=30, n_clusters=50, theta=2.0, max_iter=20, tol=0.0001, random_state=42) -> Tuple[NDArray, NDArray, Dict[str, Any]]` — Harmony-style integration of program signatures across samples.
 - `match_programs_across_samples(Z, metadata, aligned_W, all_genes, similarity_threshold=0.7, top_n_genes=20) -> List[AlignedProgram]` — Match programs across samples based on embedding similarity.
-- `compare_bivariate_relationships(bivariate_results, aligned_programs, min_samples=2, significance_threshold=0.05, colocalization_threshold=0.1) -> List[ConservedRelationship]` — Compare bivariate relationships across samples using aligned program IDs.
+- `compare_bivariate_relationships(bivariate_results, aligned_programs, min_samples=2, _significance_threshold=0.05, colocalization_threshold=0.1) -> List[ConservedRelationship]` — Compare bivariate relationships across samples using aligned program IDs.
 - `build_similarity_network(aligned_programs, conserved_relationships, min_program_conservation=0.3, min_relationship_conservation=0.3) -> nx.Graph` — Build NetworkX graph of conserved programs and relationships.
 - `integrate_samples(module4_results, module4b_results=None, n_components=30, n_clusters=50, theta=2.0, similarity_threshold=0.7, max_iter=20, random_state=42, build_network=True) -> IntegrationResult` — Main function: integrate programs across multiple samples.
 - `save_integration_results(result, output_dir, prefix='module5') -> Dict[str, Path]` — Save integration results to files.
@@ -387,9 +391,16 @@
   - `to_programs_dataframe() -> pd.DataFrame` — Convert aligned programs to DataFrame.
   - `to_relationships_dataframe() -> pd.DataFrame` — Convert conserved relationships to DataFrame.
 
+### CITEgeist/model/proposal_review_loader.py
+- `build_module3_profile_dict_from_review(reviewed) -> dict[str, dict[str, list[str]]]`
+- `build_module3_5_table_from_review(reviewed) -> dict[str, dict[str, list[str]]]`
+
 ### CITEgeist/model/qc/__init__.py
 *QC module for validating CITEgeist single-cell outputs.*
 - `run_qc(*args, **kwargs)` — Orchestrate all QC checks. See report.run_qc for full signature.
+
+### CITEgeist/model/qc/_types.py
+*Shared type definitions for the QC subpackage.*
 - `class QCResult` — Result container for a single QC module.
 
 ### CITEgeist/model/qc/canonical_markers.py
@@ -420,7 +431,7 @@
 
 ### CITEgeist/model/qc/report.py
 *QC orchestrator and figure composition.*
-- `run_qc(adata_per_cell, proportions, mode='self_consistency', gt_proportions=None, gt_gex_layers=None, pred_gex_layers=None, reference_adata=None, output_dir='./qc_output', empty_umi_threshold=50, empty_genes_threshold=25) -> dict[str, QCResult]` — Orchestrate all QC checks.
+- `run_qc(adata_per_cell, proportions, mode='self_consistency', gt_proportions=None, gt_gex_layers=None, pred_gex_layers=None, _reference_adata=None, output_dir='./qc_output', empty_umi_threshold=50, empty_genes_threshold=25) -> dict[str, QCResult]` — Orchestrate all QC checks.
 
 ### CITEgeist/model/qc/single_cell_qc.py
 *Standard single-cell QC metrics and empty cell detection.*
@@ -446,7 +457,7 @@
 - `benchmark_cell_proportions(true_proportions, predicted_proportions, cell_type_names)` — Calculate performance metrics for cell type proportion predictions.
 - `export_anndata_layers(adata, output_dir, pass_number=None)` — Export all layers of an AnnData object to separate CSV files.
 - `calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize='range', pass_number=None)` — Calculate performance metrics for gene expression predictions.
-- `plot_marker_processing_stages(marker_name, coords, raw_values, signal_prob, corrected_values, smoothed_values, zscore_values, morans_i, p_value, passed, output_path, spot_size=30.0, dpi=150, snr=None, signal_fraction=None)` — Generate 5-panel diagnostic plot showing processing stages for a marker.
+- `plot_marker_processing_stages(marker_name, coords, raw_values, signal_prob, corrected_values, _smoothed_values, zscore_values, morans_i, p_value, passed, output_path, spot_size=30.0, dpi=150, snr=None, signal_fraction=None)` — Generate 5-panel diagnostic plot showing processing stages for a marker.
 
 ## Benchmarking/
 
@@ -499,6 +510,12 @@
 `Benchmarking/simulation_benchmarking/CARD/generate_marker_genes_simulation.py`
   → Generate marker gene lists for CARD reference-free mode on simulation data.
 
+`Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_antibody_distribution.py`
+  → Analyze antibody data distribution for rare cell types.
+
+`Benchmarking/simulation_benchmarking/CITEgeist/debug/analyze_mixed_vs_highseg.py`
+  → Analysis script to compare mixed vs high_seg simulation datasets
+
 `Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_discrete_simulation.py`
   → Discrete cell assignment benchmark on scCube simulation data.
 
@@ -523,6 +540,9 @@
 `Benchmarking/simulation_benchmarking/CITEgeist/src/benchmark_simulation_unified.py`
   → Unified simulation benchmark: StarDist + continuous proportions + SC evaluation.
 
+`Benchmarking/simulation_benchmarking/CITEgeist/src/debug_gex_allocation.py`
+  → Debug: trace GEX deconvolution enrichment + allocation for a CE-specific gene.
+
 `Benchmarking/simulation_benchmarking/CITEgeist/src/generate_cellpose_images.py`
   → Generate synthetic nuclei images from scCube simulation data.
 
@@ -545,8 +565,18 @@
 
 `Benchmarking/simulation_benchmarking/Cell2Location/mixed/mixed_cell2loc.py`
 
+`Benchmarking/simulation_benchmarking/Tangram/high_seg/Tangram.py`
+
+`Benchmarking/simulation_benchmarking/Tangram/mixed/Tangram.py`
+
 `Benchmarking/simulation_benchmarking/Tangram/src/run_benchmark.py`
   → Run Tangram deconvolution on Wu BRCA simulation data.
+
+`Benchmarking/simulation_benchmarking/scResolve/src/generate_synthetic_images.py`
+  → Generate synthetic images for scResolve benchmarking using actual scCube cell data.
+
+`Benchmarking/simulation_benchmarking/scResolve/src/run_benchmark.py`
+  → scResolve benchmark wrapper for simulated spatial transcriptomics data.
 
 `Benchmarking/simulation_benchmarking/src/CARD_bench_wrapper.py`
   → Benchmark CARD predictions against ground truth for simulation data.
@@ -573,6 +603,45 @@
 `Benchmarking/simulation_benchmarking/src/seurat_bench_wrapper.py`
 
 `Benchmarking/simulation_benchmarking/src/tangram_bench_wrapper.py`
+
+`Benchmarking/visiumhd_benchmarking/slurm/download_uni.py`
+  → Download UNI pathology foundation model from HuggingFace.
+
+`Benchmarking/visiumhd_benchmarking/src/__init__.py`
+  → Benchmarking framework for H&E morphology-based cell type assignment
+
+`Benchmarking/visiumhd_benchmarking/src/create_pseudo_visium.py`
+  → Create pseudo-Visium spots from Visium HD single-cell data.
+
+`Benchmarking/visiumhd_benchmarking/src/evaluate_single_cell.py`
+  → Single-cell assignment evaluation.
+
+`Benchmarking/visiumhd_benchmarking/src/extract_patches_he.py`
+  → Extract nucleus patches from H&E images.
+
+`Benchmarking/visiumhd_benchmarking/src/run_benchmark.py`
+  → Main benchmark script for Visium HD H&E morphology.
+
+`Benchmarking/visiumhd_benchmarking/src/run_segmentation_he.py`
+  → StarDist segmentation for H&E images.
+
+`Benchmarking/visiumhd_benchmarking/src/test_create_pseudo_visium.py`
+  → Tests for pseudo-Visium spot creation.
+
+`Benchmarking/visiumhd_benchmarking/src/test_evaluate_single_cell.py`
+  → Tests for single-cell evaluation.
+
+`Benchmarking/visiumhd_benchmarking/src/test_extract_patches_he.py`
+  → Tests for H&E patch extraction.
+
+`Benchmarking/visiumhd_benchmarking/src/test_run_segmentation_he.py`
+  → Tests for StarDist H&E segmentation.
+
+`Benchmarking/visiumhd_benchmarking/src/test_train_mil.py`
+  → Tests for MIL training pipeline.
+
+`Benchmarking/visiumhd_benchmarking/src/train_mil.py`
+  → Training pipeline for proportion-guided MIL.
 
 `Benchmarking/visiumhd_segfree_poc/src/assign_transcripts_to_nuclei.py`
   → Assign Xenium transcripts to StarDist-detected nuclei.
@@ -709,6 +778,9 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_mil_assignment.py`
   → Benchmark Module 3b MIL single-cell assignment on Xenium pseudo-Visium.
 
+`Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_module2a_cpu_refactor.py`
+  → Benchmark legacy/refactor Module 2a colocalization runtimes.
+
 `Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_morphology_proportions_qp.py`
   → Benchmark: morphology-informed QP proportion estimation on Xenium Region 1.
 
@@ -772,6 +844,12 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/debug_nb_standalone.py`
   → Debug NB standalone discrepancy: profile dict (10 markers) vs full panel (18 markers).
 
+`Benchmarking/xenium_benchmarking/CITEgeist/src/diag_gt_calling_validity.py`
+  → Diagnostic: GT calling validity and interaction with Module 2 / Module 3.5.
+
+`Benchmarking/xenium_benchmarking/CITEgeist/src/diagnose_stardist_overcounting.py`
+  → Diagnostic: compare StarDist nuclei counts with/without scale+prob_thresh tuning.
+
 `Benchmarking/xenium_benchmarking/CITEgeist/src/enrich_single_cell_output_with_module3_5.py`
   → Benchmark-gated enrichment helpers for Module 3.5 single-cell outputs.
 
@@ -796,6 +874,9 @@
 `Benchmarking/xenium_benchmarking/CITEgeist/src/extract_vit_features.py`
   → Extract ViT-S features from Xenium nucleus patches.
 
+`Benchmarking/xenium_benchmarking/CITEgeist/src/generate_module2_candidate_reviews.py`
+  → Create ranked review artifacts from Module 2 proposals across Xenium regions.
+
 `Benchmarking/xenium_benchmarking/CITEgeist/src/generate_singlecell_figures.py`
   → Generate publication figures for single-cell demonstration.
 
@@ -816,6 +897,9 @@
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/quick_dino_vs_simclr.py`
   → Quick DINO vs SimCLR comparison on region 1, ViT-Tiny, 50 epochs.
+
+`Benchmarking/xenium_benchmarking/CITEgeist/src/rescore_module3_5_benchmark.py`
+  → Re-score Module 3.5 benchmark using updated GT calling and pair list.
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_benchmark.py`
   → CITEgeist benchmark runner for Xenium pseudo-Visium data.
@@ -861,6 +945,9 @@
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_preprocess.py`
   → Unified preprocessing for Xenium benchmark: StarDist segmentation,
+
+`Benchmarking/xenium_benchmarking/CITEgeist/src/run_qc_xenium_benchmark.py`
+  → Run benchmark-mode QC on CITEgeist Xenium results vs SingleR ground truth.
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/run_qp_7type_benchmark.py`
   → QP 7-type benchmark for Xenium pseudo-Visium evaluation.
@@ -981,6 +1068,9 @@
 
 `Benchmarking/xenium_benchmarking/CITEgeist/src/validate_morphology_fixes.py`
   → Validate morphology sprint + Epithelial fixes on all 5 Xenium regions.
+
+`Benchmarking/xenium_benchmarking/CITEgeist/src/xenium_spatial_displacement.py`
+  → Spatial displacement analysis for Xenium benchmark (region 1).
 
 `Benchmarking/xenium_benchmarking/CITEgeist/tests/__init__.py`
   → Benchmarking tests
@@ -1120,6 +1210,81 @@
 `Benchmarking/xenium_benchmarking/reference_data/GSE156632/src/split_tcells_to_protein7.py`
   → Derive the 7-type Xenium reference from the authoritative 6-type annotation.
 
+`Benchmarking/xenium_benchmarking/scResolve/figures/generate_gex_investigation_figure.py`
+  → Generate figure documenting scResolve GEX performance investigation.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/annotate_cells.py`
+  → Annotate scResolve segmented cells using GSE156632 reference scRNA-seq.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/annotate_cells_balanced.py`
+  → Balanced label transfer for scResolve cells using reference scRNA-seq.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/compare_multimodal_normalization.py`
+  → Compare scResolve multimodal results with different protein normalization strategies.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_rna_by_celltype.py`
+  → Diagnose scResolve RNA expression by cell type.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_rna_only_consistency.py`
+  → Diagnose scResolve RNA-only mode internal consistency.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/diagnose_xenium_ground_truth.py`
+  → Diagnose Xenium ground truth RNA-protein concordance.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_cell_recovery.py`
+  → Evaluate scResolve's ability to recover individual cells from pseudo-Visium spots.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_all_regions.py`
+  → Compare GEX recovery across all deconvolution methods - ALL REGIONS.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_comparison.py`
+  → Compare GEX recovery across all deconvolution methods.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_gex_reconstruction.py`
+  → Evaluate scResolve gene expression reconstruction quality.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/evaluate_protein_recovery.py`
+  → Evaluate scResolve's ability to recover per-cell PROTEIN expression.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/extract_dapi_regions.py`
+  → Extract high-resolution DAPI crops for each pseudo-Visium region.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/extract_morphology_regions.py`
+  → Extract morphology image regions from Xenium OME-TIFF for scResolve benchmarking.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/fair_comparison.py`
+  → Fair comparison framework for scResolve vs deconvolution methods.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/gate_and_aggregate_gex.py`
+  → Gate scResolve cells by protein markers and aggregate GEX per cell type.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/generate_cell_types.py`
+  → Generate cell_types.csv from Xenium RNA cluster annotations.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/generate_synthetic_images.py`
+  → Generate synthetic images for scResolve benchmarking.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/inspect_cell_level.py`
+  → Inspect scResolve cell-level outputs to evaluate segmentation quality
+
+`Benchmarking/xenium_benchmarking/scResolve/src/monkey_patch_scresolve.py`
+  → Monkey patch for scResolve to fix compatibility with newer SpaceRanger outputs.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/resume_segmentation.py`
+  → Resume incomplete scResolve segmentation and run aggregation.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark.py`
+  → scResolve benchmark wrapper for Xenium pseudo-Visium data with real morphology.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal.py`
+  → scResolve benchmark wrapper with MULTIMODAL support (GEX + Protein).
+
+`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal_v2.py`
+  → scResolve benchmark wrapper with MULTIMODAL support (GEX + Protein) - Version 2.
+
+`Benchmarking/xenium_benchmarking/scResolve/src/run_benchmark_multimodal_v3.py`
+  → scResolve benchmark wrapper with MULTIMODAL support - Version 3.
+
 `Benchmarking/xenium_pseudovisium/analyze_cluster_profiles.py`
   → Analyze protein marker profiles for each RNA cluster to create accurate cell type annotations.
 
@@ -1232,8 +1397,14 @@
 `tests/test_detection.py`
   → Tests for cell type detection module.
 
+`tests/test_detection_estimation.py`
+  → Tests for combined detection + estimation pipeline.
+
 `tests/test_detection_refinement.py`
   → Tests for detection refinement module (GEX detection + sparsity refinement).
+
+`tests/test_ensemble_proportions.py`
+  → CITEgeist/tests/test_ensemble_proportions.py
 
 `tests/test_figures/__init__.py`
 
@@ -1243,14 +1414,40 @@
 `tests/test_functional_annotation.py`
   → Unit tests for CITEgeist/model/functional_annotation.py (Module 3.5).
 
+`tests/test_generate_module2_candidate_reviews.py`
+
+`tests/test_gex_initialization.py`
+  → Tests for GEX initialization: anchor masks, size factors, Poisson IRLS.
+
+`tests/test_gex_nb_likelihood.py`
+  → Tests for GEX NB log-likelihood.
+
+`tests/test_gwr_gex.py`
+  → Tests for hierarchical shrinkage GEX deconvolution (gwr_gex.py).
+
 `tests/test_hungarian_assignment.py`
   → Tests for Hungarian assignment algorithm.
+
+`tests/test_hungarian_weighted.py`
+  → Tests for proportion-weighted Hungarian assignment.
 
 `tests/test_integration.py`
   → Integration tests for CITEgeist full pipeline.
 
+`tests/test_joint_nb_optimizer.py`
+  → Tests for joint NB optimizer (Stage 3).
+
+`tests/test_mae.py`
+  → Tests for Masked Autoencoder (MAE) module.
+
 `tests/test_marker_interest.py`
   → Test harness for marker_interest module.
+
+`tests/test_marker_validation.py`
+  → Tests for single-cell marker gene validation.
+
+`tests/test_masked_iqp.py`
+  → Tests for masked IQP solver.
 
 `tests/test_model.py`
   → Unit tests for CITEgeist model preprocessing and core functionality.
@@ -1258,11 +1455,20 @@
 `tests/test_module2_profile_discovery.py`
   → Test script for Module 2: Profile Discovery from Spatial Colocalization.
 
+`tests/test_module2_proposal_builder.py`
+
 `tests/test_module2b_relaxed.py`
   → Quick diagnostic to test Module 2b with relaxed parameters.
 
 `tests/test_module2c_profile_selection.py`
   → Test script for Module 2c: Reconstruction-Based Profile Selection.
+
+`tests/test_module3_5_benchmark.py`
+
+`tests/test_module3_5_migration.py`
+
+`tests/test_module3_5_prod_pipeline.py`
+  → Tests for benchmark-gated Module 3.5 orchestration.
 
 `tests/test_module3_5_projection.py`
   → Tests for Module 3.5 projection helpers.
@@ -1285,11 +1491,55 @@
 `tests/test_morphology_features.py`
   → Tests for nuclear morphology feature extraction.
 
+`tests/test_morphology_prior.py`
+  → Tests for morphology-informed proportion estimation.
+
+`tests/test_multimodal_refinement.py`
+  → Tests for multimodal refinement (Pass 1.5 + Pass 2 EM).
+
+`tests/test_nb_cold_start.py`
+  → Tests for cold-start NB deconvolution (Gurobi-free Module 3).
+
+`tests/test_nb_functional.py`
+  → Tests for nb_functional_attribution module.
+
+`tests/test_nb_gated.py`
+  → Tests for the gated NB likelihood function.
+
+`tests/test_nb_joint_model.py`
+  → Tests for the joint tri-modal model orchestrator (nb_joint_model.py).
+
+`tests/test_nb_joint_utils.py`
+  → Tests for CITEgeist.model.nb_joint_utils.
+
+`tests/test_nb_spatial_gnn.py`
+  → Tests for CITEgeist.model.nb_spatial_gnn.SpatialGNN.
+
 `tests/test_patch_extraction.py`
   → Tests for nucleus patch extraction with global normalization.
 
+`tests/test_pc_mil.py`
+  → Tests for Protein-Conditioned MIL model.
+
+`tests/test_per_cell_gex.py`
+  → Tests for Phase 4 per-cell GEX allocation with module constraints.
+
+`tests/test_profile_adapter.py`
+  → Tests for profile dict adapter between Module 3 and PC-MIL formats.
+
+`tests/test_projection_heads.py`
+  → Tests for projection heads and prototypes.
+
+`tests/test_proportion_mil.py`
+  → Tests for proportion-guided MIL.
+
+`tests/test_proposal_review_loader.py`
+
 `tests/test_prototype_contrastive.py`
   → Tests for Prototype-Contrastive LLP loss functions and model.
+
+`tests/test_prototype_learning.py`
+  → Tests for prototype learning (Stage 2).
 
 `tests/test_qc/__init__.py`
 
@@ -1323,8 +1573,20 @@
 `tests/test_segmentation.py`
   → Unit tests for segmentation utilities (non-Cellpose dependent pieces).
 
+`tests/test_simulation_benchmark.py`
+  → Tests for simulation benchmark utility functions.
+
+`tests/test_single_cell_e2e.py`
+  → End-to-end test for single-cell resolution on synthetic data.
+
+`tests/test_single_cell_integration.py`
+  → Integration tests for single-cell resolution pipeline.
+
 `tests/test_single_cell_output.py`
   → Tests for single-cell AnnData output.
+
+`tests/test_sinkhorn.py`
+  → Tests for Sinkhorn optimal transport.
 
 `tests/test_smoke_benchmark_outputs.py`
   → Smoke tests validating canonical benchmark outputs exist and meet performance thresholds.
@@ -1332,14 +1594,65 @@
 `tests/test_smoke_patient_pipeline.py`
   → End-to-end smoke test for the CITEgeist patient pipeline.
 
+`tests/test_soft_assignment.py`
+  → Tests for graded (Soft) marker assignment in map_antibodies_to_profiles_v2.
+
+`tests/test_soft_label_classifier.py`
+  → Tests for soft-label morphology classifier.
+
 `tests/test_spatial_colocalization.py`
   → Test harness for spatial_colocalization module.
+
+`tests/test_ssl_utils.py`
+  → Tests for SSL utilities module.
+
+`tests/test_stage2_high_purity.py`
+  → Tests for high-purity spot detection.
+
+`tests/test_stage2_integration.py`
+  → Integration tests for Stage 2 pipeline.
+
+`tests/test_stage2_model.py`
+  → Tests for Stage 2 complete model.
+
+`tests/test_stage2_morphology.py`
+  → Tests for Stage 2 morphology-based assignment.
+
+`tests/test_stage2_projection.py`
+  → Tests for Stage 2 projection head.
+
+`tests/test_stage2_prototypes.py`
+  → Tests for Stage 2 type prototypes.
+
+`tests/test_stage2_trainer.py`
+  → Tests for Stage 2 trainer.
 
 `tests/test_subtype_splitting.py`
   → Unit tests for subtype splitting via protein gates.
 
+`tests/test_train_vae_vicreg.py`
+  → Tests for VICReg-enhanced VAE training.
+
+`tests/test_two_stage_pipeline.py`
+  → Tests for two-stage pipeline orchestration.
+
 `tests/test_utils.py`
   → Unit tests for CITEgeist utils module.
+
+`tests/test_vae.py`
+  → Tests for VAE architecture.
+
+`tests/test_vicreg.py`
+  → Tests for VICReg loss module.
+
+`tests/test_vit_encoder.py`
+  → Tests for ViT-Small encoder for nucleus morphology patches.
+
+`tests/test_vit_extractor.py`
+  → Tests for ViT feature extraction.
+
+`tests/test_watershed_segmentation.py`
+  → Tests for watershed cell segmentation.
 
 `tests/visualize_prop_gridsearch.py`
 
@@ -1353,6 +1666,9 @@
   → Shared spatial plotting utilities for manuscript figures.
 
 `manuscript/figures/_shared/style.py`
+  → Shared style configuration for CITEgeist manuscript figures.
+
+`manuscript/figures/figure_style.py`
   → Shared style configuration for CITEgeist manuscript figures.
 
 `manuscript/figures/midkine/__init__.py`
@@ -1380,6 +1696,9 @@
 `manuscript/figures/simulated_benchmarking/test_generate.py`
   → Smoke test: script runs and produces expected output files.
 
+`manuscript/figures/supplementary/generate_supp_SPF5.py`
+  → Supplementary Figure S-PF5 -- Proportion accuracy drives GEX quality.
+
 `manuscript/figures/xenium_benchmarking/__init__.py`
 
 `manuscript/figures/xenium_benchmarking/generate.py`
@@ -1403,6 +1722,9 @@
   → Compare Discovered vs Curated Profiles.
 
 `examples/compute_sample.py`
+
+`examples/evaluate_sc_markers.py`
+  → Evaluate top marker genes per cell type from single-cell GEX AnnData.
 
 `examples/run_cuopt_qp_patient.py`
   → Run cuOPT QP proportions for a single patient sample.
@@ -1430,6 +1752,9 @@
 
 `examples/run_morphology_assignment.py`
   → H&E Morphology Single-Cell Assignment Pipeline for Patient Data.
+
+`examples/summarize_morphology.py`
+  → Generate summary report across all 12 patient samples.
 
 `examples/train_pooled_mil.py`
   → Pooled multi-sample MIL training.

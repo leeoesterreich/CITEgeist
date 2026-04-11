@@ -19,15 +19,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 # Lazy import to avoid circular deps; resolved at class instantiation time
 def _get_vit_encoder():
     """Import ViTEncoder from the same model directory."""
     _model_dir = os.path.dirname(os.path.abspath(__file__))
     if _model_dir not in sys.path:
         sys.path.insert(0, _model_dir)
-    import importlib
+    import importlib  # pylint: disable=import-outside-toplevel
+
     vit_mod = importlib.import_module("vit_encoder")
     return vit_mod.ViTEncoder
+
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +235,7 @@ class PrototypeContrastiveModel(nn.Module):
 
     def __init__(
         self,
+        *,
         num_types: int = 6,
         embed_dim: int = 128,
         in_channels: int = 3,
@@ -306,20 +310,20 @@ class PrototypeContrastiveModel(nn.Module):
         """
         # Encoder → projector
         if self.from_embeddings:
-            h = patches                     # (B, encoder_embed_dim) — already encoded
+            h = patches  # (B, encoder_embed_dim) — already encoded
         else:
-            h = self.encoder(patches)       # (B, encoder_embed_dim)
-        z = self.projector(h)               # (B, embed_dim)
-        z_norm = F.normalize(z, dim=-1)     # (B, embed_dim)
+            h = self.encoder(patches)  # (B, encoder_embed_dim)
+        z = self.projector(h)  # (B, embed_dim)
+        z_norm = F.normalize(z, dim=-1)  # (B, embed_dim)
 
         # Prototype head: cos_sim(z_norm, proto_norm) / τ
-        proto_norm = self.get_normalized_prototypes()   # (T, D)
+        proto_norm = self.get_normalized_prototypes()  # (T, D)
         logits_proto = (z_norm @ proto_norm.T) / self.temperature  # (B, T)
-        q_proto = F.softmax(logits_proto, dim=-1)       # (B, T)
+        q_proto = F.softmax(logits_proto, dim=-1)  # (B, T)
 
         # Classifier head (operates on unnormalized z)
-        logits_class = self.classifier_head(z)          # (B, T)
-        q_class = F.softmax(logits_class, dim=-1)       # (B, T)
+        logits_class = self.classifier_head(z)  # (B, T)
+        q_class = F.softmax(logits_class, dim=-1)  # (B, T)
 
         return {
             "q_class": q_class,
@@ -368,7 +372,7 @@ class PrototypeContrastiveModel(nn.Module):
         blocks = self.encoder.blocks
         total = len(blocks)
         # Unfreeze last n blocks
-        for block in blocks[max(0, total - n):]:
+        for block in blocks[max(0, total - n) :]:
             for param in block.parameters():
                 param.requires_grad = True
         # Unfreeze final LayerNorm
@@ -421,7 +425,7 @@ class PrototypeContrastiveModel(nn.Module):
         encoder_state = {}
         for k, v in ckpt.items():
             if k.startswith("encoder."):
-                encoder_state[k[len("encoder."):]] = v
+                encoder_state[k[len("encoder.") :]] = v
 
         if not encoder_state:
             logger.warning(
@@ -457,14 +461,16 @@ class PrototypeContrastiveModel(nn.Module):
                 raw embeddings from the projector.
             num_types: Number of clusters. Defaults to ``self.num_types``.
         """
-        from sklearn.cluster import KMeans  # local import to keep torch-only tests fast
+        from sklearn.cluster import (  # local import to keep torch-only tests fast  # pylint: disable=import-outside-toplevel
+            KMeans,
+        )
 
         k = num_types if num_types is not None else self.num_types
         km = KMeans(n_clusters=k, n_init=10, random_state=0)
         km.fit(embeddings)
 
         centroids = torch.tensor(km.cluster_centers_, dtype=self.prototypes.dtype)
-        centroids = F.normalize(centroids, dim=-1)          # (k, D)
+        centroids = F.normalize(centroids, dim=-1)  # (k, D)
 
         with torch.no_grad():
             self.prototypes[:k].copy_(centroids)
@@ -515,7 +521,7 @@ except ImportError:
 # Task 3: Data Augmentation
 # ---------------------------------------------------------------------------
 
-import random  # noqa: E402
+import random  # noqa: E402  # pylint: disable=wrong-import-position,wrong-import-order
 
 
 class CellPatchAugmentation:
@@ -553,7 +559,8 @@ class CellPatchAugmentation:
         # Rotation
         if self.continuous_rotation:
             try:
-                import torchvision.transforms.functional as TF  # lazy import (avoids PIL link issues)
+                import torchvision.transforms.functional as TF  # lazy import (avoids PIL link issues)  # pylint: disable=import-outside-toplevel
+
                 angle = random.uniform(0.0, 360.0)
                 x = TF.rotate(x, angle, interpolation=TF.InterpolationMode.BILINEAR)
             except ImportError:
@@ -581,7 +588,7 @@ class CellPatchAugmentation:
         Returns:
             Augmented tensor with the same shape as input.
         """
-        if x.dim() == 3:
+        if x.dim() == 3:  # pylint: disable=no-else-return
             return self._augment_single(x)
         elif x.dim() == 4:
             return torch.stack([self._augment_single(xi) for xi in x], dim=0)
@@ -694,7 +701,7 @@ def _inference_all(
     q_class_list, q_proto_list, z_list = [], [], []
     N = patches.shape[0]
     for start in range(0, N, batch_size):
-        batch = patches[start: start + batch_size].to(device)
+        batch = patches[start : start + batch_size].to(device)
         if backbone is not None:
             batch = backbone.extract(batch)  # no_grad already active from decorator
         out = model(batch)
@@ -715,6 +722,7 @@ def _validate(
     c2s: torch.Tensor,
     oracle_props: torch.Tensor,
     val_spots: np.ndarray,
+    *,
     device: str,
     batch_size: int = 256,
     backbone: Optional[nn.Module] = None,
@@ -737,7 +745,7 @@ def _validate(
     """
     model.eval()
     num_spots = oracle_props.shape[0]
-    T = oracle_props.shape[1]
+    _ = oracle_props.shape[1]
 
     # Get all q_class predictions
     q_class, _, _ = _inference_all(model, patches, device, batch_size=batch_size, backbone=backbone)
@@ -758,8 +766,9 @@ def _validate(
 def _refresh_prototypes(
     model: "PrototypeContrastiveModel",
     patches: torch.Tensor,
-    c2s: torch.Tensor,
+    _c2s: torch.Tensor,
     device: str,
+    *,
     top_frac: float = 0.1,
     batch_size: int = 256,
     backbone: Optional[nn.Module] = None,
@@ -798,7 +807,7 @@ def _refresh_prototypes(
         model.prototypes.copy_(new_proto_mat)
 
 
-def _train_one_epoch(
+def _train_one_epoch(  # pylint: disable=too-many-positional-arguments
     model: "PrototypeContrastiveModel",
     patches: torch.Tensor,
     c2s: torch.Tensor,
@@ -842,9 +851,7 @@ def _train_one_epoch(
         Mean total loss over mini-batches.
     """
     if backbone is not None and augmentation is not None:
-        raise ValueError(
-            "backbone and augmentation are mutually exclusive in _train_one_epoch"
-        )
+        raise ValueError("backbone and augmentation are mutually exclusive in _train_one_epoch")
     model.train()
     rng = np.random.RandomState()
     shuffled_spots = train_spots.copy()
@@ -853,11 +860,8 @@ def _train_one_epoch(
     total_loss = 0.0
     num_batches = 0
 
-    num_spots = oracle_props.shape[0]
-
     for batch_start in range(0, len(shuffled_spots), spots_per_batch):
-        batch_spot_ids = shuffled_spots[batch_start: batch_start + spots_per_batch]
-        batch_spot_set = set(batch_spot_ids.tolist())
+        batch_spot_ids = shuffled_spots[batch_start : batch_start + spots_per_batch]
 
         # Find cells belonging to these spots
         c2s_np = c2s.numpy() if c2s.is_cuda else c2s.cpu().numpy()
@@ -881,8 +885,7 @@ def _train_one_epoch(
             # For unfrozen CTransPath (Condition 5), gradient checkpointing + _SUB=32 needed.
             _SUB = 32
             emb_chunks = [
-                backbone.extract(cell_patches[s:s + _SUB].to(device))
-                for s in range(0, len(cell_patches), _SUB)
+                backbone.extract(cell_patches[s : s + _SUB].to(device)) for s in range(0, len(cell_patches), _SUB)
             ]
             aug_patches = torch.cat(emb_chunks, dim=0)  # (n, 768), grads flow
         elif augmentation is not None:
@@ -892,9 +895,9 @@ def _train_one_epoch(
 
         # Forward
         out = model(aug_patches)
-        q_class = out["q_class"]      # (n, T)
-        q_proto = out["q_proto"]      # (n, T)
-        z = out["z"]                  # (n, D)
+        q_class = out["q_class"]  # (n, T)
+        q_proto = out["q_proto"]  # (n, T)
+        z = out["z"]  # (n, D)
 
         # Scatter mean to local spots
         n_local = len(batch_spot_ids)
@@ -946,6 +949,7 @@ def train_prototype_contrastive(
     patches: torch.Tensor,
     cell_to_spot: torch.Tensor,
     oracle_props: torch.Tensor,
+    *,
     num_types: int = 6,
     embed_dim: int = 128,
     in_channels: int = 3,
@@ -1096,9 +1100,7 @@ def train_prototype_contrastive(
     # ------------------------------------------------------------------
     # Train / val split
     # ------------------------------------------------------------------
-    train_spots, val_spots = _spatial_train_val_split(
-        spot_coords, num_spots, val_frac=val_frac, seed=seed
-    )
+    train_spots, val_spots = _spatial_train_val_split(spot_coords, num_spots, val_frac=val_frac, seed=seed)
 
     # Augmentation is spatial (rot/flip) — meaningless for 1D embeddings
     # augmentation_continuous_rotation=False: rot90 (~0s) vs TF.rotate bilinear (slow)
@@ -1110,9 +1112,7 @@ def train_prototype_contrastive(
     else:
         # Disable noise: torch.randn_like per-patch in Python loop is slow at N=3500+
         # Flip + rot90 only — both are view-ops, near-zero cost
-        augmentation = CellPatchAugmentation(
-            continuous_rotation=False, noise_std=0.0
-        )
+        augmentation = CellPatchAugmentation(continuous_rotation=False, noise_std=0.0)
 
     # ------------------------------------------------------------------
     # Per-type weighting (inverse-frequency from oracle proportions)
@@ -1149,11 +1149,7 @@ def train_prototype_contrastive(
     _best_ckpt: Dict = {"val_kl": float("inf"), "model": None, "backbone": None}
     for epoch in range(n_epochs_2a):
         # Unfreeze encoder at warmup epoch (skipped when from_embeddings=True)
-        if (
-            not from_embeddings
-            and epoch == encoder_warmup_epochs
-            and not encoder_unfrozen
-        ):
+        if not from_embeddings and epoch == encoder_warmup_epochs and not encoder_unfrozen:
             model.unfreeze_last_n_blocks(finetune_layers)
             encoder_unfrozen = True
             # Enable gradient checkpointing for unfrozen blocks — avoids storing
@@ -1210,7 +1206,12 @@ def train_prototype_contrastive(
         train_losses.append(loss_val)
 
         val_kl = _validate(
-            model, patches, cell_to_spot, oracle_props, val_spots, device,
+            model,
+            patches,
+            cell_to_spot,
+            oracle_props,
+            val_spots,
+            device=device,
             backbone=external_backbone,
         )
         val_losses.append(val_kl)
@@ -1228,14 +1229,19 @@ def train_prototype_contrastive(
             if early_stop_patience > 0 and _es_no_improve >= early_stop_patience:
                 logger.info(
                     "Stage 2A early stop at epoch %d/%d (no val_kl improvement for %d epochs)",
-                    epoch + 1, n_epochs_2a, early_stop_patience,
+                    epoch + 1,
+                    n_epochs_2a,
+                    early_stop_patience,
                 )
                 break
 
         if (epoch + 1) % 10 == 0:
             logger.info(
                 "Stage 2A epoch %d/%d | train_loss=%.4f | val_kl=%.4f",
-                epoch + 1, n_epochs_2a, loss_val, val_kl,
+                epoch + 1,
+                n_epochs_2a,
+                loss_val,
+                val_kl,
             )
 
     # ------------------------------------------------------------------
@@ -1287,7 +1293,12 @@ def train_prototype_contrastive(
         train_losses.append(loss_val)
 
         val_kl = _validate(
-            model, patches, cell_to_spot, oracle_props, val_spots, device,
+            model,
+            patches,
+            cell_to_spot,
+            oracle_props,
+            val_spots,
+            device=device,
             backbone=external_backbone,
         )
         val_losses.append(val_kl)
@@ -1305,14 +1316,20 @@ def train_prototype_contrastive(
             if early_stop_patience > 0 and _es_no_improve >= early_stop_patience:
                 logger.info(
                     "Stage 2B early stop at epoch %d/%d (no val_kl improvement for %d epochs)",
-                    epoch + 1, n_epochs_2b, early_stop_patience,
+                    epoch + 1,
+                    n_epochs_2b,
+                    early_stop_patience,
                 )
                 break
 
         if (epoch + 1) % 10 == 0:
             logger.info(
                 "Stage 2B epoch %d/%d | train_loss=%.4f | val_kl=%.4f | tau=%.4f",
-                epoch + 1, n_epochs_2b, loss_val, val_kl, model.temperature,
+                epoch + 1,
+                n_epochs_2b,
+                loss_val,
+                val_kl,
+                model.temperature,
             )
 
     # ------------------------------------------------------------------
@@ -1355,6 +1372,7 @@ def run_inference_tta(
     patches: torch.Tensor,
     cell_to_spot: torch.Tensor,
     num_spots: int,
+    *,
     device: str = "cuda",
     batch_size: int = 256,
 ) -> Dict:
@@ -1388,7 +1406,7 @@ def run_inference_tta(
         # TTA (rot90/flip) is meaningless for 1D embeddings — single forward pass
         q_class_list, q_proto_list = [], []
         for start in range(0, N, batch_size):
-            batch = patches[start: start + batch_size].to(device)
+            batch = patches[start : start + batch_size].to(device)
             out = model(batch)
             q_class_list.append(out["q_class"])
             q_proto_list.append(out["q_proto"])
@@ -1405,7 +1423,7 @@ def run_inference_tta(
         for k_rot, do_flip in tta_params:
             q_class_list, q_proto_list = [], []
             for start in range(0, N, batch_size):
-                batch = patches[start: start + batch_size].to(device)
+                batch = patches[start : start + batch_size].to(device)
                 # Apply deterministic transforms
                 batch = torch.rot90(batch, k=k_rot, dims=[-2, -1])
                 if do_flip:

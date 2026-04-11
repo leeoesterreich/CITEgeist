@@ -67,6 +67,8 @@ extend-exclude = '''
   | build
   | dist
   | Benchmarking
+  | _archive
+  | junk
 )/
 '''
 
@@ -97,6 +99,9 @@ warn_unused_ignores = true
 warn_no_return = true
 warn_unreachable = true
 strict_equality = true
+# Suppress numpy/pandas/scipy/torch typing false positives common in scientific Python
+disable_error_code = ["operator", "index", "arg-type", "union-attr", "no-any-return"]
+exclude = ["Benchmarking", "_archive", "junk", "CITEgeist/tests"]
 
 [[tool.mypy.overrides]]
 module = [
@@ -106,7 +111,6 @@ module = [
     "matplotlib.*",
     "scanpy.*",
     "anndata.*",
-    "gurobipy.*",
 ]
 ignore_missing_imports = true
 

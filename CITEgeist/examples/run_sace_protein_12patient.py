@@ -23,9 +23,7 @@ import os
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -36,11 +34,9 @@ import numpy as np
 import pandas as pd
 import scanpy as sc
 import squidpy as sq
-
 from model import CitegeistModel
-from model.unified_config import CELL_PROFILES_NESTED
 from model.annotation.functional_annotation import DEFAULT_FUNCTIONAL_TABLE
-
+from model.unified_config import CELL_PROFILES_NESTED
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -62,10 +58,7 @@ SAMPLES = [
 MORPH_DIR = REPO / "output" / "morphology_assignment_v3"
 QP_DIR = REPO / "output" / "module3_cuopt_qp"
 M1_DIR = REPO / "output" / "module12_discovery"
-RAW_DATA = Path(
-    "/ix1/alee/LO_LAB/General/Lab_Data/"
-    "20250210_CITEGeistPublicData_GEO_Alex/processed_files"
-)
+RAW_DATA = Path("/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 OUTPUT_DIR = REPO / "output" / "sace_protein_12patient"
 
 # Cancer type aliases used in old QP outputs — merged to Epithelial in v2
@@ -96,10 +89,13 @@ def _load_m1_functional_table(sample_name: str) -> dict:
     dropped = set(DEFAULT_FUNCTIONAL_TABLE) - set(filtered)
     logger.info(
         "%s: M1 filter kept %d/%d functional markers (dropped: %s)",
-        sample_name, len(filtered), len(DEFAULT_FUNCTIONAL_TABLE),
+        sample_name,
+        len(filtered),
+        len(DEFAULT_FUNCTIONAL_TABLE),
         ", ".join(sorted(dropped)) if dropped else "none",
     )
     return filtered
+
 
 # min_counts mirrors Phase 2 biopsy/surgical split
 _BIOPSY_KEYWORDS = ("-S1",)
@@ -152,6 +148,7 @@ def run_sace_protein_sample(sample_name: str) -> None:
             # SpaceRanger < 2.0: columns are unnamed (0=barcode,1=in_tissue,2=row,3=col,4=y,5=x)
             coords = pos_df.loc[adata.obs_names].iloc[:, [4, 3]].values
         import numpy as _np
+
         adata.obsm["spatial"] = _np.array(coords, dtype=float)
         logger.info("Injected spatial coords from %s", pos_file.name)
     else:
@@ -171,9 +168,7 @@ def run_sace_protein_sample(sample_name: str) -> None:
             finite_mask = np.isfinite(ad.obsm["spatial"]).all(axis=1)
             n_nan = int((~finite_mask).sum())
             if n_nan > 0:
-                logger.warning(
-                    "Filtering %d spots with NaN spatial coords from %s", n_nan, attr
-                )
+                logger.warning("Filtering %d spots with NaN spatial coords from %s", n_nan, attr)
                 setattr(model, attr, ad[finite_mask].copy())
 
     min_counts = 100 if _is_biopsy(sample_name) else 25
@@ -198,7 +193,8 @@ def run_sace_protein_sample(sample_name: str) -> None:
     if len(common) < len(gex_barcodes):
         logger.warning(
             "%s: %d GEX spots not in saved proportions; subsetting",
-            sample_name, len(gex_barcodes) - len(common),
+            sample_name,
+            len(gex_barcodes) - len(common),
         )
         model.gene_expression_adata = model.gene_expression_adata[common].copy()
         model.antibody_capture_adata = model.antibody_capture_adata[common].copy()
@@ -283,8 +279,8 @@ def run_sace_protein_sample(sample_name: str) -> None:
 
     adata_sc = sc.read_h5ad(sc_path)
     gates_df = result["protein_gates_df"]
-    cell_protein = result["cell_protein"]       # (N_cells, M) float32 array
-    protein_names = result["protein_names"]     # list of marker names (canonical)
+    cell_protein = result["cell_protein"]  # (N_cells, M) float32 array
+    protein_names = result["protein_names"]  # list of marker names (canonical)
 
     # 6a. Update cell_type: rename Cancer_Basal/Cancer_Luminal → Epithelial
     adata_sc.obs["cell_type"] = adata_sc.obs["cell_type"].replace(_CANCER_TYPE_RENAME)
@@ -297,18 +293,31 @@ def run_sace_protein_sample(sample_name: str) -> None:
             common_genes = adata_sc.var_names.intersection(gex_cell_adata.var_names)
             if len(common_genes) == adata_sc.n_vars:
                 import scipy.sparse as _sp
+
                 new_X = gex_cell_adata[common_cells].X
                 if _sp.issparse(new_X):
                     new_X = new_X.toarray()
                 adata_sc.X = new_X.astype(np.float32)
-                logger.info("%s: replaced X with SACE GEX (%d cells × %d genes)",
-                            sample_name, len(common_cells), len(common_genes))
+                logger.info(
+                    "%s: replaced X with SACE GEX (%d cells × %d genes)",
+                    sample_name,
+                    len(common_cells),
+                    len(common_genes),
+                )
             else:
-                logger.warning("%s: gene mismatch (old %d, new %d) — X not updated",
-                               sample_name, adata_sc.n_vars, len(common_genes))
+                logger.warning(
+                    "%s: gene mismatch (old %d, new %d) — X not updated",
+                    sample_name,
+                    adata_sc.n_vars,
+                    len(common_genes),
+                )
         else:
-            logger.warning("%s: cell count mismatch (h5ad %d, sace %d) — X not updated",
-                           sample_name, adata_sc.n_obs, len(common_cells))
+            logger.warning(
+                "%s: cell count mismatch (h5ad %d, sace %d) — X not updated",
+                sample_name,
+                adata_sc.n_obs,
+                len(common_cells),
+            )
 
     # 6c. Drop stale func_* columns from previous M3.5 run
     stale_func = [c for c in adata_sc.obs.columns if c.startswith("func_")]
@@ -332,7 +341,7 @@ def run_sace_protein_sample(sample_name: str) -> None:
     for col in gates_df.columns:
         if not col.endswith("_gate"):
             continue
-        inner = col[len("func_"):-len("_gate")]  # "{marker}_{type}"
+        inner = col[len("func_") : -len("_gate")]  # "{marker}_{type}"
         matched_marker = None
         for pname in sorted(protein_names, key=len, reverse=True):
             safe_pname = pname.replace("-", "_")
@@ -341,7 +350,7 @@ def run_sace_protein_sample(sample_name: str) -> None:
                 break
         if matched_marker is None:
             continue
-        score_col = col[:-len("_gate")] + "_score"
+        score_col = col[: -len("_gate")] + "_score"
         adata_sc.obs[score_col] = protein_df[matched_marker].reindex(adata_sc.obs.index).values
         n_added_score += 1
 
@@ -352,7 +361,10 @@ def run_sace_protein_sample(sample_name: str) -> None:
 
     logger.info(
         "%s: updated h5ad — cell_type Epithelial, %d gate + %d score cols (%d cells)",
-        sample_name, n_added_gate, n_added_score, adata_sc.n_obs,
+        sample_name,
+        n_added_gate,
+        n_added_score,
+        adata_sc.n_obs,
     )
 
     adata_sc.write_h5ad(sc_path)
@@ -366,10 +378,13 @@ def run_sace_protein_sample(sample_name: str) -> None:
         gmm_df.to_csv(gmm_path, index=False)
         logger.info("GMM summary written to %s", gmm_path)
         # Flag PD-L1 Macrophages gating decision for downstream review
-        pdl1_mac = gmm_df[
-            (gmm_df.get("marker", gmm_df.columns[0]) == "PD-L1")
-            & (gmm_df.get("cell_type", "") == "Macrophages")
-        ] if {"marker", "cell_type"}.issubset(gmm_df.columns) else pd.DataFrame()
+        pdl1_mac = (
+            gmm_df[
+                (gmm_df.get("marker", gmm_df.columns[0]) == "PD-L1") & (gmm_df.get("cell_type", "") == "Macrophages")
+            ]
+            if {"marker", "cell_type"}.issubset(gmm_df.columns)
+            else pd.DataFrame()
+        )
         if not pdl1_mac.empty:
             method = pdl1_mac.iloc[0].get("gating_method", "unknown")
             logger.info("PD-L1 Macrophages gating_method for %s: %s", sample_name, method)
@@ -381,9 +396,7 @@ def run_sace_protein_sample(sample_name: str) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="SACE per-cell protein annotation for 12-patient HCC22-088 cohort"
-    )
+    parser = argparse.ArgumentParser(description="SACE per-cell protein annotation for 12-patient HCC22-088 cohort")
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--sample", help="Sample name, e.g. HCC22-088-P1-S1")
     group.add_argument(

@@ -26,15 +26,12 @@ import os
 import sys
 from pathlib import Path
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 import pandas as pd
-
 from model import run_qc
 
 REPO = Path(__file__).resolve().parents[2]
@@ -99,9 +96,7 @@ def run_qc_sample(sample_name: str) -> None:
     props_df = pd.read_csv(props_path, index_col=0)
     # Drop solver diagnostic column if present
     props_df = props_df.drop(columns=["recon_error"], errors="ignore")
-    logger.info(
-        "Loaded proportions: %d spots x %d types", *props_df.shape
-    )
+    logger.info("Loaded proportions: %d spots x %d types", *props_df.shape)
 
     # --- Run self-consistency QC ---
     logger.info("Running self-consistency QC for %s", sample_name)

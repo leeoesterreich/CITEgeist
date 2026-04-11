@@ -27,30 +27,39 @@ CELL_TYPES = [
 # Ported from archived nb_initialization.py MARKER_TYPE_TABLE.
 # E-Cadherin EXCLUDED: anti-correlates with Epithelial in RCC (r=-0.37).
 MARKER_TYPE_TABLE: Dict[str, List[Tuple[str, str]]] = {
-    "CD20":     [("B cells", "strong")],
-    "CD3E":     [("CD4+ T cells", "strong"), ("CD8+ T cells", "strong")],
-    "CD4":      [("CD4+ T cells", "strong")],
-    "CD8A":     [("CD8+ T cells", "strong")],
-    "CD68":     [("Macrophages", "strong")],
-    "CD163":    [("Macrophages", "strong")],
-    "CD16":     [("Macrophages", "strong")],
-    "HLA-DR":   [("B cells", "soft"), ("Macrophages", "strong")],
-    "CD11c":    [("Macrophages", "soft")],
-    "CD31":     [("Endothelial", "strong")],
-    "PanCK":    [("Epithelial", "strong")],
+    "CD20": [("B cells", "strong")],
+    "CD3E": [("CD4+ T cells", "strong"), ("CD8+ T cells", "strong")],
+    "CD4": [("CD4+ T cells", "strong")],
+    "CD8A": [("CD8+ T cells", "strong")],
+    "CD68": [("Macrophages", "strong")],
+    "CD163": [("Macrophages", "strong")],
+    "CD16": [("Macrophages", "strong")],
+    "HLA-DR": [("B cells", "soft"), ("Macrophages", "strong")],
+    "CD11c": [("Macrophages", "soft")],
+    "CD31": [("Endothelial", "strong")],
+    "PanCK": [("Epithelial", "strong")],
     "alphaSMA": [("Fibroblasts", "strong")],
     "Vimentin": [("Macrophages", "soft"), ("Endothelial", "soft"), ("Fibroblasts", "strong")],
-    "CD45":     [("B cells", "strong"), ("CD4+ T cells", "strong"),
-                 ("CD8+ T cells", "strong"), ("Macrophages", "strong")],
-    "CD45RA":   [("B cells", "strong")],
-    "CD45RO":   [("CD4+ T cells", "strong"), ("CD8+ T cells", "strong")],
-    "CD138":    [("B cells", "soft")],
+    "CD45": [("B cells", "strong"), ("CD4+ T cells", "strong"), ("CD8+ T cells", "strong"), ("Macrophages", "strong")],
+    "CD45RA": [("B cells", "strong")],
+    "CD45RO": [("CD4+ T cells", "strong"), ("CD8+ T cells", "strong")],
+    "CD138": [("B cells", "soft")],
 }
 
 FUNCTIONAL_MARKERS = {
-    "PD-1", "PD-L1", "LAG-3", "VISTA", "Ki-67", "PCNA",
-    "GranzymeB", "Granzyme B", "Beta-catenin", "PTEN",
-    "PD1", "PDL1", "LAG3",
+    "PD-1",
+    "PD-L1",
+    "LAG-3",
+    "VISTA",
+    "Ki-67",
+    "PCNA",
+    "GranzymeB",
+    "Granzyme B",
+    "Beta-catenin",
+    "PTEN",
+    "PD1",
+    "PDL1",
+    "LAG3",
 }
 
 
@@ -106,8 +115,7 @@ def build_marker_config(
                 t_idx = type_names.index(type_name)
                 active_mask[t_idx, m_idx] = True
 
-    logger.info("build_marker_config: %d markers, %d types, %d active pairs",
-                M, T, int(active_mask.sum()))
+    logger.info("build_marker_config: %d markers, %d types, %d active pairs", M, T, int(active_mask.sum()))
     return markers, active_mask, type_names
 
 
@@ -116,6 +124,7 @@ def initialize_beta_matrix(
     markers: List[str],
     type_names: List[str],
     median_N: float,
+    *,
     soft_scale: float = 0.1,
     inactive_val: float = 1e-3,
 ) -> np.ndarray:
@@ -144,10 +153,8 @@ def initialize_beta_matrix(
         col_median = max(float(np.median(raw_counts[:, m_idx])), 1e-6)
         lam_base = col_median / max(median_N, 1.0)
 
-        strong_types = [(type_names.index(t), t) for t, s in assignments
-                        if s == "strong" and t in type_names]
-        soft_types = [(type_names.index(t), t) for t, s in assignments
-                      if s == "soft" and t in type_names]
+        strong_types = [(type_names.index(t), t) for t, s in assignments if s == "strong" and t in type_names]
+        soft_types = [(type_names.index(t), t) for t, s in assignments if s == "soft" and t in type_names]
 
         total_weight = len(strong_types) + len(soft_types) * soft_scale
         if total_weight <= 0:
@@ -164,6 +171,7 @@ def initialize_beta_matrix(
 def build_beta_prior_sigma(
     markers: List[str],
     type_names: List[str],
+    *,
     sigma_exclusive: float = 5.0,
     sigma_shared: float = 2.0,
     sigma_inactive: float = 0.1,

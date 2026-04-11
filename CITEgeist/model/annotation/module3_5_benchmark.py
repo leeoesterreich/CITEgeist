@@ -5,11 +5,13 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import average_precision_score
-from sklearn.metrics import balanced_accuracy_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import (
+    average_precision_score,
+    balanced_accuracy_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
 
 
 @dataclass(frozen=True)
@@ -64,16 +66,12 @@ def build_gt_binary_calls(
     log_vals = np.log1p(values).reshape(-1, 1)
 
     try:
-        gmm = GaussianMixture(
-            n_components=2, covariance_type="full", random_state=42, n_init=5
-        )
+        gmm = GaussianMixture(n_components=2, covariance_type="full", random_state=42, n_init=5)
         gmm.fit(log_vals)
 
         means = gmm.means_.flatten()
         stds = np.sqrt(gmm.covariances_.flatten())
-        pooled_std = np.sqrt(
-            gmm.weights_[0] * stds[0] ** 2 + gmm.weights_[1] * stds[1] ** 2
-        )
+        pooled_std = np.sqrt(gmm.weights_[0] * stds[0] ** 2 + gmm.weights_[1] * stds[1] ** 2)
         separation = abs(means[0] - means[1])
         high_comp = int(np.argmax(means))
 
@@ -88,7 +86,7 @@ def build_gt_binary_calls(
         # Safe fallback: nonzero
         calls_arr = (values > 0).astype(int)
 
-    calls = pd.Series(calls_arr, index=subset.index, name=f"gt_{marker}")
+    calls: pd.Series = pd.Series(calls_arr, index=subset.index, name=f"gt_{marker}")
     return calls
 
 
@@ -98,6 +96,7 @@ def score_pair_predictions(
     marker: str,
     gt_calls: pd.Series,
     pred_scores: pd.Series,
+    *,
     pred_calls: pd.Series,
     n_supporting_spots: int,
     headline: bool,
@@ -133,12 +132,7 @@ def score_pair_predictions(
     gt_positive_fraction = float(gt.mean()) if len(gt) else 0.0
     pred_positive_fraction = float(calls.mean()) if len(calls) else 0.0
 
-    evaluable = bool(
-        len(common_index) >= 4
-        and n_positive > 0
-        and n_negative > 0
-        and n_supporting_spots >= 20
-    )
+    evaluable = bool(len(common_index) >= 4 and n_positive > 0 and n_negative > 0 and n_supporting_spots >= 20)
 
     if not evaluable:
         exclusion_reason = "insufficient_support"
@@ -222,11 +216,7 @@ def aggregate_module3_5_results(
         if pair.headline and pair.evaluable and not validated:
             headline_failures.append(pair.pair_id)
 
-    majority_pass = (
-        len(validated_pairs) >= ((len(evaluable_pairs) // 2) + 1)
-        if evaluable_pairs
-        else False
-    )
+    majority_pass = len(validated_pairs) >= ((len(evaluable_pairs) // 2) + 1) if evaluable_pairs else False
     benchmark_passed = majority_pass and not headline_failures
 
     return {
@@ -240,7 +230,7 @@ def aggregate_module3_5_results(
     }
 
 
-def score_spot_attribution(
+def score_spot_attribution(  # pylint: disable=too-many-positional-arguments
     cell_type: str,
     marker: str,
     lambda_df: pd.DataFrame,
@@ -269,13 +259,13 @@ def score_spot_attribution(
     # Require non-zero λ for this (type, marker) pair
     if cell_type not in lambda_df.index or marker not in lambda_df.columns:
         return None
-    if float(lambda_df.loc[cell_type, marker]) == 0.0:
+    if float(lambda_df.at[cell_type, marker]) == 0.0:
         return None
 
     # GT-positive cells of this type using GMM gating
     try:
         gt_calls = build_gt_binary_calls(protein_df, cell_type=cell_type, marker=marker)
-    except (KeyError, Exception):
+    except (KeyError, ValueError, RuntimeError):
         return None
 
     n_positive = int(gt_calls.sum())
@@ -338,4 +328,3 @@ def score_spot_attribution(
         "baseline_attribution": float(baseline_prop.mean()),
         "fraction_dominant": fraction_dominant,
     }
-

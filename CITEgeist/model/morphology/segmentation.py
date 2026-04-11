@@ -98,17 +98,15 @@ class StarDistSegmenter:
 
     def __init__(self, modality: str = "he"):
         if modality not in self.MODELS:
-            raise ValueError(
-                f"Unknown modality '{modality}'. Choose from {list(self.MODELS.keys())}."
-            )
+            raise ValueError(f"Unknown modality '{modality}'. Choose from {list(self.MODELS.keys())}.")
         self.modality = modality
 
         try:
-            from stardist.models import StarDist2D  # noqa: F401
+            from stardist.models import StarDist2D  # noqa: F401  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise ImportError(
                 "StarDist is required for segmentation. Install with "
-                "`pip install stardist csbdeep` or `pip install \"citegeist[imaging]\"`."
+                '`pip install stardist csbdeep` or `pip install "citegeist[imaging]"`.'
             ) from exc
 
         model_name = self.MODELS[modality]
@@ -159,14 +157,15 @@ class StarDistSegmenter:
             centroids_df: DataFrame with columns ``[y_pixel, x_pixel, nucleus_id]``
                 containing the centroid of each detected nucleus (after filtering).
         """
-        from csbdeep.utils import normalize as csb_normalize
+        from csbdeep.utils import normalize as csb_normalize  # pylint: disable=import-outside-toplevel
 
         # Auto-compute scale from pixel size if not explicitly provided
         if pixel_size_um is not None and "scale" not in kwargs:
             kwargs["scale"] = pixel_size_um / self.TRAINING_PIXEL_SIZE_UM
             logging.info(
                 "Auto scale=%.3f from pixel_size_um=%.4f",
-                kwargs["scale"], pixel_size_um,
+                kwargs["scale"],
+                pixel_size_um,
             )
 
         # Apply default prob_thresh if not explicitly provided
@@ -190,15 +189,13 @@ class StarDistSegmenter:
         n_raw = len(points)
 
         if n_raw == 0:
-            centroids_df = pd.DataFrame(
-                columns=["y_pixel", "x_pixel", "nucleus_id"]
-            )
+            centroids_df = pd.DataFrame(columns=["y_pixel", "x_pixel", "nucleus_id"])
             logging.info("StarDist segmented 0 nuclei from %s image", self.modality)
             return masks, centroids_df
 
         # --- Area-based post-filtering (requires pixel_size_um) ---
         if pixel_size_um is not None:
-            px_area_per_um2 = pixel_size_um ** 2
+            px_area_per_um2 = pixel_size_um**2
             _min = self.DEFAULT_MIN_AREA_UM2 if min_area_um2 is None else min_area_um2
             _max = self.DEFAULT_MAX_AREA_UM2 if max_area_um2 is None else max_area_um2
             min_area_px = _min / px_area_per_um2
@@ -207,7 +204,7 @@ class StarDistSegmenter:
             # Compute area per label via bincount (memory-efficient)
             areas_px = np.bincount(masks.ravel())  # index 0 = background
             # labels are 1..n_raw
-            label_areas = areas_px[1:n_raw + 1] if len(areas_px) > n_raw else areas_px[1:]
+            label_areas = areas_px[1 : n_raw + 1] if len(areas_px) > n_raw else areas_px[1:]
 
             keep_mask = (label_areas >= min_area_px) & (label_areas <= max_area_px)
             n_small = int(np.sum(label_areas < min_area_px))
@@ -257,12 +254,20 @@ class StarDistSegmenter:
 
             logging.info(
                 "Area filter: %d → %d nuclei (-%d small < %.0f µm², -%d large > %.0f µm²)",
-                n_raw, n_kept, n_small, _min, n_large, _max,
+                n_raw,
+                n_kept,
+                n_small,
+                _min,
+                n_large,
+                _max,
             )
             if flag != "ok":
                 logging.warning(
                     "Nuclei density %.0f/mm² flagged as %s (expected %.0f–%.0f/mm²)",
-                    density, flag, lo, hi,
+                    density,
+                    flag,
+                    lo,
+                    hi,
                 )
         else:
             self._last_qc = None
@@ -304,18 +309,19 @@ def run_nuclei_segmentation(
     segmenter = StarDistSegmenter(modality=modality)
     masks, centroids_df = segmenter.segment(image, **kwargs)
     # Stash QC on the function for callers that need it
-    run_nuclei_segmentation._last_qc = getattr(segmenter, "_last_qc", None)
+    run_nuclei_segmentation._last_qc = getattr(segmenter, "_last_qc", None)  # type: ignore[attr-defined]
     return masks, centroids_df
 
 
 def run_cellpose_nuclei_segmentation(
     image_rgb_uint8: np.ndarray,
-    use_gpu: bool = False,
-    diameter: Optional[float] = None,
-    flow_threshold: float = 0.4,
-    cellprob_threshold: float = 0.0,
-    model=None,
-    model_type: str = "nuclei",
+    *,
+    _use_gpu: bool = False,
+    _diameter: Optional[float] = None,
+    _flow_threshold: float = 0.4,
+    _cellprob_threshold: float = 0.0,
+    _model=None,
+    _model_type: str = "nuclei",
 ) -> Tuple[np.ndarray, np.ndarray]:
     """Deprecated: use ``run_nuclei_segmentation(image, modality='dapi')`` instead.
 
@@ -334,10 +340,12 @@ def run_cellpose_nuclei_segmentation(
     if len(centroids_df) == 0:
         centroids_xy = np.zeros((0, 2), dtype=np.float64)
     else:
-        centroids_xy = np.column_stack([
-            centroids_df["x_pixel"].to_numpy(dtype=np.float64),
-            centroids_df["y_pixel"].to_numpy(dtype=np.float64),
-        ])
+        centroids_xy = np.column_stack(
+            [
+                centroids_df["x_pixel"].to_numpy(dtype=np.float64),
+                centroids_df["y_pixel"].to_numpy(dtype=np.float64),
+            ]
+        )
 
     return masks, centroids_xy
 
@@ -375,9 +383,10 @@ def estimate_pixel_size_um(
 
     pixel_size = spot_diameter_um / float(diam_px)
     logging.info(
-        "Estimated pixel_size_um=%.4f from spot_diameter_fullres=%.1f px "
-        "and known spot diameter=%.1f µm",
-        pixel_size, float(diam_px), spot_diameter_um,
+        "Estimated pixel_size_um=%.4f from spot_diameter_fullres=%.1f px " "and known spot diameter=%.1f µm",
+        pixel_size,
+        float(diam_px),
+        spot_diameter_um,
     )
     return pixel_size
 
@@ -421,7 +430,9 @@ def detect_spot_diameter_pixels(
         diameter_px = spot_diameter_um / pixel_size_um
         logging.info(
             "Using explicit spot diameter: %.1f um = %.1f pixels (pixel_size=%.4f um/px)",
-            spot_diameter_um, diameter_px, pixel_size_um
+            spot_diameter_um,
+            diameter_px,
+            pixel_size_um,
         )
         return diameter_px
 
@@ -429,9 +440,7 @@ def detect_spot_diameter_pixels(
     if "spot_diameter_fullres" in scalefactors:
         diameter_px = float(scalefactors["spot_diameter_fullres"])
         if np.isfinite(diameter_px) and diameter_px > 0:
-            logging.info(
-                "Using spot_diameter_fullres from scalefactors: %.1f pixels", diameter_px
-            )
+            logging.info("Using spot_diameter_fullres from scalefactors: %.1f pixels", diameter_px)
             return diameter_px
 
     # Priority 3: Platform metadata
@@ -456,8 +465,7 @@ def detect_spot_diameter_pixels(
         diameter_um = PLATFORM_SPOT_DIAMETERS_UM[platform]
         diameter_px = diameter_um / pixel_size_um
         logging.info(
-            "Detected platform '%s': spot diameter = %.1f um = %.1f pixels",
-            platform, diameter_um, diameter_px
+            "Detected platform '%s': spot diameter = %.1f um = %.1f pixels", platform, diameter_um, diameter_px
         )
         return diameter_px
 
@@ -654,6 +662,7 @@ def normalize_nuclei_counts_for_prior(
 
 def compute_spot_nuclei_counts_from_adata(
     adata,
+    *,
     resolution_mode: str = "hires",
     max_fullres_side: int = 9000,
     spot_diameter_um: Optional[float] = None,
@@ -710,7 +719,10 @@ def compute_spot_nuclei_counts_from_adata(
         pixel_size_image = pixel_size_um / fullres_to_image_scale
         logging.info(
             "Pixel size in %s image frame: %.4f µm/px (fullres: %.4f, scale: %.4f)",
-            resolution_mode, pixel_size_image, pixel_size_um, fullres_to_image_scale,
+            resolution_mode,
+            pixel_size_image,
+            pixel_size_um,
+            fullres_to_image_scale,
         )
 
     # Auto-detect spot diameter using the detection hierarchy
@@ -726,18 +738,19 @@ def compute_spot_nuclei_counts_from_adata(
     # Pass pixel_size in the image frame so StarDist auto-computes scale
     # correction and area filtering works at the correct resolution.
     masks, centroids_df = run_nuclei_segmentation(
-        image=image, modality=modality,
-        pixel_size_um=pixel_size_image, **stardist_kwargs
+        image=image, modality=modality, pixel_size_um=pixel_size_image, **stardist_kwargs
     )
 
     # Convert centroids_df (y_pixel, x_pixel) to xy array for spot assignment
     if len(centroids_df) == 0:
         centroids_xy = np.zeros((0, 2), dtype=np.float64)
     else:
-        centroids_xy = np.column_stack([
-            centroids_df["x_pixel"].to_numpy(dtype=np.float64),
-            centroids_df["y_pixel"].to_numpy(dtype=np.float64),
-        ])
+        centroids_xy = np.column_stack(
+            [
+                centroids_df["x_pixel"].to_numpy(dtype=np.float64),
+                centroids_df["y_pixel"].to_numpy(dtype=np.float64),
+            ]
+        )
 
     spot_centers_xy = spot_centers_fullres * float(fullres_to_image_scale)
     spot_radius_px = (spot_diam_fullres * float(fullres_to_image_scale)) / 2.0
@@ -765,12 +778,14 @@ def compute_spot_nuclei_counts_from_adata(
             valid = dists <= float(spot_radius_px)
             assigned_nucleus_indices = clean_indices[valid]
             assigned_spot_original_indices = finite_indices[idxs[valid]]
-            nucleus_spot_map = pd.DataFrame({
-                "nucleus_id": assigned_nucleus_indices + 1,  # 1-based nucleus IDs
-                "spot_id": spot_names_arr[assigned_spot_original_indices],
-                "x_pixel": centroids_xy[assigned_nucleus_indices, 0],
-                "y_pixel": centroids_xy[assigned_nucleus_indices, 1],
-            })
+            nucleus_spot_map = pd.DataFrame(
+                {
+                    "nucleus_id": assigned_nucleus_indices + 1,  # 1-based nucleus IDs
+                    "spot_id": spot_names_arr[assigned_spot_original_indices],
+                    "x_pixel": centroids_xy[assigned_nucleus_indices, 0],
+                    "y_pixel": centroids_xy[assigned_nucleus_indices, 1],
+                }
+            )
 
     # Retrieve QC from the segmenter (stashed by run_nuclei_segmentation)
     qc = getattr(run_nuclei_segmentation, "_last_qc", None)
@@ -791,6 +806,7 @@ def compute_spot_nuclei_counts_patchwise(
     spot_centers_fullres: np.ndarray,
     spot_names: pd.Index,
     pixel_size_um: float,
+    *,
     spot_diameter_um: float = 55.0,
     patch_margin_um: float = 25.0,
     modality: str = "he",
@@ -836,10 +852,12 @@ def compute_spot_nuclei_counts_patchwise(
     n_spots = len(spot_names)
 
     logging.info(
-        "Patchwise segmentation: %d spots, patch=%d px (%.0f µm), "
-        "spot_radius=%.1f px, pixel_size=%.4f µm/px",
-        n_spots, 2 * patch_half_px, 2 * patch_half_um,
-        spot_radius_px, pixel_size_um,
+        "Patchwise segmentation: %d spots, patch=%d px (%.0f µm), " "spot_radius=%.1f px, pixel_size=%.4f µm/px",
+        n_spots,
+        2 * patch_half_px,
+        2 * patch_half_um,
+        spot_radius_px,
+        pixel_size_um,
     )
 
     counts = np.zeros(n_spots, dtype=np.int64)
@@ -875,9 +893,7 @@ def compute_spot_nuclei_counts_patchwise(
             continue
 
         # Run StarDist on this patch
-        masks_patch, centroids_df = segmenter.segment(
-            patch, pixel_size_um=pixel_size_um, **stardist_kwargs
-        )
+        _, centroids_df = segmenter.segment(patch, pixel_size_um=pixel_size_um, **stardist_kwargs)
 
         # Accumulate QC from segmenter
         patch_qc = getattr(segmenter, "_last_qc", None)
@@ -897,7 +913,7 @@ def compute_spot_nuclei_counts_patchwise(
         # Keep only nuclei within the spot radius
         dx = cent_x_full - cx
         dy = cent_y_full - cy
-        dist = np.sqrt(dx ** 2 + dy ** 2)
+        dist = np.sqrt(dx**2 + dy**2)
         in_spot = dist <= spot_radius_px
 
         n_in = int(in_spot.sum())
@@ -911,19 +927,21 @@ def compute_spot_nuclei_counts_patchwise(
             all_areas_um2.append(patch_qc.area_median_um2)
 
     # Build outputs
-    counts_series = pd.Series(counts, index=spot_names, name="nuclei_count_raw")
+    counts_series: pd.Series = pd.Series(counts, index=spot_names, name="nuclei_count_raw")
 
     # Build nucleus-spot mapping
     nucleus_spot_map = None
     if all_centroids:
         cent_arr = np.array(all_centroids)
         spot_names_arr = np.asarray(spot_names)
-        nucleus_spot_map = pd.DataFrame({
-            "nucleus_id": np.arange(1, len(cent_arr) + 1, dtype=np.int32),
-            "spot_id": spot_names_arr[cent_arr[:, 2].astype(int)],
-            "x_pixel": cent_arr[:, 0],
-            "y_pixel": cent_arr[:, 1],
-        })
+        nucleus_spot_map = pd.DataFrame(
+            {
+                "nucleus_id": np.arange(1, len(cent_arr) + 1, dtype=np.int32),
+                "spot_id": spot_names_arr[cent_arr[:, 2].astype(int)],
+                "x_pixel": cent_arr[:, 0],
+                "y_pixel": cent_arr[:, 1],
+            }
+        )
 
     # Build aggregate QC
     areas_arr = np.array(all_areas_um2) if all_areas_um2 else np.array([0.0])
@@ -956,9 +974,15 @@ def compute_spot_nuclei_counts_patchwise(
     logging.info(
         "Patchwise done: %d nuclei across %d spots (%.1f/spot avg), "
         "%d raw → %d filtered (-%d small, -%d large), density=%.0f/mm² [%s]",
-        total_nuclei, n_spots, total_nuclei / max(1, n_spots),
-        total_raw, total_filtered, total_small, total_large,
-        density, flag,
+        total_nuclei,
+        n_spots,
+        total_nuclei / max(1, n_spots),
+        total_raw,
+        total_filtered,
+        total_small,
+        total_large,
+        density,
+        flag,
     )
 
     # Centroids in fullres xy for downstream compatibility
@@ -998,11 +1022,13 @@ def save_segmentation_artifacts(
         outputs["stardist_masks_npy"] = str(masks_path)
 
     centroids_path = out / f"{sample_name}_centroids.csv"
-    centroids_df = pd.DataFrame({
-        "nucleus_id": np.arange(1, len(result.centroids_xy) + 1),
-        "x_pixel": result.centroids_xy[:, 0],
-        "y_pixel": result.centroids_xy[:, 1],
-    })
+    centroids_df = pd.DataFrame(
+        {
+            "nucleus_id": np.arange(1, len(result.centroids_xy) + 1),
+            "x_pixel": result.centroids_xy[:, 0],
+            "y_pixel": result.centroids_xy[:, 1],
+        }
+    )
     centroids_df.to_csv(centroids_path, index=False)
     outputs["centroids"] = str(centroids_path)
 
@@ -1012,7 +1038,8 @@ def save_segmentation_artifacts(
         outputs["nucleus_spot_map"] = str(map_path)
 
     if result.qc is not None:
-        import json
+        import json  # pylint: disable=import-outside-toplevel
+
         qc_path = out / f"{sample_name}_segmentation_qc.json"
         with open(qc_path, "w") as fh:
             json.dump(result.qc.to_dict(), fh, indent=2)

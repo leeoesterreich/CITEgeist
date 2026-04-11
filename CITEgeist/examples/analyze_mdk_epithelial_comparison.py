@@ -32,9 +32,7 @@ import scanpy as sc
 from esda import Moran_BV
 from libpysal.weights import KNN
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -49,12 +47,18 @@ OUTPUT_DIR = REPO / "output" / "mdk_epithelial_comparison"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 SAMPLES = [
-    "HCC22-088-P1-S1", "HCC22-088-P1-S2",
-    "HCC22-088-P2-S1", "HCC22-088-P2-S2",
-    "HCC22-088-P3-S1_A", "HCC22-088-P3-S2",
-    "HCC22-088-P4-S1", "HCC22-088-P4-S2_1i_rep",
-    "HCC22-088-P5-S1", "HCC22-088-P5-S2_F_rep",
-    "HCC22-088-P6-S1", "HCC22-088-P6-S2_D",
+    "HCC22-088-P1-S1",
+    "HCC22-088-P1-S2",
+    "HCC22-088-P2-S1",
+    "HCC22-088-P2-S2",
+    "HCC22-088-P3-S1_A",
+    "HCC22-088-P3-S2",
+    "HCC22-088-P4-S1",
+    "HCC22-088-P4-S2_1i_rep",
+    "HCC22-088-P5-S1",
+    "HCC22-088-P5-S2_F_rep",
+    "HCC22-088-P6-S1",
+    "HCC22-088-P6-S2_D",
 ]
 
 PATIENT_PAIRS = {
@@ -67,8 +71,17 @@ PATIENT_PAIRS = {
 }
 
 SECRETORY_GENES = [
-    "HSP90B1", "HSPA5", "CALR", "CANX", "PDIA4",
-    "PDIA6", "SEC23A", "SEC61B", "ATF6", "MAN1A1", "XBP1",
+    "HSP90B1",
+    "HSPA5",
+    "CALR",
+    "CANX",
+    "PDIA4",
+    "PDIA6",
+    "SEC23A",
+    "SEC61B",
+    "ATF6",
+    "MAN1A1",
+    "XBP1",
 ]
 
 KNN_K = 6
@@ -80,12 +93,15 @@ RERUN_THRESHOLD = 0.02  # Mean |delta| that triggers full-rerun recommendation
 # Helpers
 # =============================================================================
 
+
 def _load_spatial_coords(sample_name: str) -> pd.DataFrame:
     """Load spot spatial coords from tissue_positions.csv without loading images."""
     pos_path = (
-        Path("/ix1/alee/LO_LAB/General/Lab_Data/"
-             "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
-        / sample_name / "outs" / "spatial" / "tissue_positions.csv"
+        Path("/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
+        / sample_name
+        / "outs"
+        / "spatial"
+        / "tissue_positions.csv"
     )
     df = pd.read_csv(pos_path, index_col=0)
     return df[["pxl_col_in_fullres", "pxl_row_in_fullres"]].rename(
@@ -136,8 +152,9 @@ def _bivariate_morans_I(x_vals, y_vals, coords):
 
 def _secretory_score(X, gene_names):
     """Mean log1p expression across secretory genes present in matrix."""
-    import scanpy as sc
     import anndata
+    import scanpy as sc
+
     adata = anndata.AnnData(X=X.copy(), var=pd.DataFrame(index=gene_names))
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -153,7 +170,9 @@ def _mdk_vector(X, gene_names):
     """Log1p-normalized MDK expression vector."""
     if "MDK" not in gene_names:
         return None
-    import anndata, scanpy as sc
+    import anndata
+    import scanpy as sc
+
     adata = anndata.AnnData(X=X.copy(), var=pd.DataFrame(index=gene_names))
     sc.pp.normalize_total(adata, target_sum=1e4)
     sc.pp.log1p(adata)
@@ -165,6 +184,7 @@ def _mdk_vector(X, gene_names):
 # =============================================================================
 # Per-sample analysis
 # =============================================================================
+
 
 def analyze_sample(sample_name: str) -> dict | None:
     """Compute composite bivariate Moran's I under both grouping strategies.
@@ -249,17 +269,24 @@ def analyze_sample(sample_name: str) -> dict | None:
                 I_c, p_c = _bivariate_morans_I(mdk_c, sec_c, coords_c)
                 logger.info(
                     "  KRT5+ Epithelial: %d spots, I=%.4f, p=%.3f",
-                    len(spots_c), I_c, p_c,
+                    len(spots_c),
+                    I_c,
+                    p_c,
                 )
 
     delta = float(I_b - I_a) if not (np.isnan(I_a) or np.isnan(I_b)) else np.nan
     logger.info(
         "  A (Basal-only): n=%d spots, I=%.4f, p=%.3f",
-        len(spots_a), I_a, p_a,
+        len(spots_a),
+        I_a,
+        p_a,
     )
     logger.info(
         "  B (Epithelial): n=%d spots, I=%.4f, p=%.3f  | delta=%.4f",
-        len(spots_b), I_b, p_b, delta,
+        len(spots_b),
+        I_b,
+        p_b,
+        delta,
     )
 
     return {
@@ -270,8 +297,9 @@ def analyze_sample(sample_name: str) -> dict | None:
         "I_epithelial": I_b,
         "p_epithelial": p_b,
         "n_spots_epithelial": len(spots_b),
-        "delta": delta,                      # positive = epithelial > basal-only
-        "krt5_gate_available": krt5_gate is not None and len([c for c in (morph_adata.obs.columns if morph_path.exists() else []) if "KRT5" in c]) > 0,
+        "delta": delta,  # positive = epithelial > basal-only
+        "krt5_gate_available": krt5_gate is not None
+        and len([c for c in (morph_adata.obs.columns if morph_path.exists() else []) if "KRT5" in c]) > 0,
         "I_krt5_pos": I_c,
         "p_krt5_pos": p_c,
     }
@@ -280,6 +308,7 @@ def analyze_sample(sample_name: str) -> dict | None:
 # =============================================================================
 # Summary + trajectory
 # =============================================================================
+
 
 def trajectory_delta(rows: list[dict], strategy: str) -> pd.DataFrame:
     """Compute biopsy→surgery trajectory delta for a given strategy."""
@@ -290,15 +319,17 @@ def trajectory_delta(rows: list[dict], strategy: str) -> pd.DataFrame:
         if s1 in df.index and s2 in df.index:
             I1 = df.loc[s1, I_col]
             I2 = df.loc[s2, I_col]
-            records.append({
-                "patient": patient,
-                "biopsy": s1,
-                "surgery": s2,
-                "I_biopsy": I1,
-                "I_surgery": I2,
-                "traj_delta": I2 - I1,
-                "strategy": strategy,
-            })
+            records.append(
+                {
+                    "patient": patient,
+                    "biopsy": s1,
+                    "surgery": s2,
+                    "I_biopsy": I1,
+                    "I_surgery": I2,
+                    "traj_delta": I2 - I1,
+                    "strategy": strategy,
+                }
+            )
     return pd.DataFrame(records)
 
 
@@ -306,10 +337,9 @@ def trajectory_delta(rows: list[dict], strategy: str) -> pd.DataFrame:
 # Main
 # =============================================================================
 
+
 def main():
-    parser = argparse.ArgumentParser(
-        description="MDK Moran's I: Cancer_Basal-only vs merged Epithelial comparison"
-    )
+    parser = argparse.ArgumentParser(description="MDK Moran's I: Cancer_Basal-only vs merged Epithelial comparison")
     parser.add_argument(
         "--rerun-threshold",
         type=float,
@@ -338,9 +368,21 @@ def main():
     print("\n" + "=" * 80)
     print("MDK Bivariate Moran's I: Cancer_Basal-only (A) vs Merged Epithelial (B)")
     print("=" * 80)
-    print(df[["sample", "n_spots_basal", "I_basal_only", "p_basal_only",
-              "n_spots_epithelial", "I_epithelial", "p_epithelial", "delta",
-              "I_krt5_pos"]].to_string(index=False, float_format="{:.4f}".format))
+    print(
+        df[
+            [
+                "sample",
+                "n_spots_basal",
+                "I_basal_only",
+                "p_basal_only",
+                "n_spots_epithelial",
+                "I_epithelial",
+                "p_epithelial",
+                "delta",
+                "I_krt5_pos",
+            ]
+        ].to_string(index=False, float_format="{:.4f}".format)
+    )
 
     # Aggregate stats
     valid = df.dropna(subset=["delta"])
@@ -366,9 +408,11 @@ def main():
     if not traj_a.empty:
         traj = pd.merge(
             traj_a[["patient", "I_biopsy", "I_surgery", "traj_delta"]].rename(
-                columns={"I_biopsy": "I_biopsy_A", "I_surgery": "I_surgery_A", "traj_delta": "delta_A"}),
+                columns={"I_biopsy": "I_biopsy_A", "I_surgery": "I_surgery_A", "traj_delta": "delta_A"}
+            ),
             traj_b[["patient", "I_biopsy", "I_surgery", "traj_delta"]].rename(
-                columns={"I_biopsy": "I_biopsy_B", "I_surgery": "I_surgery_B", "traj_delta": "delta_B"}),
+                columns={"I_biopsy": "I_biopsy_B", "I_surgery": "I_surgery_B", "traj_delta": "delta_B"}
+            ),
             on="patient",
         )
         print("\nTrajectory (biopsy → surgery):")

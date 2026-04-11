@@ -11,7 +11,9 @@ from __future__ import annotations
 import logging
 
 import matplotlib
+
 matplotlib.use("Agg")
+# pylint: disable=wrong-import-position,wrong-import-order
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -20,8 +22,10 @@ from anndata import AnnData
 from scipy.stats import mannwhitneyu
 from sklearn.metrics import roc_auc_score
 
-from . import QCResult
+from ._types import QCResult
 from .canonical_markers import CANONICAL_MARKERS, get_available_markers
+
+# pylint: enable=wrong-import-position,wrong-import-order
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +69,7 @@ def compute_marker_enrichment(
         X_dense = np.asarray(X)
 
     rows = []
-    for ct, markers in CANONICAL_MARKERS.items():
+    for ct, _ in CANONICAL_MARKERS.items():
         available = get_available_markers(ct, gene_names)
         if not available:
             continue
@@ -88,7 +92,7 @@ def compute_marker_enrichment(
             log2fc = np.log2(mean_type / mean_other)
 
             try:
-                stat, pval = mannwhitneyu(vals_type, vals_other, alternative="greater")
+                _, pval = mannwhitneyu(vals_type, vals_other, alternative="greater")
             except ValueError:
                 pval = 1.0
 
@@ -99,27 +103,39 @@ def compute_marker_enrichment(
             except ValueError:
                 auc = 0.5
 
-            rows.append({
-                "cell_type": ct,
-                "marker": marker,
-                "log2fc": log2fc,
-                "pvalue": pval,
-                "auc": auc,
-                "n_type": n_type,
-                "n_other": n_other,
-                "patient_id": patient_id or "all",
-            })
+            rows.append(
+                {
+                    "cell_type": ct,
+                    "marker": marker,
+                    "log2fc": log2fc,
+                    "pvalue": pval,
+                    "auc": auc,
+                    "n_type": n_type,
+                    "n_other": n_other,
+                    "patient_id": patient_id or "all",
+                }
+            )
 
     df = pd.DataFrame(rows)
     if len(df) == 0:
-        df = pd.DataFrame(columns=[
-            "cell_type", "marker", "log2fc", "pvalue", "qvalue",
-            "auc", "n_type", "n_other", "patient_id",
-        ])
+        df = pd.DataFrame(
+            columns=[
+                "cell_type",
+                "marker",
+                "log2fc",
+                "pvalue",
+                "qvalue",
+                "auc",
+                "n_type",
+                "n_other",
+                "patient_id",
+            ]
+        )
         return df
 
     # Benjamini-Hochberg FDR
-    from scipy.stats import false_discovery_control
+    from scipy.stats import false_discovery_control  # pylint: disable=import-outside-toplevel
+
     try:
         df["qvalue"] = false_discovery_control(df["pvalue"].values, method="bh")
     except (ValueError, AttributeError):
@@ -160,8 +176,7 @@ def check_cross_patient_consistency(
         frac = n_positive / n_total
         if frac < min_positive_fraction:
             flags.append(
-                f"{ct}/{marker}: positive in {n_positive}/{n_total} patients "
-                f"({frac:.0%}) — inconsistent enrichment"
+                f"{ct}/{marker}: positive in {n_positive}/{n_total} patients " f"({frac:.0%}) — inconsistent enrichment"
             )
 
     for patient_id, group in enrichment_all_patients.groupby("patient_id"):
@@ -197,9 +212,7 @@ def check_internal_coherence(
     results = {}
 
     for ct in proportions.columns:
-        markers = get_available_markers(
-            ct, list(gex_layers.get(ct, pd.DataFrame()).columns)
-        )
+        markers = get_available_markers(ct, list(gex_layers.get(ct, pd.DataFrame()).columns))
         if not markers or ct not in gex_layers:
             continue
 
@@ -260,16 +273,17 @@ def _plot_enrichment_heatmap(
 
     consistency = None
     if cross_patient_df is not None and "patient_id" in cross_patient_df.columns:
-        cons = cross_patient_df.groupby(["cell_type", "marker"]).apply(
-            lambda g: f"{(g['log2fc'] > 0).sum()}/{len(g)}"
-        ).reset_index(name="consistency")
+        cons = (
+            cross_patient_df.groupby(["cell_type", "marker"])
+            .apply(lambda g: f"{(g['log2fc'] > 0).sum()}/{len(g)}")
+            .reset_index(name="consistency")
+        )
         consistency = cons.pivot(index="marker", columns="cell_type", values="consistency")
 
     with plt.rc_context(_STYLE_PARAMS):
         fig, ax = plt.subplots(1, 1, figsize=(14, max(8, len(pivot) * 0.5)))
 
-        im = ax.imshow(pivot.values, cmap="RdBu_r", aspect="auto",
-                       vmin=-3, vmax=3)
+        im = ax.imshow(pivot.values, cmap="RdBu_r", aspect="auto", vmin=-3, vmax=3)
         ax.set_xticks(range(len(pivot.columns)))
         ax.set_xticklabels(pivot.columns, rotation=45, ha="right")
         ax.set_yticks(range(len(pivot.index)))
@@ -281,8 +295,7 @@ def _plot_enrichment_heatmap(
                     if marker in consistency.index and ct in consistency.columns:
                         val = consistency.loc[marker, ct]
                         if pd.notna(val):
-                            ax.text(j, i, str(val), ha="center", va="center",
-                                    fontsize=MIN_FONT_SIZE - 2, color="black")
+                            ax.text(j, i, str(val), ha="center", va="center", fontsize=MIN_FONT_SIZE - 2, color="black")
 
         fig.colorbar(im, ax=ax, shrink=0.6, label="log₂FC")
         ax.set_title("Canonical Marker Enrichment")
@@ -307,27 +320,23 @@ def _plot_cross_patient_strips(enrichment_df: pd.DataFrame) -> plt.Figure:
         x_labels = []
         for ct, markers in markers_by_type.items():
             for marker in markers:
-                sub = enrichment_df[
-                    (enrichment_df["cell_type"] == ct) &
-                    (enrichment_df["marker"] == marker)
-                ]
+                sub = enrichment_df[(enrichment_df["cell_type"] == ct) & (enrichment_df["marker"] == marker)]
                 jitter = rng.random(len(sub)) * 0.3 - 0.15
                 ax.scatter(
                     [x_pos] * len(sub) + jitter,
                     sub["log2fc"].values,
-                    alpha=0.7, s=30, edgecolors="none",
+                    alpha=0.7,
+                    s=30,
+                    edgecolors="none",
                 )
-                ax.plot([x_pos - 0.3, x_pos + 0.3],
-                        [sub["log2fc"].median()] * 2,
-                        color="k", linewidth=2)
+                ax.plot([x_pos - 0.3, x_pos + 0.3], [sub["log2fc"].median()] * 2, color="k", linewidth=2)
                 x_ticks.append(x_pos)
                 x_labels.append(f"{ct}\n{marker}")
                 x_pos += 1
 
         ax.axhline(0, color="r", linestyle="--", alpha=0.5)
         ax.set_xticks(x_ticks)
-        ax.set_xticklabels(x_labels, rotation=90, ha="center",
-                           fontsize=max(8, MIN_FONT_SIZE - 4))
+        ax.set_xticklabels(x_labels, rotation=90, ha="center", fontsize=max(8, MIN_FONT_SIZE - 4))
         ax.set_ylabel("log₂FC")
         ax.set_title("Cross-Patient Marker Consistency")
         ax.spines["top"].set_visible(False)
@@ -390,9 +399,7 @@ def run_marker_enrichment(
             consistency_flags = check_cross_patient_consistency(multi_patient_enrichments)
             flags.extend(consistency_flags)
             metrics["cross_patient_enrichments"] = multi_patient_enrichments
-            figures["cross_patient_strips"] = _plot_cross_patient_strips(
-                multi_patient_enrichments
-            )
+            figures["cross_patient_strips"] = _plot_cross_patient_strips(multi_patient_enrichments)
             figures["enrichment_heatmap"] = _plot_enrichment_heatmap(
                 multi_patient_enrichments, multi_patient_enrichments
             )

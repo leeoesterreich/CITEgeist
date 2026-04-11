@@ -56,10 +56,11 @@ DEFAULT_SUBTYPE_CONFIG = {
 
 def audit_gate_identifiability(
     parent_props: pd.DataFrame,
-    gates: np.ndarray,            # (I, T, M_func)
+    gates: np.ndarray,  # (I, T, M_func)
     type_names: list,
     func_marker_names: list,
     config: dict,
+    *,
     collinearity_threshold: float = 0.8,
     min_effective_rank: int = 8,
 ) -> IdentifiabilityReport:
@@ -132,11 +133,7 @@ def audit_gate_identifiability(
             if abs(rho) > collinearity_threshold:
                 collinear_pairs.append((type_a, type_b))
 
-    passed = (
-        effective_rank >= min_effective_rank
-        and condition_number < 100
-        and len(collinear_pairs) == 0
-    )
+    passed = effective_rank >= min_effective_rank and condition_number < 100 and len(collinear_pairs) == 0
     return IdentifiabilityReport(
         gate_variance=gate_variance,
         condition_number=condition_number,
@@ -200,13 +197,15 @@ def build_subtype_proportions(
         elif mode == "binary_0.5":
             g = (g >= 0.5).astype(float)
 
-        columns.append(p * g)
+        columns.append(np.asarray(p * g))
         col_names.append(cfg["subtypes"][0])
-        columns.append(p * (1 - g))
+        columns.append(np.asarray(p * (1 - g)))
         col_names.append(cfg["subtypes"][1])
 
     return pd.DataFrame(
-        np.column_stack(columns), index=parent_props.index, columns=col_names,
+        np.column_stack(columns),
+        index=parent_props.index,
+        columns=col_names,
     )
 
 
@@ -228,12 +227,14 @@ def permute_gates_within_type(gates: np.ndarray, rng: np.random.Generator) -> np
 # Protein-gate-based per-cell subtype splitting (Phase 2)
 # ---------------------------------------------------------------------------
 
+
 def split_by_protein_gates(
     cell_assignments: Dict[str, str],
     protein_gates_df: pd.DataFrame,
     proportions: pd.DataFrame,
     cell_spot_map: pd.DataFrame,
     validated_pairs: List[Tuple[str, str]],
+    *,
     min_subtype_cells: int = 50,
 ) -> Tuple[Dict[str, str], pd.DataFrame]:
     """Split cell types into functional subtypes using per-cell protein gates.
@@ -290,16 +291,12 @@ def split_by_protein_gates(
             continue
 
         # Identify cells of this type
-        type_cell_ids = [
-            cid for cid, ct in cell_assignments.items() if ct == parent_type
-        ]
+        type_cell_ids = [cid for cid, ct in cell_assignments.items() if ct == parent_type]
         if not type_cell_ids:
             logger.debug("split_by_protein_gates: no cells of type %s; skipping", parent_type)
             continue
 
-        type_gates = protein_gates_df.loc[
-            protein_gates_df.index.intersection(type_cell_ids), gate_col
-        ]
+        type_gates = protein_gates_df.loc[protein_gates_df.index.intersection(type_cell_ids), gate_col]
 
         n_pos = int((type_gates == 1).sum())
         n_neg = int((type_gates == 0).sum())
@@ -307,9 +304,12 @@ def split_by_protein_gates(
 
         if n_pos < min_subtype_cells or n_neg < min_subtype_cells:
             logger.info(
-                "split_by_protein_gates: skipping (%s, %s) — n_pos=%d, n_neg=%d "
-                "(min_subtype_cells=%d)",
-                parent_type, marker, n_pos, n_neg, min_subtype_cells,
+                "split_by_protein_gates: skipping (%s, %s) — n_pos=%d, n_neg=%d " "(min_subtype_cells=%d)",
+                parent_type,
+                marker,
+                n_pos,
+                n_neg,
+                min_subtype_cells,
             )
             continue
 
@@ -319,7 +319,12 @@ def split_by_protein_gates(
 
         logger.info(
             "split_by_protein_gates: splitting %s by %s → %s (n=%d) / %s (n=%d)",
-            parent_type, marker, pos_label, n_pos, neg_label, n_neg,
+            parent_type,
+            marker,
+            pos_label,
+            n_pos,
+            neg_label,
+            n_neg,
         )
 
         # Update cell assignments
@@ -327,7 +332,7 @@ def split_by_protein_gates(
             updated_assignments[cid] = pos_label if type_gates[cid] == 1 else neg_label
 
         # Build per-spot cell counts for the split
-        cell_ids_series = pd.Series(type_gates.values, index=type_gates.index)
+        cell_ids_series: pd.Series = pd.Series(type_gates.values, index=type_gates.index)
         cell_spots = spot_lookup.reindex(type_gates.index)
         combined = pd.DataFrame({"gate": cell_ids_series, "spot_id": cell_spots})
         combined = combined.dropna(subset=["spot_id"])
@@ -359,7 +364,7 @@ def split_by_protein_gates(
         # Replace parent column with two subtype columns
         insert_pos = updated_props.columns.get_loc(parent_type)
         updated_props = updated_props.drop(columns=[parent_type])
-        updated_props.insert(insert_pos, neg_label, neg_col)
-        updated_props.insert(insert_pos, pos_label, pos_col)
+        updated_props.insert(int(insert_pos), neg_label, neg_col)
+        updated_props.insert(int(insert_pos), pos_label, pos_col)
 
     return updated_assignments, updated_props

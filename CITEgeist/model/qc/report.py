@@ -12,13 +12,14 @@ import logging
 import os
 
 import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from anndata import AnnData
 
-from . import QCResult
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # pylint: disable=wrong-import-position
+import numpy as np  # pylint: disable=wrong-import-position
+import pandas as pd  # pylint: disable=wrong-import-position
+from anndata import AnnData  # pylint: disable=wrong-import-position
+
+from ._types import QCResult  # pylint: disable=wrong-import-position
 
 logger = logging.getLogger(__name__)
 
@@ -57,11 +58,12 @@ def _serialize_metrics(obj):
 def run_qc(
     adata_per_cell: AnnData,
     proportions: pd.DataFrame,
+    *,
     mode: str = "self_consistency",
     gt_proportions: pd.DataFrame | None = None,
     gt_gex_layers: dict[str, pd.DataFrame] | None = None,
     pred_gex_layers: dict[str, pd.DataFrame] | None = None,
-    reference_adata: AnnData | None = None,
+    _reference_adata: AnnData | None = None,
     output_dir: str = "./qc_output",
     empty_umi_threshold: int = 50,
     empty_genes_threshold: int = 25,
@@ -95,7 +97,7 @@ def run_qc(
     all_flags = []
 
     # === Step 1: Single-cell QC ===
-    from .single_cell_qc import run_single_cell_qc
+    from .single_cell_qc import run_single_cell_qc  # pylint: disable=import-outside-toplevel
 
     logger.info("=== Step 1: Single-cell QC ===")
     sc_result = run_single_cell_qc(
@@ -110,24 +112,22 @@ def run_qc(
     is_empty = sc_result.metrics["is_empty"]
     n_empty = int(is_empty.sum())
     if n_empty > 0:
-        logger.info(f"Filtering {n_empty} empty cells for downstream QC")
+        logger.info("Filtering %s empty cells for downstream QC", n_empty)
         adata_filtered = adata_per_cell[~is_empty].copy()
     else:
         adata_filtered = adata_per_cell
 
     # === Step 3: Benchmark-only modules ===
     if mode == "benchmark":
-        from .proportion_qc import run_proportion_qc
+        from .proportion_qc import run_proportion_qc  # pylint: disable=import-outside-toplevel
 
         logger.info("=== Step 3a: Proportion QC ===")
-        prop_result = run_proportion_qc(
-            adata_filtered, proportions, gt_proportions
-        )
+        prop_result = run_proportion_qc(adata_filtered, proportions, gt_proportions)
         results["proportion"] = prop_result
         all_flags.extend(prop_result.flags)
 
         if gt_gex_layers is not None:
-            from .gex_qc import run_gex_qc
+            from .gex_qc import run_gex_qc  # pylint: disable=import-outside-toplevel
 
             logger.info("=== Step 3b: GEX QC ===")
             gex_result = run_gex_qc(
@@ -138,7 +138,7 @@ def run_qc(
             all_flags.extend(gex_result.flags)
 
     # === Step 4: Marker enrichment (both modes) ===
-    from .marker_enrichment import run_marker_enrichment
+    from .marker_enrichment import run_marker_enrichment  # pylint: disable=import-outside-toplevel
 
     logger.info("=== Step 4: Marker enrichment ===")
     enrichment_result = run_marker_enrichment(adata_filtered, proportions)
@@ -153,9 +153,10 @@ def run_qc(
             fig_path = os.path.join(output_dir, f"{module_name}_{panel_id}.pdf")
             try:
                 fig.savefig(fig_path, dpi=150, bbox_inches="tight")
-                logger.info(f"Saved: {fig_path}")
-            except Exception as e:
-                logger.warning(f"Could not save figure {fig_path}: {e}")
+                logger.info("Saved: %s", fig_path)
+            except (OSError, ValueError) as e:
+
+                logger.warning("Could not save figure %s: %s", fig_path, e)
             finally:
                 plt.close(fig)
 
@@ -182,5 +183,5 @@ def run_qc(
     with open(os.path.join(output_dir, "qc_summary.json"), "w") as f:
         json.dump(summary, f, indent=2, default=str)
 
-    logger.info(f"QC complete. {len(all_flags)} flags raised. Output: {output_dir}")
+    logger.info("QC complete. %s flags raised. Output: %s", len(all_flags), output_dir)
     return results

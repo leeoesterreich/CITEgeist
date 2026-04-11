@@ -4,6 +4,7 @@ Main CitegeistModel class for spatial transcriptomics deconvolution.
 This module implements the two-pass CITEgeist algorithm for deconvolving
 spatial transcriptomics data using CITE-seq profiles.
 """
+
 # Standard library imports
 import logging
 import os
@@ -19,15 +20,26 @@ try:
 except ImportError:  # pragma: no cover - exercised only in reduced environments
     pq = None
 
+from .assignment.module3b_nucleus_assignment import (  # noqa: F401  # pylint: disable=unused-import
+    NucleusAssignmentResult,
+    run_nucleus_assignment,
+)
+
 # Local imports
 # Production-path imports (cuOPT backend)
-from .deconvolution.cuopt_impl import (
+from .deconvolution.cuopt_impl import (  # pylint: disable=unused-import
     compute_global_prior,
     compute_marker_exclusivity,
-    map_antibodies_to_profiles,
     map_antibodies_to_profiles_v2,
     normalize_counts,
     optimize_cell_proportions_per_marker,
+)
+from .deconvolution.reference_model import ReferenceProfile
+from .deconvolution.reference_model import train_reference as _train_reference
+from .morphology.segmentation import (
+    compute_spot_nuclei_counts_from_adata,
+    normalize_nuclei_counts_for_prior,
+    save_segmentation_artifacts,
 )
 from .utils import (
     assert_neighborhood_size,
@@ -36,14 +48,6 @@ from .utils import (
     setup_logging,
     validate_cell_profile_dict,
 )
-from .morphology.segmentation import (
-    compute_spot_nuclei_counts_from_adata,
-    normalize_nuclei_counts_for_prior,
-    save_segmentation_artifacts,
-)
-from .assignment.module3b_nucleus_assignment import run_nucleus_assignment, NucleusAssignmentResult  # noqa: F401
-from .deconvolution.reference_model import ReferenceProfile, train_reference as _train_reference
-
 
 RESOLUTION_DEFAULTS = {
     "spot": {
@@ -86,6 +90,7 @@ class CitegeistModel:
         sample_name,
         adata=None,
         output_folder=None,
+        *,
         simulation=False,
         gene_expression_adata=None,
         antibody_capture_adata=None,
@@ -133,9 +138,7 @@ class CitegeistModel:
 
         # Resolution mode and parameter presets
         if resolution not in RESOLUTION_DEFAULTS:
-            raise ValueError(
-                f"resolution must be one of {list(RESOLUTION_DEFAULTS.keys())}, got '{resolution}'"
-            )
+            raise ValueError(f"resolution must be one of {list(RESOLUTION_DEFAULTS.keys())}, got '{resolution}'")
         self.resolution = resolution
         self.resolution_params = dict(RESOLUTION_DEFAULTS[resolution])
         if resolution_overrides:
@@ -359,7 +362,7 @@ class CitegeistModel:
 
         self.antibody_capture_adata = self.antibody_capture_adata[filtered_spots, :].copy()
 
-        logging.info(f"Filtered antibody capture data to {len(filtered_spots)} spots present in gene expression data.")
+        logging.info("Filtered antibody capture data to %s spots present in gene expression data.", len(filtered_spots))
 
     def preprocess_gex(self, target_sum=10000):
         """
@@ -385,7 +388,8 @@ class CitegeistModel:
 
         self.preprocessed_gex = True
         logging.info(
-            f"Gene expression data normalized to {target_sum} counts per spot and validated for discrete count analysis."
+            "Gene expression data normalized to %s counts per spot and validated for discrete count analysis.",
+            target_sum,
         )
 
     def preprocess_antibody(self):
@@ -539,9 +543,11 @@ class CitegeistModel:
         # Log row sum statistics to confirm cellularity signal is preserved
         row_sums = matrix.sum(axis=1)
         logging.info(
-            f"Discrete antibody preprocessing complete: "
-            f"Row sums range [{row_sums.min():.2f}, {row_sums.max():.2f}], "
-            f"mean={row_sums.mean():.2f}, std={row_sums.std():.2f}"
+            "Discrete antibody preprocessing complete: " "Row sums range [%s, %s], mean=%s, std=%s",
+            row_sums.min(),
+            row_sums.max(),
+            row_sums.mean(),
+            row_sums.std(),
         )
         print(
             f"Antibody capture data preprocessing completed for discrete mode: "
@@ -626,6 +632,7 @@ class CitegeistModel:
     def train_reference(
         self,
         reference_adata: sc.AnnData,
+        *,
         cell_type_col: str = "cell_type",
         n_markers_per_type: int = 20,
         de_method: str = "wilcoxon",
@@ -663,14 +670,15 @@ class CitegeistModel:
 
     def run_cell_proportion_model(
         self,
+        *,
         radius=None,
         tolerance=1e-4,
         max_iterations=20,
         lambda_reg=1,
         alpha=0.5,
-        max_y_change=0.4,
-        max_workers=None,
-        checkpoint_interval=100,
+        _max_y_change=0.4,
+        _max_workers=None,
+        _checkpoint_interval=100,
         unknown_threshold=0.05,
         min_celltype_threshold=0.01,
         redundancy_threshold=0.1,
@@ -716,8 +724,8 @@ class CitegeistModel:
         confusion_corr_threshold=-0.25,
         # Cellularity-scaled QP (count-space solver)
         nuclei_counts=None,  # pd.Series of per-spot nuclei counts
-        cellularity_slack=0.3,  # δ fraction for hard constraints
-        lambda_cellularity=1.0,  # soft penalty weight for count-sum deviation
+        _cellularity_slack=0.3,  # δ fraction for hard constraints
+        _lambda_cellularity=1.0,  # soft penalty weight for count-sum deviation
         # Cell classification parameters (cell resolution only)
         use_gating=None,
         priority_dict=None,
@@ -765,7 +773,8 @@ class CitegeistModel:
         # GMM detection gating is critical for accurate proportions (r=0.766 vs 0.36 without).
         # Disabling it is almost always a mistake in benchmarks and production.
         if not use_detection_gating:
-            import warnings
+            import warnings  # pylint: disable=import-outside-toplevel
+
             warnings.warn(
                 "use_detection_gating=False: GMM detection gating is disabled. "
                 "This typically degrades proportion accuracy (r drops ~0.40). "
@@ -783,18 +792,29 @@ class CitegeistModel:
             logging.info("Morphology two-pass: Pass 1 (base proportions)...")
             self.run_cell_proportion_model(
                 method=method,
-                radius=radius, tolerance=tolerance, max_iterations=max_iterations,
-                lambda_reg=lambda_reg, alpha=alpha, lambda_laplacian=lambda_laplacian,
-                laplacian_k=laplacian_k, beta_min=beta_min, beta_max=beta_max,
-                lambda_coverage=lambda_coverage, nuclei_counts=nuclei_counts,
-                use_detection_gating=use_detection_gating, detection_gate_ub=detection_gate_ub,
-                nb_device=nb_device, nb_n_iter=nb_n_iter, nb_gpu_adam_steps=nb_gpu_adam_steps,
+                radius=radius,
+                tolerance=tolerance,
+                max_iterations=max_iterations,
+                lambda_reg=lambda_reg,
+                alpha=alpha,
+                lambda_laplacian=lambda_laplacian,
+                laplacian_k=laplacian_k,
+                beta_min=beta_min,
+                beta_max=beta_max,
+                lambda_coverage=lambda_coverage,
+                nuclei_counts=nuclei_counts,
+                use_detection_gating=use_detection_gating,
+                detection_gate_ub=detection_gate_ub,
+                nb_device=nb_device,
+                nb_n_iter=nb_n_iter,
+                nb_gpu_adam_steps=nb_gpu_adam_steps,
             )
             p_base = self.results["cell_prop"].values
             self.results["cell_prop_base"] = self.results["cell_prop"].copy()
 
             # Stage 0: Compute morphology prior via LLP
-            from .morphology.morphology_prior import compute_morphology_prior
+            from .morphology.morphology_prior import compute_morphology_prior  # pylint: disable=import-outside-toplevel
+
             detection_mask = self.results.get("detection_masks", None)
             num_spots = len(self.results["cell_prop"])
 
@@ -816,7 +836,7 @@ class CitegeistModel:
             self.results["morphology_prior"] = morphology_prior
 
         # --- Method dispatch ---
-        if method == "nb":
+        if method == "nb":  # pylint: disable=no-else-return
             return self._run_nb_proportion_model(
                 device=nb_device,
                 n_iter=nb_n_iter,
@@ -848,7 +868,7 @@ class CitegeistModel:
             if source_adata is None:
                 raise ValueError("No AnnData available for radius auto-detection")
             radius = compute_optimal_radius(source_adata)
-            logging.info(f"Auto-detected radius: {radius:.2f} (3 rings)")
+            logging.info("Auto-detected radius: %s (3 rings)", radius)
 
         if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
             raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
@@ -859,18 +879,18 @@ class CitegeistModel:
         # Extract spatial coordinates for Laplacian smoothing
         coords = None
         if lambda_laplacian > 0:
-            coords = self.antibody_capture_adata.obsm.get('spatial', None)
+            coords = self.antibody_capture_adata.obsm.get("spatial", None)
             if coords is None and self.gene_expression_adata is not None:
-                coords = self.gene_expression_adata.obsm.get('spatial', None)
+                coords = self.gene_expression_adata.obsm.get("spatial", None)
             if coords is not None:
-                logging.info(f"Using Laplacian smoothing with lambda={lambda_laplacian}, k={laplacian_k}")
+                logging.info("Using Laplacian smoothing with lambda=%s, k=%s", lambda_laplacian, laplacian_k)
             else:
                 logging.warning("No spatial coordinates found for Laplacian smoothing - disabling")
                 lambda_laplacian = 0
 
         # Dispatch to gating-based classification for cell resolution
         if use_gating is None:
-            use_gating = (self.resolution == "cell")
+            use_gating = self.resolution == "cell"
         if use_gating:
             logging.info("Cell resolution: dispatching to gating-based classification")
             return self._run_cell_classification(
@@ -886,14 +906,17 @@ class CitegeistModel:
         cellularity_spot_weights = None
         cellularity_array = None
         if nuclei_counts is not None:
-            from .assignment.cellularity_utils import prepare_cellularity
+            from .assignment.cellularity_utils import prepare_cellularity  # pylint: disable=import-outside-toplevel
+
             spot_names_for_cell = self.antibody_capture_adata.obs_names
             cellularity_array = prepare_cellularity(nuclei_counts, spot_names_for_cell)
             median_N = np.median(cellularity_array)
             cellularity_spot_weights = np.sqrt(cellularity_array / max(median_N, 1.0))
             logging.info(
                 "Cellularity spot weights: median N=%.1f, weight range=[%.2f, %.2f]",
-                median_N, cellularity_spot_weights.min(), cellularity_spot_weights.max(),
+                median_N,
+                cellularity_spot_weights.min(),
+                cellularity_spot_weights.max(),
             )
 
         spot_names = self.antibody_capture_adata.obs_names
@@ -901,7 +924,8 @@ class CitegeistModel:
         lambda_abundance_prior = 0.0
         row_sum_bounds = None  # default (0.9, 1.2) inside solvers
         if use_nuclei_prior:
-            import warnings
+            import warnings  # pylint: disable=import-outside-toplevel
+
             warnings.warn(
                 "use_nuclei_prior is deprecated and will be removed in a future version. "
                 "Use nuclei_counts= parameter instead for cellularity-scaled QP deconvolution.",
@@ -938,17 +962,17 @@ class CitegeistModel:
             if col in self.antibody_capture_adata.obs.columns:
                 cellularity_laplacian_array = self.antibody_capture_adata.obs.loc[spot_names, col].to_numpy(dtype=float)
                 logging.info(
-                    "Cellularity-aware Laplacian: col='%s', sigma=%.2f, "
-                    "median=%.1f, range=[%.0f, %.0f]",
-                    col, cellularity_sigma,
+                    "Cellularity-aware Laplacian: col='%s', sigma=%.2f, " "median=%.1f, range=[%.0f, %.0f]",
+                    col,
+                    cellularity_sigma,
                     float(np.median(cellularity_laplacian_array)),
                     float(np.min(cellularity_laplacian_array)),
                     float(np.max(cellularity_laplacian_array)),
                 )
             else:
                 logging.warning(
-                    "use_cellularity_laplacian=True but column '%s' not found. "
-                    "Falling back to standard Laplacian.", col,
+                    "use_cellularity_laplacian=True but column '%s' not found. " "Falling back to standard Laplacian.",
+                    col,
                 )
 
         recon_error = None  # Will be set by per-marker optimization path
@@ -964,9 +988,13 @@ class CitegeistModel:
         # For per_type_beta: expand to all 17 markers from MARKER_TYPE_TABLE.
         # Keep the 7-Major assignment_matrix for detection gating (unchanged).
         if method == "per_type_beta":
-            from .deconvolution.emission_init import build_marker_config, MARKER_TYPE_TABLE, _strip_suffix
+            from .deconvolution.emission_init import (  # pylint: disable=import-outside-toplevel
+                _strip_suffix,
+                build_marker_config,
+            )
+
             available = [_strip_suffix(v) for v in self.antibody_capture_adata.var_names]
-            ptb_markers, ptb_active_mask, ptb_type_names = build_marker_config(available)
+            ptb_markers, _, ptb_type_names = build_marker_config(available)
 
             if len(ptb_markers) > len(marker_names):
                 # Extract full 17-marker data from antibody adata
@@ -989,7 +1017,8 @@ class CitegeistModel:
 
                 logging.info(
                     "Per-type beta: expanded markers %d -> %d (%s)",
-                    len(marker_names), len(ptb_markers_found),
+                    len(marker_names),
+                    len(ptb_markers_found),
                     ", ".join(set(ptb_markers_found) - set(marker_names)),
                 )
                 # Replace marker data for the optimizer (detection still uses original assignment_matrix)
@@ -1005,25 +1034,27 @@ class CitegeistModel:
             log_scale = np.maximum(log_scale, 0.3)  # floor to avoid division by tiny N
             marker_level_data = marker_level_data / log_scale[:, np.newaxis]
             logging.info(
-                "Cellularity correction (S/logN): median_N=%.1f, "
-                "scale range=[%.3f, %.3f]",
-                median_N, log_scale.min(), log_scale.max(),
+                "Cellularity correction (S/logN): median_N=%.1f, " "scale range=[%.3f, %.3f]",
+                median_N,
+                log_scale.min(),
+                log_scale.max(),
             )
 
         # GMM detection gating: identify absent types per spot
         if use_detection_gating and sparsity_mask is None:
-            from .deconvolution.detection import detect_cell_types, build_detection_marker_groups
+            from .deconvolution.detection import (  # pylint: disable=import-outside-toplevel
+                build_detection_marker_groups,
+                detect_cell_types,
+            )
 
             active_mask = assignment_matrix.T > 0  # (T, M)
             marker_groups = build_detection_marker_groups(active_mask, cell_type_names)
 
             # Map marker indices to raw antibody columns
-            raw_ab = self.antibody_capture_adata.layers.get(
-                "raw_counts", self.antibody_capture_adata.X
-            )
+            raw_ab = self.antibody_capture_adata.layers.get("raw_counts", self.antibody_capture_adata.X)
             raw_ab = raw_ab.toarray() if hasattr(raw_ab, "toarray") else np.asarray(raw_ab)
 
-            def _strip_suffix(name):
+            def _strip_suffix(name: str) -> str:
                 """Strip -1 suffix from antibody names (e.g., CD68-1 -> CD68)."""
                 return name[:-2] if name.endswith("-1") else name
 
@@ -1036,14 +1067,20 @@ class CitegeistModel:
 
             mapped_groups = {}
             for ct, m_indices in marker_groups.items():
-                raw_idx = [m2raw[_strip_suffix(marker_names[mi])]
-                           for mi in m_indices if _strip_suffix(marker_names[mi]) in m2raw]
+                raw_idx = [
+                    m2raw[_strip_suffix(marker_names[mi])]
+                    for mi in m_indices
+                    if _strip_suffix(marker_names[mi]) in m2raw
+                ]
                 if raw_idx:
                     mapped_groups[ct] = raw_idx
 
             detected = detect_cell_types(
-                raw_ab, mapped_groups, threshold=0.5,
-                log_transform=True, adaptive_threshold=True,
+                raw_ab,
+                mapped_groups,
+                threshold=0.5,
+                log_transform=True,
+                adaptive_threshold=True,
             )
 
             # Persist raw boolean detection mask for downstream Bayesian assignment
@@ -1058,9 +1095,12 @@ class CitegeistModel:
                 if detection_mask_bool[i].sum() < 2:
                     detection_mask_bool[i] = True
             self.results["detection_mask_bool"] = detection_mask_bool
-            logging.info("Persisted detection_mask_bool: %d spots, %d types, %.1f%% gated",
-                         marker_level_data.shape[0], len(cell_type_names),
-                         100.0 * (~detection_mask_bool).sum() / (marker_level_data.shape[0] * len(cell_type_names)))
+            logging.info(
+                "Persisted detection_mask_bool: %d spots, %d types, %.1f%% gated",
+                marker_level_data.shape[0],
+                len(cell_type_names),
+                100.0 * (~detection_mask_bool).sum() / (marker_level_data.shape[0] * len(cell_type_names)),
+            )
 
             N_spots = marker_level_data.shape[0]
             T = len(cell_type_names)
@@ -1072,8 +1112,7 @@ class CitegeistModel:
                     if cellularity_array is not None:
                         # Cellularity-informed gate: can't have less than 1 cell
                         # gate_ub_i = min(detection_gate_ub, 1/N_i)
-                        per_spot_ub = np.minimum(detection_gate_ub,
-                                                 1.0 / np.maximum(cellularity_array, 1.0))
+                        per_spot_ub = np.minimum(detection_gate_ub, 1.0 / np.maximum(cellularity_array, 1.0))
                         sparsity_mask[~detected[:, k], t_idx] = per_spot_ub[~detected[:, k]]
                     else:
                         sparsity_mask[~detected[:, k], t_idx] = detection_gate_ub
@@ -1086,13 +1125,15 @@ class CitegeistModel:
             n_gated = (sparsity_mask < 1.0).sum()
             logging.info(
                 "Detection gating: %d/%d (%.1f%%) spot-type pairs gated (ub=%.2f)",
-                n_gated, N_spots * T, 100.0 * n_gated / (N_spots * T),
+                n_gated,
+                N_spots * T,
+                100.0 * n_gated / (N_spots * T),
                 detection_gate_ub,
             )
 
         # GEX-informed detection fusion
         if use_gex_detection and use_detection_gating and sparsity_mask is not None:
-            from .deconvolution.detection_refinement import (
+            from .deconvolution.detection_refinement import (  # pylint: disable=import-outside-toplevel
                 compute_gene_type_correlations,
                 detect_cell_types_gex,
                 fuse_detection_masks,
@@ -1104,21 +1145,30 @@ class CitegeistModel:
 
             ab_names_stripped = [_strip_suffix(n) for n in var_names]
             H = compute_gene_type_correlations(
-                gex_X, raw_ab, ab_names_stripped,
-                self.cell_profile_dict, cell_type_names,
+                gex_X,
+                raw_ab,
+                ab_names_stripped,
+                self.cell_profile_dict,
+                cell_type_names,
             )
             self.results["gex_detection_corr"] = H
 
             gex_detected = detect_cell_types_gex(
-                gex_X, H, gene_names_list, cell_type_names,
-                k=gex_detection_k, min_corr=gex_detection_min_corr,
+                gex_X,
+                H,
+                gene_names_list,
+                cell_type_names,
+                k=gex_detection_k,
+                min_corr=gex_detection_min_corr,
             )
             self.results["detection_protein"] = detection_mask_bool.copy()
             self.results["detection_gex"] = gex_detected
 
             # Fuse protein + GEX detection
             fused_detected = fuse_detection_masks(
-                detection_mask_bool, gex_detected, assignment_matrix,
+                detection_mask_bool,
+                gex_detected,
+                assignment_matrix,
                 mode=fusion_mode,
             )
             self.results["detection_fused"] = fused_detected
@@ -1126,12 +1176,11 @@ class CitegeistModel:
             # Rebuild sparsity mask from fused detection
             sparsity_mask = np.ones((N_spots, T), dtype=np.float64)
             detected_types = list(mapped_groups.keys())
-            for k_idx, ct in enumerate(detected_types):
+            for _, ct in enumerate(detected_types):
                 if ct in cell_type_names:
                     t_idx = cell_type_names.index(ct)
                     if cellularity_array is not None:
-                        per_spot_ub = np.minimum(detection_gate_ub,
-                                                 1.0 / np.maximum(cellularity_array, 1.0))
+                        per_spot_ub = np.minimum(detection_gate_ub, 1.0 / np.maximum(cellularity_array, 1.0))
                         sparsity_mask[~fused_detected[:, t_idx], t_idx] = per_spot_ub[~fused_detected[:, t_idx]]
                     else:
                         sparsity_mask[~fused_detected[:, t_idx], t_idx] = detection_gate_ub
@@ -1147,33 +1196,48 @@ class CitegeistModel:
             n_gated_fused = (sparsity_mask < 1.0).sum()
             logging.info(
                 "GEX-fused detection: %d/%d (%.1f%%) spot-type pairs gated",
-                n_gated_fused, N_spots * T, 100.0 * n_gated_fused / (N_spots * T),
+                n_gated_fused,
+                N_spots * T,
+                100.0 * n_gated_fused / (N_spots * T),
             )
 
         # Marker weighting: explicit dict > entropy weights > uniform (None)
         marker_weight = None
         if marker_weight_dict is not None:
-            marker_weight = np.array(
-                [marker_weight_dict.get(m, 1.0) for m in marker_names], dtype=np.float64
-            )
+            marker_weight = np.array([marker_weight_dict.get(m, 1.0) for m in marker_names], dtype=np.float64)
             self.results["marker_weight_source"] = "explicit"
         elif use_entropy_weights:
-            from .deconvolution.detection_refinement import compute_marker_entropy_weights
+            from .deconvolution.detection_refinement import (  # pylint: disable=import-outside-toplevel
+                compute_marker_entropy_weights,
+            )
+
             marker_weight = compute_marker_entropy_weights(
-                marker_level_data, marker_names, alpha=entropy_weight_alpha,
+                marker_level_data,
+                marker_names,
+                alpha=entropy_weight_alpha,
             )
             self.results["marker_weight_source"] = "entropy"
         if marker_weight is not None:
             self.results["marker_weights"] = dict(zip(marker_names, marker_weight.tolist()))
 
         try:
-            logging.info(f"Running Stage 1 cell proportion optimization with validation thresholds: "
-                        f"Unknown<{unknown_threshold*100:.1f}%, CellTypes>{min_celltype_threshold*100:.1f}%, Redundancy<{redundancy_threshold*100:.0f}%")
+            logging.info(
+                "Running Stage 1 cell proportion optimization with validation thresholds: "
+                "Unknown<%s%%, CellTypes>%s%%, Redundancy<%s%%",
+                round(unknown_threshold * 100, 1),
+                round(min_celltype_threshold * 100, 1),
+                round(redundancy_threshold * 100),
+            )
 
             if method == "per_type_beta":
                 # --- Per-type beta EM path ---
-                from .deconvolution.emission_init import initialize_beta_matrix, build_beta_prior_sigma
-                from .deconvolution.cuopt_impl import optimize_cell_proportions_per_type_beta
+                from .deconvolution.cuopt_impl import (  # pylint: disable=import-outside-toplevel
+                    optimize_cell_proportions_per_type_beta,
+                )
+                from .deconvolution.emission_init import (  # pylint: disable=import-outside-toplevel
+                    build_beta_prior_sigma,
+                    initialize_beta_matrix,
+                )
 
                 # Build beta init from marker-level data
                 raw_for_init = marker_level_data  # already cellularity-corrected if applicable
@@ -1191,10 +1255,12 @@ class CitegeistModel:
                 )
                 logging.info(
                     "Per-type beta: beta_init shape=%s, prior_sigma shape=%s, sigma_scale=%.2f",
-                    beta_init.shape, prior_sigma.shape, sigma_scale,
+                    beta_init.shape,
+                    prior_sigma.shape,
+                    sigma_scale,
                 )
 
-                Y_values, beta_final, marker_beta_matrix_dict, alpha_values, recon_error, objective_history = (
+                Y_values, _, marker_beta_matrix_dict, alpha_values, recon_error, objective_history = (
                     optimize_cell_proportions_per_type_beta(
                         marker_level_data=marker_level_data,
                         marker_names=marker_names,
@@ -1221,16 +1287,18 @@ class CitegeistModel:
                 self.results["objective_history"] = objective_history
 
                 # Create scalar marker_beta_dict for backward compat (max across types)
-                marker_beta_dict = {m: max(marker_beta_matrix_dict[m].values())
-                                    for m in marker_beta_matrix_dict}
-                # beta_values as 1-D array for downstream compat
-                beta_values = np.array([marker_beta_dict[m] for m in marker_names], dtype=np.float64)
+                marker_beta_dict = {m: max(marker_beta_matrix_dict[m].values()) for m in marker_beta_matrix_dict}
+                # beta_values as 1-D array for downstream compat (kept for logging symmetry)
+                _beta_values = np.array([marker_beta_dict[m] for m in marker_names], dtype=np.float64)  # noqa: F841
 
-                logging.info("Per-type beta EM converged in %d iterations, final obj=%.4f",
-                             len(objective_history), objective_history[-1] if objective_history else float("nan"))
+                logging.info(
+                    "Per-type beta EM converged in %d iterations, final obj=%.4f",
+                    len(objective_history),
+                    objective_history[-1] if objective_history else float("nan"),
+                )
 
             else:
-                Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
+                Y_values, _, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
                     marker_level_data=marker_level_data,
                     marker_names=marker_names,
                     assignment_matrix=assignment_matrix,
@@ -1274,16 +1342,22 @@ class CitegeistModel:
                     Y_values = Y_values / row_sums
                     logging.info(
                         "Subcell cleanup: zeroed %d/%d (%.1f%%) entries below 1/(2N)",
-                        n_zeroed, Y_values.size, 100.0 * n_zeroed / Y_values.size,
+                        n_zeroed,
+                        Y_values.size,
+                        100.0 * n_zeroed / Y_values.size,
                     )
 
             # Iterative sparsity refinement: re-solve with QP-informed mask
             if refine_sparsity and sparsity_mask is not None:
-                from .deconvolution.detection_refinement import refine_sparsity_from_proportions
+                from .deconvolution.detection_refinement import (  # pylint: disable=import-outside-toplevel
+                    refine_sparsity_from_proportions,
+                )
 
                 sparsity_mask_pass1 = sparsity_mask.copy()
                 refined_mask = refine_sparsity_from_proportions(
-                    Y_values, sparsity_mask, cellularity_array,
+                    Y_values,
+                    sparsity_mask,
+                    cellularity_array,
                     suppress_threshold=refine_suppress_threshold,
                     rescue_threshold=refine_rescue_threshold,
                     detection_gate_ub=detection_gate_ub,
@@ -1292,41 +1366,42 @@ class CitegeistModel:
                 n_changes = int((refined_mask != sparsity_mask).sum())
                 logging.info(
                     "Sparsity refinement: %d/%d mask entries changed (%.1f%%)",
-                    n_changes, N_spots * T, 100.0 * n_changes / (N_spots * T),
+                    n_changes,
+                    N_spots * T,
+                    100.0 * n_changes / (N_spots * T),
                 )
 
                 if n_changes > 0:
                     logging.info("Re-solving QP with refined sparsity mask (Pass 2)...")
-                    Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = \
-                        optimize_cell_proportions_per_marker(
-                            marker_level_data=marker_level_data,
-                            marker_names=marker_names,
-                            assignment_matrix=assignment_matrix,
-                            cell_type_names=cell_type_names,
-                            tolerance=tolerance,
-                            max_iterations=max_iterations,
-                            lambda_reg=lambda_reg,
-                            alpha=alpha,
-                            beta_min=beta_min,
-                            beta_max=beta_max,
-                            unknown_threshold=unknown_threshold,
-                            min_celltype_threshold=min_celltype_threshold,
-                            redundancy_threshold=redundancy_threshold,
-                            warn_only=validation_warn_only,
-                            lambda_laplacian=lambda_laplacian,
-                            coords=coords,
-                            laplacian_k=laplacian_k,
-                            lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
-                            lambda_coverage=lambda_coverage,
-                            spot_abundance_target=spot_abundance_target,
-                            lambda_abundance_prior=lambda_abundance_prior,
-                            row_sum_bounds=row_sum_bounds,
-                            cellularity=cellularity_laplacian_array,
-                            cellularity_sigma=cellularity_sigma,
-                            sparsity_mask=refined_mask,
-                            spot_weights=cellularity_spot_weights,
-                            marker_weight=marker_weight,
-                        )
+                    Y_values, _, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
+                        marker_level_data=marker_level_data,
+                        marker_names=marker_names,
+                        assignment_matrix=assignment_matrix,
+                        cell_type_names=cell_type_names,
+                        tolerance=tolerance,
+                        max_iterations=max_iterations,
+                        lambda_reg=lambda_reg,
+                        alpha=alpha,
+                        beta_min=beta_min,
+                        beta_max=beta_max,
+                        unknown_threshold=unknown_threshold,
+                        min_celltype_threshold=min_celltype_threshold,
+                        redundancy_threshold=redundancy_threshold,
+                        warn_only=validation_warn_only,
+                        lambda_laplacian=lambda_laplacian,
+                        coords=coords,
+                        laplacian_k=laplacian_k,
+                        lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
+                        lambda_coverage=lambda_coverage,
+                        spot_abundance_target=spot_abundance_target,
+                        lambda_abundance_prior=lambda_abundance_prior,
+                        row_sum_bounds=row_sum_bounds,
+                        cellularity=cellularity_laplacian_array,
+                        cellularity_sigma=cellularity_sigma,
+                        sparsity_mask=refined_mask,
+                        spot_weights=cellularity_spot_weights,
+                        marker_weight=marker_weight,
+                    )
 
                     # Re-run subcell cleanup with refined mask
                     if cellularity_array is not None:
@@ -1351,7 +1426,7 @@ class CitegeistModel:
 
                 if confusion_pairs_manual:
                     # Manual pairs: convert type names to indices
-                    for (name_a, name_b) in confusion_pairs_manual:
+                    for name_a, name_b in confusion_pairs_manual:
                         if name_a in cell_type_names and name_b in cell_type_names:
                             idx_a = cell_type_names.index(name_a)
                             idx_b = cell_type_names.index(name_b)
@@ -1367,46 +1442,48 @@ class CitegeistModel:
                                 confusion_pairs.append((i, j))
                                 logging.info(
                                     "Confusion pair detected: %s ↔ %s (corr=%.3f)",
-                                    cell_type_names[i], cell_type_names[j], corr_matrix[i, j],
+                                    cell_type_names[i],
+                                    cell_type_names[j],
+                                    corr_matrix[i, j],
                                 )
 
                 if confusion_pairs:
                     logging.info(
                         "Re-solving QP with confusion penalty (λ=%.3f, %d pairs)...",
-                        lambda_confusion, len(confusion_pairs),
+                        lambda_confusion,
+                        len(confusion_pairs),
                     )
-                    Y_values, beta_values, marker_beta_dict, alpha_values, recon_error = \
-                        optimize_cell_proportions_per_marker(
-                            marker_level_data=marker_level_data,
-                            marker_names=marker_names,
-                            assignment_matrix=assignment_matrix,
-                            cell_type_names=cell_type_names,
-                            tolerance=tolerance,
-                            max_iterations=max_iterations,
-                            lambda_reg=lambda_reg,
-                            alpha=alpha,
-                            beta_min=beta_min,
-                            beta_max=beta_max,
-                            unknown_threshold=unknown_threshold,
-                            min_celltype_threshold=min_celltype_threshold,
-                            redundancy_threshold=redundancy_threshold,
-                            warn_only=validation_warn_only,
-                            lambda_laplacian=lambda_laplacian,
-                            coords=coords,
-                            laplacian_k=laplacian_k,
-                            lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
-                            lambda_coverage=lambda_coverage,
-                            spot_abundance_target=spot_abundance_target,
-                            lambda_abundance_prior=lambda_abundance_prior,
-                            row_sum_bounds=row_sum_bounds,
-                            cellularity=cellularity_laplacian_array,
-                            cellularity_sigma=cellularity_sigma,
-                            sparsity_mask=sparsity_mask,
-                            spot_weights=cellularity_spot_weights,
-                            marker_weight=marker_weight,
-                            confusion_pairs=confusion_pairs,
-                            lambda_confusion=lambda_confusion,
-                        )
+                    Y_values, _, marker_beta_dict, alpha_values, recon_error = optimize_cell_proportions_per_marker(
+                        marker_level_data=marker_level_data,
+                        marker_names=marker_names,
+                        assignment_matrix=assignment_matrix,
+                        cell_type_names=cell_type_names,
+                        tolerance=tolerance,
+                        max_iterations=max_iterations,
+                        lambda_reg=lambda_reg,
+                        alpha=alpha,
+                        beta_min=beta_min,
+                        beta_max=beta_max,
+                        unknown_threshold=unknown_threshold,
+                        min_celltype_threshold=min_celltype_threshold,
+                        redundancy_threshold=redundancy_threshold,
+                        warn_only=validation_warn_only,
+                        lambda_laplacian=lambda_laplacian,
+                        coords=coords,
+                        laplacian_k=laplacian_k,
+                        lambda_sparse=self.resolution_params.get("lambda_sparse", 0.0),
+                        lambda_coverage=lambda_coverage,
+                        spot_abundance_target=spot_abundance_target,
+                        lambda_abundance_prior=lambda_abundance_prior,
+                        row_sum_bounds=row_sum_bounds,
+                        cellularity=cellularity_laplacian_array,
+                        cellularity_sigma=cellularity_sigma,
+                        sparsity_mask=sparsity_mask,
+                        spot_weights=cellularity_spot_weights,
+                        marker_weight=marker_weight,
+                        confusion_pairs=confusion_pairs,
+                        lambda_confusion=lambda_confusion,
+                    )
 
                     # Re-run subcell cleanup
                     if cellularity_array is not None and sparsity_mask is not None:
@@ -1430,7 +1507,10 @@ class CitegeistModel:
 
             # Store cellularity results (post-hoc conversion)
             if cellularity_array is not None:
-                from .assignment.cellularity_utils import round_counts_largest_remainder
+                from .assignment.cellularity_utils import (  # pylint: disable=import-outside-toplevel
+                    round_counts_largest_remainder,
+                )
+
                 spot_names = self.antibody_capture_adata.obs_names
                 c_continuous = Y_values * cellularity_array[:, np.newaxis]
                 c_df = pd.DataFrame(c_continuous, index=spot_names, columns=cell_type_names)
@@ -1438,9 +1518,7 @@ class CitegeistModel:
 
                 int_counts = np.zeros_like(c_continuous, dtype=np.int64)
                 for i in range(len(spot_names)):
-                    int_counts[i] = round_counts_largest_remainder(
-                        c_continuous[i], round(cellularity_array[i])
-                    )
+                    int_counts[i] = round_counts_largest_remainder(c_continuous[i], round(cellularity_array[i]))
                 int_df = pd.DataFrame(int_counts, index=spot_names, columns=cell_type_names)
                 self.results["cell_counts_integer"] = int_df
 
@@ -1450,7 +1528,7 @@ class CitegeistModel:
             self.results["marker_alpha"] = marker_alpha_dict
             for m_idx, m_name in enumerate(marker_names):
                 if alpha_values[m_idx] > 0.05:
-                    logging.info(f"  Marker baseline: {m_name} = {alpha_values[m_idx]:.3f}")
+                    logging.info("  Marker baseline: %s = %s", m_name, alpha_values[m_idx])
 
             # Compute marker exclusivity scores for finetuning
             # (skip for per_type_beta — exclusivity is encoded in the beta matrix itself)
@@ -1470,7 +1548,7 @@ class CitegeistModel:
                 # Log exclusivity scores
                 for m_idx, m_name in enumerate(marker_names):
                     if marker_owners[m_idx]:
-                        logging.info(f"  Marker exclusivity: {m_name} = {marker_exclusivity[m_idx]:.3f}")
+                        logging.info("  Marker exclusivity: %s = %s", m_name, marker_exclusivity[m_idx])
                 self.results["marker_exclusivity"] = {
                     marker_names[i]: marker_exclusivity[i] for i in range(len(marker_names))
                 }
@@ -1508,38 +1586,33 @@ class CitegeistModel:
         # --- Optional NB refinement with scRNA-seq reference ---
         if reference is not None:
             logging.info("Running NB proportion refinement with scRNA-seq reference (kappa=%.1f)", kappa)
-            from .deconvolution.reference_model import refine_proportions_nb
-            import torch
+            import torch  # pylint: disable=import-outside-toplevel
+
+            from .deconvolution.reference_model import refine_proportions_nb  # pylint: disable=import-outside-toplevel
 
             # Store protein-only proportions for comparison
             self.results["cell_prop_protein"] = self.results["cell_prop"].copy()
 
             # Extract marker gene counts from spatial data
-            marker_genes_in_spatial = [
-                g for g in reference.gene_names
-                if g in self.gene_expression_adata.var_names
-            ]
+            marker_genes_in_spatial = [g for g in reference.gene_names if g in self.gene_expression_adata.var_names]
             if len(marker_genes_in_spatial) < len(reference.gene_names):
                 logging.warning(
                     "Only %d/%d reference marker genes found in spatial data",
-                    len(marker_genes_in_spatial), len(reference.gene_names),
+                    len(marker_genes_in_spatial),
+                    len(reference.gene_names),
                 )
 
             # Get raw counts for marker genes
             gex_adata = self.gene_expression_adata
             raw_counts = gex_adata.layers.get("raw_counts", gex_adata.X)
-            marker_idx = [
-                list(gex_adata.var_names).index(g) for g in marker_genes_in_spatial
-            ]
+            marker_idx = [list(gex_adata.var_names).index(g) for g in marker_genes_in_spatial]
             if hasattr(raw_counts, "toarray"):
                 spot_marker_counts = raw_counts[:, marker_idx].toarray()
             else:
                 spot_marker_counts = np.asarray(raw_counts[:, marker_idx])
 
             # Build reference subset matching available genes
-            ref_gene_idx = [
-                reference.gene_names.index(g) for g in marker_genes_in_spatial
-            ]
+            ref_gene_idx = [reference.gene_names.index(g) for g in marker_genes_in_spatial]
             ref_mu_subset = reference.mu[:, ref_gene_idx]
             ref_alpha_subset = reference.alpha[ref_gene_idx]
 
@@ -1575,7 +1648,7 @@ class CitegeistModel:
             try:
                 if torch.cuda.is_available():
                     device = "cuda"
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 pass
 
             # Compute residual mass for uncovered types (stays fixed)
@@ -1599,9 +1672,7 @@ class CitegeistModel:
             for i, col_idx in enumerate(covered_idx):
                 pi_refined_full[:, col_idx] = pi_refined_covered[:, i] * covered_mass.ravel()
 
-            refined_df = pd.DataFrame(
-                pi_refined_full, index=prop_df.index, columns=prop_df.columns
-            )
+            refined_df = pd.DataFrame(pi_refined_full, index=prop_df.index, columns=prop_df.columns)
             self.results["cell_prop"] = refined_df
             self.results["cell_prop_base"] = refined_df.copy()
 
@@ -1660,18 +1731,15 @@ class CitegeistModel:
 
         if len(common_spots) < len(proportions_df):
             logging.warning(
-                f"Only {len(common_spots)}/{len(proportions_df)} spots have nuclei counts. "
-                "Missing spots will be excluded."
+                "Only %s/%s spots have nuclei counts. Missing spots will be excluded.",
+                len(common_spots),
+                len(proportions_df),
             )
 
         props = proportions_df.loc[common_spots]
         nuclei = nuclei_counts.loc[common_spots]
 
-        cell_counts = pd.DataFrame(
-            index=common_spots,
-            columns=props.columns,
-            dtype=int
-        )
+        cell_counts = pd.DataFrame(index=common_spots, columns=props.columns, dtype=int)
 
         for spot in common_spots:
             N = int(nuclei[spot])
@@ -1705,9 +1773,10 @@ class CitegeistModel:
             cell_counts.loc[spot] = floor_counts
 
         logging.info(
-            f"Discretized {len(common_spots)} spots: "
-            f"total cells={cell_counts.values.sum()}, "
-            f"mean per spot={cell_counts.sum(axis=1).mean():.1f}"
+            "Discretized %s spots: total cells=%s, mean per spot=%s",
+            len(common_spots),
+            cell_counts.values.sum(),
+            round(cell_counts.sum(axis=1).mean(), 1),
         )
 
         return cell_counts
@@ -1716,6 +1785,7 @@ class CitegeistModel:
         self,
         cell_assignments=None,
         cell_spot_map=None,
+        *,
         sace_max_iter: int = 1,
         sace_n_0: float = 10.0,
         sace_bandwidth=None,
@@ -1748,7 +1818,7 @@ class CitegeistModel:
         logging.info("Using SACE GEX deconvolution (1.7s, no solver required)")
 
         # Delegate to run_sace_allocation
-        spot_type_gex, cell_adata, diagnostics = self.run_sace_allocation(
+        spot_type_gex, cell_adata, _ = self.run_sace_allocation(
             cell_assignments=cell_assignments,
             cell_spot_map=cell_spot_map,
             n_0=sace_n_0,
@@ -1793,7 +1863,7 @@ class CitegeistModel:
         # Get gene and cell type names for validation
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
-        gene_names = self.gene_expression_adata.var_names
+        _gene_names = self.gene_expression_adata.var_names  # noqa: F841
 
         if self.cell_profile_dict is None:
             raise ValueError("Cell profile dictionary not loaded. Run load_cell_profile_dict() first.")
@@ -1816,24 +1886,24 @@ class CitegeistModel:
 
         # Log detailed statistics about the prior
         logging.info("\nPrior computation details:")
-        logging.info(f"Number of cell types: {T}")
-        logging.info(f"Number of genes: {M}")
+        logging.info("Number of cell types: %s", T)
+        logging.info("Number of genes: %s", M)
 
         # Per cell-type statistics
         for t, cell_type in enumerate(cell_type_names):
             mean_conf = np.mean(prior_info["confidence_scores"][t])
             strong_signals = np.mean(prior_info["global_prior"][t] > 0.5)
-            logging.info(f"\n{cell_type}:")
-            logging.info(f" - Mean confidence score: {mean_conf:.4f}")
-            logging.info(f" - % Strong signals: {100 * strong_signals:.2f}%")
+            logging.info("\n%s:", cell_type)
+            logging.info(" - Mean confidence score: %s", mean_conf)
+            logging.info(" - % Strong signals: %s%", 100 * strong_signals)
 
             # Expression pattern summary
             mean_exp = np.mean(prior_info["expression_patterns"]["mean_expression"][t])
             freq = np.mean(prior_info["expression_patterns"]["expression_frequency"][t])
             cons = np.mean(prior_info["expression_patterns"]["expression_consistency"][t])
-            logging.info(f" - Mean expression: {mean_exp:.4f}")
-            logging.info(f" - Mean expression frequency: {freq:.4f}")
-            logging.info(f" - Mean expression consistency: {cons:.4f}")
+            logging.info(" - Mean expression: %s", mean_exp)
+            logging.info(" - Mean expression frequency: %s", freq)
+            logging.info(" - Mean expression consistency: %s", cons)
 
         return prior_info
 
@@ -1875,7 +1945,7 @@ class CitegeistModel:
         df = pd.DataFrame(data_combined, index=spot_celltype_indices, columns=gene_names)
 
         df.to_parquet(path, compression="gzip")
-        logging.info(f"Saved profiles to {path} with cell types: {cell_type_names}")
+        logging.info("Saved profiles to %s with cell types: %s", path, cell_type_names)
 
     def append_proportions_to_adata(self, proportions_path=None, key="finetuned"):
         """Append cell type proportions to AnnData object."""
@@ -1964,12 +2034,14 @@ class CitegeistModel:
                 for ct in known_cell_types:
                     suffix = f"_{ct}"
                     if idx_val.endswith(suffix):
-                        spots.append(idx_val[:-len(suffix)])
+                        spots.append(idx_val[: -len(suffix)])
                         cell_types.append(ct)
                         matched = True
                         break
                 if not matched:
-                    raise ValueError(f"Could not parse index '{idx_val}' - no matching cell type found in {known_cell_types}")
+                    raise ValueError(
+                        f"Could not parse index '{idx_val}' - no matching cell type found in {known_cell_types}"
+                    )
 
             df["Spot"] = spots
             df["CellType"] = cell_types
@@ -1990,8 +2062,8 @@ class CitegeistModel:
         found_cell_types = set(df["CellType"].unique())
 
         if not found_cell_types.issubset(expected_cell_types):
-            logging.warning(f"Found unexpected cell types: {found_cell_types - expected_cell_types}")
-            logging.warning(f"Expected cell types: {expected_cell_types}")
+            logging.warning("Found unexpected cell types: %s", found_cell_types - expected_cell_types)
+            logging.warning("Expected cell types: %s", expected_cell_types)
             raise ValueError("Cell type mismatch in loaded data")
 
         # Step 3: Process each cell type
@@ -2006,7 +2078,7 @@ class CitegeistModel:
                 and not celltype_data["Spot"].str.contains("spot_").all()
             ):
                 celltype_data["Spot"] = "spot_" + celltype_data["Spot"].astype(str)
-            elif celltype_data["Spot"].str.contains("spot_").all() and not "spot_" in str(
+            elif celltype_data["Spot"].str.contains("spot_").all() and "spot_" not in str(
                 self.gene_expression_adata.obs_names[0]
             ):
                 celltype_data["Spot"] = celltype_data["Spot"].str.replace("spot_", "")
@@ -2035,9 +2107,9 @@ class CitegeistModel:
 
             # After adding each layer, verify it was added correctly
             if layer_name not in self.gene_expression_adata.layers:
-                logging.error(f"Failed to add layer: {layer_name}")
+                logging.error("Failed to add layer: %s", layer_name)
             else:
-                logging.info(f"Successfully added layer: {layer_name}")
+                logging.info("Successfully added layer: %s", layer_name)
 
     def get_adata(self):
         """
@@ -2066,8 +2138,9 @@ class CitegeistModel:
 
     def assign_cells(
         self,
-        nuclei_counts: 'pd.Series',
+        nuclei_counts: "pd.Series",
         cell_to_spot: np.ndarray,
+        *,
         cell_ids: np.ndarray = None,
         morphology_embeddings: np.ndarray = None,
         patches: np.ndarray = None,
@@ -2079,7 +2152,7 @@ class CitegeistModel:
         detection_mask: np.ndarray = None,
         proportion_prior: np.ndarray = None,
         morph_scores_precomputed: np.ndarray = None,
-    ) -> 'pd.DataFrame':
+    ) -> "pd.DataFrame":
         """Assign individual cells to types using proportions + optional morphology.
 
         Post-processing step that runs after run_cell_proportion_model().
@@ -2103,12 +2176,11 @@ class CitegeistModel:
         Returns:
             DataFrame (C rows): spot_id, cell_id, per-type scores, assigned_type, confidence.
         """
-        from .assignment.cell_assignment import assign_cells as _assign_cells
+        from .assignment.cell_assignment import assign_cells as _assign_cells  # pylint: disable=import-outside-toplevel
 
         if "cell_prop" not in self.results:
             raise RuntimeError(
-                "run_cell_proportion_model() must be called before assign_cells(). "
-                "No 'cell_prop' found in results."
+                "run_cell_proportion_model() must be called before assign_cells(). " "No 'cell_prop' found in results."
             )
 
         # Auto-populate for Bayesian assignment
@@ -2123,7 +2195,7 @@ class CitegeistModel:
             if proportion_prior is None:
                 base = self.results.get("cell_prop_base", self.results.get("cell_prop"))
                 if base is not None:
-                    proportion_prior = base.values if hasattr(base, 'values') else base
+                    proportion_prior = base.values if hasattr(base, "values") else base
 
         existing_int = self.results.get("cell_counts_integer", None)
 
@@ -2137,8 +2209,8 @@ class CitegeistModel:
             encoder_checkpoint=encoder_checkpoint,
             morphology_weight=morphology_weight,
             existing_integer_counts=existing_int,
-            output_folder=getattr(self, 'output_folder', None),
-            sample_name=getattr(self, 'sample_name', 'sample'),
+            output_folder=getattr(self, "output_folder", None),
+            sample_name=getattr(self, "sample_name", "sample"),
             device=device,
             random_state=random_state,
             assignment_method=assignment_method,
@@ -2162,6 +2234,7 @@ class CitegeistModel:
         self,
         cell_assignments,
         cell_spot_map,
+        *,
         n_0=10.0,
         bandwidth=None,
         max_iter=1,
@@ -2190,7 +2263,7 @@ class CitegeistModel:
         Returns:
             Tuple of (spot_type_gex, cell_adata, diagnostics).
         """
-        from .gex.sace_gex import run_sace
+        from .gex.sace_gex import run_sace  # pylint: disable=import-outside-toplevel
 
         if "cell_prop" not in self.results:
             raise ValueError("Run run_cell_proportion_model() first.")
@@ -2224,7 +2297,7 @@ class CitegeistModel:
         # so antibody may have more spots than GEX.
         ab_data = None
         ab_names = None
-        if hasattr(self, 'antibody_capture_adata') and self.antibody_capture_adata is not None:
+        if hasattr(self, "antibody_capture_adata") and self.antibody_capture_adata is not None:
             ab_adata = self.antibody_capture_adata
             ab_names = list(ab_adata.var_names)
             # Subset antibody to GEX spots
@@ -2232,9 +2305,9 @@ class CitegeistModel:
             ab_mask = ab_adata.obs_names.isin(gex_spots)
             if ab_mask.sum() < len(adata):
                 logging.warning(
-                    "Only %d/%d GEX spots found in antibody data — "
-                    "skipping marker-guided SACE init",
-                    ab_mask.sum(), len(adata),
+                    "Only %d/%d GEX spots found in antibody data — " "skipping marker-guided SACE init",
+                    ab_mask.sum(),
+                    len(adata),
                 )
             else:
                 ab_sub = ab_adata[ab_mask]
@@ -2244,7 +2317,8 @@ class CitegeistModel:
                 ab_data = np.asarray(ab_raw)
                 logging.info(
                     "Aligned antibody data: %d spots × %d markers",
-                    ab_data.shape[0], ab_data.shape[1],
+                    ab_data.shape[0],
+                    ab_data.shape[1],
                 )
 
         spot_type_gex, cell_adata, diagnostics = run_sace(
@@ -2261,7 +2335,7 @@ class CitegeistModel:
             tol=tol,
             antibody_data=ab_data,
             antibody_names=ab_names,
-            cell_profile_dict=getattr(self, 'cell_profile_dict', None),
+            cell_profile_dict=getattr(self, "cell_profile_dict", None),
         )
 
         self.results["sace_spot_type_gex"] = spot_type_gex
@@ -2272,6 +2346,7 @@ class CitegeistModel:
 
     def run_module3_5_functional_annotation(
         self,
+        *,
         functional_marker_table=None,
         max_iter=200,
         lr=0.01,
@@ -2310,12 +2385,12 @@ class CitegeistModel:
             Dict with functional_lambda, functional_intensity,
             functional_gates, functional_summary.
         """
-        from .annotation.functional_annotation import (
+        from .annotation.functional_annotation import (  # pylint: disable=import-outside-toplevel
             DEFAULT_FUNCTIONAL_TABLE,
             build_active_mask,
-            learn_functional_emissions,
-            gate_functional_markers,
             compute_spatial_statistics,
+            gate_functional_markers,
+            learn_functional_emissions,
         )
 
         if "cell_prop" not in self.results:
@@ -2343,12 +2418,14 @@ class CitegeistModel:
             functional_markers = [m for m in functional_marker_table if m in panel_stripped]
             marker_to_panel = {m: panel_stripped[m] for m in functional_markers}
 
-        logging.info("Module 3.5: %d/%d functional markers found in panel",
-                     len(functional_markers), len(functional_marker_table))
+        logging.info(
+            "Module 3.5: %d/%d functional markers found in panel", len(functional_markers), len(functional_marker_table)
+        )
 
         if len(functional_markers) == 0:
-            raise ValueError("No functional markers found in antibody panel. "
-                             f"Panel markers: {panel_markers[:10]}...")
+            raise ValueError(
+                "No functional markers found in antibody panel. " f"Panel markers: {panel_markers[:10]}..."
+            )
 
         # Extract raw counts for functional markers (NB needs integer counts)
         panel_names = [marker_to_panel[m] for m in functional_markers]
@@ -2365,7 +2442,9 @@ class CitegeistModel:
         active_mask = build_active_mask(functional_markers, cell_types, functional_marker_table)
 
         # Size factors: fixed from antibody total counts
-        total_ab = np.asarray(ab_adata.X.sum(axis=1)).flatten() if hasattr(ab_adata.X, "toarray") else ab_adata.X.sum(axis=1)
+        total_ab = (
+            np.asarray(ab_adata.X.sum(axis=1)).flatten() if hasattr(ab_adata.X, "toarray") else ab_adata.X.sum(axis=1)
+        )
         total_ab = np.asarray(total_ab, dtype=np.float64).flatten()
         median_ab = np.median(total_ab[total_ab > 0]) if (total_ab > 0).any() else 1.0
         size_factors = np.clip(total_ab / max(median_ab, 1.0), 0.1, 10.0).astype(np.float32)
@@ -2404,7 +2483,8 @@ class CitegeistModel:
         # Spatial statistics
         spot_coords = self.gene_expression_adata.obsm["spatial"]
         active_pairs = [
-            (ct, m) for t_idx, ct in enumerate(cell_types)
+            (ct, m)
+            for t_idx, ct in enumerate(cell_types)
             for m_idx, m in enumerate(functional_markers)
             if active_mask[t_idx, m_idx] > 0.5
         ]
@@ -2425,17 +2505,24 @@ class CitegeistModel:
         # Save to output folder
         if self.output_folder:
             lam_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_lambda.csv"))
-            intensity_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_intensity.csv"), index=False)
+            intensity_df.to_csv(
+                os.path.join(self.output_folder, f"{self.sample_name}_functional_intensity.csv"), index=False
+            )
             gates_df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_functional_gates.csv"), index=False)
 
-            import json
+            import json  # pylint: disable=import-outside-toplevel
+
             summary_ser = {f"{k[0]}:{k[1]}": v for k, v in summary.items()}
             with open(os.path.join(self.output_folder, f"{self.sample_name}_functional_summary.json"), "w") as f:
                 json.dump(summary_ser, f, indent=2)
 
         n_sig = sum(1 for s in spatial_stats.values() if s.get("morans_p", 1.0) < 0.05)
-        logging.info("Module 3.5 complete: %d markers, %d active pairs, %d spatially significant",
-                     len(functional_markers), len(active_pairs), n_sig)
+        logging.info(
+            "Module 3.5 complete: %d markers, %d active pairs, %d spatially significant",
+            len(functional_markers),
+            len(active_pairs),
+            n_sig,
+        )
 
         results = {
             "functional_lambda": lam_df,
@@ -2446,7 +2533,8 @@ class CitegeistModel:
 
         # Optional coverage gap analysis (fires only when M1/M2 results are provided)
         if m1_result is not None or m2_result is not None:
-            from .annotation.coverage_check import check_module_coverage
+            from .annotation.coverage_check import check_module_coverage  # pylint: disable=import-outside-toplevel
+
             coverage = check_module_coverage(
                 m1_result=m1_result,
                 m2_result=m2_result,
@@ -2459,9 +2547,7 @@ class CitegeistModel:
                 logging.warning(line)
             if coverage.n_warnings > 0 and self.output_folder:
                 coverage.to_csv(self.output_folder)
-                logging.info(
-                    "Coverage check saved to %s/coverage_check_*.csv", self.output_folder
-                )
+                logging.info("Coverage check saved to %s/coverage_check_*.csv", self.output_folder)
             results["coverage_check"] = coverage
 
         return results
@@ -2474,6 +2560,7 @@ class CitegeistModel:
         self,
         cell_assignments: Dict[str, str],
         cell_spot_map: "pd.DataFrame",
+        *,
         module3_5_candidates_df: Optional["pd.DataFrame"] = None,
         functional_table: Optional[Dict] = None,
         max_iter: int = 1,
@@ -2519,23 +2606,19 @@ class CitegeistModel:
                 gmm_summary: per-pair gating summary
                 sace_diagnostics: SACE convergence info
         """
-        from .gex.sace_gex import run_sace
-        from .annotation.functional_annotation import (
+        from .annotation.functional_annotation import (  # pylint: disable=import-outside-toplevel
             DEFAULT_FUNCTIONAL_TABLE,
             build_active_mask,
             gmm_gate_cells,
         )
+        from .gex.sace_gex import run_sace  # pylint: disable=import-outside-toplevel
 
         if "cell_prop" not in self.results:
-            raise ValueError(
-                "run_cell_proportion_model() must be called before run_sace_protein()."
-            )
+            raise ValueError("run_cell_proportion_model() must be called before run_sace_protein().")
 
         # --- 1. Identify unused functional markers ---
-        if not hasattr(self, 'cell_profile_dict') or self.cell_profile_dict is None:
-            raise ValueError(
-                "cell_profile_dict must be loaded before run_sace_protein()."
-            )
+        if not hasattr(self, "cell_profile_dict") or self.cell_profile_dict is None:
+            raise ValueError("cell_profile_dict must be loaded before run_sace_protein().")
 
         consumed = set()
         for ct_info in self.cell_profile_dict.values():
@@ -2562,7 +2645,8 @@ class CitegeistModel:
 
         logging.info(
             "SACE protein: %d unused markers out of %d panel markers",
-            len(unused_canon), len(panel_markers),
+            len(unused_canon),
+            len(panel_markers),
         )
 
         if len(unused_canon) == 0:
@@ -2580,22 +2664,24 @@ class CitegeistModel:
                 if _canon(marker) in unused_canon or marker in unused_canon:
                     type_marker_pairs.append((ct, _canon(marker)))
             active_mask = build_active_mask(
-                unused_canon, cell_types,
+                unused_canon,
+                cell_types,
                 functional_table={
-                    m: {"active_types": [ct for ct2, m2 in type_marker_pairs
-                                         if m2 == m for ct in [ct2]]}
+                    m: {"active_types": [ct for ct2, m2 in type_marker_pairs if m2 == m for ct in [ct2]]}
                     for m in unused_canon
                 },
             )
         else:
             active_mask = build_active_mask(
-                unused_canon, cell_types,
+                unused_canon,
+                cell_types,
                 functional_table if functional_table is not None else DEFAULT_FUNCTIONAL_TABLE,
             )
 
         logging.info(
             "SACE protein active mask: %d active pairs out of %d possible",
-            int(active_mask.sum()), active_mask.size,
+            int(active_mask.sum()),
+            active_mask.size,
         )
 
         # --- 3. Extract raw protein counts ---
@@ -2611,14 +2697,11 @@ class CitegeistModel:
         try:
             col_idx = [list(ab_sub.var_names).index(m) for m in unused_panel_names]
         except ValueError as e:
-            logging.error(
-                "SACE protein: marker not found in antibody panel — %s. "
-                "Cannot extract protein counts.", e
-            )
+            logging.error("SACE protein: marker not found in antibody panel — %s. " "Cannot extract protein counts.", e)
             return {}
 
         raw_layer = ab_sub.layers.get("raw_counts", ab_sub.X)
-        raw = raw_layer[:, col_idx] if hasattr(raw_layer, '__getitem__') else raw_layer
+        raw = raw_layer[:, col_idx] if hasattr(raw_layer, "__getitem__") else raw_layer
         spot_protein = np.asarray(raw, dtype=np.float64)
 
         # --- 4. Adapt cell_spot_map columns ---
@@ -2654,7 +2737,7 @@ class CitegeistModel:
             logging.info("SACE protein: warm-starting from functional_lambda")
 
         # --- 6. Call run_sace() ---
-        spot_type_protein, cell_adata, diagnostics = run_sace(
+        _, cell_adata, diagnostics = run_sace(
             spot_counts=spot_protein,
             proportions=self.results["cell_prop"],
             cell_assignments=cell_assignments,
@@ -2704,19 +2787,19 @@ class CitegeistModel:
 
         logging.info(
             "SACE protein complete: %d cells x %d markers, %d active pairs gated",
-            cell_protein.shape[0], cell_protein.shape[1], len(gmm_summary),
+            cell_protein.shape[0],
+            cell_protein.shape[1],
+            len(gmm_summary),
         )
 
         # Save outputs if output_folder configured
         if self.output_folder:
             np.save(
-                os.path.join(self.output_folder,
-                             f"{self.sample_name}_cell_protein.npy"),
+                os.path.join(self.output_folder, f"{self.sample_name}_cell_protein.npy"),
                 cell_protein,
             )
             gates_df.to_csv(
-                os.path.join(self.output_folder,
-                             f"{self.sample_name}_protein_gates.csv"),
+                os.path.join(self.output_folder, f"{self.sample_name}_protein_gates.csv"),
             )
             logging.info("SACE protein outputs saved to %s", self.output_folder)
 
@@ -2764,13 +2847,9 @@ class CitegeistModel:
         from .annotation.subtype_splitting import split_by_protein_gates  # pylint: disable=import-outside-toplevel
 
         if "sace_protein_gates" not in self.results:
-            raise ValueError(
-                "run_sace_protein() must be called before run_protein_subtype_split()."
-            )
+            raise ValueError("run_sace_protein() must be called before run_protein_subtype_split().")
         if "cell_prop" not in self.results:
-            raise ValueError(
-                "run_cell_proportion_model() must be called before run_protein_subtype_split()."
-            )
+            raise ValueError("run_cell_proportion_model() must be called before run_protein_subtype_split().")
 
         protein_gates_df = self.results["sace_protein_gates"]
         gmm_summary = self.results.get("sace_protein_gmm_summary", {})
@@ -2785,7 +2864,8 @@ class CitegeistModel:
 
         # Filter to pairs that actually fired gmm_bimodal — don't split on weak signal
         bimodal_pairs = [
-            (ct, mk) for ct, mk in validated_pairs
+            (ct, mk)
+            for ct, mk in validated_pairs
             if gmm_summary.get((ct, mk), {}).get("gating_method") == "gmm_bimodal"
         ]
         if not bimodal_pairs:
@@ -2798,7 +2878,8 @@ class CitegeistModel:
 
         logging.info(
             "run_protein_subtype_split: splitting on %d bimodal pairs: %s",
-            len(bimodal_pairs), bimodal_pairs,
+            len(bimodal_pairs),
+            bimodal_pairs,
         )
 
         updated_assignments, updated_proportions = split_by_protein_gates(
@@ -2821,7 +2902,7 @@ class CitegeistModel:
 
         return updated_assignments, updated_proportions
 
-    def build_validated_module3_5_annotations(self, assignments_df=None, benchmark_summary=None):
+    def build_validated_module3_5_annotations(self, _assignments_df=None, _benchmark_summary=None):
         """Build validated Module 3.5 annotations from SACE protein output.
 
         If SACE protein has been run, annotations are already per-cell in
@@ -2834,8 +2915,7 @@ class CitegeistModel:
             return gates
 
         logging.warning(
-            "build_validated_module3_5_annotations: no SACE protein output found. "
-            "Run run_sace_protein() first."
+            "build_validated_module3_5_annotations: no SACE protein output found. " "Run run_sace_protein() first."
         )
         return None
 

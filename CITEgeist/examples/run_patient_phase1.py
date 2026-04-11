@@ -66,9 +66,10 @@ def run_phase1(sample_name, output_dir, data_dir):
     pixel_size_um = 55.0 / spot_diameter_fullres  # Visium spots are 55 um
     stardist_scale = pixel_size_um / 0.25  # StarDist trained at ~0.25 um/px
     logger.info(
-        "Scale factors: spot_diameter_fullres=%.1f, pixel_size=%.3f um/px, "
-        "StarDist scale=%.2f",
-        spot_diameter_fullres, pixel_size_um, stardist_scale,
+        "Scale factors: spot_diameter_fullres=%.1f, pixel_size=%.3f um/px, " "StarDist scale=%.2f",
+        spot_diameter_fullres,
+        pixel_size_um,
+        stardist_scale,
     )
 
     # ----------------------------------------------------------------
@@ -89,6 +90,7 @@ def run_phase1(sample_name, output_dir, data_dir):
     # Load fullres H&E image — NEVER use hires (too small for 224px patches)
     # ----------------------------------------------------------------
     from PIL import Image
+
     Image.MAX_IMAGE_PIXELS = None  # Fullres images can exceed PIL default limit
 
     tif_path = spatial_dir / "tissue_fullres_image.tif"
@@ -99,8 +101,7 @@ def run_phase1(sample_name, output_dir, data_dir):
         fullres_raw = Image.open(png_path)
     else:
         raise FileNotFoundError(
-            f"Fullres H&E image not found at {spatial_dir}. "
-            "Expected tissue_fullres_image.tif or .png"
+            f"Fullres H&E image not found at {spatial_dir}. " "Expected tissue_fullres_image.tif or .png"
         )
     img_w, img_h = fullres_raw.size
     logger.info("Fullres image loaded: %d x %d px", img_h, img_w)
@@ -113,7 +114,10 @@ def run_phase1(sample_name, output_dir, data_dir):
     crop_x2 = min(img_w, int(tissue_cols.max()) + pad)
     logger.info(
         "Tissue crop: rows [%d:%d], cols [%d:%d]",
-        crop_y1, crop_y2, crop_x1, crop_x2,
+        crop_y1,
+        crop_y2,
+        crop_x1,
+        crop_x2,
     )
 
     fullres_crop = np.array(fullres_raw.crop((crop_x1, crop_y1, crop_x2, crop_y2)))
@@ -140,7 +144,10 @@ def run_phase1(sample_name, output_dir, data_dir):
     n_tiles_x = max(1, scaled_w // 1024)
     logger.info(
         "StarDist n_tiles: (%d, %d, 1) for scaled image %dx%d",
-        n_tiles_y, n_tiles_x, scaled_h, scaled_w,
+        n_tiles_y,
+        n_tiles_x,
+        scaled_h,
+        scaled_w,
     )
 
     segmenter = StarDistSegmenter(modality="he")
@@ -151,6 +158,7 @@ def run_phase1(sample_name, output_dir, data_dir):
     )
 
     import tensorflow as tf
+
     tf.keras.backend.clear_session()
     del segmenter
 
@@ -172,6 +180,7 @@ def run_phase1(sample_name, output_dir, data_dir):
     # Load spot coordinates and assign nuclei to spots
     # ----------------------------------------------------------------
     import squidpy as sq
+
     adata = sq.read.visium(
         str(sample_path),
         counts_file="filtered_feature_bc_matrix.h5",
@@ -192,7 +201,10 @@ def run_phase1(sample_name, output_dir, data_dir):
 
     spot_radius_px = spot_diameter_fullres / 2.0
     centroids_df = _assign_nuclei_to_spots(
-        centroids_df, spatial_coords, barcodes, spot_radius=spot_radius_px,
+        centroids_df,
+        spatial_coords,
+        barcodes,
+        spot_radius=spot_radius_px,
     )
 
     centroids_df.to_csv(seg_dir / "nuclei_centroids.csv", index=False)
@@ -239,7 +251,9 @@ def _assign_nuclei_to_spots(centroids_df, spatial_coords, barcodes, spot_radius=
         centroids_df = centroids_df[centroids_df["distance_to_spot"] <= spot_radius]
         logger.info(
             "Kept %d/%d nuclei within radius %.1f px",
-            len(centroids_df), n_before, spot_radius,
+            len(centroids_df),
+            n_before,
+            spot_radius,
         )
 
     return centroids_df
@@ -255,8 +269,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data-dir",
-        default="/ix1/alee/LO_LAB/General/Lab_Data/"
-                "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
+        default="/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
         help="Root of SpaceRanger processed_files directory",
     )
     args = parser.parse_args()

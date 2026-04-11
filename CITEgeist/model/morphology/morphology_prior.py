@@ -46,6 +46,7 @@ def compute_morphology_prior(
     oracle_props: np.ndarray,
     num_types: int,
     num_spots: int,
+    *,
     n_epochs: int = 100,
     device: str = "cpu",
     detection_mask: Optional[np.ndarray] = None,
@@ -70,11 +71,12 @@ def compute_morphology_prior(
     Returns:
         (I, T) preprocessed morphology prior.
     """
-    import torch
-    from .prototype_contrastive import (
+    import torch  # pylint: disable=import-outside-toplevel
+
+    from .prototype_contrastive import (  # pylint: disable=import-outside-toplevel
         PrototypeContrastiveModel,
-        train_prototype_contrastive,
         run_inference_tta,
+        train_prototype_contrastive,
     )
 
     patches_t = torch.from_numpy(patches).float()

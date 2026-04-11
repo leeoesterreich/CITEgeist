@@ -3,10 +3,13 @@
 Replaces heuristic per-cell GEX allocation with iterative Poisson-multinomial
 EM that learns spatially-varying type profiles and between-type RNA mass.
 """
+
 import logging
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
+import pandas as pd
+import scanpy as sc
 import scipy.sparse as sp
 from scipy.spatial import KDTree
 
@@ -94,6 +97,7 @@ def _m_step_B(E_x: np.ndarray) -> np.ndarray:
 def _m_step_mu(
     E_x: np.ndarray,
     K: sp.csr_matrix,
+    *,
     n_0: float = 10.0,
     eps: float = 1e-6,
     min_mass_threshold: float = 1.0,
@@ -133,12 +137,11 @@ def _m_step_mu(
         KB = np.array(K @ b_t).ravel()
         K_bt = K.multiply(b_t[np.newaxis, :])
         KB2 = np.array(K_bt.multiply(K_bt).sum(axis=1)).ravel()
-        n_eff = np.where(KB2 > 0, KB ** 2 / KB2, 0.0)
+        n_eff = np.where(KB2 > 0, KB**2 / KB2, 0.0)
         alpha[:, t] = n_eff / (n_eff + n_0)
 
     # Blend local + global
-    mu = (alpha[:, :, None] * mu_local
-          + (1 - alpha[:, :, None]) * mu_global[None, :, :])
+    mu = alpha[:, :, None] * mu_local + (1 - alpha[:, :, None]) * mu_global[None, :, :]
 
     # Normalize
     mu_sum = mu.sum(axis=2, keepdims=True)
@@ -151,8 +154,7 @@ def _m_step_mu(
             mu[:, t, :] = mu_prev[:, t, :]
         else:
             mu[:, t, :] = mu_global[t, :]
-        logger.debug("Type %d frozen (mass %.2f < %.2f)", t,
-                     total_mass_per_type[t], min_mass_threshold)
+        logger.debug("Type %d frozen (mass %.2f < %.2f)", t, total_mass_per_type[t], min_mass_threshold)
 
     return mu
 
@@ -175,6 +177,7 @@ def _marker_guided_init(
     antibody_names: List[str],
     cell_profile_dict: dict,
     type_names: List[str],
+    *,
     eps: float = 1e-10,
 ) -> tuple:
     """Marker-guided initialization for SACE mu_global.
@@ -199,13 +202,19 @@ def _marker_guided_init(
         - mu_global: (T, G) normalized type profiles, or None if degenerate
         - diagnostics: dict with status and mean_row_corr
     """
-    N, G = Y.shape
+    _, G = Y.shape
     T = len(type_names)
 
-    from ..deconvolution.detection_refinement import compute_gene_type_correlations
+    from ..deconvolution.detection_refinement import (  # pylint: disable=import-outside-toplevel
+        compute_gene_type_correlations,
+    )
 
     H = compute_gene_type_correlations(
-        Y, antibody_data, antibody_names, cell_profile_dict, type_names,
+        Y,
+        antibody_data,
+        antibody_names,
+        cell_profile_dict,
+        type_names,
     )
 
     # SACE needs 0.01 floor for profile init (shared helper clips to [0,1])
@@ -238,10 +247,11 @@ def _marker_guided_init(
 
 def run_sace(
     spot_counts: np.ndarray,
-    proportions: "pd.DataFrame",
+    proportions: pd.DataFrame,
     cell_assignments: Dict[str, str],
-    cell_spot_map: "pd.DataFrame",
+    cell_spot_map: pd.DataFrame,
     spot_coords: np.ndarray,
+    *,
     gene_names: List[str],
     spotwise_profiles_init: Optional[Dict[int, np.ndarray]] = None,
     n_0: float = 10.0,
@@ -254,7 +264,7 @@ def run_sace(
     antibody_data: Optional[np.ndarray] = None,
     antibody_names: Optional[List[str]] = None,
     cell_profile_dict: Optional[dict] = None,
-) -> Tuple[Dict[int, np.ndarray], "sc.AnnData", Dict]:
+) -> Tuple[Dict[int, np.ndarray], sc.AnnData, Dict]:
     """Run Spatially-Adaptive Compositional EM for per-cell GEX.
 
     Args:
@@ -284,8 +294,6 @@ def run_sace(
         - cell_adata: AnnData (n_cells, G)
         - diagnostics: Dict with convergence info
     """
-    import scanpy as sc
-
     # Handle sparse matrices (common when raw_counts layer is CSR)
     if hasattr(spot_counts, "toarray"):
         spot_counts = spot_counts.toarray()
@@ -295,8 +303,7 @@ def run_sace(
     T = len(type_names)
     props = proportions.values.astype(float)  # (N, T)
 
-    logger.info("SACE: N=%d spots, T=%d types, G=%d genes, %d cells",
-                N, T, G, len(cell_assignments))
+    logger.info("SACE: N=%d spots, T=%d types, G=%d genes, %d cells", N, T, G, len(cell_assignments))
 
     # --- Build kernel matrix ---
     K = build_kernel_matrix(spot_coords, bandwidth=bandwidth)
@@ -313,7 +320,7 @@ def run_sace(
         # Global: mean across spots weighted by proportions
         mu_global = np.zeros((T, G))
         for t in range(T):
-            weighted = (props[:, t:t+1] * all_profiles[:, t, :])
+            weighted = props[:, t : t + 1] * all_profiles[:, t, :]
             total_w = props[:, t].sum()
             if total_w > 0:
                 mu_global[t] = weighted.sum(axis=0) / total_w
@@ -326,20 +333,26 @@ def run_sace(
         # Try marker-guided init if antibody data is available
         if antibody_data is not None and cell_profile_dict is not None:
             mg_result = _marker_guided_init(
-                Y, antibody_data, antibody_names or [],
-                cell_profile_dict, type_names, eps=eps,
+                Y,
+                antibody_data,
+                antibody_names or [],
+                cell_profile_dict,
+                type_names,
+                eps=eps,
             )
             mu_global, mg_diag = mg_result
             if mu_global is not None:
-                logger.info("Using marker-guided init (mean_row_corr=%.4f)",
-                           mg_diag.get("mean_row_corr", 0))
+                logger.info(
+                    "Using marker-guided init (mean_row_corr=%.4f)",
+                    mg_diag.get("mean_row_corr", 0),
+                )
 
         if mu_global is None:
             # Fallback: confounded proportional init
             logger.info("Using confounded proportional init (no antibody data or marker-guided failed)")
             mu_global = np.zeros((T, G))
             for t in range(T):
-                weighted = props[:, t:t+1] * Y
+                weighted = props[:, t : t + 1] * Y
                 total_w = weighted.sum()
                 if total_w > 0:
                     mu_global[t] = weighted.sum(axis=0) / total_w
@@ -355,7 +368,7 @@ def run_sace(
 
     # --- EM loop ---
     ll_trace = []
-    change_trace = []
+    change_trace = []  # type: ignore[var-annotated]
     damping_activated = False
     E_x_prev = None
 
@@ -369,8 +382,7 @@ def run_sace(
             rel_change = max_change / max(E_x.max(), 1.0)
             change_trace.append(float(rel_change))
             if rel_change < tol:
-                logger.info("SACE converged at iteration %d (change=%.2e)",
-                            iteration, rel_change)
+                logger.info("SACE converged at iteration %d (change=%.2e)", iteration, rel_change)
                 break
         E_x_prev = E_x.copy()
 
@@ -383,12 +395,12 @@ def run_sace(
             if damping_eta >= 1.0:
                 damping_eta = 0.5
                 damping_activated = True
-                logger.warning("SACE: log-likelihood dropped at iter %d, "
-                               "enabling damping (eta=%.2f)", iteration, damping_eta)
+                logger.warning(
+                    "SACE: log-likelihood dropped at iter %d, " "enabling damping (eta=%.2f)", iteration, damping_eta
+                )
 
         # M-step: profiles
-        mu_new = _m_step_mu(E_x, K, n_0=n_0, eps=eps,
-                            min_mass_threshold=min_mass_threshold, mu_prev=mu)
+        mu_new = _m_step_mu(E_x, K, n_0=n_0, eps=eps, min_mass_threshold=min_mass_threshold, mu_prev=mu)
 
         # M-step: RNA mass
         B_new = _m_step_B(E_x)
@@ -402,8 +414,7 @@ def run_sace(
         mu_sum = np.where(mu_sum > 0, mu_sum, 1.0)
         mu = mu / mu_sum
 
-        logger.info("SACE iter %d: LL=%.1f%s", iteration, ll,
-                     f" change={change_trace[-1]:.2e}" if change_trace else "")
+        logger.info("SACE iter %d: LL=%.1f%s", iteration, ll, f" change={change_trace[-1]:.2e}" if change_trace else "")
 
     # Final E-step with converged parameters.
     # Skip when max_iter <= 1: the loop's E-step already used the init mu,
@@ -420,8 +431,15 @@ def run_sace(
 
     # 2. Per-cell AnnData
     cell_adata = _assemble_cell_adata(
-        E_x, B, mu, K, n_0,
-        cell_assignments, cell_spot_map, gene_names, type_names,
+        E_x,
+        B,
+        mu,
+        K,
+        n_0,
+        cell_assignments,
+        cell_spot_map,
+        gene_names,
+        type_names,
     )
 
     # 3. Diagnostics
@@ -436,21 +454,18 @@ def run_sace(
     return spot_type_gex, cell_adata, diagnostics
 
 
-def _assemble_cell_adata(
-    E_x: np.ndarray,           # (N, T, G) final allocated counts
-    B: np.ndarray,             # (N, T)
-    mu: np.ndarray,            # (N, T, G)
-    K: sp.csr_matrix,          # (N, N)
+def _assemble_cell_adata(  # pylint: disable=too-many-positional-arguments
+    E_x: np.ndarray,  # (N, T, G) final allocated counts
+    B: np.ndarray,  # (N, T)
+    mu: np.ndarray,  # (N, T, G)
+    K: sp.csr_matrix,  # (N, N)
     n_0: float,
     cell_assignments: Dict[str, str],
-    cell_spot_map: "pd.DataFrame",
+    cell_spot_map: pd.DataFrame,
     gene_names: List[str],
     type_names: List[str],
-) -> "sc.AnnData":
+) -> sc.AnnData:
     """Assemble per-cell AnnData from SACE results."""
-    import pandas as pd
-    import scanpy as sc
-
     N, T, G = E_x.shape
     type_to_idx = {t: i for i, t in enumerate(type_names)}
 
@@ -510,7 +525,7 @@ def _assemble_cell_adata(
         KB = np.array(K @ b_t).ravel()
         K_bt = K.multiply(b_t[np.newaxis, :])
         KB2 = np.array(K_bt.multiply(K_bt).sum(axis=1)).ravel()
-        n_eff_arr[:, t] = np.where(KB2 > 0, KB ** 2 / KB2, 0.0)
+        n_eff_arr[:, t] = np.where(KB2 > 0, KB**2 / KB2, 0.0)
 
     # Shrinkage alpha per (spot, type)
     alpha_arr = n_eff_arr / (n_eff_arr + n_0)
@@ -520,15 +535,12 @@ def _assemble_cell_adata(
         "spot_barcode": cell_spot_map["spot_barcode"].values,
         "cell_type": [cell_assignments[cid] for cid in cell_ids],
         "allocation_entropy": entropy[spot_indices],
-        "n_eff_type": [n_eff_arr[spot_indices[i], cell_type_indices[i]]
-                       for i in range(n_cells)],
-        "shrinkage_alpha": [alpha_arr[spot_indices[i], cell_type_indices[i]]
-                            for i in range(n_cells)],
-        "B_st": [B[spot_indices[i], cell_type_indices[i]]
-                 for i in range(n_cells)],
+        "n_eff_type": [n_eff_arr[spot_indices[i], cell_type_indices[i]] for i in range(n_cells)],
+        "shrinkage_alpha": [alpha_arr[spot_indices[i], cell_type_indices[i]] for i in range(n_cells)],
+        "B_st": [B[spot_indices[i], cell_type_indices[i]] for i in range(n_cells)],
     }
     obs = pd.DataFrame(obs_data)
-    obs.index = obs["cell_id"]
+    obs.index = pd.Index(obs["cell_id"])
 
     coords = cell_spot_map[["x", "y"]].values.astype(float)
 

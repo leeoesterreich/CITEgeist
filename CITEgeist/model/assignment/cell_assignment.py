@@ -130,6 +130,7 @@ def assign_cells_to_types(
     cell_types: List[str],
     morph_scores: Optional[np.ndarray],
     morphology_weight: float,
+    *,
     spot_proportions: pd.DataFrame,
     cell_ids: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
@@ -180,7 +181,9 @@ def assign_cells_to_types(
             if n_expected > 0 and abs(n_actual - n_expected) / n_expected > 0.20:
                 logger.warning(
                     "Spot %s: nuclei_counts=%d, cells_in_spot=%d (%.0f%% disagreement)",
-                    spot_id, n_expected, n_actual,
+                    spot_id,
+                    n_expected,
+                    n_actual,
                     100 * abs(n_actual - n_expected) / n_expected,
                 )
             raw_counts = round_counts_largest_remainder(
@@ -232,6 +235,7 @@ def fit_morphology_scores(
     cell_to_spot: np.ndarray,
     oracle_props: np.ndarray,
     num_types: int,
+    *,
     n_epochs: int = 100,
     device: str = "cpu",
     seed: int = 42,
@@ -260,11 +264,12 @@ def fit_morphology_scores(
     Returns:
         (C, T) numpy array of per-cell type probabilities (rows sum to 1).
     """
-    import torch
-    from ..morphology.prototype_contrastive import (
+    import torch  # pylint: disable=import-outside-toplevel
+
+    from ..morphology.prototype_contrastive import (  # pylint: disable=import-outside-toplevel
         PrototypeContrastiveModel,
-        train_prototype_contrastive,
         run_inference_tta,
+        train_prototype_contrastive,
     )
 
     patches_tensor = torch.from_numpy(embeddings).float()
@@ -313,6 +318,7 @@ def bayesian_assign_cells(
     cell_to_spot: np.ndarray,
     proportion_prior: np.ndarray,
     detection_mask: np.ndarray,
+    *,
     cell_ids: Optional[np.ndarray] = None,
     spot_ids: Optional[list] = None,
     cell_types: Optional[list] = None,
@@ -386,6 +392,7 @@ def assign_cells(
     cell_prop: pd.DataFrame,
     nuclei_counts: pd.Series,
     cell_to_spot: np.ndarray,
+    *,
     cell_ids: Optional[np.ndarray] = None,
     morphology_embeddings: Optional[np.ndarray] = None,
     patches: Optional[np.ndarray] = None,
@@ -447,18 +454,12 @@ def assign_cells(
     # Validate alignment
     max_spot_idx = int(cell_to_spot.max())
     if max_spot_idx >= len(cell_prop):
-        raise ValueError(
-            f"cell_to_spot max index {max_spot_idx} >= number of spots {len(cell_prop)}"
-        )
+        raise ValueError(f"cell_to_spot max index {max_spot_idx} >= number of spots {len(cell_prop)}")
 
-    logger.info(
-        "assign_cells: %d cells, %d spots, %d types", n_cells, len(cell_prop), len(cell_types)
-    )
+    logger.info("assign_cells: %d cells, %d spots, %d types", n_cells, len(cell_prop), len(cell_types))
 
     # --- Stage 1: Discretize ---
-    integer_counts = discretize_proportions(
-        cell_prop, nuclei_counts, existing_integer_counts
-    )
+    integer_counts = discretize_proportions(cell_prop, nuclei_counts, existing_integer_counts)
     logger.info("Stage 1: Discretized proportions to integer counts")
 
     # --- Stage 2: Morphology scores (optional) ---
@@ -485,9 +486,7 @@ def assign_cells(
             device=device,
             seed=random_state,
         )
-        logger.info(
-            "Stage 2: Fitted morphology scores (%d cells, %d types)", *morph_scores.shape
-        )
+        logger.info("Stage 2: Fitted morphology scores (%d cells, %d types)", *morph_scores.shape)
     else:
         logger.info("Stage 2: Skipped (no morphology provided or weight=0)")
 
@@ -495,8 +494,10 @@ def assign_cells(
     if assignment_method == "bayesian":
         effective_morph = morph_scores_precomputed if morph_scores_precomputed is not None else morph_scores
         if effective_morph is None:
-            raise ValueError("Morphology scores required for bayesian assignment. "
-                             "Provide morphology_embeddings, patches, or morph_scores_precomputed.")
+            raise ValueError(
+                "Morphology scores required for bayesian assignment. "
+                "Provide morphology_embeddings, patches, or morph_scores_precomputed."
+            )
         if detection_mask is None:
             raise ValueError("detection_mask required for bayesian assignment.")
         effective_prior = proportion_prior if proportion_prior is not None else cell_prop.values
@@ -551,8 +552,7 @@ def extract_embeddings(
     # Validate patch shape
     if patches.ndim != 4 or patches.shape[2] != 96 or patches.shape[3] != 96:
         raise ValueError(
-            f"Patches must be (C, ch, 96, 96), got {patches.shape}. "
-            "Only DAPI 96x96 patches are supported in v1."
+            f"Patches must be (C, ch, 96, 96), got {patches.shape}. " "Only DAPI 96x96 patches are supported in v1."
         )
     in_channels = patches.shape[1]
     if in_channels not in (2, 3):
@@ -568,7 +568,7 @@ def extract_embeddings(
     # Check cache
     if os.path.exists(cache_path):
         cached = np.load(cache_path)
-        if cached.shape == (len(patches), 384):
+        if cached.shape == (len(patches), 384):  # pylint: disable=no-else-return
             logger.info("Loading cached embeddings from %s", cache_path)
             return cached
         else:
@@ -579,7 +579,7 @@ def extract_embeddings(
             )
 
     # Extract via DAPIBackbone
-    from ..morphology.morphology_backbone import DAPIBackbone
+    from ..morphology.morphology_backbone import DAPIBackbone  # pylint: disable=import-outside-toplevel
 
     backbone = DAPIBackbone(
         checkpoint=encoder_checkpoint,

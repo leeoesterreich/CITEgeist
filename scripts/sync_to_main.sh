@@ -55,6 +55,44 @@ ALLOWLIST=(
   ".github/"
 )
 
+# ── Wipe .github/workflows/ so stale-on-main-only workflow files don't survive ──
+# git checkout only copies/updates; it never deletes files present on main but absent from dev.
+if git ls-files .github/workflows/ | grep -q .; then
+  git ls-files .github/workflows/ | xargs git rm --cached
+  rm -rf "${REPO_ROOT}/.github/workflows/"
+  echo "Cleared .github/workflows/ (will be restored from dev)"
+fi
+
+# ── Wipe stale directories that should not be on main ──
+# These are untracked on dev but survive sync because git checkout copies but never deletes.
+STALE_WIPE_DIRS=(
+  "CITEgeist/model/_archive/"
+  "CITEgeist/junk/"
+  "CITEgeist/examples/_archive/"
+  "CITEgeist/tests/"
+)
+for dir in "${STALE_WIPE_DIRS[@]}"; do
+  if git ls-files "${dir}" | grep -q .; then
+    git ls-files "${dir}" | xargs git rm -f
+    echo "Cleared stale: ${dir}"
+  fi
+done
+
+# ── Wipe root-level model .py files that were git-mv'd into subpackages on dev ──
+# Uses git ls-files (tracked-only) to avoid failing on untracked working-tree files.
+KEEP_MODEL_FILES=("__init__.py" "citegeist_model.py" "checkpoints.py" "utils.py" "unified_config.py" "module2_proposal_builder.py" "proposal_review_loader.py")
+for f in $(git ls-files 'CITEgeist/model/*.py'); do
+  base=$(basename "$f")
+  dir=$(dirname "$f")
+  [[ "$dir" != "CITEgeist/model" ]] && continue
+  keep=false
+  for k in "${KEEP_MODEL_FILES[@]}"; do [[ "$base" == "$k" ]] && keep=true && break; done
+  if ! $keep; then
+    git rm -f "$f"
+    echo "Cleared stale root model file: $f"
+  fi
+done
+
 echo "Copying allowlisted paths from dev..."
 for path in "${ALLOWLIST[@]}"; do
   # Strip trailing slash for git checkout

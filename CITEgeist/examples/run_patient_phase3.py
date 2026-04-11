@@ -30,8 +30,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import numpy as np
 import pandas as pd
 import torch
-
-from model.unified_config import VIT_MODEL, PATCH_SIZE
+from model.unified_config import PATCH_SIZE, VIT_MODEL
 from model.vit_extractor import ViTFeatureExtractor
 
 
@@ -61,10 +60,7 @@ def run_phase3(sample_name, output_dir, seg_dir, data_dir):
     # ----------------------------------------------------------------
     phase1_marker = seg_dir / sample_name / ".phase1_complete"
     if not phase1_marker.exists():
-        raise RuntimeError(
-            f"Phase 1 not complete for {sample_name}. "
-            f"Expected marker: {phase1_marker}"
-        )
+        raise RuntimeError(f"Phase 1 not complete for {sample_name}. " f"Expected marker: {phase1_marker}")
 
     seg_sample_dir = seg_dir / sample_name / "segmentation"
 
@@ -92,6 +88,7 @@ def run_phase3(sample_name, output_dir, seg_dir, data_dir):
     # Load fullres H&E image (NEVER use hires — too small for 224px patches)
     # ----------------------------------------------------------------
     from PIL import Image
+
     Image.MAX_IMAGE_PIXELS = None
 
     sample_path = data_dir / sample_name / "outs" / "spatial"
@@ -103,8 +100,7 @@ def run_phase3(sample_name, output_dir, seg_dir, data_dir):
         fullres_raw = Image.open(png_path)
     else:
         raise FileNotFoundError(
-            f"Fullres H&E image not found at {sample_path}. "
-            "Expected tissue_fullres_image.tif or .png"
+            f"Fullres H&E image not found at {sample_path}. " "Expected tissue_fullres_image.tif or .png"
         )
     fullres_img = np.array(fullres_raw)
     del fullres_raw
@@ -118,7 +114,11 @@ def run_phase3(sample_name, output_dir, seg_dir, data_dir):
     # Extract 224px patches centred on each nucleus (fullres coords)
     # ----------------------------------------------------------------
     patches, valid_ids = _extract_patches(
-        fullres_img, centroids_df, crop_x1, crop_y1, PATCH_SIZE,
+        fullres_img,
+        centroids_df,
+        crop_x1,
+        crop_y1,
+        PATCH_SIZE,
     )
 
     if len(patches) == 0:
@@ -199,9 +199,7 @@ def _extract_patches(image, centroids_df, crop_x1, crop_y1, patch_size=224):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Patient pipeline Phase 3: ViT feature extraction"
-    )
+    parser = argparse.ArgumentParser(description="Patient pipeline Phase 3: ViT feature extraction")
     parser.add_argument("--sample", required=True, help="Sample name, e.g. HCC22-088-P1-S1")
     parser.add_argument(
         "--output-dir",
@@ -215,8 +213,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data-dir",
-        default="/ix1/alee/LO_LAB/General/Lab_Data/"
-                "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
+        default="/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
         help="Root of SpaceRanger processed_files directory",
     )
     args = parser.parse_args()

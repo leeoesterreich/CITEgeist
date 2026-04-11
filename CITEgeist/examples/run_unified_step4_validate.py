@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import sys
-from pathlib import Path
 
 import pandas as pd
 
@@ -18,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from model.unified_config import OUTPUT_BASE, RNA_MARKERS
 from model.marker_validation import compute_marker_scores, summarize_validation
+from model.unified_config import OUTPUT_BASE, RNA_MARKERS
 
 
 def run_step4(sample_name):
@@ -52,8 +51,10 @@ def run_step4(sample_name):
     logger.info(f"Overall fraction correct: {summary['overall']['fraction_correct']:.3f}")
     logger.info(f"Overall median marker score: {summary['overall']['median_marker_score']:.3f}")
     for ct, metrics in summary["per_type"].items():
-        logger.info(f"  {ct}: {metrics['fraction_correct']:.3f} correct "
-                     f"({metrics['n_nuclei']} nuclei, median score={metrics['median_marker_score']:.2f})")
+        logger.info(
+            f"  {ct}: {metrics['fraction_correct']:.3f} correct "
+            f"({metrics['n_nuclei']} nuclei, median score={metrics['median_marker_score']:.2f})"
+        )
 
     step4_marker = OUTPUT_BASE / sample_name / ".step4_complete"
     step4_marker.touch()

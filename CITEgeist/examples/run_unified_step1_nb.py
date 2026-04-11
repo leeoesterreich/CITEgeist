@@ -19,7 +19,6 @@ Usage:
 """
 import argparse
 import logging
-import os
 import sys
 import time
 from pathlib import Path
@@ -38,11 +37,10 @@ REPO_ROOT = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist")
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "CITEgeist"))
 
-import scanpy as sc
 import squidpy as sq
-
 from model import CitegeistModel
 from model.unified_config import CELL_PROFILES_NESTED
+
 from CITEgeist.model.nb_deconvolution import run_nb_optimization
 from CITEgeist.model.nb_initialization import (
     initialize_background,
@@ -53,10 +51,7 @@ from CITEgeist.model.nb_initialization import (
 # ---------------------------------------------------------------------------
 # Patient data path
 # ---------------------------------------------------------------------------
-DATA_DIR = Path(
-    "/ix1/alee/LO_LAB/General/Lab_Data/"
-    "20250210_CITEGeistPublicData_GEO_Alex/processed_files"
-)
+DATA_DIR = Path("/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 
 # ---------------------------------------------------------------------------
 # Patient marker-to-type config for NB model
@@ -77,17 +72,17 @@ PATIENT_CELL_TYPES = [
 ]
 
 PATIENT_MARKER_TYPE_TABLE = {
-    "EPCAM":   [("Cancer", "strong")],
-    "CD68":    [("Macrophages", "strong")],
-    "CD163":   [("Macrophages", "strong")],
-    "CD3E":    [("CD8_T_Cells", "strong"), ("CD4_T_Cells", "strong")],
-    "CD8A":    [("CD8_T_Cells", "strong")],
-    "CD4":     [("CD4_T_Cells", "strong")],
-    "CD19":    [("B_Cells", "strong")],
-    "PECAM1":  [("Endothelial", "strong")],
-    "ACTA2":   [("Fibroblasts", "strong")],
-    "CD14":    [("Monocytes", "strong")],
-    "ITGAX":   [("Dendritic_Cells", "strong"), ("Macrophages", "soft")],
+    "EPCAM": [("Cancer", "strong")],
+    "CD68": [("Macrophages", "strong")],
+    "CD163": [("Macrophages", "strong")],
+    "CD3E": [("CD8_T_Cells", "strong"), ("CD4_T_Cells", "strong")],
+    "CD8A": [("CD8_T_Cells", "strong")],
+    "CD4": [("CD4_T_Cells", "strong")],
+    "CD19": [("B_Cells", "strong")],
+    "PECAM1": [("Endothelial", "strong")],
+    "ACTA2": [("Fibroblasts", "strong")],
+    "CD14": [("Monocytes", "strong")],
+    "ITGAX": [("Dendritic_Cells", "strong"), ("Macrophages", "soft")],
     "HLA-DRA": [("Dendritic_Cells", "strong"), ("B_Cells", "soft"), ("Macrophages", "soft")],
 }
 
@@ -186,7 +181,8 @@ def run_step1_nb(sample_name, output_dir=None):
             if n_nan > 0:
                 logger.warning(
                     "Filtering %d spots with NaN spatial coords from %s",
-                    n_nan, adata_attr,
+                    n_nan,
+                    adata_attr,
                 )
                 setattr(model, adata_attr, ad[finite_mask].copy())
 
@@ -209,7 +205,8 @@ def run_step1_nb(sample_name, output_dir=None):
 
     qp_props = model.results["cell_prop"]
     logger.info(
-        "QP proportions: %d spots x %d types", *qp_props.shape,
+        "QP proportions: %d spots x %d types",
+        *qp_props.shape,
     )
 
     # ------------------------------------------------------------------
@@ -223,29 +220,26 @@ def run_step1_nb(sample_name, output_dir=None):
     M = len(markers)
     logger.info(
         "NB config: %d types x %d markers, %d active pairs",
-        T, M, int(active_mask.sum()),
+        T,
+        M,
+        int(active_mask.sum()),
     )
     logger.info("Markers found: %s", markers)
 
     if M == 0:
-        raise RuntimeError(
-            "No NB markers found in antibody panel. "
-            f"Available: {available_markers}"
-        )
+        raise RuntimeError("No NB markers found in antibody panel. " f"Available: {available_markers}")
 
     # ------------------------------------------------------------------
     # 4. Extract raw counts for NB markers
     # ------------------------------------------------------------------
     raw = model.antibody_capture_adata.layers.get("raw_counts", None)
     if raw is None:
-        raise RuntimeError(
-            "No raw_counts layer — preprocess_antibody() must store it"
-        )
+        raise RuntimeError("No raw_counts layer — preprocess_antibody() must store it")
     raw = raw.toarray() if hasattr(raw, "toarray") else np.asarray(raw)
 
     S = raw[:, raw_indices].astype(np.float64)
     S = np.maximum(S, 0.0)
-    I = S.shape[0]
+    I = S.shape[0]  # noqa: E741 — number of spots (NB model notation)
 
     # ------------------------------------------------------------------
     # 5. Prepare cellularity (N=1, no nuclei counts for patient data)
@@ -276,7 +270,10 @@ def run_step1_nb(sample_name, output_dir=None):
 
     logger.info(
         "NB init: %d spots, median_N=%.1f, lam_nz_mean=%.2f, b_mean=%.1f",
-        I, median_N, lam_init[active_mask].mean(), b_init.mean(),
+        I,
+        median_N,
+        lam_init[active_mask].mean(),
+        b_init.mean(),
     )
 
     result = run_nb_optimization(
@@ -300,7 +297,9 @@ def run_step1_nb(sample_name, output_dir=None):
     nb_time = time.time() - t1
     n_iters_run = len(result["held_out_nll"])
     logger.info(
-        "NB optimization done in %.1fs (%d iterations)", nb_time, n_iters_run,
+        "NB optimization done in %.1fs (%d iterations)",
+        nb_time,
+        n_iters_run,
     )
 
     # ------------------------------------------------------------------
@@ -308,7 +307,9 @@ def run_step1_nb(sample_name, output_dir=None):
     # ------------------------------------------------------------------
     spot_names = model.antibody_capture_adata.obs_names
     nb_props = pd.DataFrame(
-        result["proportions"], index=spot_names, columns=type_names,
+        result["proportions"],
+        index=spot_names,
+        columns=type_names,
     )
 
     # Ensure all QP columns present (should already match)
@@ -361,7 +362,10 @@ def run_step1_nb(sample_name, output_dir=None):
     marker_file.touch()
     logger.info(
         "Step 1 NB complete for %s (QP=%.1fs, NB=%.1fs, GEX=%.1fs)",
-        sample_name, qp_time, nb_time, gex_time,
+        sample_name,
+        qp_time,
+        nb_time,
+        gex_time,
     )
 
 
@@ -371,7 +375,8 @@ if __name__ == "__main__":
     )
     parser.add_argument("--sample", required=True, help="Patient sample name")
     parser.add_argument(
-        "--output-dir", default=None,
+        "--output-dir",
+        default=None,
         help="Output directory (default: output/module3_nb/)",
     )
     args = parser.parse_args()

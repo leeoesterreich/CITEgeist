@@ -22,11 +22,12 @@ Example usage:
     >>> print(features.shape)  # (100, 384)
 """
 
+from pathlib import Path
+from typing import Optional, Union
+
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-from typing import Optional, Union
-from pathlib import Path
 
 
 class ViTFeatureExtractor(nn.Module):
@@ -47,10 +48,10 @@ class ViTFeatureExtractor(nn.Module):
 
     def __init__(
         self,
-        model_name: str = 'vit_small_patch16_224',
+        model_name: str = "vit_small_patch16_224",
         pretrained: bool = True,
         weights_path: Optional[Path] = None,
-        device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+        device: str = "cuda" if torch.cuda.is_available() else "cpu",
     ):
         """Initialize ViT feature extractor.
 
@@ -64,7 +65,7 @@ class ViTFeatureExtractor(nn.Module):
             device: Device to run on ('cuda' or 'cpu')
         """
         super().__init__()
-        import timm
+        import timm  # pylint: disable=import-outside-toplevel
 
         # Create model without classification head
         self.model = timm.create_model(
@@ -79,12 +80,12 @@ class ViTFeatureExtractor(nn.Module):
             if not weights_path.exists():
                 raise FileNotFoundError(f"Weights file not found: {weights_path}")
 
-            state_dict = torch.load(weights_path, map_location='cpu')
+            state_dict = torch.load(weights_path, map_location="cpu")
             # Handle different state dict formats
-            if 'model' in state_dict:
-                state_dict = state_dict['model']
-            elif 'state_dict' in state_dict:
-                state_dict = state_dict['state_dict']
+            if "model" in state_dict:
+                state_dict = state_dict["model"]
+            elif "state_dict" in state_dict:
+                state_dict = state_dict["state_dict"]
             self.model.load_state_dict(state_dict, strict=False)
 
         self.model.eval()
@@ -92,14 +93,8 @@ class ViTFeatureExtractor(nn.Module):
         self.embed_dim = self.model.num_features
 
         # Register normalization as buffer
-        self.register_buffer(
-            'mean',
-            torch.tensor(self.IMAGENET_MEAN).view(1, 3, 1, 1)
-        )
-        self.register_buffer(
-            'std',
-            torch.tensor(self.IMAGENET_STD).view(1, 3, 1, 1)
-        )
+        self.register_buffer("mean", torch.tensor(self.IMAGENET_MEAN).view(1, 3, 1, 1))
+        self.register_buffer("std", torch.tensor(self.IMAGENET_STD).view(1, 3, 1, 1))
 
         # Move entire module (including model and buffers) to device
         self.to(device)
@@ -152,12 +147,12 @@ class ViTFeatureExtractor(nn.Module):
 
         # Handle empty input
         if n_patches == 0:
-            return np.empty((0, self.embed_dim), dtype=np.float32)
+            return np.empty((0, int(self.embed_dim)), dtype=np.float32)
 
         features = []
 
         for i in range(0, n_patches, batch_size):
-            batch = patches[i:i + batch_size]
+            batch = patches[i : i + batch_size]
             batch_tensor = torch.from_numpy(batch).to(self.device)
             batch_features = self.forward(batch_tensor)
             features.append(batch_features.cpu().numpy())
@@ -167,7 +162,7 @@ class ViTFeatureExtractor(nn.Module):
 
 def load_uni_extractor(
     weights_path: Union[str, Path],
-    device: str = 'cuda' if torch.cuda.is_available() else 'cpu',
+    device: str = "cuda" if torch.cuda.is_available() else "cpu",
 ) -> ViTFeatureExtractor:
     """Load UNI foundation model.
 
@@ -190,7 +185,7 @@ def load_uni_extractor(
         FileNotFoundError: If weights_path does not exist
     """
     return ViTFeatureExtractor(
-        model_name='vit_large_patch16_224',
+        model_name="vit_large_patch16_224",
         pretrained=False,
         weights_path=Path(weights_path),
         device=device,

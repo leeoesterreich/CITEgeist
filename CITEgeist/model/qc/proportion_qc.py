@@ -11,7 +11,9 @@ from __future__ import annotations
 import logging
 
 import matplotlib
+
 matplotlib.use("Agg")
+# pylint: disable=wrong-import-position,wrong-import-order
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -19,7 +21,9 @@ from anndata import AnnData
 from scipy.spatial.distance import jensenshannon
 from scipy.stats import pearsonr, spearmanr
 
-from . import QCResult
+from ._types import QCResult
+
+# pylint: enable=wrong-import-position,wrong-import-order
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +70,11 @@ def compute_proportion_correlations(
         p, g = pred[ct].values, gt[ct].values
         if len(p) < 3 or np.std(g) < 1e-10:
             results[ct] = {
-                "pearson_r": np.nan, "spearman_rho": np.nan,
-                "rmse": np.nan, "mae": np.nan, "pearson_spearman_gap": np.nan,
+                "pearson_r": np.nan,
+                "spearman_rho": np.nan,
+                "rmse": np.nan,
+                "mae": np.nan,
+                "pearson_spearman_gap": np.nan,
             }
             continue
         pr, _ = pearsonr(p, g)
@@ -75,8 +82,10 @@ def compute_proportion_correlations(
         rmse = np.sqrt(np.mean((p - g) ** 2))
         mae = np.mean(np.abs(p - g))
         results[ct] = {
-            "pearson_r": pr, "spearman_rho": sr,
-            "rmse": rmse, "mae": mae,
+            "pearson_r": pr,
+            "spearman_rho": sr,
+            "rmse": rmse,
+            "mae": float(mae),
             "pearson_spearman_gap": abs(pr - sr),
         }
 
@@ -86,7 +95,8 @@ def compute_proportion_correlations(
     pr_all, _ = pearsonr(p_flat, g_flat)
     sr_all, _ = spearmanr(p_flat, g_flat)
     results["overall"] = {
-        "pearson_r": pr_all, "spearman_rho": sr_all,
+        "pearson_r": pr_all,
+        "spearman_rho": sr_all,
         "rmse": np.sqrt(np.mean((p_flat - g_flat) ** 2)),
         "mae": np.mean(np.abs(p_flat - g_flat)),
         "pearson_spearman_gap": abs(pr_all - sr_all),
@@ -102,7 +112,7 @@ def compute_proportion_correlations(
         p_row = p_row / p_row.sum()
         g_row = g_row / g_row.sum()
         jsd_vals.append(jensenshannon(p_row, g_row) ** 2)
-    results["jsd_per_spot"] = np.array(jsd_vals)
+    results["jsd_per_spot"] = np.array(jsd_vals)  # type: ignore[assignment]
     results["mean_jsd"] = np.mean(jsd_vals)
 
     return results
@@ -168,7 +178,7 @@ def compute_discrete_round_trip(
     n_skipped = (~valid).sum()
 
     if n_skipped > 0:
-        logger.info(f"Discrete round-trip: skipping {n_skipped} spots with zero nuclei")
+        logger.info("Discrete round-trip: skipping %s spots with zero nuclei", n_skipped)
 
     discrete_props = counts.loc[valid].div(totals[valid], axis=0)
 
@@ -274,9 +284,14 @@ def _plot_spatial_errors(
             residual = pred.loc[common, ct].values - gt.loc[common, ct].values
             vmax = max(abs(residual.min()), abs(residual.max()))
             scatter = ax.scatter(
-                coords[:, 0], coords[:, 1],
-                c=residual, cmap="RdBu_r", vmin=-vmax, vmax=vmax,
-                s=15, edgecolors="none",
+                coords[:, 0],
+                coords[:, 1],
+                c=residual,
+                cmap="RdBu_r",
+                vmin=-vmax,
+                vmax=vmax,
+                s=15,
+                edgecolors="none",
             )
             fig.colorbar(scatter, ax=ax, shrink=0.7, label="Pred − GT")
             ax.set_title(f"{ct} Residual")
@@ -367,10 +382,7 @@ def run_proportion_qc(
         if gap and gap > 0.15:
             flags.append(f"{ct} Spearman-Pearson gap = {gap:.3f} — check outliers")
     if round_trip["n_skipped_spots"] > 0:
-        flags.append(
-            f"Discrete round-trip: {round_trip['n_skipped_spots']} spots "
-            f"with zero nuclei skipped"
-        )
+        flags.append(f"Discrete round-trip: {round_trip['n_skipped_spots']} spots " f"with zero nuclei skipped")
 
     fig_scatter = _plot_scatter_grid(pred, gt, correlations)
 

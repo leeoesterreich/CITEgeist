@@ -42,7 +42,7 @@ try:
         SpatialProgram,
     )
 except ImportError:
-    from anchored_program_discovery import (
+    from anchored_program_discovery import (  # type: ignore[no-redef]
         AnchoredProgramDiscoveryResult,
         AnchoredProgramResult,
         BivariateProgramResult,
@@ -193,9 +193,7 @@ class IntegrationResult:
         if self.aligned_programs:
             lines.append("")
             lines.append("Top conserved programs:")
-            sorted_progs = sorted(
-                self.aligned_programs, key=lambda p: p.conservation_score, reverse=True
-            )
+            sorted_progs = sorted(self.aligned_programs, key=lambda p: p.conservation_score, reverse=True)
             for prog in sorted_progs[:5]:
                 lines.append(
                     f"  {prog.program_id} ({prog.cell_type}): "
@@ -207,9 +205,7 @@ class IntegrationResult:
         if self.conserved_relationships:
             lines.append("")
             lines.append("Top conserved relationships:")
-            sorted_rels = sorted(
-                self.conserved_relationships, key=lambda r: r.conservation_score, reverse=True
-            )
+            sorted_rels = sorted(self.conserved_relationships, key=lambda r: r.conservation_score, reverse=True)
             for rel in sorted_rels[:5]:
                 lines.append(
                     f"  {rel.program1_id} <-> {rel.program2_id}: "
@@ -223,30 +219,34 @@ class IntegrationResult:
         """Convert aligned programs to DataFrame."""
         records = []
         for prog in self.aligned_programs:
-            records.append({
-                "program_id": prog.program_id,
-                "cell_type": prog.cell_type,
-                "n_samples": len(prog.samples_present),
-                "conservation_score": prog.conservation_score,
-                "samples": ",".join(prog.samples_present),
-                "top_genes": ",".join(prog.top_genes[:10]),
-            })
+            records.append(
+                {
+                    "program_id": prog.program_id,
+                    "cell_type": prog.cell_type,
+                    "n_samples": len(prog.samples_present),
+                    "conservation_score": prog.conservation_score,
+                    "samples": ",".join(prog.samples_present),
+                    "top_genes": ",".join(prog.top_genes[:10]),
+                }
+            )
         return pd.DataFrame(records)
 
     def to_relationships_dataframe(self) -> pd.DataFrame:
         """Convert conserved relationships to DataFrame."""
         records = []
         for rel in self.conserved_relationships:
-            records.append({
-                "program1_id": rel.program1_id,
-                "program2_id": rel.program2_id,
-                "n_samples": len(rel.samples_with_relationship),
-                "conservation_score": rel.conservation_score,
-                "mean_bivariate_i": rel.mean_bivariate_i,
-                "std_bivariate_i": rel.std_bivariate_i,
-                "relationship_type": rel.relationship_type,
-                "samples": ",".join(rel.samples_with_relationship),
-            })
+            records.append(
+                {
+                    "program1_id": rel.program1_id,
+                    "program2_id": rel.program2_id,
+                    "n_samples": len(rel.samples_with_relationship),
+                    "conservation_score": rel.conservation_score,
+                    "mean_bivariate_i": rel.mean_bivariate_i,
+                    "std_bivariate_i": rel.std_bivariate_i,
+                    "relationship_type": rel.relationship_type,
+                    "samples": ",".join(rel.samples_with_relationship),
+                }
+            )
         return pd.DataFrame(records)
 
 
@@ -276,12 +276,12 @@ def load_module4_from_csv(
     df = pd.read_csv(csv_path)
 
     # Check if first column is an unnamed index
-    if df.columns[0] == '' or df.columns[0].startswith('Unnamed'):
+    if df.columns[0] == "" or df.columns[0].startswith("Unnamed"):
         df = pd.read_csv(csv_path, index_col=0)
 
     # Ensure 'anchor' column exists
-    if 'anchor' not in df.columns:
-        logger.warning(f"No 'anchor' column in {csv_path}")
+    if "anchor" not in df.columns:
+        logger.warning("No 'anchor' column in %s", csv_path)
         return {}
 
     results = {}
@@ -293,16 +293,18 @@ def load_module4_from_csv(
         programs = []
         for _, row in anchor_df.iterrows():
             top_genes = row["top_genes"].split(", ") if pd.notna(row["top_genes"]) else []
-            programs.append(SpatialProgram(
-                program_id=int(row["program_id"]),
-                top_genes=top_genes,
-                gene_loadings={g: 1.0 / (i + 1) for i, g in enumerate(top_genes)},  # Approximate
-                variance_explained=row["variance_explained"],
-                spatial_moran_i=row["spatial_moran_i"],
-                spatial_moran_pvalue=row["spatial_moran_pvalue"],
-                mean_activity=row["mean_activity"],
-                active_spots_fraction=row["active_spots_fraction"],
-            ))
+            programs.append(
+                SpatialProgram(
+                    program_id=int(row["program_id"]),
+                    top_genes=top_genes,
+                    gene_loadings={g: 1.0 / (i + 1) for i, g in enumerate(top_genes)},  # Approximate
+                    variance_explained=row["variance_explained"],
+                    spatial_moran_i=row["spatial_moran_i"],
+                    spatial_moran_pvalue=row["spatial_moran_pvalue"],
+                    mean_activity=row["mean_activity"],
+                    active_spots_fraction=row["active_spots_fraction"],
+                )
+            )
 
         # Create partial result (W matrix approximate from top genes)
         all_genes = list(set(g for p in programs for g in p.top_genes))
@@ -343,7 +345,7 @@ def load_module4b_from_csv(csv_path: Path) -> BivariateProgramResult:
     df = pd.read_csv(csv_path)
 
     # Check if first column is an unnamed index
-    if df.columns[0] == '' or df.columns[0].startswith('Unnamed'):
+    if df.columns[0] == "" or df.columns[0].startswith("Unnamed"):
         df = pd.read_csv(csv_path, index_col=0)
 
     all_pairs = []
@@ -358,7 +360,9 @@ def load_module4b_from_csv(csv_path: Path) -> BivariateProgramResult:
             pearson_correlation=row.get("pearson_correlation", 0.0),
             pearson_pvalue=row.get("pearson_pvalue", 1.0),
             n_spots_used=int(row.get("n_spots_used", 0)),
-            top_genes_overlap=row.get("top_genes_overlap", "").split(",") if pd.notna(row.get("top_genes_overlap", "")) else [],
+            top_genes_overlap=(
+                row.get("top_genes_overlap", "").split(",") if pd.notna(row.get("top_genes_overlap", "")) else []
+            ),
             relationship_type=row.get("relationship_type", "unknown"),
         )
         all_pairs.append(pair)
@@ -368,10 +372,9 @@ def load_module4b_from_csv(csv_path: Path) -> BivariateProgramResult:
     return BivariateProgramResult(
         significant_pairs=significant,
         all_pairs=all_pairs,
-        n_programs_total=len(set(
-            [(p.anchor1, p.program1_id) for p in all_pairs] +
-            [(p.anchor2, p.program2_id) for p in all_pairs]
-        )),
+        n_programs_total=len(
+            set([(p.anchor1, p.program1_id) for p in all_pairs] + [(p.anchor2, p.program2_id) for p in all_pairs])
+        ),
         n_pairs_tested=len(all_pairs),
         n_significant=len(significant),
         fdr_threshold=0.05,
@@ -417,7 +420,7 @@ def load_multi_sample_results(
                 profile_discovery_result=None,
                 parameters={"source_file": str(m4_path)},
             )
-            logger.info(f"Loaded Module 4 results for {sample_name}: {len(results_by_anchor)} anchors")
+            logger.info("Loaded Module 4 results for %s: %s anchors", sample_name, len(results_by_anchor))
 
         # Find Module 4b files
         m4b_files = list(sample_dir.glob(module4b_pattern))
@@ -425,7 +428,11 @@ def load_multi_sample_results(
             m4b_path = m4b_files[0]
             sample_name = m4b_path.stem.split("_module4b")[0]
             module4b_results[sample_name] = load_module4b_from_csv(m4b_path)
-            logger.info(f"Loaded Module 4b results for {sample_name}: {module4b_results[sample_name].n_pairs_tested} pairs")
+            logger.info(
+                "Loaded Module 4b results for %s: %s pairs",
+                sample_name,
+                module4b_results[sample_name].n_pairs_tested,
+            )
 
     return module4_results, module4b_results
 
@@ -459,7 +466,7 @@ def align_gene_sets(
     all_genes = sorted(list(all_genes_set))
     gene_to_idx = {g: i for i, g in enumerate(all_genes)}
 
-    logger.info(f"Gene set alignment: {len(all_genes)} genes across {len(results_by_sample)} samples")
+    logger.info("Gene set alignment: %s genes across %s samples", len(all_genes), len(results_by_sample))
 
     # Create aligned W matrices
     aligned_W = {}
@@ -479,16 +486,18 @@ def align_gene_sets(
 
             # Record metadata for each program
             for k in range(n_programs):
-                metadata_records.append({
-                    "sample": sample_name,
-                    "cell_type": cell_type,
-                    "program_id": k,
-                    "program_key": f"{sample_name}_{cell_type}_prog{k}",
-                })
+                metadata_records.append(
+                    {
+                        "sample": sample_name,
+                        "cell_type": cell_type,
+                        "program_id": k,
+                        "program_key": f"{sample_name}_{cell_type}_prog{k}",
+                    }
+                )
 
     metadata = pd.DataFrame(metadata_records)
 
-    logger.info(f"Created {len(aligned_W)} aligned W matrices with {len(metadata)} total programs")
+    logger.info("Created %s aligned W matrices with %s total programs", len(aligned_W), len(metadata))
 
     return aligned_W, all_genes, metadata
 
@@ -500,7 +509,8 @@ def align_gene_sets(
 
 def integrate_programs_harmony(
     aligned_W: Dict[Tuple[str, str], NDArray],
-    metadata: pd.DataFrame,
+    metadata: pd.DataFrame,  # pylint: disable=unused-argument
+    *,
     n_components: int = 30,
     n_clusters: int = 50,
     theta: float = 2.0,
@@ -536,23 +546,23 @@ def integrate_programs_harmony(
     np.random.seed(random_state)
 
     # Stack all W matrices (each program is a column)
-    W_list = []
-    sample_labels = []
+    W_list: List[Any] = []
+    sample_labels_list: List[str] = []
 
-    for (sample, cell_type), W in aligned_W.items():
+    for (sample, _), W in aligned_W.items():
         n_progs = W.shape[1]
         for k in range(n_progs):
             W_list.append(W[:, k])
-            sample_labels.append(sample)
+            sample_labels_list.append(sample)
 
     W_stacked = np.column_stack(W_list)  # (n_genes, n_programs)
-    sample_labels = np.array(sample_labels)
+    sample_labels: NDArray[Any] = np.array(sample_labels_list)
     unique_samples = np.unique(sample_labels)
 
     n_programs = W_stacked.shape[1]
     n_genes = W_stacked.shape[0]
 
-    logger.info(f"Harmony integration: {n_programs} programs, {n_genes} genes, {len(unique_samples)} samples")
+    logger.info("Harmony integration: %s programs, %s genes, %s samples", n_programs, n_genes, len(unique_samples))
 
     # Adjust n_components if needed
     actual_components = min(n_components, n_programs, n_genes)
@@ -561,7 +571,11 @@ def integrate_programs_harmony(
     pca = PCA(n_components=actual_components, random_state=random_state)
     Z = pca.fit_transform(W_stacked.T)  # (n_programs, n_components)
 
-    logger.info(f"PCA: {pca.explained_variance_ratio_.sum():.1%} variance explained with {actual_components} components")
+    logger.info(
+        "PCA: %s%% variance explained with %s components",
+        round(pca.explained_variance_ratio_.sum() * 100, 1),
+        actual_components,
+    )
 
     # L2 normalize
     norms = np.linalg.norm(Z, axis=1, keepdims=True)
@@ -624,16 +638,16 @@ def integrate_programs_harmony(
         delta = np.mean(np.abs(Z - prev_Z))
         if delta < tol:
             converged = True
-            logger.info(f"Harmony converged at iteration {iteration + 1} (delta={delta:.6f})")
+            logger.info("Harmony converged at iteration %s (delta=%s)", iteration + 1, round(delta, 6))
             break
 
         prev_Z = Z.copy()
 
         if (iteration + 1) % 5 == 0:
-            logger.info(f"Harmony iteration {iteration + 1}: delta={delta:.6f}")
+            logger.info("Harmony iteration %s: delta=%s", iteration + 1, round(delta, 6))
 
     if not converged:
-        logger.warning(f"Harmony did not converge after {max_iter} iterations")
+        logger.warning("Harmony did not converge after %s iterations", max_iter)
 
     info = {
         "converged": converged,
@@ -657,6 +671,7 @@ def match_programs_across_samples(
     metadata: pd.DataFrame,
     aligned_W: Dict[Tuple[str, str], NDArray],
     all_genes: List[str],
+    *,
     similarity_threshold: float = 0.7,
     top_n_genes: int = 20,
 ) -> List[AlignedProgram]:
@@ -692,12 +707,13 @@ def match_programs_across_samples(
             linkage="average",
         )
         labels = clustering.fit_predict(distance_matrix)
-    except Exception as e:
-        logger.warning(f"Clustering failed: {e}. Using fallback method.")
+    except (ValueError, RuntimeError) as e:
+
+        logger.warning("Clustering failed: %s. Using fallback method.", e)
         # Fallback: each program is its own cluster
         labels = np.arange(len(Z))
 
-    logger.info(f"Program matching: {len(np.unique(labels))} aligned program groups from {len(Z)} total programs")
+    logger.info("Program matching: %s aligned program groups from %s total programs", len(np.unique(labels)), len(Z))
 
     # Build aligned programs
     aligned_programs = []
@@ -707,9 +723,6 @@ def match_programs_across_samples(
         cluster_meta = metadata[mask]
         cluster_indices = np.where(mask)[0]
 
-        # Get cell types in this cluster
-        cell_types = cluster_meta["cell_type"].unique()
-
         # Use the most common cell type as the representative
         cell_type = cluster_meta["cell_type"].mode().iloc[0] if len(cluster_meta) > 0 else "Unknown"
 
@@ -717,7 +730,7 @@ def match_programs_across_samples(
         sample_signatures = {}
         sample_program_ids = {}
 
-        for idx, (_, row) in zip(cluster_indices, cluster_meta.iterrows()):
+        for _, (_, row) in zip(cluster_indices, cluster_meta.iterrows()):
             sample = row["sample"]
             ct = row["cell_type"]
             prog_id = row["program_id"]
@@ -746,22 +759,24 @@ def match_programs_across_samples(
         # Mean embedding
         mean_embedding = Z[mask].mean(axis=0)
 
-        aligned_programs.append(AlignedProgram(
-            program_id=f"aligned_{cluster_id:03d}",
-            cell_type=cell_type,
-            samples_present=samples_present,
-            consensus_signature=consensus_dict,
-            sample_signatures=sample_signatures,
-            sample_program_ids=sample_program_ids,
-            embedding=mean_embedding,
-            conservation_score=len(samples_present) / n_samples,
-            top_genes=top_genes,
-        ))
+        aligned_programs.append(
+            AlignedProgram(
+                program_id=f"aligned_{cluster_id:03d}",
+                cell_type=cell_type,
+                samples_present=samples_present,
+                consensus_signature=consensus_dict,
+                sample_signatures=sample_signatures,
+                sample_program_ids=sample_program_ids,
+                embedding=mean_embedding,
+                conservation_score=len(samples_present) / n_samples,
+                top_genes=top_genes,
+            )
+        )
 
     # Sort by conservation score
     aligned_programs.sort(key=lambda p: p.conservation_score, reverse=True)
 
-    logger.info(f"Created {len(aligned_programs)} aligned programs")
+    logger.info("Created %s aligned programs", len(aligned_programs))
 
     return aligned_programs
 
@@ -775,7 +790,7 @@ def compare_bivariate_relationships(
     bivariate_results: Dict[str, BivariateProgramResult],
     aligned_programs: List[AlignedProgram],
     min_samples: int = 2,
-    significance_threshold: float = 0.05,
+    _significance_threshold: float = 0.05,
     colocalization_threshold: float = 0.1,
 ) -> List[ConservedRelationship]:
     """
@@ -802,7 +817,7 @@ def compare_bivariate_relationships(
             program_to_aligned[key] = aligned_prog.program_id
 
     # Collect bivariate I values per aligned program pair
-    relationship_data = defaultdict(lambda: {"values": [], "samples": []})
+    relationship_data: Dict[Any, Any] = defaultdict(lambda: {"values": [], "samples": []})
 
     for sample_name, result in bivariate_results.items():
         for pair in result.all_pairs:
@@ -842,23 +857,26 @@ def compare_bivariate_relationships(
         else:
             rel_type = "independent"
 
-        conserved_relationships.append(ConservedRelationship(
-            program1_id=prog1,
-            program2_id=prog2,
-            samples_with_relationship=data["samples"],
-            bivariate_i_values=data["values"],
-            mean_bivariate_i=mean_i,
-            std_bivariate_i=std_i,
-            conservation_score=len(data["samples"]) / n_samples,
-            relationship_type=rel_type,
-        ))
+        conserved_relationships.append(
+            ConservedRelationship(
+                program1_id=prog1,
+                program2_id=prog2,
+                samples_with_relationship=data["samples"],
+                bivariate_i_values=data["values"],
+                mean_bivariate_i=mean_i,
+                std_bivariate_i=std_i,
+                conservation_score=len(data["samples"]) / n_samples,
+                relationship_type=rel_type,
+            )
+        )
 
     # Sort by conservation score
     conserved_relationships.sort(key=lambda r: r.conservation_score, reverse=True)
 
     logger.info(
-        f"Found {len(conserved_relationships)} relationships across samples, "
-        f"{sum(1 for r in conserved_relationships if r.conservation_score > 0.5)} conserved in >50% samples"
+        "Found %s relationships across samples, %s conserved in >50%% samples",
+        len(conserved_relationships),
+        sum(1 for r in conserved_relationships if r.conservation_score > 0.5),
     )
 
     return conserved_relationships
@@ -914,7 +932,7 @@ def build_similarity_network(
                     n_samples=len(rel.samples_with_relationship),
                 )
 
-    logger.info(f"Built similarity network: {G.number_of_nodes()} nodes, {G.number_of_edges()} edges")
+    logger.info("Built similarity network: %s nodes, %s edges", G.number_of_nodes(), G.number_of_edges())
 
     return G
 
@@ -927,6 +945,7 @@ def build_similarity_network(
 def integrate_samples(
     module4_results: Dict[str, AnchoredProgramDiscoveryResult],
     module4b_results: Optional[Dict[str, BivariateProgramResult]] = None,
+    *,
     n_components: int = 30,
     n_clusters: int = 50,
     theta: float = 2.0,
@@ -952,13 +971,13 @@ def integrate_samples(
     Returns:
         IntegrationResult with aligned programs, relationships, and network
     """
-    logger.info(f"Starting cross-sample integration with {len(module4_results)} samples")
+    logger.info("Starting cross-sample integration with %s samples", len(module4_results))
 
     # Step 1: Align gene sets
     aligned_W, all_genes, metadata = align_gene_sets(module4_results)
 
     # Step 2: Harmony integration
-    Z, R, harmony_info = integrate_programs_harmony(
+    Z, _, harmony_info = integrate_programs_harmony(
         aligned_W=aligned_W,
         metadata=metadata,
         n_components=n_components,
@@ -994,10 +1013,7 @@ def integrate_samples(
         )
 
     # Compute n_programs per sample
-    n_programs_per_sample = {
-        sample: result.total_programs
-        for sample, result in module4_results.items()
-    }
+    n_programs_per_sample = {sample: result.total_programs for sample, result in module4_results.items()}
 
     result = IntegrationResult(
         aligned_programs=aligned_programs,
@@ -1070,6 +1086,6 @@ def save_integration_results(
         nx.write_graphml(result.similarity_graph, network_file)
         saved_files["network"] = network_file
 
-    logger.info(f"Saved integration results to {output_dir}")
+    logger.info("Saved integration results to %s", output_dir)
 
     return saved_files

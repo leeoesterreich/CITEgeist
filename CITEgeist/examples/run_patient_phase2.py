@@ -30,10 +30,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import numpy as np
 import pandas as pd
 import squidpy as sq
-
 from model import CitegeistModel
 from model.unified_config import CELL_PROFILES_NESTED
-
 
 # Samples containing "S1" in name are core biopsies (higher quality / more counts).
 # Samples with "S2" are surgical excisions (lower sequencing depth).
@@ -73,10 +71,7 @@ def run_phase2(sample_name, output_dir, seg_dir, data_dir, use_cellularity_prior
     # ----------------------------------------------------------------
     phase1_marker = seg_dir / sample_name / ".phase1_complete"
     if not phase1_marker.exists():
-        raise RuntimeError(
-            f"Phase 1 not complete for {sample_name}. "
-            f"Expected marker: {phase1_marker}"
-        )
+        raise RuntimeError(f"Phase 1 not complete for {sample_name}. " f"Expected marker: {phase1_marker}")
 
     # ----------------------------------------------------------------
     # Load SpaceRanger data
@@ -108,7 +103,9 @@ def run_phase2(sample_name, output_dir, seg_dir, data_dir, use_cellularity_prior
             n_nan = int((~finite_mask).sum())
             if n_nan > 0:
                 logger.warning(
-                    "Filtering %d spots with NaN spatial coords from %s", n_nan, attr,
+                    "Filtering %d spots with NaN spatial coords from %s",
+                    n_nan,
+                    attr,
                 )
                 setattr(model, attr, ad[finite_mask].copy())
 
@@ -132,8 +129,7 @@ def run_phase2(sample_name, output_dir, seg_dir, data_dir, use_cellularity_prior
         nuclei_per_spot_path = seg_dir / sample_name / "segmentation" / "nuclei_per_spot.csv"
         if not nuclei_per_spot_path.exists():
             logger.warning(
-                "Nuclei-per-spot file not found at %s; "
-                "falling back to no cellularity prior",
+                "Nuclei-per-spot file not found at %s; " "falling back to no cellularity prior",
                 nuclei_per_spot_path,
             )
         else:
@@ -169,9 +165,7 @@ def run_phase2(sample_name, output_dir, seg_dir, data_dir, use_cellularity_prior
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Patient pipeline Phase 2: Module 3 deconvolution"
-    )
+    parser = argparse.ArgumentParser(description="Patient pipeline Phase 2: Module 3 deconvolution")
     parser.add_argument("--sample", required=True, help="Sample name, e.g. HCC22-088-P1-S1")
     parser.add_argument(
         "--output-dir",
@@ -185,8 +179,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--data-dir",
-        default="/ix1/alee/LO_LAB/General/Lab_Data/"
-                "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
+        default="/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files",
         help="Root of SpaceRanger processed_files directory",
     )
     parser.add_argument(

@@ -2,6 +2,7 @@
 
 Handles nuclei count preparation, winsorization, and discrete rounding.
 """
+
 import logging
 from typing import Optional
 
@@ -86,7 +87,9 @@ def winsorize_cellularity(
     if n_capped > 0:
         logger.info(
             "Cellularity winsorized: %d spots capped at N=%.0f (%.0fth percentile)",
-            n_capped, cap, percentile,
+            n_capped,
+            cap,
+            percentile,
         )
     return N
 
@@ -119,6 +122,8 @@ def prepare_cellularity(
         if frac > 0.05:
             logger.warning(
                 "%.1f%% of spots (%d/%d) have no nuclei counts — falling back to N=1 for those",
-                frac * 100, n_missing, n_total,
+                frac * 100,
+                n_missing,
+                n_total,
             )
     return winsorize_cellularity(aligned, percentile=percentile)

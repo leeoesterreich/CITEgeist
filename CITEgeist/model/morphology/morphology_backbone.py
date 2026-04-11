@@ -4,6 +4,7 @@ Modality-specific backends with variable embedding dimensions:
 - DAPIBackbone: ViT-Small (custom init) on DAPI+boundary patches (96×96, 2ch) → 384-d
 - HEBackbone: ViT-Small (ImageNet init), optionally LLP fine-tuned on H&E (224×224, 3ch) → 384-d
 """
+
 import logging
 from abc import ABC, abstractmethod
 from typing import Optional
@@ -52,9 +53,7 @@ class MorphologyBackbone(ABC):
 
         with torch.no_grad():
             for i in range(0, len(patches), batch_size):
-                batch = torch.tensor(
-                    patches[i:i + batch_size], dtype=torch.float32, device=device
-                )
+                batch = torch.tensor(patches[i : i + batch_size], dtype=torch.float32, device=device)
                 emb = self.extract(batch)
                 all_embeddings.append(emb.cpu().numpy())
 
@@ -84,7 +83,7 @@ class DAPIBackbone(MorphologyBackbone):
         img_size: int = 96,
         device: str = "cpu",
     ):
-        from .vit_encoder import create_vit_small
+        from .vit_encoder import create_vit_small  # pylint: disable=import-outside-toplevel
 
         self.encoder = create_vit_small(in_chans=in_channels, img_size=img_size)
 
@@ -98,14 +97,14 @@ class DAPIBackbone(MorphologyBackbone):
         state = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
         # Handle wrapped checkpoint format {'model_state_dict': ..., 'epoch': ...}
-        if 'model_state_dict' in state:
-            state = state['model_state_dict']
+        if "model_state_dict" in state:
+            state = state["model_state_dict"]
 
         # Strip 'encoder.' prefix if present (produced by contrastive training wrappers)
         encoder_state = {}
         for k, v in state.items():
             if k.startswith("encoder."):
-                encoder_state[k[len("encoder."):]] = v
+                encoder_state[k[len("encoder.") :]] = v
 
         if encoder_state:
             # Validate in_channels match between checkpoint and model
@@ -151,7 +150,7 @@ class HEBackbone(MorphologyBackbone):
         checkpoint: Optional[str] = None,
         device: str = "cpu",
     ):
-        from .vit_extractor import ViTFeatureExtractor
+        from .vit_extractor import ViTFeatureExtractor  # pylint: disable=import-outside-toplevel
 
         self._extractor = ViTFeatureExtractor(
             model_name=model_name,
@@ -171,4 +170,3 @@ class HEBackbone(MorphologyBackbone):
     @property
     def _model(self) -> nn.Module:
         return self._extractor.model
-

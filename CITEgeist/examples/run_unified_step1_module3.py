@@ -9,7 +9,6 @@ import argparse
 import logging
 import os
 import sys
-from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -41,7 +40,9 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
             gex_only=False,
         )
         model = CitegeistModel(
-            sample_name=sample_name, adata=adata, output_folder=str(output_dir),
+            sample_name=sample_name,
+            adata=adata,
+            output_folder=str(output_dir),
         )
         model.split_adata()
     elif modality == "dapi":
@@ -49,8 +50,10 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
         adata_gex = sc.read_h5ad(xenium_gex)
         adata_cite = sc.read_h5ad(xenium_protein)
         model = CitegeistModel(
-            sample_name=sample_name, output_folder=str(output_dir),
-            simulation=True, gene_expression_adata=adata_gex,
+            sample_name=sample_name,
+            output_folder=str(output_dir),
+            simulation=True,
+            gene_expression_adata=adata_gex,
             antibody_capture_adata=adata_cite,
         )
     else:
@@ -58,6 +61,7 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
 
     # Filter spots with NaN spatial coordinates (causes cKDTree and kneighbors_graph to fail)
     import numpy as np
+
     for adata_attr in ("gene_expression_adata", "antibody_capture_adata"):
         ad = getattr(model, adata_attr, None)
         if ad is not None and "spatial" in ad.obsm:
@@ -73,7 +77,9 @@ def run_step1(sample_name, modality="he", xenium_gex=None, xenium_protein=None):
 
     if modality == "he":
         nuclei_counts = model.compute_spot_nuclei_counts(
-            resolution_mode="hires", use_gpu=False, save_masks=True,
+            resolution_mode="hires",
+            use_gpu=False,
+            save_masks=True,
         )
         logger.info(f"Segmentation: {nuclei_counts.sum():.0f} total nuclei across {len(nuclei_counts)} spots")
 

@@ -17,7 +17,7 @@ import sys
 import warnings
 from pathlib import Path
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
@@ -26,27 +26,30 @@ import squidpy as sq
 from scipy.stats import mannwhitneyu, pearsonr
 from sklearn.decomposition import NMF
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # =============================================================================
 # Configuration
 # =============================================================================
-PATIENT_DATA_ROOT = Path(
-    "/ix1/alee/LO_LAB/General/Lab_Data/"
-    "20250210_CITEGeistPublicData_GEO_Alex/processed_files"
-)
+PATIENT_DATA_ROOT = Path("/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 V3_DIR = Path("output/morphology_assignment_v3")
 OUTPUT_BASE = Path("output/mdk_v3_reanalysis_expanded")
 OUTPUT_BASE.mkdir(parents=True, exist_ok=True)
 
 SAMPLES = [
-    "HCC22-088-P1-S1", "HCC22-088-P1-S2",
-    "HCC22-088-P2-S1", "HCC22-088-P2-S2",
-    "HCC22-088-P3-S1_A", "HCC22-088-P3-S2",
-    "HCC22-088-P4-S1", "HCC22-088-P4-S2_1i_rep",
-    "HCC22-088-P5-S1", "HCC22-088-P5-S2_F_rep",
-    "HCC22-088-P6-S1", "HCC22-088-P6-S2_D",
+    "HCC22-088-P1-S1",
+    "HCC22-088-P1-S2",
+    "HCC22-088-P2-S1",
+    "HCC22-088-P2-S2",
+    "HCC22-088-P3-S1_A",
+    "HCC22-088-P3-S2",
+    "HCC22-088-P4-S1",
+    "HCC22-088-P4-S2_1i_rep",
+    "HCC22-088-P5-S1",
+    "HCC22-088-P5-S2_F_rep",
+    "HCC22-088-P6-S1",
+    "HCC22-088-P6-S2_D",
 ]
 
 MODEL_PROFILE_DICT = {
@@ -67,7 +70,7 @@ MODEL_PROFILE_DICT = {
 
 # Both subtypes are pooled as a single Epithelial population.
 # Within-Epithelial stratification uses the KRT5 protein gate (Module 3.5).
-CANCER_TYPES = ['Cancer_Basal', 'Cancer_Luminal']
+CANCER_TYPES = ["Cancer_Basal", "Cancer_Luminal"]
 
 # Relaxed gene filter: Option A (min_counts=50, 1% nonzero, mean>0.5)
 FILTER_MIN_COUNTS = 50
@@ -98,7 +101,7 @@ def rerun_sace(sample_name):
     # Load raw Visium data
     adata = sq.read.visium(
         str(patient_dir),
-        counts_file='filtered_feature_bc_matrix.h5',
+        counts_file="filtered_feature_bc_matrix.h5",
         load_images=True,
         gex_only=False,
     )
@@ -139,9 +142,7 @@ def rerun_sace(sample_name):
     assignments_df = pd.read_csv(v3_sample_dir / "cell_assignments.csv")
 
     # Subset to common spots
-    common_spots = ensemble_df.index.intersection(
-        sace_model.gene_expression_adata.obs_names
-    )
+    common_spots = ensemble_df.index.intersection(sace_model.gene_expression_adata.obs_names)
     if len(common_spots) < len(ensemble_df):
         logger.warning(f"  {len(common_spots)}/{len(ensemble_df)} ensemble spots in GEX")
     sace_model.gene_expression_adata = sace_model.gene_expression_adata[common_spots].copy()
@@ -152,17 +153,21 @@ def rerun_sace(sample_name):
     sace_model.results["cell_prop"] = ensemble_df
 
     # Build cell assignments and spot map
-    cell_assignments = dict(zip(
-        assignments_df["nucleus_id"].astype(str),
-        assignments_df["assigned_type"],
-    ))
+    cell_assignments = dict(
+        zip(
+            assignments_df["nucleus_id"].astype(str),
+            assignments_df["assigned_type"],
+        )
+    )
 
     nucleus_spot_map = pd.read_csv(v3_sample_dir / "nucleus_spot_mapping.csv")
-    cell_spot_map = nucleus_spot_map.rename(columns={
-        "nucleus_id": "cell_id",
-        "centroid_x": "x",
-        "centroid_y": "y",
-    })
+    cell_spot_map = nucleus_spot_map.rename(
+        columns={
+            "nucleus_id": "cell_id",
+            "centroid_x": "x",
+            "centroid_y": "y",
+        }
+    )
     assigned_ids = set(assignments_df["nucleus_id"].values)
     cell_spot_map = cell_spot_map[cell_spot_map["cell_id"].isin(assigned_ids)].copy()
     cell_spot_map["cell_id"] = cell_spot_map["cell_id"].astype(str)
@@ -197,23 +202,22 @@ def run_mdk_analysis(sample_name, cell_adata=None):
         logger.info(f"Loaded: {cell_adata.shape}")
 
     # Subset to cancer cells
-    cancer_mask = cell_adata.obs['cell_type'].isin(CANCER_TYPES)
+    cancer_mask = cell_adata.obs["cell_type"].isin(CANCER_TYPES)
     n_cancer = cancer_mask.sum()
     if n_cancer < 20:
         logger.warning(f"Only {n_cancer} cancer cells — skipping MDK analysis")
         return None
 
     adata_cancer = cell_adata[cancer_mask].copy()
-    krt5_cols = [c for c in adata_cancer.obs.columns
-                 if 'KRT5' in c and c.endswith('_gate')]
+    krt5_cols = [c for c in adata_cancer.obs.columns if "KRT5" in c and c.endswith("_gate")]
     if krt5_cols:
         krt5_pos = adata_cancer.obs[krt5_cols].max(axis=1).fillna(0).astype(bool)
         n_basal = int(krt5_pos.sum())
         n_luminal = int((~krt5_pos).sum())
         logger.info(f"Cancer cells: {adata_cancer.n_obs} ({n_basal} KRT5-high, {n_luminal} KRT5-low)")
     else:
-        n_basal = int((adata_cancer.obs['cell_type'] == 'Cancer_Basal').sum())
-        n_luminal = int((adata_cancer.obs['cell_type'] == 'Cancer_Luminal').sum())
+        n_basal = int((adata_cancer.obs["cell_type"] == "Cancer_Basal").sum())
+        n_luminal = int((adata_cancer.obs["cell_type"] == "Cancer_Luminal").sum())
         logger.info(f"Cancer cells: {adata_cancer.n_obs} ({n_basal} KRT5-high proxy, {n_luminal} KRT5-low proxy)")
 
     # Store raw, normalize
@@ -222,7 +226,7 @@ def run_mdk_analysis(sample_name, cell_adata=None):
 
     # Gene detection filter (5% of cancer cells)
     min_cells = int(0.05 * adata_cancer.n_obs)
-    X_dense = adata_cancer.X.toarray() if hasattr(adata_cancer.X, 'toarray') else np.asarray(adata_cancer.X)
+    X_dense = adata_cancer.X.toarray() if hasattr(adata_cancer.X, "toarray") else np.asarray(adata_cancer.X)
     detection_counts = (X_dense > 0).sum(axis=0)
     gene_mask = detection_counts >= min_cells
     adata_nmf = adata_cancer[:, gene_mask].copy()
@@ -238,23 +242,21 @@ def run_mdk_analysis(sample_name, cell_adata=None):
 
     if not mdk_present:
         logger.warning("MDK not in filtered genes — writing null result")
-        _write_null_result(output_dir, sample_name, adata_cancer, gene_names,
-                           secretory_present, secretory_missing)
+        _write_null_result(output_dir, sample_name, adata_cancer, gene_names, secretory_present, secretory_missing)
         return None
 
     # NMF (multi-seed at K=5)
-    X = np.maximum(np.asarray(adata_nmf.X.toarray() if hasattr(adata_nmf.X, 'toarray')
-                              else adata_nmf.X), 0)
+    X = np.maximum(np.asarray(adata_nmf.X.toarray() if hasattr(adata_nmf.X, "toarray") else adata_nmf.X), 0)
 
     seed_results = {}
     for seed in NMF_SEEDS:
-        model = NMF(n_components=PRIMARY_K, init='nndsvda', random_state=seed, max_iter=500)
+        model = NMF(n_components=PRIMARY_K, init="nndsvda", random_state=seed, max_iter=500)
         H = model.fit_transform(X)
         W = model.components_.T
-        seed_results[seed] = {'W': W, 'H': H, 'recon_err': model.reconstruction_err_}
+        seed_results[seed] = {"W": W, "H": H, "recon_err": model.reconstruction_err_}
 
-    W = seed_results[PRIMARY_SEED]['W']
-    H = seed_results[PRIMARY_SEED]['H']
+    W = seed_results[PRIMARY_SEED]["W"]
+    H = seed_results[PRIMARY_SEED]["H"]
 
     # Stability
     mdk_idx = gene_names.index("MDK")
@@ -262,7 +264,7 @@ def run_mdk_analysis(sample_name, cell_adata=None):
     mdk_w_vectors = {}
     mdk_top50 = {}
     for seed in sorted(seed_results.keys()):
-        Ws = seed_results[seed]['W']
+        Ws = seed_results[seed]["W"]
         best = int(np.argmax(Ws[mdk_idx, :]))
         mdk_programs_per_seed[seed] = best
         mdk_w_vectors[seed] = Ws[:, best]
@@ -270,55 +272,68 @@ def run_mdk_analysis(sample_name, cell_adata=None):
         mdk_top50[seed] = set(gene_names[i] for i in top50_idx)
 
     ref = sorted(seed_results.keys())[0]
-    w_corrs = [pearsonr(mdk_w_vectors[ref], mdk_w_vectors[s])[0]
-               for s in sorted(seed_results.keys())[1:]]
-    jaccards = [len(mdk_top50[ref] & mdk_top50[s]) / len(mdk_top50[ref] | mdk_top50[s])
-                for s in sorted(seed_results.keys())[1:]]
+    w_corrs = [pearsonr(mdk_w_vectors[ref], mdk_w_vectors[s])[0] for s in sorted(seed_results.keys())[1:]]
+    jaccards = [
+        len(mdk_top50[ref] & mdk_top50[s]) / len(mdk_top50[ref] | mdk_top50[s]) for s in sorted(seed_results.keys())[1:]
+    ]
     all_same_rank = len(set(mdk_programs_per_seed.values())) == 1
 
     # Region annotation: use KRT5 protein gate if available, fall back to QP type
-    krt5_cols = [c for c in adata_cancer.obs.columns
-                 if 'KRT5' in c and c.endswith('_gate')]
+    krt5_cols = [c for c in adata_cancer.obs.columns if "KRT5" in c and c.endswith("_gate")]
     if krt5_cols:
         krt5_pos = adata_cancer.obs[krt5_cols].max(axis=1).fillna(0).astype(bool)
-        adata_cancer.obs['cancer_subtype'] = np.where(krt5_pos, 'KRT5-high', 'KRT5-low')
+        adata_cancer.obs["cancer_subtype"] = np.where(krt5_pos, "KRT5-high", "KRT5-low")
     else:
-        adata_cancer.obs['cancer_subtype'] = adata_cancer.obs['cell_type'].map({
-            'Cancer_Basal': 'KRT5-high', 'Cancer_Luminal': 'KRT5-low',
-        })
+        adata_cancer.obs["cancer_subtype"] = adata_cancer.obs["cell_type"].map(
+            {
+                "Cancer_Basal": "KRT5-high",
+                "Cancer_Luminal": "KRT5-low",
+            }
+        )
 
     # Region enrichment
-    subtypes = adata_cancer.obs['cancer_subtype'].values
-    basal_mask = subtypes == 'KRT5-high'
-    luminal_mask = subtypes == 'KRT5-low'
+    subtypes = adata_cancer.obs["cancer_subtype"].values
+    basal_mask = subtypes == "KRT5-high"
+    luminal_mask = subtypes == "KRT5-low"
 
     enrichment_rows = []
     for k in range(PRIMARY_K):
         h_k = H[:, k]
         if basal_mask.sum() == 0 or luminal_mask.sum() == 0:
-            enrichment_rows.append({
-                'program': k, 'mean_basal': 0, 'mean_luminal': 0,
-                'fold_change': 1, 'pvalue_bonferroni': 1, 'enriched_in': 'N/A',
-                'significant': False,
-            })
+            enrichment_rows.append(
+                {
+                    "program": k,
+                    "mean_basal": 0,
+                    "mean_luminal": 0,
+                    "fold_change": 1,
+                    "pvalue_bonferroni": 1,
+                    "enriched_in": "N/A",
+                    "significant": False,
+                }
+            )
             continue
         mb = float(np.mean(h_k[basal_mask]))
         ml = float(np.mean(h_k[luminal_mask]))
-        _, pval = mannwhitneyu(h_k[basal_mask], h_k[luminal_mask], alternative='two-sided')
+        _, pval = mannwhitneyu(h_k[basal_mask], h_k[luminal_mask], alternative="two-sided")
         pval_corr = min(pval * PRIMARY_K, 1.0)
         fc = (mb + 1e-10) / (ml + 1e-10)
-        enrichment_rows.append({
-            'program': k, 'mean_basal': mb, 'mean_luminal': ml,
-            'fold_change': fc, 'pvalue_bonferroni': pval_corr,
-            'enriched_in': 'KRT5-high' if mb > ml else 'KRT5-low',
-            'significant': pval_corr < 0.05 and max(fc, 1.0 / fc) > 1.5,
-        })
+        enrichment_rows.append(
+            {
+                "program": k,
+                "mean_basal": mb,
+                "mean_luminal": ml,
+                "fold_change": fc,
+                "pvalue_bonferroni": pval_corr,
+                "enriched_in": "KRT5-high" if mb > ml else "KRT5-low",
+                "significant": pval_corr < 0.05 and max(fc, 1.0 / fc) > 1.5,
+            }
+        )
     enrichment_df = pd.DataFrame(enrichment_rows)
 
     # MDK program
     mdk_program = int(np.argmax(W[mdk_idx, :]))
     mdk_loading = float(W[mdk_idx, mdk_program])
-    mdk_row = enrichment_df[enrichment_df['program'] == mdk_program].iloc[0]
+    mdk_row = enrichment_df[enrichment_df["program"] == mdk_program].iloc[0]
 
     # Context genes
     prog_loadings = W[:, mdk_program]
@@ -330,27 +345,28 @@ def run_mdk_analysis(sample_name, cell_adata=None):
         context_genes.append((gene_names[idx], float(prog_loadings[idx])))
         if len(context_genes) >= 100:
             break
-    context_df = pd.DataFrame(context_genes, columns=['gene', 'loading'])
-    for name, gl in [("Secretory", SECRETORY_GENES), ("MDK_receptor", MDK_RECEPTORS),
-                     ("ER_related", ER_RELATED)]:
-        context_df[name] = context_df['gene'].isin(gl)
+    context_df = pd.DataFrame(context_genes, columns=["gene", "loading"])
+    for name, gl in [("Secretory", SECRETORY_GENES), ("MDK_receptor", MDK_RECEPTORS), ("ER_related", ER_RELATED)]:
+        context_df[name] = context_df["gene"].isin(gl)
 
     # Moran's I
     import anndata
+
     moran_i_val = np.nan
     moran_p_val = np.nan
-    if 'spatial' in adata_cancer.obsm:
-        program_names = [f'program_{k}' for k in range(PRIMARY_K)]
+    if "spatial" in adata_cancer.obsm:
+        program_names = [f"program_{k}" for k in range(PRIMARY_K)]
         adata_prog = anndata.AnnData(
-            X=H, obs=adata_cancer.obs.copy(),
+            X=H,
+            obs=adata_cancer.obs.copy(),
             var=pd.DataFrame(index=program_names),
-            obsm={'spatial': adata_cancer.obsm['spatial'].copy()},
+            obsm={"spatial": adata_cancer.obsm["spatial"].copy()},
         )
-        sq.gr.spatial_neighbors(adata_prog, coord_type='generic', n_neighs=15)
-        sq.gr.spatial_autocorr(adata_prog, mode='moran')
-        moran_df = adata_prog.uns['moranI']
-        moran_i_val = float(moran_df.loc[f'program_{mdk_program}', 'I'])
-        moran_p_val = float(moran_df.loc[f'program_{mdk_program}', 'pval_norm'])
+        sq.gr.spatial_neighbors(adata_prog, coord_type="generic", n_neighs=15)
+        sq.gr.spatial_autocorr(adata_prog, mode="moran")
+        moran_df = adata_prog.uns["moranI"]
+        moran_i_val = float(moran_df.loc[f"program_{mdk_program}", "I"])
+        moran_p_val = float(moran_df.loc[f"program_{mdk_program}", "pval_norm"])
 
     # Top 5 genes in MDK program
     top5_idx = np.argsort(W[:, mdk_program])[::-1][:5]
@@ -358,59 +374,60 @@ def run_mdk_analysis(sample_name, cell_adata=None):
 
     # Build result dict
     result = {
-        'sample': sample_name,
-        'n_cancer_cells': int(adata_cancer.n_obs),
-        'n_basal': int(n_basal),
-        'n_luminal': int(n_luminal),
-        'n_genes_sace': int(cell_adata.n_vars),
-        'n_genes_nmf': len(gene_names),
-        'mdk_present': True,
-        'mdk_program': mdk_program,
-        'mdk_loading': mdk_loading,
-        'mdk_fc': float(mdk_row['fold_change']),
-        'mdk_pval_bonf': float(mdk_row['pvalue_bonferroni']),
-        'mdk_enriched_in': mdk_row['enriched_in'],
-        'mdk_significant': bool(mdk_row['significant']),
-        'moran_i': moran_i_val,
-        'moran_p': moran_p_val,
-        'stable_across_seeds': all_same_rank,
-        'mean_w_corr': float(np.mean(w_corrs)) if w_corrs else np.nan,
-        'mean_jaccard': float(np.mean(jaccards)) if jaccards else np.nan,
-        'top5_genes': top5_genes,
-        'secretory_in_top100': context_df[context_df['Secretory']]['gene'].tolist(),
-        'receptor_in_top100': context_df[context_df['MDK_receptor']]['gene'].tolist(),
-        'er_in_top100': context_df[context_df['ER_related']]['gene'].tolist(),
-        'secretory_in_sace': [g for g in SECRETORY_GENES if g in cell_adata.var_names],
-        'secretory_missing': [g for g in SECRETORY_GENES if g not in cell_adata.var_names],
+        "sample": sample_name,
+        "n_cancer_cells": int(adata_cancer.n_obs),
+        "n_basal": int(n_basal),
+        "n_luminal": int(n_luminal),
+        "n_genes_sace": int(cell_adata.n_vars),
+        "n_genes_nmf": len(gene_names),
+        "mdk_present": True,
+        "mdk_program": mdk_program,
+        "mdk_loading": mdk_loading,
+        "mdk_fc": float(mdk_row["fold_change"]),
+        "mdk_pval_bonf": float(mdk_row["pvalue_bonferroni"]),
+        "mdk_enriched_in": mdk_row["enriched_in"],
+        "mdk_significant": bool(mdk_row["significant"]),
+        "moran_i": moran_i_val,
+        "moran_p": moran_p_val,
+        "stable_across_seeds": all_same_rank,
+        "mean_w_corr": float(np.mean(w_corrs)) if w_corrs else np.nan,
+        "mean_jaccard": float(np.mean(jaccards)) if jaccards else np.nan,
+        "top5_genes": top5_genes,
+        "secretory_in_top100": context_df[context_df["Secretory"]]["gene"].tolist(),
+        "receptor_in_top100": context_df[context_df["MDK_receptor"]]["gene"].tolist(),
+        "er_in_top100": context_df[context_df["ER_related"]]["gene"].tolist(),
+        "secretory_in_sace": [g for g in SECRETORY_GENES if g in cell_adata.var_names],
+        "secretory_missing": [g for g in SECRETORY_GENES if g not in cell_adata.var_names],
     }
 
     # Save per-sample outputs
     enrichment_df.to_csv(output_dir / "region_enrichment_summary.csv", index=False)
     context_df.to_csv(output_dir / "mdk_context_genes.csv", index=False)
-    with open(output_dir / "mdk_result.json", 'w') as f:
+    with open(output_dir / "mdk_result.json", "w") as f:
         json.dump(result, f, indent=2, default=str)
 
-    logger.info(f"MDK program {mdk_program}: loading={mdk_loading:.2f}, "
-                f"FC={result['mdk_fc']:.2f}, p_bonf={result['mdk_pval_bonf']:.2e}, "
-                f"Moran's I={moran_i_val:.4f}, top5={top5_genes}")
+    logger.info(
+        f"MDK program {mdk_program}: loading={mdk_loading:.2f}, "
+        f"FC={result['mdk_fc']:.2f}, p_bonf={result['mdk_pval_bonf']:.2e}, "
+        f"Moran's I={moran_i_val:.4f}, top5={top5_genes}"
+    )
     logger.info(f"Secretory in SACE: {result['secretory_in_sace']}")
     logger.info(f"Secretory in top 100 context: {result['secretory_in_top100']}")
 
     return result
 
 
-def _write_null_result(output_dir, sample_name, adata_cancer, gene_names,
-                       secretory_present, secretory_missing):
+def _write_null_result(output_dir, sample_name, adata_cancer, gene_names, secretory_present, secretory_missing):
     """Write a null result JSON when MDK is not in the filtered gene set."""
     result = {
-        'sample': sample_name,
-        'n_cancer_cells': int(adata_cancer.n_obs),
-        'n_genes_nmf': len(gene_names),
-        'mdk_present': False,
-        'secretory_in_nmf': secretory_present,
-        'secretory_missing': secretory_missing,
+        "sample": sample_name,
+        "n_cancer_cells": int(adata_cancer.n_obs),
+        "n_genes_nmf": len(gene_names),
+        "mdk_present": False,
+        "secretory_in_nmf": secretory_present,
+        "secretory_missing": secretory_missing,
     }
-    with open(output_dir / "mdk_result.json", 'w') as f:
+    with open(output_dir / "mdk_result.json", "w") as f:
         json.dump(result, f, indent=2)
 
 
@@ -438,15 +455,18 @@ def summarize_cross_patient():
     lines = []
     lines.append("=" * 90)
     lines.append("MDK CROSS-PATIENT SUMMARY — v3 Single-Cell with Expanded Gene Filter")
-    lines.append(f"Gene filter: min_counts={FILTER_MIN_COUNTS}, "
-                 f"nonzero>={FILTER_NONZERO_PCT:.0%}, mean>{FILTER_MEAN_THRESH}")
+    lines.append(
+        f"Gene filter: min_counts={FILTER_MIN_COUNTS}, " f"nonzero>={FILTER_NONZERO_PCT:.0%}, mean>{FILTER_MEAN_THRESH}"
+    )
     lines.append("=" * 90)
     lines.append("")
 
     # Per-sample table
-    header = (f"{'Sample':<28s} {'Cells':>5s} {'Genes':>5s} {'MDK?':>4s} "
-              f"{'Prog':>4s} {'FC':>6s} {'p_bonf':>10s} {'Enrich':>12s} "
-              f"{'Moran':>6s} {'Stable':>6s} {'Top gene':>10s}")
+    header = (
+        f"{'Sample':<28s} {'Cells':>5s} {'Genes':>5s} {'MDK?':>4s} "
+        f"{'Prog':>4s} {'FC':>6s} {'p_bonf':>10s} {'Enrich':>12s} "
+        f"{'Moran':>6s} {'Stable':>6s} {'Top gene':>10s}"
+    )
     lines.append(header)
     lines.append("-" * len(header))
 
@@ -458,23 +478,24 @@ def summarize_cross_patient():
     all_top5 = []
 
     for r in results:
-        sample_short = r['sample'].replace('HCC22-088-', '')
-        if not r.get('mdk_present', False):
-            lines.append(f"{sample_short:<28s} {r.get('n_cancer_cells', '?'):>5} "
-                         f"{r.get('n_genes_nmf', '?'):>5} {'NO':>4s}")
+        sample_short = r["sample"].replace("HCC22-088-", "")
+        if not r.get("mdk_present", False):
+            lines.append(
+                f"{sample_short:<28s} {r.get('n_cancer_cells', '?'):>5} " f"{r.get('n_genes_nmf', '?'):>5} {'NO':>4s}"
+            )
             continue
 
         n_mdk_found += 1
-        if r['mdk_enriched_in'] == 'KRT5-high':
+        if r["mdk_enriched_in"] == "KRT5-high":
             n_basal_enriched += 1
-        if r['mdk_significant']:
+        if r["mdk_significant"]:
             n_significant += 1
-        if r['stable_across_seeds']:
+        if r["stable_across_seeds"]:
             n_stable += 1
-        all_secretory_in_context.extend(r.get('secretory_in_top100', []))
-        all_top5.append(r.get('top5_genes', []))
+        all_secretory_in_context.extend(r.get("secretory_in_top100", []))
+        all_top5.append(r.get("top5_genes", []))
 
-        top1 = r['top5_genes'][0] if r.get('top5_genes') else '?'
+        top1 = r["top5_genes"][0] if r.get("top5_genes") else "?"
         lines.append(
             f"{sample_short:<28s} {r['n_cancer_cells']:>5d} {r['n_genes_nmf']:>5d} "
             f"{'YES':>4s} {r['mdk_program']:>4d} {r['mdk_fc']:>6.2f} "
@@ -495,17 +516,18 @@ def summarize_cross_patient():
     lines.append("SECRETORY GENE RECOVERY (expanded filter)")
     lines.append("-" * 40)
     for r in results:
-        if not r.get('mdk_present'):
+        if not r.get("mdk_present"):
             continue
-        sample_short = r['sample'].replace('HCC22-088-', '')
-        in_sace = r.get('secretory_in_sace', [])
-        in_ctx = r.get('secretory_in_top100', [])
+        sample_short = r["sample"].replace("HCC22-088-", "")
+        in_sace = r.get("secretory_in_sace", [])
+        in_ctx = r.get("secretory_in_top100", [])
         lines.append(f"  {sample_short}: in SACE={in_sace}, in MDK context={in_ctx}")
     lines.append("")
 
     # Consensus top genes
     if all_top5:
         from collections import Counter
+
         gene_counts = Counter()
         for t5 in all_top5:
             gene_counts.update(t5)
@@ -540,10 +562,8 @@ def summarize_cross_patient():
 # =============================================================================
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('sample_index', nargs='?', type=int, default=None,
-                        help='Sample index (0-11) for array jobs')
-    parser.add_argument('--summarize', action='store_true',
-                        help='Generate cross-patient summary from existing results')
+    parser.add_argument("sample_index", nargs="?", type=int, default=None, help="Sample index (0-11) for array jobs")
+    parser.add_argument("--summarize", action="store_true", help="Generate cross-patient summary from existing results")
     args = parser.parse_args()
 
     if args.summarize:
@@ -553,7 +573,8 @@ def main():
     if args.sample_index is None:
         # Default: use SLURM_ARRAY_TASK_ID
         import os
-        task_id = os.environ.get('SLURM_ARRAY_TASK_ID')
+
+        task_id = os.environ.get("SLURM_ARRAY_TASK_ID")
         if task_id is not None:
             args.sample_index = int(task_id)
         else:

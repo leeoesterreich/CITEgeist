@@ -15,11 +15,10 @@ Usage:
 
 import argparse
 import logging
-import sys
 import warnings
 from pathlib import Path
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
@@ -28,7 +27,7 @@ import squidpy as sq
 from esda import Moran_BV
 from libpysal.weights import KNN
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # =============================================================================
@@ -38,18 +37,21 @@ V3_EXPANDED_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgei
 OUTPUT_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/output/bivariate_morans_v3")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-PATIENT_DATA_ROOT = Path(
-    "/ix1/alee/LO_LAB/General/Lab_Data/"
-    "20250210_CITEGeistPublicData_GEO_Alex/processed_files"
-)
+PATIENT_DATA_ROOT = Path("/ix1/alee/LO_LAB/General/Lab_Data/" "20250210_CITEGeistPublicData_GEO_Alex/processed_files")
 
 SAMPLES = [
-    "HCC22-088-P1-S1", "HCC22-088-P1-S2",
-    "HCC22-088-P2-S1", "HCC22-088-P2-S2",
-    "HCC22-088-P3-S1_A", "HCC22-088-P3-S2",
-    "HCC22-088-P4-S1", "HCC22-088-P4-S2_1i_rep",
-    "HCC22-088-P5-S1", "HCC22-088-P5-S2_F_rep",
-    "HCC22-088-P6-S1", "HCC22-088-P6-S2_D",
+    "HCC22-088-P1-S1",
+    "HCC22-088-P1-S2",
+    "HCC22-088-P2-S1",
+    "HCC22-088-P2-S2",
+    "HCC22-088-P3-S1_A",
+    "HCC22-088-P3-S2",
+    "HCC22-088-P4-S1",
+    "HCC22-088-P4-S2_1i_rep",
+    "HCC22-088-P5-S1",
+    "HCC22-088-P5-S2_F_rep",
+    "HCC22-088-P6-S1",
+    "HCC22-088-P6-S2_D",
 ]
 
 # Patient pairing for trajectory analysis
@@ -64,18 +66,36 @@ PATIENT_PAIRS = {
 
 # 11 secretory genes from manuscript (T1-2 in evidence ledger)
 SECRETORY_GENES_MANUSCRIPT = [
-    "HSP90B1", "HSPA5", "CALR", "CANX", "PDIA4",
-    "PDIA6", "SEC23A", "SEC61B", "ATF6", "MAN1A1", "XBP1",
+    "HSP90B1",
+    "HSPA5",
+    "CALR",
+    "CANX",
+    "PDIA4",
+    "PDIA6",
+    "SEC23A",
+    "SEC61B",
+    "ATF6",
+    "MAN1A1",
+    "XBP1",
 ]
 
 # Control genes (housekeeping, for comparison — same count as secretory)
 CONTROL_GENES = [
-    "ACTB", "GAPDH", "RPL13", "RPS18", "TUBB",
-    "EEF1A1", "UBC", "ALDOA", "ENO1", "TPI1", "LDHA",
+    "ACTB",
+    "GAPDH",
+    "RPL13",
+    "RPS18",
+    "TUBB",
+    "EEF1A1",
+    "UBC",
+    "ALDOA",
+    "ENO1",
+    "TPI1",
+    "LDHA",
 ]
 
 # Both QP subtypes pooled as a single Epithelial population for Moran's I
-CANCER_TYPES = ['Cancer_Basal', 'Cancer_Luminal']
+CANCER_TYPES = ["Cancer_Basal", "Cancer_Luminal"]
 N_PERM = 999
 KNN_K = 6  # match original methodology
 
@@ -85,7 +105,7 @@ def load_spot_spatial(sample_name):
     patient_dir = PATIENT_DATA_ROOT / sample_name / "outs"
     adata = sq.read.visium(
         str(patient_dir),
-        counts_file='filtered_feature_bc_matrix.h5',
+        counts_file="filtered_feature_bc_matrix.h5",
         load_images=True,
         gex_only=True,
     )
@@ -98,17 +118,17 @@ def aggregate_cancer_to_spots(cell_adata, spot_coords_adata):
     Returns spot-level AnnData with only spots that have cancer cells,
     using spatial coords from the Visium data.
     """
-    cancer_mask = cell_adata.obs['cell_type'].isin(CANCER_TYPES)
+    cancer_mask = cell_adata.obs["cell_type"].isin(CANCER_TYPES)
     cancer_cells = cell_adata[cancer_mask].copy()
 
     if cancer_cells.n_obs == 0:
         return None
 
     # Get raw counts
-    X = cancer_cells.X.toarray() if hasattr(cancer_cells.X, 'toarray') else np.asarray(cancer_cells.X)
+    X = cancer_cells.X.toarray() if hasattr(cancer_cells.X, "toarray") else np.asarray(cancer_cells.X)
 
     # Sum per spot
-    spot_ids = cancer_cells.obs['spot_barcode'].values
+    spot_ids = cancer_cells.obs["spot_barcode"].values
     unique_spots = np.unique(spot_ids)
 
     spot_sums = np.zeros((len(unique_spots), X.shape[1]))
@@ -119,12 +139,16 @@ def aggregate_cancer_to_spots(cell_adata, spot_coords_adata):
         spot_counts[i] = mask.sum()
 
     # Build spot-level AnnData
-    obs = pd.DataFrame({
-        'spot_barcode': unique_spots,
-        'n_cancer_cells': spot_counts,
-    }, index=unique_spots)
+    obs = pd.DataFrame(
+        {
+            "spot_barcode": unique_spots,
+            "n_cancer_cells": spot_counts,
+        },
+        index=unique_spots,
+    )
 
     import anndata
+
     spot_adata = anndata.AnnData(
         X=spot_sums,
         obs=obs,
@@ -134,7 +158,7 @@ def aggregate_cancer_to_spots(cell_adata, spot_coords_adata):
     # Attach spatial coords from Visium
     common = spot_adata.obs_names.intersection(spot_coords_adata.obs_names)
     spot_adata = spot_adata[common].copy()
-    spot_adata.obsm['spatial'] = spot_coords_adata[common].obsm['spatial'].copy()
+    spot_adata.obsm["spatial"] = spot_coords_adata[common].obsm["spatial"].copy()
 
     return spot_adata
 
@@ -142,9 +166,9 @@ def aggregate_cancer_to_spots(cell_adata, spot_coords_adata):
 def compute_bivariate_morans(spot_adata, gene_x, gene_y, n_perm=N_PERM, knn_k=KNN_K):
     """Compute bivariate Moran's I between two genes at spot level."""
     if gene_x not in spot_adata.var_names or gene_y not in spot_adata.var_names:
-        return {'I': np.nan, 'p_value': np.nan, 'present': False}
+        return {"I": np.nan, "p_value": np.nan, "present": False}
 
-    X = spot_adata.X if not hasattr(spot_adata.X, 'toarray') else spot_adata.X.toarray()
+    X = spot_adata.X if not hasattr(spot_adata.X, "toarray") else spot_adata.X.toarray()
     x_idx = list(spot_adata.var_names).index(gene_x)
     y_idx = list(spot_adata.var_names).index(gene_y)
 
@@ -153,17 +177,17 @@ def compute_bivariate_morans(spot_adata, gene_x, gene_y, n_perm=N_PERM, knn_k=KN
 
     # Skip if either has zero variance
     if np.std(x_vals) == 0 or np.std(y_vals) == 0:
-        return {'I': 0.0, 'p_value': 1.0, 'present': True, 'note': 'zero_variance'}
+        return {"I": 0.0, "p_value": 1.0, "present": True, "note": "zero_variance"}
 
-    coords = spot_adata.obsm['spatial']
+    coords = spot_adata.obsm["spatial"]
     w = KNN.from_array(coords, k=knn_k)
-    w.transform = 'r'
+    w.transform = "r"
 
     bv = Moran_BV(x_vals, y_vals, w, permutations=n_perm)
     return {
-        'I': float(bv.I),
-        'p_value': float(bv.p_sim),
-        'present': True,
+        "I": float(bv.I),
+        "p_value": float(bv.p_sim),
+        "present": True,
     }
 
 
@@ -193,7 +217,7 @@ def analyze_sample(sample_name):
     logger.info(f"  Cancer spots: {n_spots}, MDK present: {mdk_present}")
 
     if not mdk_present:
-        logger.warning(f"  MDK not in spot-aggregated genes — skipping")
+        logger.warning("  MDK not in spot-aggregated genes — skipping")
         return None
 
     # Normalize (log1p for Moran's I, matching standard practice)
@@ -204,31 +228,35 @@ def analyze_sample(sample_name):
     per_gene_results = []
     for gene in SECRETORY_GENES_MANUSCRIPT:
         result = compute_bivariate_morans(spot_adata, "MDK", gene)
-        per_gene_results.append({
-            'sample': sample_name,
-            'gene': gene,
-            'gene_type': 'secretory',
-            'morans_I': result['I'],
-            'p_value': result['p_value'],
-            'present': result['present'],
-        })
-        if result['present']:
+        per_gene_results.append(
+            {
+                "sample": sample_name,
+                "gene": gene,
+                "gene_type": "secretory",
+                "morans_I": result["I"],
+                "p_value": result["p_value"],
+                "present": result["present"],
+            }
+        )
+        if result["present"]:
             logger.info(f"    MDK vs {gene}: I={result['I']:.4f}, p={result['p_value']:.3f}")
 
     # --- Control genes ---
     for gene in CONTROL_GENES:
         result = compute_bivariate_morans(spot_adata, "MDK", gene)
-        per_gene_results.append({
-            'sample': sample_name,
-            'gene': gene,
-            'gene_type': 'control',
-            'morans_I': result['I'],
-            'p_value': result['p_value'],
-            'present': result['present'],
-        })
+        per_gene_results.append(
+            {
+                "sample": sample_name,
+                "gene": gene,
+                "gene_type": "control",
+                "morans_I": result["I"],
+                "p_value": result["p_value"],
+                "present": result["present"],
+            }
+        )
 
     # --- Composite bivariate Moran's I (MDK vs secretory score) ---
-    X = spot_adata.X if not hasattr(spot_adata.X, 'toarray') else spot_adata.X.toarray()
+    X = spot_adata.X if not hasattr(spot_adata.X, "toarray") else spot_adata.X.toarray()
     gene_names = list(spot_adata.var_names)
 
     secretory_present = [g for g in SECRETORY_GENES_MANUSCRIPT if g in gene_names]
@@ -240,9 +268,9 @@ def analyze_sample(sample_name):
         mdk_vals = X[:, mdk_idx].flatten().astype(float)
 
         if np.std(secretory_score) > 0 and np.std(mdk_vals) > 0:
-            coords = spot_adata.obsm['spatial']
+            coords = spot_adata.obsm["spatial"]
             w = KNN.from_array(coords, k=KNN_K)
-            w.transform = 'r'
+            w.transform = "r"
             bv = Moran_BV(mdk_vals, secretory_score, w, permutations=N_PERM)
             composite_I = float(bv.I)
             composite_p = float(bv.p_sim)
@@ -254,17 +282,19 @@ def analyze_sample(sample_name):
         composite_p = np.nan
         secretory_present = []
 
-    mdk_nonzero_raw = int((spot_adata[:, "MDK"].X.toarray().flatten() > 0).sum()) if "MDK" in spot_adata.var_names else 0
+    mdk_nonzero_raw = (
+        int((spot_adata[:, "MDK"].X.toarray().flatten() > 0).sum()) if "MDK" in spot_adata.var_names else 0
+    )
 
     composite_result = {
-        'sample': sample_name,
-        'composite_I': composite_I,
-        'composite_p': composite_p,
-        'n_spots': n_spots,
-        'n_cancer_cells': int(spot_adata.obs['n_cancer_cells'].sum()),
-        'mdk_nonzero_spots': mdk_nonzero_raw,
-        'n_secretory_present': len(secretory_present),
-        'secretory_present': ','.join(secretory_present),
+        "sample": sample_name,
+        "composite_I": composite_I,
+        "composite_p": composite_p,
+        "n_spots": n_spots,
+        "n_cancer_cells": int(spot_adata.obs["n_cancer_cells"].sum()),
+        "mdk_nonzero_spots": mdk_nonzero_raw,
+        "n_secretory_present": len(secretory_present),
+        "secretory_present": ",".join(secretory_present),
     }
 
     logger.info(f"  Composite: I={composite_I:.4f}, p={composite_p:.4f}")
@@ -307,48 +337,51 @@ def run_all_and_summarize(sample_indices=None):
 
     # FDR correction on per-gene results (Benjamini-Hochberg)
     from statsmodels.stats.multitest import multipletests
-    valid = per_gene_df['present'] & per_gene_df['p_value'].notna()
+
+    valid = per_gene_df["present"] & per_gene_df["p_value"].notna()
     if valid.sum() > 0:
-        _, fdr, _, _ = multipletests(per_gene_df.loc[valid, 'p_value'], method='fdr_bh')
-        per_gene_df.loc[valid, 'fdr'] = fdr
+        _, fdr, _, _ = multipletests(per_gene_df.loc[valid, "p_value"], method="fdr_bh")
+        per_gene_df.loc[valid, "fdr"] = fdr
     else:
-        per_gene_df['fdr'] = np.nan
+        per_gene_df["fdr"] = np.nan
 
     per_gene_df.to_csv(OUTPUT_DIR / "per_gene_bivariate_morans_v3.csv", index=False)
 
     # Stats for manuscript
-    sec_mask = (per_gene_df['gene_type'] == 'secretory') & per_gene_df['present']
-    ctrl_mask = (per_gene_df['gene_type'] == 'control') & per_gene_df['present']
+    sec_mask = (per_gene_df["gene_type"] == "secretory") & per_gene_df["present"]
+    ctrl_mask = (per_gene_df["gene_type"] == "control") & per_gene_df["present"]
 
     sec_df = per_gene_df[sec_mask]
     ctrl_df = per_gene_df[ctrl_mask]
 
     n_sec_tests = len(sec_df)
-    n_sec_sig = (sec_df['fdr'] < 0.05).sum() if 'fdr' in sec_df.columns else 0
-    mean_sec_I = sec_df['morans_I'].mean()
+    n_sec_sig = (sec_df["fdr"] < 0.05).sum() if "fdr" in sec_df.columns else 0
+    mean_sec_I = sec_df["morans_I"].mean()
 
     n_ctrl_tests = len(ctrl_df)
-    n_ctrl_sig = (ctrl_df['fdr'] < 0.05).sum() if 'fdr' in ctrl_df.columns else 0
-    mean_ctrl_I = ctrl_df['morans_I'].mean()
+    n_ctrl_sig = (ctrl_df["fdr"] < 0.05).sum() if "fdr" in ctrl_df.columns else 0
+    mean_ctrl_I = ctrl_df["morans_I"].mean()
 
     # Per-gene: how many samples each secretory gene is significant
-    gene_sample_sig = sec_df[sec_df['fdr'] < 0.05].groupby('gene').size()
+    gene_sample_sig = sec_df[sec_df["fdr"] < 0.05].groupby("gene").size()
 
     # Composite trajectory deltas
     trajectory_rows = []
     for patient, (biopsy, surgery) in PATIENT_PAIRS.items():
-        biopsy_row = composite_df[composite_df['sample'] == biopsy]
-        surgery_row = composite_df[composite_df['sample'] == surgery]
+        biopsy_row = composite_df[composite_df["sample"] == biopsy]
+        surgery_row = composite_df[composite_df["sample"] == surgery]
         if len(biopsy_row) > 0 and len(surgery_row) > 0:
-            delta = surgery_row.iloc[0]['composite_I'] - biopsy_row.iloc[0]['composite_I']
-            trajectory_rows.append({
-                'patient': patient,
-                'biopsy_sample': biopsy,
-                'surgery_sample': surgery,
-                'biopsy_I': float(biopsy_row.iloc[0]['composite_I']),
-                'surgery_I': float(surgery_row.iloc[0]['composite_I']),
-                'delta_I': float(delta),
-            })
+            delta = surgery_row.iloc[0]["composite_I"] - biopsy_row.iloc[0]["composite_I"]
+            trajectory_rows.append(
+                {
+                    "patient": patient,
+                    "biopsy_sample": biopsy,
+                    "surgery_sample": surgery,
+                    "biopsy_I": float(biopsy_row.iloc[0]["composite_I"]),
+                    "surgery_I": float(surgery_row.iloc[0]["composite_I"]),
+                    "delta_I": float(delta),
+                }
+            )
 
     trajectory_df = pd.DataFrame(trajectory_rows)
     trajectory_df.to_csv(OUTPUT_DIR / "trajectory_deltas_v3.csv", index=False)
@@ -375,54 +408,66 @@ def run_all_and_summarize(sample_indices=None):
     ]
     for gene in SECRETORY_GENES_MANUSCRIPT:
         n = gene_sample_sig.get(gene, 0)
-        n_total = len(set(sec_df[sec_df['gene'] == gene]['sample']))
+        n_total = len(set(sec_df[sec_df["gene"] == gene]["sample"]))
         summary_lines.append(f"    {gene:12s}: {n}/{n_total} samples")
 
-    summary_lines.extend([
-        "",
-        "COMPOSITE BIVARIATE MORAN'S I (MDK vs mean secretory score)",
-        "-" * 60,
-    ])
+    summary_lines.extend(
+        [
+            "",
+            "COMPOSITE BIVARIATE MORAN'S I (MDK vs mean secretory score)",
+            "-" * 60,
+        ]
+    )
     for _, row in composite_df.iterrows():
-        sig = "***" if row['composite_p'] <= 0.001 else ("**" if row['composite_p'] <= 0.01 else ("*" if row['composite_p'] <= 0.05 else ""))
+        sig = (
+            "***"
+            if row["composite_p"] <= 0.001
+            else ("**" if row["composite_p"] <= 0.01 else ("*" if row["composite_p"] <= 0.05 else ""))
+        )
         summary_lines.append(
             f"  {row['sample']:30s}  I={row['composite_I']:.4f}  p={row['composite_p']:.3f} {sig}"
             f"  ({row['n_spots']} spots, {row['n_cancer_cells']} cells, {row['mdk_nonzero_spots']} MDK+ spots)"
         )
     if len(composite_df) > 0:
-        mean_comp = composite_df['composite_I'].mean()
-        n_sig_comp = (composite_df['composite_p'] <= 0.001).sum()
-        summary_lines.extend([
-            f"  Mean composite I: {mean_comp:.4f}",
-            f"  Significant (p<=0.001): {n_sig_comp}/{len(composite_df)}",
-        ])
+        mean_comp = composite_df["composite_I"].mean()
+        n_sig_comp = (composite_df["composite_p"] <= 0.001).sum()
+        summary_lines.extend(
+            [
+                f"  Mean composite I: {mean_comp:.4f}",
+                f"  Significant (p<=0.001): {n_sig_comp}/{len(composite_df)}",
+            ]
+        )
 
-    summary_lines.extend([
-        "",
-        "PATIENT TRAJECTORIES (biopsy → surgery)",
-        "-" * 60,
-    ])
+    summary_lines.extend(
+        [
+            "",
+            "PATIENT TRAJECTORIES (biopsy → surgery)",
+            "-" * 60,
+        ]
+    )
     for _, row in trajectory_df.iterrows():
-        direction = "↑" if row['delta_I'] > 0 else "↓"
+        direction = "↑" if row["delta_I"] > 0 else "↓"
         summary_lines.append(
             f"  {row['patient']}: {row['biopsy_I']:.4f} → {row['surgery_I']:.4f}  "
             f"(delta = {row['delta_I']:+.4f} {direction})"
         )
 
-    summary_lines.extend([
-        "",
-        "MANUSCRIPT COMPARISON",
-        "-" * 60,
-        f"  Current manuscript (v7.md): mean I = 0.224, {123 if n_sec_tests >= 132 else '?'}/132 sig",
-        f"  v3 recomputation:           mean I = {mean_sec_I:.3f}, {n_sec_sig}/{n_sec_tests} sig",
-        f"  Old persisted CSV (spot-level): mean I = 0.367 (composite, different method)",
-        "",
-    ])
+    summary_lines.extend(
+        [
+            "",
+            "MANUSCRIPT COMPARISON",
+            "-" * 60,
+            f"  Current manuscript (v7.md): mean I = 0.224, {123 if n_sec_tests >= 132 else '?'}/132 sig",
+            f"  v3 recomputation:           mean I = {mean_sec_I:.3f}, {n_sec_sig}/{n_sec_tests} sig",
+            "  Old persisted CSV (spot-level): mean I = 0.367 (composite, different method)",
+            "",
+        ]
+    )
 
     summary_text = "\n".join(summary_lines)
-    with open(OUTPUT_DIR / "bivariate_morans_v3_summary.txt", 'w') as f:
+    with open(OUTPUT_DIR / "bivariate_morans_v3_summary.txt", "w") as f:
         f.write(summary_text)
-    logger.info(f"\n{summary_text}")
+    logger.info("\n%s", summary_text)
 
     # Manuscript numbers comparison
     logger.info("=" * 60)
@@ -436,10 +481,9 @@ def run_all_and_summarize(sample_indices=None):
     logger.info("=" * 60)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--sample', type=int, default=None,
-                        help='Single sample index (0-11)')
+    parser.add_argument("--sample", type=int, default=None, help="Single sample index (0-11)")
     args = parser.parse_args()
 
     if args.sample is not None:

@@ -156,3 +156,9 @@ replicates/
 midkine/
 !midkine/if_analysis/
 !midkine/if_analysis/bivariate_morans_results.csv
+
+# Dead/archived code — kept locally, not tracked
+CITEgeist/model/_archive/
+CITEgeist/junk/
+CITEgeist/examples/_archive/
+CITEgeist/tests/

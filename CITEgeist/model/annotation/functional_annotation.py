@@ -16,6 +16,7 @@ where:
     - b_m is per-marker background
     - r_m is per-marker NB dispersion
 """
+
 import logging
 from typing import Dict, List, Optional, Tuple
 
@@ -42,8 +43,15 @@ DEFAULT_FUNCTIONAL_TABLE: Dict[str, Dict] = {
     "PCNA": {
         "function": "Proliferation",
         "active_types": [
-            "Endothelial", "Fibroblasts", "B_Cells", "Macrophages", "Monocytes",
-            "CD8_T_Cells", "CD4_T_Cells", "Epithelial", "Dendritic_Cells",
+            "Endothelial",
+            "Fibroblasts",
+            "B_Cells",
+            "Macrophages",
+            "Monocytes",
+            "CD8_T_Cells",
+            "CD4_T_Cells",
+            "Epithelial",
+            "Dendritic_Cells",
         ],
     },
     # --- Survival / apoptosis ---
@@ -115,6 +123,7 @@ DEFAULT_FUNCTIONAL_TABLE: Dict[str, Dict] = {
 # build_active_mask
 # ---------------------------------------------------------------------------
 
+
 def build_active_mask(
     functional_markers: List[str],
     cell_types: List[str],
@@ -158,11 +167,13 @@ def build_active_mask(
 # learn_functional_emissions
 # ---------------------------------------------------------------------------
 
+
 def learn_functional_emissions(
     observed: np.ndarray,
     proportions: np.ndarray,
     active_mask: np.ndarray,
     size_factors: np.ndarray,
+    *,
     max_iter: int = 200,
     lr: float = 0.01,
     early_stopping_patience: int = 20,
@@ -214,12 +225,8 @@ def learn_functional_emissions(
     N, M = observed.shape
     T = proportions.shape[1]
 
-    assert active_mask.shape == (T, M), (
-        f"active_mask shape {active_mask.shape} does not match (T={T}, M={M})"
-    )
-    assert size_factors.shape == (N,), (
-        f"size_factors shape {size_factors.shape} does not match N={N}"
-    )
+    assert active_mask.shape == (T, M), f"active_mask shape {active_mask.shape} does not match (T={T}, M={M})"
+    assert size_factors.shape == (N,), f"size_factors shape {size_factors.shape} does not match N={N}"
 
     MIN_SUPPORT_SPOTS = 20
     MIN_DOMINANT_SPOTS = 20
@@ -228,8 +235,8 @@ def learn_functional_emissions(
     dev = torch.device(device)
 
     # --- Identify active pairs and filter for support ---
-    active_pairs = []      # list of (t_idx, m_idx) with sufficient support
-    skipped_pairs = []     # list of (t_idx, m_idx) with insufficient support
+    active_pairs = []  # list of (t_idx, m_idx) with sufficient support
+    skipped_pairs = []  # list of (t_idx, m_idx) with insufficient support
 
     for t_idx in range(T):
         for m_idx in range(M):
@@ -240,7 +247,10 @@ def learn_functional_emissions(
                 skipped_pairs.append((t_idx, m_idx))
                 logger.debug(
                     "Skipping pair (t=%d, m=%d): only %d spots with p > %.2f",
-                    t_idx, m_idx, support, MIN_PROPORTION_THRESHOLD,
+                    t_idx,
+                    m_idx,
+                    support,
+                    MIN_PROPORTION_THRESHOLD,
                 )
             else:
                 active_pairs.append((t_idx, m_idx))
@@ -248,7 +258,8 @@ def learn_functional_emissions(
     n_active = len(active_pairs)
     logger.info(
         "learn_functional_emissions: %d active pairs, %d skipped (insufficient support)",
-        n_active, len(skipped_pairs),
+        n_active,
+        len(skipped_pairs),
     )
 
     if n_active == 0:
@@ -332,8 +343,8 @@ def learn_functional_emissions(
     def _compute_nll_functional(spot_mask_t):
         """Compute NB NLL on spots selected by spot_mask_t."""
         lam_active_vals = torch.exp(log_lam)  # (n_active,)
-        r = torch.exp(log_r)                  # (M,)
-        b = torch.exp(log_b)                  # (M,)
+        r = torch.exp(log_r)  # (M,)
+        b = torch.exp(log_b)  # (M,)
 
         # Build full (T, M) lambda matrix (inactive pairs = 0)
         lam_full = torch.zeros(T, M, dtype=torch.float32, device=dev)
@@ -377,9 +388,7 @@ def learn_functional_emissions(
         train_nll = _compute_nll_functional(train_mask_t)
 
         # Log-normal prior on lambda: log(lambda) ~ N(log(lam_init), sigma^2)
-        lam_prior = (
-            (log_lam - torch.log(lam_init_t + 1e-8)) ** 2
-        ).sum() / (2.0 * lambda_sigma ** 2)
+        lam_prior = ((log_lam - torch.log(lam_init_t + 1e-8)) ** 2).sum() / (2.0 * lambda_sigma**2)
 
         loss = train_nll + lam_prior / max(train_mask.sum(), 1)
         loss.backward()
@@ -402,7 +411,8 @@ def learn_functional_emissions(
             if patience_counter >= early_stopping_patience:
                 logger.info(
                     "Early stopping at iteration %d (patience=%d).",
-                    iteration, early_stopping_patience,
+                    iteration,
+                    early_stopping_patience,
                 )
                 break
 
@@ -429,12 +439,14 @@ def learn_functional_emissions(
 # gate_functional_markers
 # ---------------------------------------------------------------------------
 
+
 def gate_functional_markers(
     observed: np.ndarray,
     proportions: np.ndarray,
     lam: np.ndarray,
     background: np.ndarray,
     size_factors: np.ndarray,
+    *,
     active_mask: np.ndarray,
     cell_types: List[str],
     functional_markers: List[str],
@@ -477,8 +489,8 @@ def gate_functional_markers(
     """
     from sklearn.mixture import GaussianMixture  # pylint: disable=import-outside-toplevel
 
-    N, M = observed.shape
-    T = proportions.shape[1]
+    N, _ = observed.shape
+    _ = proportions.shape[1]
 
     # Compute expected counts: mu[i,m] = s_i * (p @ lam + b)[m]
     expected = size_factors[:, None] * (proportions @ lam + background[None, :])  # (N, M)
@@ -530,10 +542,7 @@ def gate_functional_markers(
 
                 means = gmm.means_.flatten()
                 stds = np.sqrt(gmm.covariances_.flatten())
-                pooled_std = np.sqrt(
-                    gmm.weights_[0] * stds[0] ** 2
-                    + gmm.weights_[1] * stds[1] ** 2
-                )
+                pooled_std = np.sqrt(gmm.weights_[0] * stds[0] ** 2 + gmm.weights_[1] * stds[1] ** 2)
                 component_separation = abs(means[0] - means[1])
 
                 if component_separation < 0.5 * pooled_std:
@@ -550,17 +559,15 @@ def gate_functional_markers(
                     posteriors = gmm.predict_proba(log_ratio_all)  # (N, 2)
                     high_posterior = posteriors[:, high_comp]
 
-                    positive_mask = (
-                        qualifying
-                        & (high_posterior > 0.5)
-                        & (ratio_all > 1.0)
-                    )
+                    positive_mask = qualifying & (high_posterior > 0.5) & (ratio_all > 1.0)
                     gating_method = "gmm"
 
             except Exception as exc:  # pylint: disable=broad-except
                 logger.warning(
                     "GMM failed for (%s, %s): %s; using ratio > 1 fallback.",
-                    ct, marker, exc,
+                    ct,
+                    marker,
+                    exc,
                 )
                 gating_method = "ratio_fallback_exception"
                 positive_mask = qualifying & (ratio_all > 1.0)
@@ -583,6 +590,7 @@ def gate_functional_markers(
 # ---------------------------------------------------------------------------
 # compute_spatial_statistics
 # ---------------------------------------------------------------------------
+
 
 def compute_spatial_statistics(
     gates_df: pd.DataFrame,
@@ -608,12 +616,11 @@ def compute_spatial_statistics(
         import anndata  # pylint: disable=import-outside-toplevel
         import scipy.sparse as sp  # pylint: disable=import-outside-toplevel
         import squidpy as sq  # pylint: disable=import-outside-toplevel
+
         _has_squidpy = True
     except ImportError:
         _has_squidpy = False
-        logger.warning(
-            "squidpy not available; spatial statistics will return NaN."
-        )
+        logger.warning("squidpy not available; spatial statistics will return NaN.")
 
     results = {}
     N = spot_coords.shape[0]
@@ -666,7 +673,9 @@ def compute_spatial_statistics(
         if n_positive < 5 or (N - n_positive) < 5:
             logger.debug(
                 "Pair (%s, %s): too few positives (%d) or negatives for Moran's I.",
-                ct, marker, n_positive,
+                ct,
+                marker,
+                n_positive,
             )
             results[(ct, marker)] = nan_result
             continue
@@ -693,14 +702,13 @@ def compute_spatial_statistics(
             # (Cliff & Ord 1981, standard formula)
             E_I = -1.0 / max(N - 1, 1)
             n = N
-            b2 = float(np.mean(xz ** 4)) / (float(np.mean(xz ** 2)) ** 2 + 1e-12)
-            var_I_numerator = (
-                n * ((n ** 2 - 3 * n + 3) * S1 - n * S2 + 3 * S0 ** 2)
-                - b2 * ((n ** 2 - n) * S1 - 2 * n * S2 + 6 * S0 ** 2)
+            b2 = float(np.mean(xz**4)) / (float(np.mean(xz**2)) ** 2 + 1e-12)
+            var_I_numerator = n * ((n**2 - 3 * n + 3) * S1 - n * S2 + 3 * S0**2) - b2 * (
+                (n**2 - n) * S1 - 2 * n * S2 + 6 * S0**2
             )
-            var_I_denominator = (n - 1) * (n - 2) * (n - 3) * S0 ** 2
+            var_I_denominator = (n - 1) * (n - 2) * (n - 3) * S0**2
             if var_I_denominator > 0:
-                var_I = var_I_numerator / var_I_denominator - E_I ** 2
+                var_I = var_I_numerator / var_I_denominator - E_I**2
             else:
                 var_I = 1.0
             var_I = max(var_I, 1e-12)
@@ -713,7 +721,9 @@ def compute_spatial_statistics(
         except Exception as exc:  # pylint: disable=broad-except
             logger.warning(
                 "Moran's I computation failed for (%s, %s): %s",
-                ct, marker, exc,
+                ct,
+                marker,
+                exc,
             )
             results[(ct, marker)] = nan_result
 
@@ -724,12 +734,14 @@ def compute_spatial_statistics(
 # gmm_gate_cells
 # ---------------------------------------------------------------------------
 
+
 def gmm_gate_cells(
     cell_protein: np.ndarray,
     cell_types: np.ndarray,
     type_names: List[str],
     marker_names: List[str],
     active_mask: np.ndarray,
+    *,
     min_cells: int = 20,
     bimodality_threshold: float = 1.5,
     posterior_threshold: float = 0.5,
@@ -810,8 +822,10 @@ def gmm_gate_cells(
             n_nan = int(np.isnan(values).sum())
             if n_nan > 0:
                 logger.warning(
-                    "gmm_gate_cells: %d NaN values in cell_protein for (%s, %s); "
-                    "replacing with 0 before GMM fit.", n_nan, ct, marker,
+                    "gmm_gate_cells: %d NaN values in cell_protein for (%s, %s); " "replacing with 0 before GMM fit.",
+                    n_nan,
+                    ct,
+                    marker,
                 )
                 values = np.where(np.isnan(values), 0.0, values)
             log_values = np.log(np.maximum(values, 1e-8)).reshape(-1, 1)
@@ -831,10 +845,7 @@ def gmm_gate_cells(
 
                 means = gmm.means_.flatten()
                 stds = np.sqrt(gmm.covariances_.flatten())
-                pooled_std = np.sqrt(
-                    gmm.weights_[0] * stds[0] ** 2
-                    + gmm.weights_[1] * stds[1] ** 2
-                )
+                pooled_std = np.sqrt(gmm.weights_[0] * stds[0] ** 2 + gmm.weights_[1] * stds[1] ** 2)
                 separation = abs(means[0] - means[1])
 
                 if separation < bimodality_threshold * pooled_std:
@@ -854,9 +865,7 @@ def gmm_gate_cells(
                         gating_method = "gmm_bimodal"
 
             except Exception as exc:  # pylint: disable=broad-except
-                logger.warning(
-                    "GMM failed for (%s, %s): %s. Using fallback.", ct, marker, exc
-                )
+                logger.warning("GMM failed for (%s, %s): %s. Using fallback.", ct, marker, exc)
                 gating_method = "threshold_fallback_error"
 
             gate_cols[col_name] = gates

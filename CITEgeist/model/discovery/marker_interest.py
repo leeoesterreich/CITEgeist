@@ -46,7 +46,8 @@ class MarkerInterestResult:
     morans_threshold: float
     morans_k: int
     morans_alpha: float
-    signal_masks: Optional[NDArray[np.bool_]] = field(default=None, repr=False)  # (n_spots, n_markers) boolean, True = signal component
+    signal_masks: Optional[NDArray[np.bool_]] = field(default=None, repr=False)
+    """(n_spots, n_markers) boolean, True = signal component."""
     signal_mask_marker_names: Optional[List[str]] = None  # marker names corresponding to columns
 
     def to_dataframe(self) -> pd.DataFrame:
@@ -73,18 +74,12 @@ class MarkerInterestResult:
     @property
     def interesting_markers(self) -> List[str]:
         """Return names of markers passing EITHER kurtosis OR Moran's I gate (plus GMM)."""
-        return [
-            m.name for m in self.markers
-            if (m.passed_kurtosis or m.passed_morans) and m.passed_gmm
-        ]
+        return [m.name for m in self.markers if (m.passed_kurtosis or m.passed_morans) and m.passed_gmm]
 
     @property
     def boring_markers(self) -> List[str]:
         """Return names of markers failing both kurtosis AND Moran's I gates (or GMM)."""
-        return [
-            m.name for m in self.markers
-            if not ((m.passed_kurtosis or m.passed_morans) and m.passed_gmm)
-        ]
+        return [m.name for m in self.markers if not ((m.passed_kurtosis or m.passed_morans) and m.passed_gmm)]
 
 
 def _compute_kurtosis(X: NDArray[np.floating]) -> NDArray[np.floating]:
@@ -177,8 +172,9 @@ def _fit_gmm_per_marker(
             posteriors = gmm.predict_proba(values)
             signal_masks[:, m] = posteriors[:, signal_idx] > 0.5
 
-        except Exception as e:
-            logging.debug(f"GMM fitting failed for marker {m}: {e}")
+        except (ValueError, RuntimeError) as e:
+
+            logging.debug("GMM fitting failed for marker %s: %s", m, e)
             snr_values[m] = 0.0
             signal_fractions[m] = 0.0
 
@@ -252,7 +248,7 @@ def _compute_morans_i_batch(
 
     tree = cKDTree(coords)
     query_k = min(k + 1, n_spots)
-    dists, idx = tree.query(coords, k=query_k)
+    _, idx = tree.query(coords, k=query_k)
 
     # Handle 1D array case
     if idx.ndim == 1:
@@ -372,14 +368,18 @@ def _fit_kurtosis_gmm(
         passed_kurtosis[valid_mask] = passed_valid
 
         logging.info(
-            f"Kurtosis GMM: low_mean={mu_low:.2f}, high_mean={mu_high:.2f}, "
-            f"threshold={learned_threshold:.2f}, n_high={passed_kurtosis.sum()}"
+            "Kurtosis GMM: low_mean=%s, high_mean=%s, threshold=%s, n_high=%s",
+            round(mu_low, 2),
+            round(mu_high, 2),
+            round(learned_threshold, 2),
+            passed_kurtosis.sum(),
         )
 
         return float(learned_threshold), passed_kurtosis
 
-    except Exception as e:
-        logging.warning(f"Kurtosis GMM fitting failed: {e}, falling back to threshold=2.0")
+    except (ValueError, RuntimeError) as e:
+
+        logging.warning("Kurtosis GMM fitting failed: %s, falling back to threshold=2.0", e)
         return 2.0, kurtosis_values >= 2.0
 
 
@@ -451,14 +451,18 @@ def _fit_morans_gmm(
         passed_morans[valid_mask] = passed_valid
 
         logging.info(
-            f"Moran's I GMM: low_mean={mu_low:.3f}, high_mean={mu_high:.3f}, "
-            f"threshold={learned_threshold:.3f}, n_high={passed_morans.sum()}"
+            "Moran's I GMM: low_mean=%s, high_mean=%s, threshold=%s, n_high=%s",
+            round(mu_low, 3),
+            round(mu_high, 3),
+            round(learned_threshold, 3),
+            passed_morans.sum(),
         )
 
         return float(learned_threshold), passed_morans
 
-    except Exception as e:
-        logging.warning(f"Moran's I GMM fitting failed: {e}, falling back to threshold=0.1")
+    except (ValueError, RuntimeError) as e:
+
+        logging.warning("Moran's I GMM fitting failed: %s, falling back to threshold=0.1", e)
         return 0.1, morans_values >= 0.1
 
 
@@ -553,12 +557,11 @@ def identify_interesting_markers(
 
     if len(marker_names) != n_markers:
         raise ValueError(
-            f"Number of marker names ({len(marker_names)}) must match "
-            f"number of columns in X ({n_markers})"
+            f"Number of marker names ({len(marker_names)}) must match " f"number of columns in X ({n_markers})"
         )
 
     if verbose:
-        logging.info(f"Analyzing {n_markers} markers across {n_spots} spots")
+        logging.info("Analyzing %s markers across %s spots", n_markers, n_spots)
 
     rng = np.random.default_rng(seed)
 
@@ -584,12 +587,12 @@ def identify_interesting_markers(
 
     # Step 4: Spatial smoothing before Moran's I
     if verbose:
-        logging.info(f"Applying spatial smoothing (k={smooth_k} neighbors)...")
+        logging.info("Applying spatial smoothing (k=%s neighbors)...", smooth_k)
     X_smoothed = _spatial_smooth(X, coords, smooth_k)
 
     # Step 5: Compute Moran's I on smoothed, z-scored data
     if verbose:
-        logging.info(f"Computing Moran's I on smoothed data (k={morans_k}, {morans_n_perm} permutations)...")
+        logging.info("Computing Moran's I on smoothed data (k=%s, %s permutations)...", morans_k, morans_n_perm)
 
     # Z-score the smoothed data
     Z = np.zeros_like(X_smoothed)
@@ -632,18 +635,20 @@ def identify_interesting_markers(
         # Compute combined score
         interest = _compute_interest_score(kurt, snr, morans_i if not np.isnan(morans_i) else 0.0)
 
-        markers.append(MarkerInterest(
-            name=name,
-            interest_score=interest,
-            kurtosis=kurt,
-            gmm_snr=snr,
-            gmm_signal_fraction=sig_frac,
-            morans_i=morans_i if not np.isnan(morans_i) else 0.0,
-            morans_i_pvalue=morans_p,
-            passed_kurtosis=passed_kurt,
-            passed_gmm=passed_gmm,
-            passed_morans=passed_morans,
-        ))
+        markers.append(
+            MarkerInterest(
+                name=name,
+                interest_score=interest,
+                kurtosis=kurt,
+                gmm_snr=snr,
+                gmm_signal_fraction=sig_frac,
+                morans_i=morans_i if not np.isnan(morans_i) else 0.0,
+                morans_i_pvalue=morans_p,
+                passed_kurtosis=passed_kurt,
+                passed_gmm=passed_gmm,
+                passed_morans=passed_morans,
+            )
+        )
 
     # Sort by interest score
     markers.sort(key=lambda x: x.interest_score, reverse=True)
@@ -664,8 +669,12 @@ def identify_interesting_markers(
         n_morans_only = sum(1 for m in markers if m.passed_morans and not m.passed_kurtosis and m.passed_gmm)
         n_both = sum(1 for m in markers if m.passed_kurtosis and m.passed_morans and m.passed_gmm)
         logging.info(
-            f"Found {n_interesting}/{n_markers} interesting markers "
-            f"(kurtosis_only={n_kurtosis_only}, morans_only={n_morans_only}, both={n_both})"
+            "Found %s/%s interesting markers (kurtosis_only=%s, morans_only=%s, both=%s)",
+            n_interesting,
+            n_markers,
+            n_kurtosis_only,
+            n_morans_only,
+            n_both,
         )
 
     return result

@@ -3,10 +3,10 @@
 Trains NB emission profiles from annotated scRNA-seq, then refines
 cuOPT QP proportions via MAP inference with Dirichlet protein prior.
 """
+
 import logging
 import pickle
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -48,6 +48,7 @@ class ReferenceProfile:
 
 def train_reference(
     reference_adata: sc.AnnData,
+    *,
     cell_type_col: str = "cell_type",
     spatial_genes: Optional[List[str]] = None,
     n_markers_per_type: int = 20,
@@ -75,9 +76,7 @@ def train_reference(
     # --- Apply type mapping (pool subtypes) ---
     if type_mapping is not None:
         raw_labels = adata.obs[cell_type_col].values.copy()
-        mapped_labels = np.array(
-            [type_mapping.get(str(l), str(l)) for l in raw_labels]
-        )
+        mapped_labels = np.array([type_mapping.get(str(lbl), str(lbl)) for lbl in raw_labels])
         adata.obs[cell_type_col] = mapped_labels
 
     # --- Filter to spatial gene universe ---
@@ -87,20 +86,20 @@ def train_reference(
             raise ValueError("No shared genes between reference and spatial data.")
         logger.info(
             "Filtered to %d shared genes (ref=%d, spatial=%d)",
-            len(shared), adata.n_vars, len(spatial_genes),
+            len(shared),
+            adata.n_vars,
+            len(spatial_genes),
         )
         adata = adata[:, shared].copy()
 
     # --- Differential expression ---
     # Store raw counts for mu estimation, but run DE on log-normalized data
-    raw_X = adata.X.copy() if not hasattr(adata.X, 'toarray') else adata.X.toarray().copy()
+    raw_X = adata.X.copy() if not hasattr(adata.X, "toarray") else adata.X.toarray().copy()
     adata_de = adata.copy()
     sc.pp.normalize_total(adata_de, target_sum=1e4)
     sc.pp.log1p(adata_de)
     # Request 3x markers to allow deduplication headroom
-    sc.tl.rank_genes_groups(
-        adata_de, groupby=cell_type_col, method=de_method, n_genes=n_markers_per_type * 3
-    )
+    sc.tl.rank_genes_groups(adata_de, groupby=cell_type_col, method=de_method, n_genes=n_markers_per_type * 3)
     de_results = sc.get.rank_genes_groups_df(adata_de, group=None)
 
     # --- Select top marker genes (deduplicated) ---
@@ -108,9 +107,7 @@ def train_reference(
     selected_genes = []
     seen_genes = set()
     for tname in type_names_sorted:
-        type_de = de_results[de_results["group"] == tname].sort_values(
-            "scores", ascending=False
-        )
+        type_de = de_results[de_results["group"] == tname].sort_values("scores", ascending=False)
         count = 0
         for _, row in type_de.iterrows():
             if count >= n_markers_per_type:
@@ -126,7 +123,8 @@ def train_reference(
 
     logger.info(
         "Selected %d marker genes across %d types",
-        len(selected_genes), len(type_names_sorted),
+        len(selected_genes),
+        len(type_names_sorted),
     )
 
     # --- Compute mu (raw count scale) and alpha (overdispersion) ---
@@ -136,7 +134,9 @@ def train_reference(
     if missing_genes:
         logger.warning(
             "%d/%d selected marker genes NOT in filtered adata (removing): %s",
-            len(missing_genes), len(selected_genes), missing_genes[:5],
+            len(missing_genes),
+            len(selected_genes),
+            missing_genes[:5],
         )
         selected_genes = [g for g in selected_genes if g in adata_genes]
     logger.info("Subsetting adata (%d genes) to %d marker genes", adata.n_vars, len(selected_genes))
@@ -163,7 +163,7 @@ def train_reference(
 
         # Method of moments on raw counts: alpha = (var - mean) / mean^2
         mean_safe = np.maximum(mu[i], 1e-8)
-        alpha_raw = (var_type - mu[i]) / (mean_safe ** 2)
+        alpha_raw = (var_type - mu[i]) / (mean_safe**2)
         alpha_per_type[i] = np.maximum(alpha_raw, 0.01)
 
     # Pool alpha across types via median (robust to outlier types)
@@ -184,6 +184,7 @@ def refine_proportions_nb(
     spot_counts: np.ndarray,
     pi_protein: np.ndarray,
     reference: ReferenceProfile,
+    *,
     kappa: float = 10.0,
     epsilon: float = 1.0,
     lr: float = 0.1,
@@ -207,10 +208,10 @@ def refine_proportions_nb(
     Returns:
         (N, T) refined proportions on the simplex.
     """
-    import torch
+    import torch  # pylint: disable=import-outside-toplevel
 
-    N, G = spot_counts.shape
-    T = pi_protein.shape[1]
+    _, _ = spot_counts.shape
+    _ = pi_protein.shape[1]
 
     Y = torch.tensor(spot_counts, dtype=torch.float64, device=device)
     mu = torch.tensor(reference.mu, dtype=torch.float64, device=device)

@@ -1,7 +1,9 @@
 """Distribute deconvolved GEX to individual cells."""
+
+from typing import Dict, List
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List
 
 
 def distribute_gex_to_cells(
@@ -25,19 +27,15 @@ def distribute_gex_to_cells(
     """
     # Build nucleus info
     nucleus_info = nucleus_spot_map.copy()
-    nucleus_info['cell_type'] = nucleus_info['nucleus_id'].map(assignments)
+    nucleus_info["cell_type"] = nucleus_info["nucleus_id"].map(assignments)
 
     # Initialize output
     genes = deconvolved_gex.columns
-    cell_gex = pd.DataFrame(
-        index=nucleus_info['nucleus_id'],
-        columns=genes,
-        dtype=float
-    )
+    cell_gex = pd.DataFrame(index=nucleus_info["nucleus_id"], columns=genes, dtype=float)
     cell_gex[:] = 0.0
 
     # Group by spot and cell type
-    for (spot_id, cell_type), group in nucleus_info.groupby(['spot_id', 'cell_type']):
+    for (spot_id, cell_type), group in nucleus_info.groupby(["spot_id", "cell_type"]):
         layer_key = f"{spot_id}:::{cell_type}"
 
         if layer_key not in deconvolved_gex.index:
@@ -51,15 +49,13 @@ def distribute_gex_to_cells(
         per_cell_expr = layer_expr / n_cells
 
         # Assign to each cell
-        for nid in group['nucleus_id']:
+        for nid in group["nucleus_id"]:
             cell_gex.loc[nid] = per_cell_expr.values
 
     return cell_gex
 
 
-def _compute_reference_profiles(
-    proportions: pd.DataFrame, spot_gex: pd.DataFrame, type_names: List[str]
-) -> np.ndarray:
+def _compute_reference_profiles(proportions: pd.DataFrame, spot_gex: pd.DataFrame, type_names: List[str]) -> np.ndarray:
     """Compute per-type GEX profiles via least-squares deconvolution.
 
     Solves gex = P @ beta for beta via least squares, where P is the
@@ -82,7 +78,7 @@ def _compute_reference_profiles(
     return beta
 
 
-def allocate_gex_type_reference(
+def allocate_gex_type_reference(  # pylint: disable=too-many-positional-arguments
     hard_labels: np.ndarray,
     scores: np.ndarray,
     type_names: List[str],
@@ -113,22 +109,15 @@ def allocate_gex_type_reference(
     ref_profiles = _compute_reference_profiles(proportions, spot_gex[gene_names], type_names)
     cell_gex = np.zeros((len(nucleus_ids), len(gene_names)), dtype=float)
 
-    barcode_groups = (
-        pd.DataFrame({'barcode': barcodes, 'idx': range(len(barcodes))})
-        .groupby('barcode')
-    )
+    barcode_groups = pd.DataFrame({"barcode": barcodes, "idx": range(len(barcodes))}).groupby("barcode")
     for barcode, group in barcode_groups:
         if barcode not in spot_gex.index:
             continue
-        cell_indices = group['idx'].to_numpy()
-        assigned_idx = np.array(
-            [type_to_idx[hard_labels[ci]] for ci in cell_indices], dtype=int
-        )
+        cell_indices = group["idx"].to_numpy()
+        assigned_idx = np.array([type_to_idx[hard_labels[ci]] for ci in cell_indices], dtype=int)
         soft_scores = scores[cell_indices, assigned_idx]
         profile_matrix = ref_profiles[assigned_idx]
-        gene_weights = np.maximum(
-            soft_scores[:, None] * np.maximum(profile_matrix, 0.0), 1e-12
-        )
+        gene_weights = np.maximum(soft_scores[:, None] * np.maximum(profile_matrix, 0.0), 1e-12)
         gene_weight_sums = gene_weights.sum(axis=0, keepdims=True)
         gene_weight_sums[gene_weight_sums <= 0] = 1.0
         spot_vector = spot_gex.loc[barcode, gene_names].to_numpy(dtype=float)

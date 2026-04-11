@@ -78,9 +78,7 @@ class PatchEmbed(nn.Module):
         self.grid_size = img_size // patch_size
 
         # Conv2d with kernel_size=stride=patch_size creates non-overlapping patches
-        self.proj = nn.Conv2d(
-            in_chans, embed_dim, kernel_size=patch_size, stride=patch_size
-        )
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -113,6 +111,7 @@ class Attention(nn.Module):
 
     def __init__(
         self,
+        *,
         dim: int = 384,
         num_heads: int = 6,
         qkv_bias: bool = True,
@@ -122,7 +121,7 @@ class Attention(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
-        self.scale = self.head_dim ** -0.5
+        self.scale = self.head_dim**-0.5
 
         # Combined Q, K, V projection for efficiency
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
@@ -146,9 +145,16 @@ class Attention(nn.Module):
         q, k, v = qkv.unbind(0)  # Each: (B, heads, N, head_dim)
 
         # Scaled dot-product attention (use SDPA for better AMP/CUBLAS compat)
-        x = F.scaled_dot_product_attention(
-            q, k, v, dropout_p=self.attn_drop.p if self.training else 0.0,
-        ).transpose(1, 2).reshape(B, N, D)  # (B, N, D)
+        x = (
+            F.scaled_dot_product_attention(
+                q,
+                k,
+                v,
+                dropout_p=self.attn_drop.p if self.training else 0.0,
+            )
+            .transpose(1, 2)
+            .reshape(B, N, D)
+        )  # (B, N, D)
 
         # Output projection
         x = self.proj(x)
@@ -218,6 +224,7 @@ class TransformerBlock(nn.Module):
 
     def __init__(
         self,
+        *,
         dim: int = 384,
         num_heads: int = 6,
         mlp_ratio: float = 4.0,
@@ -285,6 +292,7 @@ class ViTEncoder(nn.Module):
 
     def __init__(
         self,
+        *,
         img_size: int = 96,
         patch_size: int = 16,
         in_chans: int = 2,
@@ -318,17 +326,19 @@ class ViTEncoder(nn.Module):
         self.pos_drop = nn.Dropout(p=drop_rate)
 
         # Transformer blocks
-        self.blocks = nn.ModuleList([
-            TransformerBlock(
-                dim=embed_dim,
-                num_heads=num_heads,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                drop=drop_rate,
-                attn_drop=attn_drop_rate,
-            )
-            for _ in range(depth)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                TransformerBlock(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                )
+                for _ in range(depth)
+            ]
+        )
 
         # Final LayerNorm
         self.norm = nn.LayerNorm(embed_dim)
@@ -394,11 +404,11 @@ class ViTEncoder(nn.Module):
         patch_pos = self.pos_embed[:, 1:, :]  # (1, N_old, D)
 
         dim = patch_pos.shape[-1]
-        old_grid = int(num_old_patches ** 0.5)
-        new_grid = int(num_new_patches ** 0.5)
+        old_grid = int(num_old_patches**0.5)
+        new_grid = int(num_new_patches**0.5)
 
         patch_pos = patch_pos.reshape(1, old_grid, old_grid, dim).permute(0, 3, 1, 2)
-        patch_pos = F.interpolate(patch_pos, size=(new_grid, new_grid), mode='bicubic', align_corners=False)
+        patch_pos = F.interpolate(patch_pos, size=(new_grid, new_grid), mode="bicubic", align_corners=False)
         patch_pos = patch_pos.permute(0, 2, 3, 1).reshape(1, new_grid * new_grid, dim)
 
         return torch.cat([cls_pos, patch_pos], dim=1)
@@ -454,7 +464,7 @@ class ViTEncoder(nn.Module):
         # Final LayerNorm
         x = self.norm(x)
 
-        if return_patch_tokens:
+        if return_patch_tokens:  # pylint: disable=no-else-return
             # Return CLS token and patch tokens separately
             cls_token = x[:, 0]  # (B, embed_dim)
             patch_tokens = x[:, 1:]  # (B, num_patches, embed_dim)

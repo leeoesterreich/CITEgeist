@@ -12,42 +12,39 @@ This script runs the full MDK analysis pipeline:
 Research Question: Why does MDK secretion increase in MCF7-D538G but not T47D-D538G?
 """
 
+import logging
 import os
 import sys
 import warnings
-import logging
 from pathlib import Path
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
-import scanpy as sc
 import squidpy as sq
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy.stats import mannwhitneyu, kruskal
 
 # Optional GEO download
 try:
     import GEOparse
+
     HAS_GEOPARSE = True
 except ImportError:
     HAS_GEOPARSE = False
     print("GEOparse not installed. GEO download will be skipped.")
 
 # Setup logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # Add parent directory
 sys.path.insert(0, os.path.abspath(".."))
 
-from model import CitegeistModel
 from model import (
-    discover_programs_from_layers,
+    CitegeistModel,
     analyze_program_regions,
     compare_programs_by_region,
+    discover_programs_from_layers,
     extract_program_context_genes,
 )
 
@@ -97,18 +94,20 @@ def download_geo_rnaseq(output_path: Path):
 
         # Parse characteristics
         chars = {}
-        for char in meta.get('characteristics_ch1', []):
-            if ':' in char:
-                key, val = char.split(':', 1)
+        for char in meta.get("characteristics_ch1", []):
+            if ":" in char:
+                key, val = char.split(":", 1)
                 chars[key.strip()] = val.strip()
 
-        samples.append({
-            'sample_id': gsm_name,
-            'title': meta.get('title', [''])[0],
-            'cell_line': chars.get('cell line', ''),
-            'esr1_status': chars.get('esr1 status', chars.get('genotype', '')),
-            'treatment': chars.get('treatment', chars.get('agent', '')),
-        })
+        samples.append(
+            {
+                "sample_id": gsm_name,
+                "title": meta.get("title", [""])[0],
+                "cell_line": chars.get("cell line", ""),
+                "esr1_status": chars.get("esr1 status", chars.get("genotype", "")),
+                "treatment": chars.get("treatment", chars.get("agent", "")),
+            }
+        )
 
     meta_df = pd.DataFrame(samples)
     meta_df.to_csv(geo_dir / "sample_metadata.csv", index=False)
@@ -116,7 +115,7 @@ def download_geo_rnaseq(output_path: Path):
 
     # Try to get expression data from supplementary files
     # GSE89888 should have processed counts
-    supp_files = gse.metadata.get('supplementary_file', [])
+    supp_files = gse.metadata.get("supplementary_file", [])
     logger.info(f"Supplementary files: {supp_files}")
 
     return geo_dir, meta_df
@@ -131,7 +130,7 @@ def load_rnaseq_from_geo(geo_dir: Path):
 
     if counts_files:
         logger.info(f"Found counts file: {counts_files[0]}")
-        counts = pd.read_csv(counts_files[0], sep='\t', index_col=0)
+        counts = pd.read_csv(counts_files[0], sep="\t", index_col=0)
         return counts
 
     # If no pre-processed counts, try to extract from GSM
@@ -147,25 +146,16 @@ def load_rnaseq_from_geo(geo_dir: Path):
 
 def run_spatial_analysis():
     """Run Parts 1-4: Spatial program discovery and region analysis."""
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 1-2: LOADING DATA AND RUNNING CITEGEIST")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Load spatial data
-    adata = sq.read.visium(
-        SAMPLE_PATH,
-        counts_file='filtered_feature_bc_matrix.h5',
-        load_images=True,
-        gex_only=False
-    )
+    adata = sq.read.visium(SAMPLE_PATH, counts_file="filtered_feature_bc_matrix.h5", load_images=True, gex_only=False)
     logger.info(f"Loaded: {adata.shape[0]} spots x {adata.shape[1]} features")
 
     # Initialize and run CITEgeist
-    model = CitegeistModel(
-        sample_name=SAMPLE_NAME,
-        adata=adata,
-        output_folder=str(OUTPUT_DIR / "citegeist_output")
-    )
+    model = CitegeistModel(sample_name=SAMPLE_NAME, adata=adata, output_folder=str(OUTPUT_DIR / "citegeist_output"))
 
     model.load_cell_profile_dict(CELL_PROFILES)
     model.split_adata()
@@ -180,13 +170,13 @@ def run_spatial_analysis():
     else:
         # Find license from environment (set by module load)
         import os
+
         grb_license = os.environ.get("GRB_LICENSE_FILE")
         if grb_license:
             model.register_gurobi(grb_license)
         else:
             # Try default locations
-            for path in [os.environ.get("GRB_LICENSE_FILE", ""),
-                        os.path.expanduser("~/gurobi.lic")]:
+            for path in [os.environ.get("GRB_LICENSE_FILE", ""), os.path.expanduser("~/gurobi.lic")]:
                 if os.path.exists(path):
                     model.register_gurobi(path)
                     break
@@ -203,16 +193,18 @@ def run_spatial_analysis():
     prop_gex_adata = model.get_adata()
 
     # Define D538G regions using basal cytokeratins
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("DEFINING D538G MUTATION REGIONS")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     paper_keratins = ["KRT5", "KRT6A", "KRT6B", "KRT14", "KRT16", "KRT17"]
     available_keratins = [g for g in paper_keratins if g in prop_gex_adata.var_names]
 
     if available_keratins and "Cancer_Cells_genes_pass1" in prop_gex_adata.layers:
         keratin_idx = [prop_gex_adata.var_names.get_loc(g) for g in available_keratins]
-        prop_gex_adata.obs["Basal_Cytokeratin"] = prop_gex_adata.layers["Cancer_Cells_genes_pass1"][:, keratin_idx].sum(axis=1)
+        prop_gex_adata.obs["Basal_Cytokeratin"] = prop_gex_adata.layers["Cancer_Cells_genes_pass1"][:, keratin_idx].sum(
+            axis=1
+        )
 
         # Threshold at median of non-zero values
         nonzero = prop_gex_adata.obs["Basal_Cytokeratin"][prop_gex_adata.obs["Basal_Cytokeratin"] > 0]
@@ -229,9 +221,9 @@ def run_spatial_analysis():
     logger.info(f"D538G+ spots: {n_d538g_pos}, D538G- spots: {n_d538g_neg}")
 
     # Discover programs
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 2: MODULE 4 PROGRAM DISCOVERY")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     result = discover_programs_from_layers(
         adata=prop_gex_adata,
@@ -253,15 +245,16 @@ def run_spatial_analysis():
 
     if cancer_result:
         for k, prog in enumerate(cancer_result.programs):
-            logger.info(f"  Program {k}: Moran's I = {prog.spatial_moran_i:.3f}, "
-                       f"top genes: {', '.join(prog.top_genes[:5])}")
+            logger.info(
+                f"  Program {k}: Moran's I = {prog.spatial_moran_i:.3f}, " f"top genes: {', '.join(prog.top_genes[:5])}"
+            )
     else:
         logger.warning("Cancer Cells not found in results")
 
     # Region enrichment analysis
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 3: REGION ENRICHMENT ANALYSIS")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     if not cancer_result:
         logger.error("No Cancer Cells result to analyze")
@@ -275,27 +268,26 @@ def run_spatial_analysis():
     # Use the full adata for region analysis - H matrix should match
     # Note: discover_programs_from_layers uses all spots in the layer
     cancer_result = analyze_program_regions(
-        result=cancer_result,
-        adata=prop_gex_adata,
-        region_column="D538G_Mutation",
-        min_spots_per_region=20
+        result=cancer_result, adata=prop_gex_adata, region_column="D538G_Mutation", min_spots_per_region=20
     )
 
     # For downstream analysis, still filter to cancer cell spots
     cancer_mask = prop_gex_adata.obs["Cancer Cells"] > 0.1
-    adata_cancer = prop_gex_adata[cancer_mask].copy()
+    _adata_cancer = prop_gex_adata[cancer_mask].copy()  # noqa: F841
 
     # Summary table
     region_summary = []
     for prog in cancer_result.programs:
-        region_summary.append({
-            "Program": prog.program_id,
-            "D538G+ Activity": prog.region_enrichment.get("True", 0) if prog.region_enrichment else 0,
-            "D538G- Activity": prog.region_enrichment.get("False", 0) if prog.region_enrichment else 0,
-            "Specificity": prog.region_specificity,
-            "P-value": prog.region_pvalue,
-            "Enriched In": prog.enriched_region,
-        })
+        region_summary.append(
+            {
+                "Program": prog.program_id,
+                "D538G+ Activity": prog.region_enrichment.get("True", 0) if prog.region_enrichment else 0,
+                "D538G- Activity": prog.region_enrichment.get("False", 0) if prog.region_enrichment else 0,
+                "Specificity": prog.region_specificity,
+                "P-value": prog.region_pvalue,
+                "Enriched In": prog.enriched_region,
+            }
+        )
 
     region_df = pd.DataFrame(region_summary)
     logger.info("\nRegion Enrichment Summary:")
@@ -309,7 +301,7 @@ def run_spatial_analysis():
         region_column="D538G_Mutation",
         region_a=True,
         region_b=False,
-        top_n_genes=50
+        top_n_genes=50,
     )
     comparison_df.to_csv(OUTPUT_DIR / "program_region_comparison.csv", index=False)
 
@@ -318,9 +310,9 @@ def run_spatial_analysis():
     logger.info(f"\nD538G-enriched programs: {len(d538g_enriched)}")
 
     # MDK context discovery
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 4: MDK SECRETION CONTEXT DISCOVERY")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Check MDK loading in each program
     W = cancer_result.W
@@ -329,12 +321,14 @@ def run_spatial_analysis():
     if "MDK" in cancer_result.gene_names:
         mdk_idx = cancer_result.gene_names.index("MDK")
         for k in range(len(cancer_result.programs)):
-            mdk_loadings.append({
-                "Program": k,
-                "MDK_Loading": W[mdk_idx, k],
-                "D538G_Enriched": k in d538g_enriched["program_id"].values if len(d538g_enriched) > 0 else False,
-                "Top_Genes": ", ".join(cancer_result.programs[k].top_genes[:5])
-            })
+            mdk_loadings.append(
+                {
+                    "Program": k,
+                    "MDK_Loading": W[mdk_idx, k],
+                    "D538G_Enriched": k in d538g_enriched["program_id"].values if len(d538g_enriched) > 0 else False,
+                    "Top_Genes": ", ".join(cancer_result.programs[k].top_genes[:5]),
+                }
+            )
 
         mdk_df = pd.DataFrame(mdk_loadings).sort_values("MDK_Loading", ascending=False)
         logger.info("\nMDK Loading by Program:")
@@ -359,15 +353,11 @@ def run_spatial_analysis():
 
     # Extract contextual genes
     context_genes = extract_program_context_genes(
-        result=cancer_result,
-        program_id=secretion_program_id,
-        target_gene="MDK",
-        top_n=100,
-        exclude_target=True
+        result=cancer_result, program_id=secretion_program_id, target_gene="MDK", top_n=100, exclude_target=True
     )
 
     context_df = pd.DataFrame(context_genes, columns=["Gene", "Loading"])
-    logger.info(f"\nTop 20 Contextual Factors (co-loaded with MDK):")
+    logger.info("\nTop 20 Contextual Factors (co-loaded with MDK):")
     print(context_df.head(20).to_string())
     context_df.to_csv(OUTPUT_DIR / "mdk_contextual_genes.csv", index=False)
 
@@ -377,22 +367,22 @@ def run_spatial_analysis():
     logger.info(f"\nMDK receptors in context: {receptor_in_context}")
 
     return {
-        'prop_gex_adata': prop_gex_adata,
-        'result': cancer_result,
-        'comparison_df': comparison_df,
-        'd538g_enriched': d538g_enriched,
-        'context_genes': context_genes,
-        'context_df': context_df,
-        'secretion_program_id': secretion_program_id,
-        'mdk_df': mdk_df,
+        "prop_gex_adata": prop_gex_adata,
+        "result": cancer_result,
+        "comparison_df": comparison_df,
+        "d538g_enriched": d538g_enriched,
+        "context_genes": context_genes,
+        "context_df": context_df,
+        "secretion_program_id": secretion_program_id,
+        "mdk_df": mdk_df,
     }
 
 
 def run_rnaseq_validation(context_genes, geo_dir: Path):
     """Run Parts 5-6: Bulk RNA-seq validation."""
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 5-6: BULK RNA-SEQ VALIDATION (GSE89888)")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
     # Load metadata
     meta_path = geo_dir / "sample_metadata.csv"
@@ -402,7 +392,7 @@ def run_rnaseq_validation(context_genes, geo_dir: Path):
 
     meta_df = pd.read_csv(meta_path)
     logger.info(f"Loaded metadata for {len(meta_df)} samples")
-    print(meta_df.groupby(['cell_line', 'esr1_status']).size())
+    print(meta_df.groupby(["cell_line", "esr1_status"]).size())
 
     # Try to load counts
     counts = load_rnaseq_from_geo(geo_dir)
@@ -413,6 +403,7 @@ def run_rnaseq_validation(context_genes, geo_dir: Path):
 
         try:
             import urllib.request
+
             # GSE89888 has FPKM data
             url = "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE89888&format=file&file=GSE89888%5Fgene%5Fexpression%5FFPKM%2Etxt%2Egz"
             dest = geo_dir / "GSE89888_gene_expression_FPKM.txt.gz"
@@ -423,8 +414,9 @@ def run_rnaseq_validation(context_genes, geo_dir: Path):
 
             # Load
             import gzip
-            with gzip.open(dest, 'rt') as f:
-                counts = pd.read_csv(f, sep='\t', index_col=0)
+
+            with gzip.open(dest, "rt") as f:
+                counts = pd.read_csv(f, sep="\t", index_col=0)
             logger.info(f"Loaded expression data: {counts.shape}")
 
         except Exception as e:
@@ -461,8 +453,12 @@ def compute_interaction_effect(gene, counts_df, meta_df):
 
     results = {}
     for cell_line in ["MCF7", "T47D"]:
-        mask_wt = (meta_df["cell_line"] == cell_line) & (meta_df["esr1_status"].str.contains("WT", case=False, na=False))
-        mask_mut = (meta_df["cell_line"] == cell_line) & (meta_df["esr1_status"].str.contains("D538G", case=False, na=False))
+        mask_wt = (meta_df["cell_line"] == cell_line) & (
+            meta_df["esr1_status"].str.contains("WT", case=False, na=False)
+        )
+        mask_mut = (meta_df["cell_line"] == cell_line) & (
+            meta_df["esr1_status"].str.contains("D538G", case=False, na=False)
+        )
 
         wt_samples = meta_df[mask_wt]["sample_id"].tolist()
         mut_samples = meta_df[mask_mut]["sample_id"].tolist()
@@ -487,33 +483,33 @@ def compute_interaction_effect(gene, counts_df, meta_df):
 
 def generate_summary(spatial_results, rnaseq_results=None):
     """Generate integrated findings and summary."""
-    logger.info("="*60)
+    logger.info("=" * 60)
     logger.info("PART 9: INTEGRATED FINDINGS")
-    logger.info("="*60)
+    logger.info("=" * 60)
 
-    context_df = spatial_results['context_df']
-    d538g_enriched = spatial_results['d538g_enriched']
+    _context_df = spatial_results["context_df"]  # noqa: F841
+    d538g_enriched = spatial_results["d538g_enriched"]
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("HIGH-CONFIDENCE PERMISSIVE FACTORS FOR MDK SECRETION")
-    print("="*60)
+    print("=" * 60)
 
-    print(f"\n1. SPATIAL DISCOVERY:")
+    print("\n1. SPATIAL DISCOVERY:")
     print(f"   - Analyzed {len(spatial_results['result'].programs)} programs in cancer cells")
     print(f"   - Identified {len(d538g_enriched)} D538G-enriched programs")
     print(f"   - Extracted {len(spatial_results['context_genes'])} genes co-loaded with MDK")
 
-    print(f"\n2. TOP MDK CONTEXTUAL GENES:")
-    for i, (gene, loading) in enumerate(spatial_results['context_genes'][:15]):
+    print("\n2. TOP MDK CONTEXTUAL GENES:")
+    for i, (gene, loading) in enumerate(spatial_results["context_genes"][:15]):
         print(f"   {i+1:2d}. {gene:<12s} (loading: {loading:.4f})")
 
     # Biological interpretation
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("BIOLOGICAL INTERPRETATION")
-    print("="*60)
+    print("=" * 60)
 
     # Check for known pathways in context genes
-    context_gene_list = [g for g, _ in spatial_results['context_genes'][:50]]
+    context_gene_list = [g for g, _ in spatial_results["context_genes"][:50]]
 
     # Known ESR1/ER signaling genes
     er_related = ["ESR1", "ESR2", "PGR", "GREB1", "TFF1", "CCND1", "MYC", "FOXA1", "XBP1"]
@@ -531,11 +527,12 @@ def generate_summary(spatial_results, rnaseq_results=None):
     print(f"   Secretion pathway genes: {secretion_in_context}")
     print(f"   Transcription factors: {tfs_in_context}")
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("HYPOTHESIS: WHY MCF7 BUT NOT T47D?")
-    print("="*60)
+    print("=" * 60)
 
-    print("""
+    print(
+        """
    The contextual genes co-expressed with MDK in D538G+ regions may represent
    the "permissive context" that enables D538G-driven MDK secretion.
 
@@ -559,14 +556,15 @@ def generate_summary(spatial_results, rnaseq_results=None):
    4. COFACTOR AVAILABILITY
       - D538G-ER recruits different coactivators than WT-ER
       - These cofactors may be differentially available in MCF7 vs T47D
-""")
+"""
+    )
 
     # Save summary
     with open(OUTPUT_DIR / "biological_summary.txt", "w") as f:
         f.write("MDK Contextual Genes Analysis Summary\n")
-        f.write("="*50 + "\n\n")
-        f.write(f"Top contextual genes co-loaded with MDK:\n")
-        for gene, loading in spatial_results['context_genes'][:20]:
+        f.write("=" * 50 + "\n\n")
+        f.write("Top contextual genes co-loaded with MDK:\n")
+        for gene, loading in spatial_results["context_genes"][:20]:
             f.write(f"  {gene}: {loading:.4f}\n")
         f.write(f"\nER-related: {er_in_context}\n")
         f.write(f"Secretion pathway: {secretion_in_context}\n")
@@ -593,10 +591,7 @@ def main():
 
     rnaseq_results = None
     if geo_dir and geo_dir.exists():
-        rnaseq_results = run_rnaseq_validation(
-            spatial_results['context_genes'],
-            geo_dir
-        )
+        rnaseq_results = run_rnaseq_validation(spatial_results["context_genes"], geo_dir)
 
     # Part 9: Generate summary
     generate_summary(spatial_results, rnaseq_results)

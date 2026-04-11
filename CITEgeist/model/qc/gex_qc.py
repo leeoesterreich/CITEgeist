@@ -11,7 +11,9 @@ from __future__ import annotations
 import logging
 
 import matplotlib
+
 matplotlib.use("Agg")
+# pylint: disable=wrong-import-position,wrong-import-order
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -19,7 +21,9 @@ from scipy.stats import pearsonr, spearmanr
 from sklearn.decomposition import NMF
 from sklearn.metrics.pairwise import cosine_similarity
 
-from . import QCResult
+from ._types import QCResult
+
+# pylint: enable=wrong-import-position,wrong-import-order
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +72,10 @@ def compute_gex_correlations(
         common_spots = pred.index.intersection(gt.index)
         if len(common_genes) < 5 or len(common_spots) < 5:
             results[ct] = {
-                "pearson_r": np.nan, "spearman_rho": np.nan,
-                "pearson_spearman_gap": np.nan, "n_genes": len(common_genes),
+                "pearson_r": np.nan,
+                "spearman_rho": np.nan,
+                "pearson_spearman_gap": np.nan,
+                "n_genes": len(common_genes),
             }
             continue
 
@@ -80,15 +86,18 @@ def compute_gex_correlations(
         nonzero = (p > 0) | (g > 0)
         if nonzero.sum() < 10:
             results[ct] = {
-                "pearson_r": np.nan, "spearman_rho": np.nan,
-                "pearson_spearman_gap": np.nan, "n_genes": len(common_genes),
+                "pearson_r": np.nan,
+                "spearman_rho": np.nan,
+                "pearson_spearman_gap": np.nan,
+                "n_genes": len(common_genes),
             }
             continue
 
         pr, _ = pearsonr(p[nonzero], g[nonzero])
         sr, _ = spearmanr(p[nonzero], g[nonzero])
         results[ct] = {
-            "pearson_r": pr, "spearman_rho": sr,
+            "pearson_r": pr,
+            "spearman_rho": sr,
             "pearson_spearman_gap": abs(pr - sr),
             "n_genes": len(common_genes),
         }
@@ -121,9 +130,15 @@ def analyze_per_gene(
 
         gt_mean = gt[gene].mean()
         if gt_mean < 1e-10:
-            rows.append({"gene": gene, "spatial_r": np.nan,
-                         "log_mean_ratio": np.nan, "classification": "zero_gt",
-                         "gt_variance": 0.0})
+            rows.append(
+                {
+                    "gene": gene,
+                    "spatial_r": np.nan,
+                    "log_mean_ratio": np.nan,
+                    "classification": "zero_gt",
+                    "gt_variance": 0.0,
+                }
+            )
             continue
 
         if np.std(p) < 1e-10 or np.std(g) < 1e-10:
@@ -139,13 +154,15 @@ def analyze_per_gene(
         else:
             classification = "spatial_mismatch"
 
-        rows.append({
-            "gene": gene,
-            "spatial_r": spatial_r,
-            "log_mean_ratio": log_ratio,
-            "classification": classification,
-            "gt_variance": gt[gene].var(),
-        })
+        rows.append(
+            {
+                "gene": gene,
+                "spatial_r": spatial_r,
+                "log_mean_ratio": log_ratio,
+                "classification": classification,
+                "gt_variance": gt[gene].var(),
+            }
+        )
 
     return pd.DataFrame(rows).set_index("gene")
 
@@ -181,7 +198,7 @@ def compare_nmf_programs(
     nmf_pred.fit(pred)
     W_pred = nmf_pred.components_  # (k, genes)
 
-    return cosine_similarity(W_gt, W_pred)
+    return np.asarray(cosine_similarity(W_gt, W_pred))
 
 
 def _plot_bar_pearson_spearman(correlations: dict) -> plt.Figure:
@@ -222,16 +239,19 @@ def _plot_gene_scatter(gene_analysis: pd.DataFrame, cell_type: str) -> plt.Figur
         fig, ax = plt.subplots(1, 1, figsize=(9, 7))
 
         df = df.copy()
-        df["var_quartile"] = pd.qcut(
-            df["gt_variance"].clip(lower=1e-10), q=4, labels=["Q1", "Q2", "Q3", "Q4"]
-        )
+        df["var_quartile"] = pd.qcut(df["gt_variance"].clip(lower=1e-10), q=4, labels=["Q1", "Q2", "Q3", "Q4"])
         colors = {"Q1": "#c0c0c0", "Q2": "#7eb0d5", "Q3": "#4878CF", "Q4": "#1f3d7a"}
 
         for q in ["Q1", "Q2", "Q3", "Q4"]:
             sub = df[df["var_quartile"] == q]
             ax.scatter(
-                sub["spatial_r"], sub["log_mean_ratio"],
-                label=f"Variance {q}", c=colors[q], alpha=0.6, s=20, edgecolors="none",
+                sub["spatial_r"],
+                sub["log_mean_ratio"],
+                label=f"Variance {q}",
+                c=colors[q],
+                alpha=0.6,
+                s=20,
+                edgecolors="none",
             )
 
         ax.axhline(0, color="k", linestyle="--", alpha=0.3)
@@ -304,23 +324,18 @@ def run_gex_qc(
             common_counts = {}
             for ct in pred_gex_layers:
                 if ct in gt_gex_layers:
-                    n = len(pred_gex_layers[ct].columns.intersection(
-                        gt_gex_layers[ct].columns))
+                    n = len(pred_gex_layers[ct].columns.intersection(gt_gex_layers[ct].columns))
                     common_counts[ct] = n
             exemplar_type = max(common_counts, key=common_counts.get) if common_counts else None
 
         if exemplar_type and exemplar_type in pred_gex_layers and exemplar_type in gt_gex_layers:
-            gene_analysis = analyze_per_gene(
-                pred_gex_layers[exemplar_type], gt_gex_layers[exemplar_type]
-            )
+            gene_analysis = analyze_per_gene(pred_gex_layers[exemplar_type], gt_gex_layers[exemplar_type])
             metrics["gene_analysis"] = {exemplar_type: gene_analysis}
 
             if len(gene_analysis) > 0:
                 vc = gene_analysis["classification"].value_counts()
                 total = len(gene_analysis)
-                metrics["gene_classification_summary"] = {
-                    cls: int(count) for cls, count in vc.items()
-                }
+                metrics["gene_classification_summary"] = {cls: int(count) for cls, count in vc.items()}
                 pct_spatial_ok = (vc.get("good", 0) + vc.get("magnitude_only", 0)) / total
                 metrics["pct_spatially_correct"] = pct_spatial_ok
 
@@ -332,7 +347,7 @@ def run_gex_qc(
                 gt_gex_layers[exemplar_type],
                 k=nmf_k,
             )
-            metrics["nmf_cosine"] = cosine_mat
+            metrics["nmf_cosine"] = cosine_mat  # type: ignore[assignment]
             figures["nmf_recovery"] = _plot_nmf_cosine(cosine_mat)
 
         figures["bar_pearson_spearman"] = _plot_bar_pearson_spearman(correlations)

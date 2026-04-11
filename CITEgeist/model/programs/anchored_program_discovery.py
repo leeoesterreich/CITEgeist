@@ -36,7 +36,6 @@ from sklearn.decomposition import NMF
 from ..deconvolution.cuopt_impl import build_spatial_laplacian
 from ..discovery.spatial_colocalization import ProfileDiscoveryResult
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -215,19 +214,21 @@ class JointDiscoveryResult:
         """Convert programs to DataFrame."""
         records = []
         for prog in self.programs:
-            records.append({
-                "program_id": prog.program_id,
-                "top_genes": ", ".join(prog.top_genes[:10]),
-                "variance_explained": prog.variance_explained,
-                "spatial_moran_i": prog.spatial_moran_i,
-                "spatial_moran_pvalue": prog.spatial_moran_pvalue,
-                "mean_activity": prog.mean_activity,
-                "active_spots_fraction": prog.active_spots_fraction,
-                "primary_cell_type": prog.primary_cell_type,
-                "secondary_cell_type": prog.secondary_cell_type,
-                "interaction_score": prog.interaction_score,
-                "program_type": prog.program_type,
-            })
+            records.append(
+                {
+                    "program_id": prog.program_id,
+                    "top_genes": ", ".join(prog.top_genes[:10]),
+                    "variance_explained": prog.variance_explained,
+                    "spatial_moran_i": prog.spatial_moran_i,
+                    "spatial_moran_pvalue": prog.spatial_moran_pvalue,
+                    "mean_activity": prog.mean_activity,
+                    "active_spots_fraction": prog.active_spots_fraction,
+                    "primary_cell_type": prog.primary_cell_type,
+                    "secondary_cell_type": prog.secondary_cell_type,
+                    "interaction_score": prog.interaction_score,
+                    "program_type": prog.program_type,
+                }
+            )
         return pd.DataFrame(records)
 
 
@@ -291,17 +292,19 @@ class AnchoredProgramResult:
         """Convert program summaries to DataFrame."""
         records = []
         for p in self.programs:
-            records.append({
-                "anchor": self.anchor_name,
-                "program_id": p.program_id,
-                "n_top_genes": len(p.top_genes),
-                "top_genes": ", ".join(p.top_genes[:10]),
-                "variance_explained": p.variance_explained,
-                "spatial_moran_i": p.spatial_moran_i,
-                "spatial_moran_pvalue": p.spatial_moran_pvalue,
-                "mean_activity": p.mean_activity,
-                "active_spots_fraction": p.active_spots_fraction,
-            })
+            records.append(
+                {
+                    "anchor": self.anchor_name,
+                    "program_id": p.program_id,
+                    "n_top_genes": len(p.top_genes),
+                    "top_genes": ", ".join(p.top_genes[:10]),
+                    "variance_explained": p.variance_explained,
+                    "spatial_moran_i": p.spatial_moran_i,
+                    "spatial_moran_pvalue": p.spatial_moran_pvalue,
+                    "mean_activity": p.mean_activity,
+                    "active_spots_fraction": p.active_spots_fraction,
+                }
+            )
         return pd.DataFrame(records)
 
 
@@ -327,8 +330,8 @@ class AnchoredProgramDiscoveryResult:
     def summary(self) -> str:
         """Return a summary string."""
         lines = [
-            f"Anchored Program Discovery Results",
-            f"=" * 40,
+            "Anchored Program Discovery Results",
+            "=" * 40,
             f"Anchors analyzed: {self.n_anchors}",
             f"Total programs: {self.total_programs}",
             "",
@@ -472,20 +475,22 @@ class BivariateProgramResult:
         """Convert all pairs to DataFrame."""
         records = []
         for p in self.all_pairs:
-            records.append({
-                "anchor1": p.anchor1,
-                "program1_id": p.program1_id,
-                "anchor2": p.anchor2,
-                "program2_id": p.program2_id,
-                "bivariate_morans_i": p.bivariate_morans_i,
-                "bivariate_pvalue": p.bivariate_pvalue,
-                "pearson_correlation": p.pearson_correlation,
-                "pearson_pvalue": p.pearson_pvalue,
-                "n_spots_used": p.n_spots_used,
-                "n_genes_overlap": len(p.top_genes_overlap),
-                "top_genes_overlap": ", ".join(p.top_genes_overlap[:10]),
-                "relationship_type": p.relationship_type,
-            })
+            records.append(
+                {
+                    "anchor1": p.anchor1,
+                    "program1_id": p.program1_id,
+                    "anchor2": p.anchor2,
+                    "program2_id": p.program2_id,
+                    "bivariate_morans_i": p.bivariate_morans_i,
+                    "bivariate_pvalue": p.bivariate_pvalue,
+                    "pearson_correlation": p.pearson_correlation,
+                    "pearson_pvalue": p.pearson_pvalue,
+                    "n_spots_used": p.n_spots_used,
+                    "n_genes_overlap": len(p.top_genes_overlap),
+                    "top_genes_overlap": ", ".join(p.top_genes_overlap[:10]),
+                    "relationship_type": p.relationship_type,
+                }
+            )
         return pd.DataFrame(records)
 
 
@@ -517,7 +522,7 @@ def _build_program_pair_list(
                     pairs.append((anchor1, p1, anchor1, p2))
 
         # Cross-anchor pairs
-        for anchor2 in anchors[i + 1:]:
+        for anchor2 in anchors[i + 1 :]:
             result2 = result.results_by_anchor[anchor2]
             n_progs2 = len(result2.programs)
 
@@ -530,7 +535,7 @@ def _build_program_pair_list(
 
 def _classify_relationship(
     bivariate_i: float,
-    pvalue: float,
+    _pvalue: float,
     fdr_significant: bool,
     threshold: float = 0.1,
 ) -> str:
@@ -549,7 +554,7 @@ def _classify_relationship(
     if not fdr_significant:
         return "independent"
 
-    if bivariate_i > threshold:
+    if bivariate_i > threshold:  # pylint: disable=no-else-return
         return "co-localized"
     elif bivariate_i < -threshold:
         return "exclusive"
@@ -581,6 +586,7 @@ def _compute_gene_overlap(
 def analyze_program_relationships(
     result: AnchoredProgramDiscoveryResult,
     adata: sc.AnnData,
+    *,
     fdr_threshold: float = 0.05,
     min_bivariate_i: float = 0.1,
     n_permutations: int = 199,
@@ -610,20 +616,20 @@ def analyze_program_relationships(
     Returns:
         BivariateProgramResult with all pairwise relationships.
     """
-    from scipy.spatial import cKDTree
-    from scipy.stats import false_discovery_control
+    from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
+    from scipy.stats import false_discovery_control  # pylint: disable=import-outside-toplevel
 
     logger.info("Starting Module 4b: Bivariate Program Relationships")
 
     # Get spatial coordinates
-    coords = adata.obsm.get('spatial', None)
+    coords = adata.obsm.get("spatial", None)
     if coords is None:
         raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
 
     n_spots = coords.shape[0]
 
     # Build k-NN neighbor graph
-    logger.info(f"Building {neighbor_k}-NN spatial neighbor graph for {n_spots} spots")
+    logger.info("Building %s-NN spatial neighbor graph for %s spots", neighbor_k, n_spots)
     tree = cKDTree(coords)
     _, neighbor_indices = tree.query(coords, k=neighbor_k + 1)
 
@@ -640,8 +646,12 @@ def analyze_program_relationships(
     # Count total programs
     n_programs = sum(len(r.programs) for r in result.results_by_anchor.values())
 
-    logger.info(f"Testing {n_pairs} program pairs ({n_programs} programs, "
-                f"{'including' if include_within_anchor else 'excluding'} within-anchor)")
+    logger.info(
+        "Testing %s program pairs (%s programs, %s within-anchor)",
+        n_pairs,
+        n_programs,
+        "including" if include_within_anchor else "excluding",
+    )
 
     # Initialize random number generator
     rng = np.random.default_rng(random_state)
@@ -652,7 +662,7 @@ def analyze_program_relationships(
 
     for pair_idx, (anchor1, prog1_id, anchor2, prog2_id) in enumerate(pairs):
         if (pair_idx + 1) % 50 == 0 or pair_idx == n_pairs - 1:
-            logger.info(f"  Processing pair {pair_idx + 1}/{n_pairs}")
+            logger.info("  Processing pair %s/%s", pair_idx + 1, n_pairs)
 
         # Get H vectors for both programs
         result1 = result.results_by_anchor[anchor1]
@@ -727,7 +737,7 @@ def analyze_program_relationships(
 
     # Apply FDR correction (Benjamini-Hochberg)
     pvalues_array = np.array(pvalues_for_fdr)
-    fdr_significant = false_discovery_control(pvalues_array, method='bh') < fdr_threshold
+    fdr_significant = false_discovery_control(pvalues_array, method="bh") < fdr_threshold
 
     # Classify relationships based on FDR-corrected significance
     significant_pairs: List[ProgramPairRelationship] = []
@@ -761,7 +771,7 @@ def analyze_program_relationships(
     significant_pairs.sort(key=lambda x: abs(x.bivariate_morans_i), reverse=True)
 
     n_significant = len(significant_pairs)
-    logger.info(f"Found {n_significant} significant pairs (FDR < {fdr_threshold}, |I| >= {min_bivariate_i})")
+    logger.info("Found %s significant pairs (FDR < %s, |I| >= %s)", n_significant, fdr_threshold, min_bivariate_i)
 
     # Build result
     bivariate_result = BivariateProgramResult(
@@ -772,11 +782,11 @@ def analyze_program_relationships(
         n_significant=n_significant,
         fdr_threshold=fdr_threshold,
         parameters={
-            'min_bivariate_i': min_bivariate_i,
-            'n_permutations': n_permutations,
-            'neighbor_k': neighbor_k,
-            'include_within_anchor': include_within_anchor,
-            'random_state': random_state,
+            "min_bivariate_i": min_bivariate_i,
+            "n_permutations": n_permutations,
+            "neighbor_k": neighbor_k,
+            "include_within_anchor": include_within_anchor,
+            "random_state": random_state,
         },
     )
 
@@ -874,10 +884,7 @@ def stack_deconvolved_layers(
     """
     # Find deconvolved layers
     if cell_type_names is None:
-        deconv_layers = [
-            layer_name for layer_name in adata.layers.keys()
-            if layer_pattern in layer_name
-        ]
+        deconv_layers = [layer_name for layer_name in adata.layers.keys() if layer_pattern in layer_name]
         if not deconv_layers:
             raise ValueError(
                 f"No deconvolved layers found matching pattern '{layer_pattern}'. "
@@ -885,13 +892,11 @@ def stack_deconvolved_layers(
             )
         # Extract cell type names from layer names
         # e.g., 'Profile_1_genes_pass1' -> 'Profile_1'
-        cell_type_names = [
-            layer.replace(layer_pattern, "") for layer in deconv_layers
-        ]
+        cell_type_names = [layer.replace(layer_pattern, "") for layer in deconv_layers]
     else:
         deconv_layers = [f"{ct}{layer_pattern}" for ct in cell_type_names]
         # Verify all layers exist
-        missing = [l for l in deconv_layers if l not in adata.layers]
+        missing = [lyr for lyr in deconv_layers if lyr not in adata.layers]
         if missing:
             raise ValueError(f"Missing layers: {missing}")
 
@@ -899,9 +904,9 @@ def stack_deconvolved_layers(
     n_genes = adata.shape[1]
     n_celltypes = len(cell_type_names)
 
-    logger.info(f"Stacking {n_celltypes} deconvolved layers: {cell_type_names}")
-    logger.info(f"  Input: {n_spots} spots × {n_genes} genes")
-    logger.info(f"  Output: {n_spots * n_celltypes} rows × {n_genes} genes")
+    logger.info("Stacking %s deconvolved layers: %s", n_celltypes, cell_type_names)
+    logger.info("  Input: %s spots x %s genes", n_spots, n_genes)
+    logger.info("  Output: %s rows x %s genes", n_spots * n_celltypes, n_genes)
 
     # Stack expression matrices
     stacked_X = []
@@ -910,7 +915,7 @@ def stack_deconvolved_layers(
 
     coords = adata.obsm.get(coord_key, None)
     if coords is None:
-        logger.warning(f"No spatial coordinates found at obsm['{coord_key}']")
+        logger.warning("No spatial coordinates found at obsm['%s']", coord_key)
         coords = np.zeros((n_spots, 2))
 
     for ct_idx, (cell_type, layer_name) in enumerate(zip(cell_type_names, deconv_layers)):
@@ -923,27 +928,26 @@ def stack_deconvolved_layers(
 
         # Build obs for this cell type
         for spot_idx, spot_name in enumerate(adata.obs_names):
-            stacked_obs.append({
-                'original_spot': spot_name,
-                'cell_type': cell_type,
-                'original_spot_idx': spot_idx,
-                'cell_type_idx': ct_idx,
-            })
+            stacked_obs.append(
+                {
+                    "original_spot": spot_name,
+                    "cell_type": cell_type,
+                    "original_spot_idx": spot_idx,
+                    "cell_type_idx": ct_idx,
+                }
+            )
 
         # Duplicate coordinates
         stacked_coords.append(coords.copy())
 
     # Concatenate
-    stacked_X = np.vstack(stacked_X)
-    stacked_coords = np.vstack(stacked_coords)
+    stacked_X = np.vstack(stacked_X)  # type: ignore[assignment]
+    stacked_coords = np.vstack(stacked_coords)  # type: ignore[assignment]
     stacked_obs_df = pd.DataFrame(stacked_obs)
 
     # Create new row names: {spot}_{celltype}
-    row_names = [
-        f"{row['original_spot']}_{row['cell_type']}"
-        for _, row in stacked_obs_df.iterrows()
-    ]
-    stacked_obs_df.index = row_names
+    row_names = [f"{row['original_spot']}_{row['cell_type']}" for _, row in stacked_obs_df.iterrows()]
+    stacked_obs_df.index = pd.Index(row_names)
 
     # Create stacked AnnData
     stacked_adata = sc.AnnData(
@@ -954,10 +958,10 @@ def stack_deconvolved_layers(
     stacked_adata.obsm[coord_key] = stacked_coords
 
     # Copy over any useful uns metadata
-    if 'anchored_programs' in adata.uns:
-        stacked_adata.uns['anchored_programs'] = adata.uns['anchored_programs']
+    if "anchored_programs" in adata.uns:
+        stacked_adata.uns["anchored_programs"] = adata.uns["anchored_programs"]
 
-    logger.info(f"  Created stacked AnnData: {stacked_adata.shape}")
+    logger.info("  Created stacked AnnData: %s", stacked_adata.shape)
 
     return stacked_adata
 
@@ -981,9 +985,7 @@ def unstack_program_results(
     Returns:
         Dict mapping cell_type -> H matrix (K_programs, n_spots)
     """
-    cell_types = stacked_adata.obs['cell_type'].unique()
-    n_celltypes = len(cell_types)
-    K = stacked_H.shape[0]
+    cell_types = stacked_adata.obs["cell_type"].unique()
 
     # H is (K, N*T), need to split into T matrices of (K, N)
     H_by_celltype = {}
@@ -1017,15 +1019,13 @@ def extract_celltype_expression(
     layer_name = f"{cell_type}{layer_pattern}"
 
     if layer_name not in adata.layers:
-        raise ValueError(
-            f"Layer '{layer_name}' not found. Available: {list(adata.layers.keys())}"
-        )
+        raise ValueError(f"Layer '{layer_name}' not found. Available: {list(adata.layers.keys())}")
 
     X = adata.layers[layer_name]
     if scipy.sparse.issparse(X):
         X = X.toarray()
 
-    coords = adata.obsm.get('spatial', np.zeros((adata.shape[0], 2)))
+    coords = adata.obsm.get("spatial", np.zeros((adata.shape[0], 2)))
 
     return np.array(X), np.array(coords)
 
@@ -1065,8 +1065,11 @@ def _get_celltype_weights(
     mask = weights >= min_proportion_threshold
 
     logger.debug(
-        f"Cell type '{cell_type_name}': {mask.sum()}/{len(mask)} spots "
-        f"have proportion >= {min_proportion_threshold}"
+        "Cell type '%s': %s/%s spots have proportion >= %s",
+        cell_type_name,
+        mask.sum(),
+        len(mask),
+        min_proportion_threshold,
     )
 
     return weights, mask
@@ -1108,7 +1111,12 @@ def _assign_program_cell_types(
             h_indices = np.arange(H.shape[1])
             prop_aligned = cell_type_proportions
         else:
-            logger.info(f"Aligned {len(common_spots)} spots (H has {len(h_spots)}, proportions has {len(prop_spots)})")
+            logger.info(
+                "Aligned %s spots (H has %s, proportions has %s)",
+                len(common_spots),
+                len(h_spots),
+                len(prop_spots),
+            )
             # Get indices in H for common spots
             h_indices = np.array([h_spots.get_loc(s) for s in common_spots])
             # Align proportions to same order
@@ -1170,13 +1178,15 @@ def _assign_program_cell_types(
         else:
             program_type = "microenvironment"
 
-        results.append({
-            "cell_type_enrichments": enrichments,
-            "primary_cell_type": primary_ct,
-            "secondary_cell_type": secondary_ct if secondary_score >= interaction_threshold else None,
-            "interaction_score": interaction_score,
-            "program_type": program_type,
-        })
+        results.append(
+            {
+                "cell_type_enrichments": enrichments,
+                "primary_cell_type": primary_ct,
+                "secondary_cell_type": secondary_ct if secondary_score >= interaction_threshold else None,
+                "interaction_score": interaction_score,
+                "program_type": program_type,
+            }
+        )
 
     return results
 
@@ -1199,7 +1209,7 @@ def _compute_spatial_moran_i(
     Returns:
         Tuple of (Moran's I, p-value).
     """
-    from scipy.spatial import cKDTree
+    from scipy.spatial import cKDTree  # pylint: disable=import-outside-toplevel
 
     n = len(values)
     if n < 10:
@@ -1224,12 +1234,12 @@ def _compute_spatial_moran_i(
     # Compute Moran's I
     z = values - values.mean()
     numerator = np.sum(W * np.outer(z, z))
-    denominator = np.sum(z ** 2)
+    denominator = np.sum(z**2)
 
     if denominator == 0:
         return 0.0, 1.0
 
-    I = (n / W.sum()) * (numerator / denominator)
+    I = (n / W.sum()) * (numerator / denominator)  # noqa: E741 — Moran's I
 
     # Permutation test for p-value
     I_perm = np.zeros(n_permutations)
@@ -1248,6 +1258,7 @@ def anchored_spatial_nmf(
     X: NDArray[np.floating],
     weights: NDArray[np.floating],
     coords: NDArray[np.floating],
+    *,
     K: int = 5,
     lambda_spatial: float = 0.0,
     lambda_sparsity: float = 0.01,
@@ -1293,7 +1304,7 @@ def anchored_spatial_nmf(
     # Run NMF
     nmf = NMF(
         n_components=K,
-        init='nndsvda',
+        init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
         alpha_W=lambda_sparsity,
@@ -1304,7 +1315,7 @@ def anchored_spatial_nmf(
         H = nmf.fit_transform(X_weighted)  # (n_spots, K)
         W = nmf.components_.T  # (n_genes, K) after transpose
     except ValueError as e:
-        logger.warning(f"NMF failed: {e}. Using random initialization.")
+        logger.warning("NMF failed: %s. Using random initialization.", e)
         W = np.random.rand(n_genes, K)
         H = np.random.rand(n_spots, K)
 
@@ -1314,23 +1325,25 @@ def anchored_spatial_nmf(
 
         # Smooth each program's loadings
         # H_smooth = (I + lambda * L)^(-1) @ H
-        I = scipy.sparse.eye(n_spots)
+        I = scipy.sparse.eye(n_spots)  # noqa: E741 — identity matrix
         smoothing_matrix = I + lambda_spatial * L
 
         try:
-            from scipy.sparse.linalg import spsolve
+            from scipy.sparse.linalg import spsolve  # pylint: disable=import-outside-toplevel
+
             H_smooth = np.zeros_like(H)
             for k in range(K):
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)  # Keep non-negative
-        except Exception as e:
-            logger.debug(f"Spatial smoothing failed: {e}. Using unsmoothed H.")
+        except (ImportError, OSError) as e:
+
+            logger.debug("Spatial smoothing failed: %s. Using unsmoothed H.", e)
 
     # Compute reconstruction error
     X_reconstructed = H @ W.T
-    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, 'fro')
+    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, "fro")
 
-    return W, H.T, reconstruction_error  # H transposed to (K, n_spots)
+    return W, H.T, float(reconstruction_error)  # H transposed to (K, n_spots)
 
 
 def validate_programs_with_proteins(
@@ -1362,7 +1375,7 @@ def validate_programs_with_proteins(
 
     for k in range(K):
         h_k = H[k, :]
-        for p, prot in enumerate(protein_names):
+        for p, _ in enumerate(protein_names):
             prot_values = protein_data[:, p]
 
             # Handle constant values
@@ -1376,16 +1389,16 @@ def validate_programs_with_proteins(
 
     # Create DataFrame
     df = pd.DataFrame(correlations, columns=protein_names)
-    df.index.name = 'program'
+    df.index.name = "program"
 
     # Add validation column: does program correlate with anchor proteins?
     anchor_mask = [p in anchor_proteins for p in protein_names]
     if any(anchor_mask):
-        df['anchor_correlation'] = df.iloc[:, anchor_mask].max(axis=1)
-        df['validated'] = df['anchor_correlation'] > 0.3
+        df["anchor_correlation"] = df.iloc[:, anchor_mask].max(axis=1)
+        df["validated"] = df["anchor_correlation"] > 0.3
     else:
-        df['anchor_correlation'] = np.nan
-        df['validated'] = False
+        df["anchor_correlation"] = np.nan
+        df["validated"] = False
 
     return df
 
@@ -1413,14 +1426,14 @@ def detect_spatial_subpopulations(
     Returns:
         List of SpatialSubpopulation objects, one per detected cluster
     """
-    from sklearn.cluster import KMeans
-    from sklearn.preprocessing import StandardScaler
+    from sklearn.cluster import KMeans  # pylint: disable=import-outside-toplevel
+    from sklearn.preprocessing import StandardScaler  # pylint: disable=import-outside-toplevel
 
     n_spots = H.shape[1]
     K = H.shape[0]
 
     if n_spots < n_clusters * min_spots_per_cluster:
-        logger.warning(f"Too few spots ({n_spots}) for {n_clusters} subpopulations")
+        logger.warning("Too few spots (%s) for %s subpopulations", n_spots, n_clusters)
         return []
 
     # Normalize program loadings and coordinates separately
@@ -1429,10 +1442,7 @@ def detect_spatial_subpopulations(
 
     # Combine features with spatial weighting
     # Higher spatial_weight = more emphasis on spatial location
-    features = np.hstack([
-        (1 - spatial_weight) * H_norm,
-        spatial_weight * coords_norm
-    ])
+    features = np.hstack([(1 - spatial_weight) * H_norm, spatial_weight * coords_norm])
 
     # Cluster spots
     kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
@@ -1458,12 +1468,8 @@ def detect_spatial_subpopulations(
         # Generate location label based on centroid position relative to all spots
         # (This is a heuristic - could be refined with actual tissue annotation)
         all_centroid = coords.mean(axis=0)
-        dist_from_center = np.sqrt(
-            (centroid[0] - all_centroid[0])**2 + (centroid[1] - all_centroid[1])**2
-        )
-        max_dist = np.sqrt(
-            ((coords[:, 0] - all_centroid[0])**2 + (coords[:, 1] - all_centroid[1])**2).max()
-        )
+        dist_from_center = np.sqrt((centroid[0] - all_centroid[0]) ** 2 + (centroid[1] - all_centroid[1]) ** 2)
+        max_dist = np.sqrt(((coords[:, 0] - all_centroid[0]) ** 2 + (coords[:, 1] - all_centroid[1]) ** 2).max())
 
         if dist_from_center < max_dist * 0.33:
             location_label = "core"
@@ -1492,6 +1498,7 @@ def detect_spatial_subpopulations(
 def discover_anchored_programs(
     adata,
     cell_type_proportions: pd.DataFrame,
+    *,
     profile_discovery_result: Optional[ProfileDiscoveryResult] = None,
     protein_adata=None,
     K_programs: int = 5,
@@ -1539,10 +1546,8 @@ def discover_anchored_programs(
     Returns:
         AnchoredProgramDiscoveryResult with anchor-specific programs.
     """
-    import scanpy as sc
-
     logger.info("Starting CONTRASTIVE anchor-specific program discovery (Module 4)")
-    logger.info(f"  contrastive_strength={contrastive_strength}, use_enriched_genes={use_enriched_genes}")
+    logger.info("  contrastive_strength=%s, use_enriched_genes=%s", contrastive_strength, use_enriched_genes)
 
     # Get gene expression data
     if scipy.sparse.issparse(adata.X):
@@ -1551,10 +1556,10 @@ def discover_anchored_programs(
         X = np.array(adata.X)
 
     gene_names = list(adata.var_names)
-    coords = adata.obsm['spatial']
+    coords = adata.obsm["spatial"]
     n_spots, n_genes = X.shape
 
-    logger.info(f"Input: {n_spots} spots, {n_genes} genes, {len(cell_type_proportions.columns)} cell types")
+    logger.info("Input: %s spots, %s genes, %s cell types", n_spots, n_genes, len(cell_type_proportions.columns))
 
     # Get protein data if available
     protein_data = None
@@ -1565,7 +1570,7 @@ def discover_anchored_programs(
         else:
             protein_data = np.array(protein_adata.X)
         protein_names = list(protein_adata.var_names)
-        logger.info(f"Protein data: {protein_data.shape[1]} proteins for validation")
+        logger.info("Protein data: %s proteins for validation", protein_data.shape[1])
 
     # Build profile name -> proteins mapping from Module 2
     profile_to_proteins = {}
@@ -1583,31 +1588,32 @@ def discover_anchored_programs(
         if cell_type == "Unknown":
             continue
 
-        logger.info(f"Processing anchor: {cell_type}")
+        logger.info("Processing anchor: %s", cell_type)
 
         # Get weights from Module 3 proportions
-        weights, mask = _get_celltype_weights(
-            cell_type_proportions, cell_type, min_proportion_threshold
-        )
+        weights, mask = _get_celltype_weights(cell_type_proportions, cell_type, min_proportion_threshold)
 
         n_included = mask.sum()
         if n_included < 20:
             logger.warning(
-                f"Skipping {cell_type}: only {n_included} spots have "
-                f"proportion >= {min_proportion_threshold}"
+                "Skipping %s: only %s spots have proportion >= %s", cell_type, n_included, min_proportion_threshold
             )
             continue
 
         # Compute background expression from anchor-LOW spots (contrastive)
         background = _compute_background_expression(
-            X, cell_type_proportions, cell_type,
-            low_threshold=min_proportion_threshold / 2  # Use stricter threshold for background
+            X,
+            cell_type_proportions,
+            cell_type,
+            low_threshold=min_proportion_threshold / 2,  # Use stricter threshold for background
         )
 
         # Optionally select anchor-enriched genes
         if use_enriched_genes:
             enriched_idx, enriched_names = _select_anchor_enriched_genes(
-                X, weights, gene_names,
+                X,
+                weights,
+                gene_names,
                 high_threshold=0.3 if n_included > 100 else min_proportion_threshold * 2,
                 low_threshold=min_proportion_threshold / 2,
                 min_fold_change=enriched_gene_fc,
@@ -1631,9 +1637,7 @@ def discover_anchored_programs(
         anchor_proteins = profile_to_proteins.get(cell_type, [])
         if not anchor_proteins:
             for pname, prots in profile_to_proteins.items():
-                if cell_type.lower() in pname.lower() or any(
-                    cell_type.lower() in p.lower() for p in prots
-                ):
+                if cell_type.lower() in pname.lower() or any(cell_type.lower() in p.lower() for p in prots):
                     anchor_proteins = prots
                     break
 
@@ -1658,9 +1662,7 @@ def discover_anchored_programs(
         protein_correlations = pd.DataFrame()
         if validate_with_proteins and protein_data is not None and protein_names is not None:
             protein_subset = protein_data[mask, :]
-            protein_correlations = validate_programs_with_proteins(
-                H, protein_subset, protein_names, anchor_proteins
-            )
+            protein_correlations = validate_programs_with_proteins(H, protein_subset, protein_names, anchor_proteins)
 
         # Build SpatialProgram objects for each program
         programs = []
@@ -1674,29 +1676,29 @@ def discover_anchored_programs(
             gene_loadings = {gene_names_used[i]: float(loadings[i]) for i in top_indices}
 
             # Compute variance explained (approximate)
-            program_var = np.var(H[k, :]) * np.sum(loadings ** 2)
+            program_var = np.var(H[k, :]) * np.sum(loadings**2)
             var_explained = program_var / total_var if total_var > 0 else 0
 
             # Compute spatial Moran's I for this program
-            moran_i, moran_p = _compute_spatial_moran_i(
-                H[k, :], coords_subset, k=8, n_permutations=99
-            )
+            moran_i, moran_p = _compute_spatial_moran_i(H[k, :], coords_subset, k=8, n_permutations=99)
 
             # Program activity statistics
             mean_activity = float(np.mean(H[k, :]))
             median_activity = float(np.median(H[k, :]))
             active_fraction = float(np.mean(H[k, :] > median_activity))
 
-            programs.append(SpatialProgram(
-                program_id=k,
-                top_genes=top_genes,
-                gene_loadings=gene_loadings,
-                variance_explained=var_explained,
-                spatial_moran_i=moran_i,
-                spatial_moran_pvalue=moran_p,
-                mean_activity=mean_activity,
-                active_spots_fraction=active_fraction,
-            ))
+            programs.append(
+                SpatialProgram(
+                    program_id=k,
+                    top_genes=top_genes,
+                    gene_loadings=gene_loadings,
+                    variance_explained=var_explained,
+                    spatial_moran_i=moran_i,
+                    spatial_moran_pvalue=moran_p,
+                    mean_activity=mean_activity,
+                    active_spots_fraction=active_fraction,
+                )
+            )
 
         # Map W back to full gene space if using enriched genes
         if use_enriched_genes:
@@ -1733,19 +1735,22 @@ def discover_anchored_programs(
             reconstruction_error=recon_error,
             n_spots_used=n_included,
             parameters={
-                'K_programs': K_programs,
-                'lambda_spatial': lambda_spatial,
-                'contrastive_strength': contrastive_strength,
-                'use_enriched_genes': use_enriched_genes,
-                'n_enriched_genes': len(enriched_idx) if use_enriched_genes else n_genes,
+                "K_programs": K_programs,
+                "lambda_spatial": lambda_spatial,
+                "contrastive_strength": contrastive_strength,
+                "use_enriched_genes": use_enriched_genes,
+                "n_enriched_genes": len(enriched_idx) if use_enriched_genes else n_genes,
             },
             subpopulations=subpopulations,
         )
 
         total_programs += K_programs
         logger.info(
-            f"  {cell_type}: {K_programs} programs, {n_included} spots, "
-            f"{len(enriched_idx) if use_enriched_genes else n_genes} genes"
+            "  %s: %s programs, %s spots, %s genes",
+            cell_type,
+            K_programs,
+            n_included,
+            len(enriched_idx) if use_enriched_genes else n_genes,
         )
 
     # Build final result
@@ -1755,16 +1760,16 @@ def discover_anchored_programs(
         total_programs=total_programs,
         profile_discovery_result=profile_discovery_result,
         parameters={
-            'K_programs': K_programs,
-            'lambda_spatial': lambda_spatial,
-            'contrastive_strength': contrastive_strength,
-            'use_enriched_genes': use_enriched_genes,
-            'min_proportion_threshold': min_proportion_threshold,
-            'random_state': random_state,
+            "K_programs": K_programs,
+            "lambda_spatial": lambda_spatial,
+            "contrastive_strength": contrastive_strength,
+            "use_enriched_genes": use_enriched_genes,
+            "min_proportion_threshold": min_proportion_threshold,
+            "random_state": random_state,
         },
     )
 
-    logger.info(f"Completed: {result.n_anchors} anchors, {result.total_programs} programs (contrastive)")
+    logger.info("Completed: %s anchors, %s programs (contrastive)", result.n_anchors, result.total_programs)
 
     return result
 
@@ -1772,6 +1777,7 @@ def discover_anchored_programs(
 def discover_joint_programs(
     adata: sc.AnnData,
     cell_type_proportions: pd.DataFrame,
+    *,
     K_programs: int = 10,
     layer_pattern: str = "_genes_pass1",
     lambda_spatial: float = 0.0,
@@ -1819,10 +1825,9 @@ def discover_joint_programs(
     gene_names = list(stacked_adata.var_names)
     cell_type_names = list(stacked_adata.obs["cell_type"].unique())
     n_spots = adata.shape[0]
-    n_genes = len(gene_names)
 
-    logger.info(f"Stacked data: {X_stacked.shape[0]} rows ({n_spots} spots x {len(cell_type_names)} cell types)")
-    logger.info(f"Discovering {K_programs} joint programs")
+    logger.info("Stacked data: %s rows (%s spots x %s cell types)", X_stacked.shape[0], n_spots, len(cell_type_names))
+    logger.info("Discovering %s joint programs", K_programs)
 
     # Run NMF on stacked data
     # X_stacked is (n_spots * n_celltypes, n_genes)
@@ -1885,7 +1890,7 @@ def discover_joint_programs(
         gene_loadings = {gene_names[i]: float(loadings[i]) for i in top_indices}
 
         # Variance explained
-        program_var = np.var(H[k, :]) * np.sum(loadings ** 2)
+        program_var = np.var(H[k, :]) * np.sum(loadings**2)
         var_explained = program_var / total_var if total_var > 0 else 0
 
         # Spatial Moran's I
@@ -1899,26 +1904,28 @@ def discover_joint_programs(
         # Cell type assignment
         ct_info = cell_type_assignments[k]
 
-        programs.append(JointProgram(
-            program_id=k,
-            top_genes=top_genes,
-            gene_loadings=gene_loadings,
-            variance_explained=var_explained,
-            spatial_moran_i=moran_i,
-            spatial_moran_pvalue=moran_p,
-            mean_activity=mean_activity,
-            active_spots_fraction=active_fraction,
-            cell_type_enrichments=ct_info["cell_type_enrichments"],
-            primary_cell_type=ct_info["primary_cell_type"],
-            secondary_cell_type=ct_info["secondary_cell_type"],
-            interaction_score=ct_info["interaction_score"],
-            program_type=ct_info["program_type"],
-        ))
+        programs.append(
+            JointProgram(
+                program_id=k,
+                top_genes=top_genes,
+                gene_loadings=gene_loadings,
+                variance_explained=var_explained,
+                spatial_moran_i=moran_i,
+                spatial_moran_pvalue=moran_p,
+                mean_activity=mean_activity,
+                active_spots_fraction=active_fraction,
+                cell_type_enrichments=ct_info["cell_type_enrichments"],
+                primary_cell_type=ct_info["primary_cell_type"],
+                secondary_cell_type=ct_info["secondary_cell_type"],
+                interaction_score=ct_info["interaction_score"],
+                program_type=ct_info["program_type"],
+            )
+        )
 
-    logger.info(f"Discovered {len(programs)} joint programs")
-    logger.info(f"  Single cell-type: {sum(1 for p in programs if p.program_type == 'single_celltype')}")
-    logger.info(f"  Interaction: {sum(1 for p in programs if p.program_type == 'interaction')}")
-    logger.info(f"  Microenvironment: {sum(1 for p in programs if p.program_type == 'microenvironment')}")
+    logger.info("Discovered %s joint programs", len(programs))
+    logger.info("  Single cell-type: %s", sum(1 for p in programs if p.program_type == "single_celltype"))
+    logger.info("  Interaction: %s", sum(1 for p in programs if p.program_type == "interaction"))
+    logger.info("  Microenvironment: %s", sum(1 for p in programs if p.program_type == "microenvironment"))
 
     return JointDiscoveryResult(
         programs=programs,
@@ -1957,24 +1964,24 @@ def store_results_in_adata(
     """
     # Store program activities in obsm
     for anchor_name, anchor_result in result.results_by_anchor.items():
-        key = f'X_anchored_programs_{anchor_name}'
+        key = f"X_anchored_programs_{anchor_name}"
         adata.obsm[key] = anchor_result.H.T  # (n_spots, K)
 
         # Store gene loadings in varm if genes match
         if list(adata.var_names) == anchor_result.gene_names:
-            varm_key = f'anchored_program_loadings_{anchor_name}'
+            varm_key = f"anchored_program_loadings_{anchor_name}"
             adata.varm[varm_key] = anchor_result.W  # (n_genes, K)
 
     # Store metadata in uns
-    adata.uns['anchored_programs'] = {
-        'n_anchors': result.n_anchors,
-        'total_programs': result.total_programs,
-        'parameters': result.parameters,
-        'anchors': list(result.results_by_anchor.keys()),
-        'summary': result.summary(),
+    adata.uns["anchored_programs"] = {
+        "n_anchors": result.n_anchors,
+        "total_programs": result.total_programs,
+        "parameters": result.parameters,
+        "anchors": list(result.results_by_anchor.keys()),
+        "summary": result.summary(),
     }
 
-    logger.info(f"Stored results in adata: {result.n_anchors} anchors in obsm/varm/uns")
+    logger.info("Stored results in adata: %s anchors in obsm/varm/uns", result.n_anchors)
 
 
 # =============================================================================
@@ -2005,7 +2012,7 @@ def _compute_background_expression(
         Background expression matrix (n_spots, n_genes) - same value per gene,
         broadcast to all spots for subtraction.
     """
-    n_spots, n_genes = X.shape
+    n_spots, _ = X.shape
 
     # Find spots with LOW anchor proportion
     anchor_props = all_proportions[anchor_name].values
@@ -2031,6 +2038,7 @@ def _select_anchor_enriched_genes(
     X: NDArray[np.floating],
     anchor_proportions: NDArray[np.floating],
     gene_names: List[str],
+    *,
     high_threshold: float = 0.3,
     low_threshold: float = 0.1,
     min_fold_change: float = 1.2,
@@ -2061,7 +2069,7 @@ def _select_anchor_enriched_genes(
     n_low = low_mask.sum()
 
     if n_high < 10 or n_low < 10:
-        logger.warning(f"Too few spots for enrichment (high={n_high}, low={n_low}), using all genes")
+        logger.warning("Too few spots for enrichment (high=%s, low=%s), using all genes", n_high, n_low)
         return list(range(X.shape[1])), gene_names
 
     # Mean expression in high vs low spots
@@ -2081,7 +2089,7 @@ def _select_anchor_enriched_genes(
 
     enriched_names = [gene_names[i] for i in enriched_indices]
 
-    logger.debug(f"Selected {len(enriched_indices)} enriched genes (FC >= {min_fold_change})")
+    logger.debug("Selected %s enriched genes (FC >= %s)", len(enriched_indices), min_fold_change)
 
     return list(enriched_indices), enriched_names
 
@@ -2091,6 +2099,7 @@ def contrastive_anchored_nmf(
     anchor_weights: NDArray[np.floating],
     background: NDArray[np.floating],
     coords: NDArray[np.floating],
+    *,
     K: int = 5,
     lambda_spatial: float = 0.0,
     lambda_sparsity: float = 0.01,
@@ -2124,7 +2133,7 @@ def contrastive_anchored_nmf(
     Returns:
         Tuple of (W gene loadings, H spot loadings, reconstruction error)
     """
-    n_spots, n_genes = X.shape
+    n_spots, _ = X.shape
 
     # Compute contrastive expression: anchor contribution minus background
     X_contrastive = X - contrastive_strength * background
@@ -2153,7 +2162,7 @@ def contrastive_anchored_nmf(
     # Run NMF
     nmf = NMF(
         n_components=K,
-        init='nndsvda',
+        init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
         alpha_W=lambda_sparsity,
@@ -2164,32 +2173,40 @@ def contrastive_anchored_nmf(
         H = nmf.fit_transform(X_weighted)  # (n_spots, K)
         W = nmf.components_.T  # (n_genes, K)
     except ValueError as e:
-        logger.warning(f"Contrastive NMF failed: {e}. Falling back to standard NMF.")
+        logger.warning("Contrastive NMF failed: %s. Falling back to standard NMF.", e)
         return anchored_spatial_nmf(
-            X, anchor_weights, coords, K, lambda_spatial, lambda_sparsity,
-            max_iter, random_state
+            X,
+            anchor_weights,
+            coords,
+            K=K,
+            lambda_spatial=lambda_spatial,
+            lambda_sparsity=lambda_sparsity,
+            max_iter=max_iter,
+            random_state=random_state,
         )
 
     # Apply spatial smoothing
     if lambda_spatial > 0 and n_spots >= 10:
         L = build_spatial_laplacian(coords, k=8, normed=True)
-        I = scipy.sparse.eye(n_spots)
+        I = scipy.sparse.eye(n_spots)  # noqa: E741 — identity matrix
         smoothing_matrix = I + lambda_spatial * L
 
         try:
-            from scipy.sparse.linalg import spsolve
+            from scipy.sparse.linalg import spsolve  # pylint: disable=import-outside-toplevel
+
             H_smooth = np.zeros_like(H)
             for k in range(K):
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)
-        except Exception as e:
-            logger.debug(f"Spatial smoothing failed: {e}")
+        except (ImportError, OSError) as e:
+
+            logger.debug("Spatial smoothing failed: %s", e)
 
     # Reconstruction error (on original weighted data)
     X_reconstructed = H @ W.T
-    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, 'fro')
+    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, "fro")
 
-    return W, H.T, reconstruction_error
+    return W, H.T, float(reconstruction_error)
 
 
 # =============================================================================
@@ -2199,6 +2216,7 @@ def contrastive_anchored_nmf(
 
 def discover_programs_from_layers(
     adata: sc.AnnData,
+    *,
     layer_pattern: str = "_genes_pass1",
     cell_type_proportions: Optional[pd.DataFrame] = None,
     profile_discovery_result: Optional[ProfileDiscoveryResult] = None,
@@ -2250,10 +2268,7 @@ def discover_programs_from_layers(
     logger.info("Starting DECONVOLVED LAYER-BASED program discovery (Module 4 v3)")
 
     # Find deconvolved layers
-    deconv_layers = [
-        layer_name for layer_name in adata.layers.keys()
-        if layer_pattern in layer_name
-    ]
+    deconv_layers = [layer_name for layer_name in adata.layers.keys() if layer_pattern in layer_name]
     if not deconv_layers:
         raise ValueError(
             f"No deconvolved layers found matching pattern '{layer_pattern}'. "
@@ -2262,14 +2277,12 @@ def discover_programs_from_layers(
         )
 
     # Extract cell type names from layer names
-    cell_type_names = [
-        layer.replace(layer_pattern, "") for layer in deconv_layers
-    ]
+    cell_type_names = [layer.replace(layer_pattern, "") for layer in deconv_layers]
 
-    logger.info(f"Found {len(cell_type_names)} deconvolved layers: {cell_type_names}")
+    logger.info("Found %s deconvolved layers: %s", len(cell_type_names), cell_type_names)
 
     # Get spatial coordinates
-    coords = adata.obsm.get('spatial', None)
+    coords = adata.obsm.get("spatial", None)
     if coords is None:
         raise ValueError("No spatial coordinates found in adata.obsm['spatial']")
 
@@ -2277,7 +2290,7 @@ def discover_programs_from_layers(
     n_spots = adata.shape[0]
     n_genes = adata.shape[1]
 
-    logger.info(f"Input: {n_spots} spots, {n_genes} genes")
+    logger.info("Input: %s spots, %s genes", n_spots, n_genes)
 
     # Get protein data if available
     protein_data = None
@@ -2288,7 +2301,7 @@ def discover_programs_from_layers(
         else:
             protein_data = np.array(protein_adata.X)
         protein_names = list(protein_adata.var_names)
-        logger.info(f"Protein data: {protein_data.shape[1]} proteins for validation")
+        logger.info("Protein data: %s proteins for validation", protein_data.shape[1])
 
     # Build profile name -> proteins mapping from Module 2
     profile_to_proteins = {}
@@ -2302,12 +2315,10 @@ def discover_programs_from_layers(
     total_programs = 0
 
     for cell_type in cell_type_names:
-        logger.info(f"Processing cell type: {cell_type}")
+        logger.info("Processing cell type: %s", cell_type)
 
         # Extract deconvolved expression for this cell type
-        X_celltype, coords_celltype = extract_celltype_expression(
-            adata, cell_type, layer_pattern
-        )
+        X_celltype, _ = extract_celltype_expression(adata, cell_type, layer_pattern)
 
         # Get cell type proportions for weighting (if available)
         if cell_type_proportions is not None and cell_type in cell_type_proportions.columns:
@@ -2323,8 +2334,7 @@ def discover_programs_from_layers(
 
         if n_active < 20:
             logger.warning(
-                f"Skipping {cell_type}: only {n_active} spots have "
-                f"expression > {min_expression_threshold}"
+                "Skipping %s: only %s spots have expression > %s", cell_type, n_active, min_expression_threshold
             )
             continue
 
@@ -2332,7 +2342,7 @@ def discover_programs_from_layers(
         coords_subset = coords[active_mask, :]
         weights_subset = weights[active_mask]
 
-        logger.info(f"  {n_active} active spots (expression > {min_expression_threshold})")
+        logger.info("  %s active spots (expression > %s)", n_active, min_expression_threshold)
 
         # Determine anchor proteins for validation
         anchor_proteins = profile_to_proteins.get(cell_type, [])
@@ -2356,15 +2366,13 @@ def discover_programs_from_layers(
         protein_correlations = pd.DataFrame()
         if validate_with_proteins and protein_data is not None and protein_names is not None:
             protein_subset = protein_data[active_mask, :]
-            protein_correlations = validate_programs_with_proteins(
-                H, protein_subset, protein_names, anchor_proteins
-            )
+            protein_correlations = validate_programs_with_proteins(H, protein_subset, protein_names, anchor_proteins)
 
         # Build SpatialProgram objects
         programs = []
 
         # Compute total variance for normalization (proper calculation)
-        X_reconstructed = (H.T @ W.T)  # (n_spots_subset, n_genes)
+        X_reconstructed = H.T @ W.T  # (n_spots_subset, n_genes)
         total_ss = np.sum((X_subset - X_subset.mean()) ** 2)
         residual_ss = np.sum((X_subset - X_reconstructed) ** 2)
         total_var_explained = 1 - (residual_ss / total_ss) if total_ss > 0 else 0
@@ -2378,30 +2386,30 @@ def discover_programs_from_layers(
 
             # Compute per-program variance explained (approximate)
             # Using the fraction of total W norm
-            W_k_norm = np.sum(loadings ** 2)
-            total_W_norm = np.sum(W ** 2)
+            W_k_norm = np.sum(loadings**2)
+            total_W_norm = np.sum(W**2)
             var_explained = (W_k_norm / total_W_norm) * total_var_explained if total_W_norm > 0 else 0
 
             # Compute spatial Moran's I for this program
-            moran_i, moran_p = _compute_spatial_moran_i(
-                H[k, :], coords_subset, k=8, n_permutations=199
-            )
+            moran_i, moran_p = _compute_spatial_moran_i(H[k, :], coords_subset, k=8, n_permutations=199)
 
             # Program activity statistics
             mean_activity = float(np.mean(H[k, :]))
             median_activity = float(np.median(H[k, :]))
             active_fraction = float(np.mean(H[k, :] > median_activity))
 
-            programs.append(SpatialProgram(
-                program_id=k,
-                top_genes=top_genes,
-                gene_loadings=gene_loadings,
-                variance_explained=var_explained * 100,  # As percentage
-                spatial_moran_i=moran_i,
-                spatial_moran_pvalue=moran_p,
-                mean_activity=mean_activity,
-                active_spots_fraction=active_fraction,
-            ))
+            programs.append(
+                SpatialProgram(
+                    program_id=k,
+                    top_genes=top_genes,
+                    gene_loadings=gene_loadings,
+                    variance_explained=var_explained * 100,  # As percentage
+                    spatial_moran_i=moran_i,
+                    spatial_moran_pvalue=moran_p,
+                    mean_activity=mean_activity,
+                    active_spots_fraction=active_fraction,
+                )
+            )
 
         # Detect spatial subpopulations
         subpopulations = []
@@ -2414,7 +2422,7 @@ def discover_programs_from_layers(
                 min_spots_per_cluster=10,
             )
             if subpopulations:
-                logger.info(f"  Subpopulations: {len(subpopulations)} detected")
+                logger.info("  Subpopulations: %s detected", len(subpopulations))
 
         # Build AnchoredProgramResult
         results_by_anchor[cell_type] = AnchoredProgramResult(
@@ -2428,17 +2436,17 @@ def discover_programs_from_layers(
             reconstruction_error=recon_error,
             n_spots_used=n_active,
             parameters={
-                'K_programs': K_programs,
-                'lambda_spatial': lambda_spatial,
-                'lambda_sparsity': lambda_sparsity,
-                'min_expression_threshold': min_expression_threshold,
-                'source': 'deconvolved_layers',
+                "K_programs": K_programs,
+                "lambda_spatial": lambda_spatial,
+                "lambda_sparsity": lambda_sparsity,
+                "min_expression_threshold": min_expression_threshold,
+                "source": "deconvolved_layers",
             },
             subpopulations=subpopulations,
         )
 
         total_programs += K_programs
-        logger.info(f"  {cell_type}: {K_programs} programs, {n_active} spots")
+        logger.info("  %s: %s programs, %s spots", cell_type, K_programs, n_active)
 
     # Build final result
     result = AnchoredProgramDiscoveryResult(
@@ -2447,17 +2455,17 @@ def discover_programs_from_layers(
         total_programs=total_programs,
         profile_discovery_result=profile_discovery_result,
         parameters={
-            'K_programs': K_programs,
-            'lambda_spatial': lambda_spatial,
-            'lambda_sparsity': lambda_sparsity,
-            'min_expression_threshold': min_expression_threshold,
-            'layer_pattern': layer_pattern,
-            'random_state': random_state,
-            'source': 'deconvolved_layers',
+            "K_programs": K_programs,
+            "lambda_spatial": lambda_spatial,
+            "lambda_sparsity": lambda_sparsity,
+            "min_expression_threshold": min_expression_threshold,
+            "layer_pattern": layer_pattern,
+            "random_state": random_state,
+            "source": "deconvolved_layers",
         },
     )
 
-    logger.info(f"Completed: {result.n_anchors} cell types, {result.total_programs} programs")
+    logger.info("Completed: %s cell types, %s programs", result.n_anchors, result.total_programs)
 
     return result
 
@@ -2466,6 +2474,7 @@ def _deconvolved_spatial_nmf(
     X: NDArray[np.floating],
     weights: NDArray[np.floating],
     coords: NDArray[np.floating],
+    *,
     K: int = 5,
     lambda_spatial: float = 0.0,
     lambda_sparsity: float = 0.01,
@@ -2503,7 +2512,7 @@ def _deconvolved_spatial_nmf(
     # Run NMF
     nmf = NMF(
         n_components=K,
-        init='nndsvda',
+        init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
         alpha_W=lambda_sparsity,
@@ -2514,30 +2523,32 @@ def _deconvolved_spatial_nmf(
         H = nmf.fit_transform(X_weighted)  # (n_spots, K)
         W = nmf.components_.T  # (n_genes, K)
     except ValueError as e:
-        logger.warning(f"NMF failed: {e}. Using random initialization.")
+        logger.warning("NMF failed: %s. Using random initialization.", e)
         W = np.abs(np.random.randn(n_genes, K))
         H = np.abs(np.random.randn(n_spots, K))
 
     # Apply spatial smoothing to H
     if lambda_spatial > 0 and n_spots >= 10:
         L = build_spatial_laplacian(coords, k=8, normed=True)
-        I = scipy.sparse.eye(n_spots)
+        I = scipy.sparse.eye(n_spots)  # noqa: E741 — identity matrix
         smoothing_matrix = I + lambda_spatial * L
 
         try:
-            from scipy.sparse.linalg import spsolve
+            from scipy.sparse.linalg import spsolve  # pylint: disable=import-outside-toplevel
+
             H_smooth = np.zeros_like(H)
             for k in range(K):
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)
-        except Exception as e:
-            logger.debug(f"Spatial smoothing failed: {e}")
+        except (ImportError, OSError) as e:
+
+            logger.debug("Spatial smoothing failed: %s", e)
 
     # Compute reconstruction error
     X_reconstructed = H @ W.T
-    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, 'fro')
+    reconstruction_error = np.linalg.norm(X_weighted - X_reconstructed * sqrt_weights, "fro")
 
-    return W, H.T, reconstruction_error
+    return W, H.T, float(reconstruction_error)
 
 
 # =============================================================================
@@ -2575,7 +2586,7 @@ def analyze_program_regions(
         >>> for prog in result.programs:
         ...     print(f"Program {prog.program_id}: enriched in {prog.enriched_region}")
     """
-    from scipy.stats import mannwhitneyu, kruskal
+    from scipy.stats import kruskal, mannwhitneyu  # pylint: disable=import-outside-toplevel
 
     if region_column not in adata.obs.columns:
         raise ValueError(f"Region column '{region_column}' not found in adata.obs")
@@ -2583,7 +2594,7 @@ def analyze_program_regions(
     regions = adata.obs[region_column].unique()
     n_regions = len(regions)
 
-    logger.info(f"Analyzing program regions using '{region_column}' ({n_regions} regions)")
+    logger.info("Analyzing program regions using '%s' (%s regions)", region_column, n_regions)
 
     # Get program activities (H matrix)
     H = result.H  # Shape: (K_programs, n_spots)
@@ -2615,10 +2626,10 @@ def analyze_program_regions(
         activity_lists = list(region_activities.values())
         if len(region_activities) == 2:
             # Mann-Whitney U for two regions
-            stat, pval = mannwhitneyu(activity_lists[0], activity_lists[1], alternative='two-sided')
+            _, pval = mannwhitneyu(activity_lists[0], activity_lists[1], alternative="two-sided")
         else:
             # Kruskal-Wallis for multiple regions
-            stat, pval = kruskal(*activity_lists)
+            _, pval = kruskal(*activity_lists)
 
         program.region_pvalue = float(pval)
 
@@ -2636,8 +2647,9 @@ def analyze_program_regions(
             program.enriched_region = None
 
     n_enriched = sum(1 for p in result.programs if p.enriched_region is not None)
-    logger.info(f"Region analysis complete: {n_enriched}/{len(result.programs)} "
-                f"programs show significant region enrichment")
+    logger.info(
+        "Region analysis complete: %s/%s programs show significant region enrichment", n_enriched, len(result.programs)
+    )
 
     return result
 
@@ -2648,6 +2660,7 @@ def compare_programs_by_region(
     region_column: str,
     region_a: Any,
     region_b: Any,
+    *,
     top_n_genes: int = 50,
 ) -> pd.DataFrame:
     """
@@ -2681,7 +2694,7 @@ def compare_programs_by_region(
         >>> df = compare_programs_by_region(result, adata, "D538G Mutation", True, False)
         >>> d538g_enriched = df[df['fold_change'] > 1.5]
     """
-    from scipy.stats import mannwhitneyu
+    from scipy.stats import mannwhitneyu  # pylint: disable=import-outside-toplevel
 
     mask_a = (adata.obs[region_column] == region_a).values
     mask_b = (adata.obs[region_column] == region_b).values
@@ -2690,7 +2703,7 @@ def compare_programs_by_region(
     W = result.W
 
     records = []
-    for k, program in enumerate(result.programs):
+    for k, _ in enumerate(result.programs):
         h_k = H[k, :]
 
         activities_a = h_k[mask_a]
@@ -2704,7 +2717,7 @@ def compare_programs_by_region(
 
         # Statistical test
         if len(activities_a) >= 10 and len(activities_b) >= 10:
-            _, pval = mannwhitneyu(activities_a, activities_b, alternative='two-sided')
+            _, pval = mannwhitneyu(activities_a, activities_b, alternative="two-sided")
         else:
             pval = 1.0
 
@@ -2714,20 +2727,22 @@ def compare_programs_by_region(
         top_genes = [result.gene_names[i] for i in top_idx]
         gene_loadings = {result.gene_names[i]: float(loadings[i]) for i in top_idx}
 
-        records.append({
-            'program_id': k,
-            'mean_activity_a': mean_a,
-            'mean_activity_b': mean_b,
-            'fold_change': fc,
-            'pvalue': float(pval),
-            'n_spots_a': int(mask_a.sum()),
-            'n_spots_b': int(mask_b.sum()),
-            'top_genes': ', '.join(top_genes[:10]),
-            'gene_loadings': gene_loadings,
-        })
+        records.append(
+            {
+                "program_id": k,
+                "mean_activity_a": mean_a,
+                "mean_activity_b": mean_b,
+                "fold_change": fc,
+                "pvalue": float(pval),
+                "n_spots_a": int(mask_a.sum()),
+                "n_spots_b": int(mask_b.sum()),
+                "top_genes": ", ".join(top_genes[:10]),
+                "gene_loadings": gene_loadings,
+            }
+        )
 
     df = pd.DataFrame(records)
-    df = df.sort_values('fold_change', ascending=False)
+    df = df.sort_values("fold_change", ascending=False)
 
     return df
 
@@ -2770,9 +2785,9 @@ def extract_program_context_genes(
     if target_gene in result.gene_names:
         target_idx = result.gene_names.index(target_gene)
         target_loading = loadings[target_idx]
-        logger.info(f"Target gene '{target_gene}' loading in program {program_id}: {target_loading:.4f}")
+        logger.info("Target gene '%s' loading in program %s: %s", target_gene, program_id, round(target_loading, 4))
     else:
-        logger.warning(f"Target gene '{target_gene}' not found in gene list")
+        logger.warning("Target gene '%s' not found in gene list", target_gene)
 
     # Get top genes by loading
     top_idx = np.argsort(loadings)[::-1]

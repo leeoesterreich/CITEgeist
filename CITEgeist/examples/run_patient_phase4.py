@@ -31,16 +31,14 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import numpy as np
 import pandas as pd
 import torch
-
+from model.hungarian_assignment import assign_nuclei_to_types
+from model.single_cell_mil import SingleCellMIL, train_mil
 from model.unified_config import (
     CELL_TYPE_NAMES,
-    K,
     MAX_EPOCHS,
-    PATIENCE,
     PATIENT_SAMPLES,
+    K,
 )
-from model.single_cell_mil import SingleCellMIL, train_mil
-from model.hungarian_assignment import assign_nuclei_to_types
 
 
 def load_sample_data(
@@ -119,11 +117,7 @@ def build_spot_list(
 
     for spot in spots:
         spot_nuclei = centroids_df[centroids_df["spot_barcode"] == spot]
-        feat_indices = [
-            nid_to_idx[int(nid)]
-            for nid in spot_nuclei["nucleus_id"].values
-            if int(nid) in nid_to_idx
-        ]
+        feat_indices = [nid_to_idx[int(nid)] for nid in spot_nuclei["nucleus_id"].values if int(nid) in nid_to_idx]
         if not feat_indices:
             continue
 
@@ -199,12 +193,14 @@ def hungarian_assign_sample(
             )
 
             for nid, type_idx in assignments.items():
-                rows.append({
-                    "nucleus_id": nid,
-                    "cell_type_idx": type_idx,
-                    "cell_type": CELL_TYPE_NAMES[type_idx],
-                    "spot_barcode": barcode,
-                })
+                rows.append(
+                    {
+                        "nucleus_id": nid,
+                        "cell_type_idx": type_idx,
+                        "cell_type": CELL_TYPE_NAMES[type_idx],
+                        "spot_barcode": barcode,
+                    }
+                )
 
     return pd.DataFrame(rows)
 
@@ -317,9 +313,7 @@ def run_phase4(output_dir, mod3_dir, features_dir, seg_dir, variant="baseline"):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Patient pipeline Phase 4: pooled MIL training + Hungarian assignment"
-    )
+    parser = argparse.ArgumentParser(description="Patient pipeline Phase 4: pooled MIL training + Hungarian assignment")
     parser.add_argument(
         "--output-dir",
         default="output/patient_pipeline/phase4",
