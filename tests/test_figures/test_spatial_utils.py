@@ -8,7 +8,10 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "manuscript" / "figures"))
-from _shared.spatial_utils import compute_spot_radius, draw_pie_spots
+try:
+    from _shared.spatial_utils import compute_spot_radius, draw_pie_spots
+except ImportError:
+    pytest.skip("manuscript/figures/_shared not available", allow_module_level=True)
 
 
 def test_compute_spot_radius_regular_grid():

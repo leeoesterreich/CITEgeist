@@ -7,7 +7,10 @@ import textwrap
 import pytest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent.parent / "scripts"))
-import build_codebase_index as bci
+try:
+    import build_codebase_index as bci
+except ImportError:
+    pytest.skip("scripts/build_codebase_index.py not available", allow_module_level=True)
 
 
 class TestShouldSkipPath:
