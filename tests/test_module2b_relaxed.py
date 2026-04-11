@@ -22,9 +22,14 @@ from CITEgeist.model.discovery.spatial_colocalization import (
     discover_profiles,
 )
 
-# Paths
-XENIUM_BASE = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/Benchmarking/xenium_pseudovisium")
-OUTPUT_DIR = Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/tests/test_results")
+import pytest
+
+# Paths (relative to repo root, resolved from this test file's location)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+XENIUM_BASE = _REPO_ROOT / "Benchmarking" / "xenium_pseudovisium"
+OUTPUT_DIR = Path(__file__).resolve().parent / "test_results"
+if not XENIUM_BASE.exists():
+    pytest.skip("Xenium pseudovisium dataset not available", allow_module_level=True)
 OUTPUT_DIR.mkdir(exist_ok=True)
 
 # Ideal 7-type profiles for comparison
@@ -71,7 +76,7 @@ def profile_to_celltype(profile_markers: set) -> str:
     return best_match if best_score > 0.3 else "Novel"
 
 
-def test_parameters(top_k_values, min_score_values, regions=[0, 1, 2, 3, 4]):
+def run_parameters(top_k_values, min_score_values, regions=[0, 1, 2, 3, 4]):
     """Test different parameter combinations."""
 
     results = {}
@@ -186,7 +191,7 @@ if __name__ == "__main__":
     print("Testing Module 2b with relaxed parameters...")
     print("Goal: Find settings that produce consistent profiles across regions")
 
-    results = test_parameters(top_k_values, min_score_values)
+    results = run_parameters(top_k_values, min_score_values)
 
     # Save results
     output_file = OUTPUT_DIR / "module2b_parameter_test.json"

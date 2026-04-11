@@ -6,9 +6,11 @@ Settings should work without tuning across both domains.
 import os
 import sys
 import logging
+from pathlib import Path
 
-os.chdir('/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist')
-sys.path.insert(0, '.')
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+os.chdir(_REPO_ROOT)
+sys.path.insert(0, str(_REPO_ROOT))
 
 import scanpy as sc
 import numpy as np
@@ -28,7 +30,7 @@ GT_CELL_TYPES = ['B-cells', 'CAFs', 'Cancer Epithelial', 'Endothelial',
 GT_PAIRS = [(f'{ct}_Protein_1', f'{ct}_Protein_2') for ct in GT_CELL_TYPES]
 
 
-def test_pipeline(dataset_name: str, h5ad_path: str):
+def run_pipeline(dataset_name: str, h5ad_path: str):
     """Run full Module 1-2c pipeline and report metrics."""
     print(f"\n{'='*60}")
     print(f"TESTING: {dataset_name}")
@@ -167,13 +169,13 @@ if __name__ == '__main__':
     results = []
 
     # Test on mixed data
-    results.append(test_pipeline(
+    results.append(run_pipeline(
         'MIXED (overlapping cell types)',
         'replicates/mixed/h5ad_objects/Wu_rep_1_CITE.h5ad'
     ))
 
     # Test on high_seg data
-    results.append(test_pipeline(
+    results.append(run_pipeline(
         'HIGH_SEG (clear boundaries)',
         'replicates/high_seg/h5ad_objects/Wu_rep_1_CITE.h5ad'
     ))

@@ -9,9 +9,12 @@ import numpy as np
 
 # Import directly from the module file to avoid the heavy CITEgeist/__init__.py
 # which pulls in pandas/gurobi/etc and fails in lightweight test environments.
-_model_dir = os.path.join(os.path.dirname(__file__), "..", "model", "morphology")
+_model_dir = os.path.join(os.path.dirname(__file__), "..", "CITEgeist", "model", "morphology")
 sys.path.insert(0, os.path.abspath(_model_dir))
-_pc = importlib.import_module("prototype_contrastive")
+try:
+    _pc = importlib.import_module("prototype_contrastive")
+except ImportError:
+    pytest.skip("CITEgeist/model/morphology/prototype_contrastive.py not available", allow_module_level=True)
 proportion_kl_loss = _pc.proportion_kl_loss
 consistency_loss = _pc.consistency_loss
 variance_covariance_loss = _pc.variance_covariance_loss
