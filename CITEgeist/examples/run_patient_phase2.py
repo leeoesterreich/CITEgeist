@@ -16,6 +16,7 @@ Usage:
     python run_patient_phase2.py --sample HCC22-088-P1-S1
     python run_patient_phase2.py --sample HCC22-088-P1-S1 --use-cellularity-prior
 """
+
 import argparse
 import logging
 import os

@@ -15,6 +15,7 @@ Usage:
     python run_patient_phase4.py --variant baseline
     python run_patient_phase4.py --variant cellularity
 """
+
 import argparse
 import json
 import logging

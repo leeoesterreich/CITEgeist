@@ -8,6 +8,7 @@ to classify spots as signal (cell type present) or background (absent).
 The multivariate approach captures marker covariance - e.g., CD4+ T cells
 should have BOTH CD3 and CD4 elevated, not just one.
 """
+
 import logging
 from typing import Dict, List
 

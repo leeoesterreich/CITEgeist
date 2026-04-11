@@ -531,8 +531,7 @@ def generate_summary(spatial_results, rnaseq_results=None):
     print("HYPOTHESIS: WHY MCF7 BUT NOT T47D?")
     print("=" * 60)
 
-    print(
-        """
+    print("""
    The contextual genes co-expressed with MDK in D538G+ regions may represent
    the "permissive context" that enables D538G-driven MDK secretion.
 
@@ -556,8 +555,7 @@ def generate_summary(spatial_results, rnaseq_results=None):
    4. COFACTOR AVAILABILITY
       - D538G-ER recruits different coactivators than WT-ER
       - These cofactors may be differentially available in MCF7 vs T47D
-"""
-    )
+""")
 
     # Save summary
     with open(OUTPUT_DIR / "biological_summary.txt", "w") as f:
