@@ -1,4 +1,4 @@
-<!-- codebase-index git:ca608868 -->
+<!-- codebase-index git:cfdae96b -->
 # CITEgeist Codebase Index
 
 ## CITEgeist/model/
@@ -78,8 +78,8 @@
 - `class CheckpointManager` — Manages loading and saving of optimization checkpoints.
   - `check_complete_run(N, T, M)` — Check if a complete run exists.
   - `load_latest_checkpoint(N, T, M)` — Load the latest valid checkpoint.
-  - `save_checkpoint(completed_spots, spotwise_profiles, _N, T, M)` — Save current progress as checkpoint.
-  - `save_final_results(spotwise_profiles, completed_spots, _N, T, M)` — Save final results.
+  - `save_checkpoint(completed_spots, spotwise_profiles, N, T, M)` — Save current progress as checkpoint.
+  - `save_final_results(spotwise_profiles, completed_spots, N, T, M)` — Save final results.
 
 ### CITEgeist/model/citegeist_model.py
 *Main CitegeistModel class for spatial transcriptomics deconvolution.*

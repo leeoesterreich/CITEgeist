@@ -30,7 +30,7 @@ def save_results_to_output(results, filepath):
     Save results as a CSV file.
     """
     df = pd.DataFrame(results)
-    df.to_csv(filepath)
+    df.to_csv(filepath, index=False)
 
 
 def cleanup_memory():
@@ -378,6 +378,9 @@ def calculate_expression_metrics(ground_truth_dir, predictions_dir, normalize="r
         dict: Dictionary containing performance metrics per cell type and overall statistics.
               Includes special keys '_spurious_profiles' and '_missed_profiles' for tracking.
     """
+    if normalize not in ("range", "mean"):
+        raise ValueError("Normalization type must be 'range' or 'mean'")
+
     metrics_per_cell_type = {}
 
     # Adjust predictions directory if pass number specified

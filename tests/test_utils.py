@@ -352,8 +352,10 @@ class TestExpressionMetrics:
         )
 
         # Metrics should be near zero for perfect prediction
-        assert len(metrics) == len(cell_type_names)
-        for cell_type, values in metrics.items():
+        # Filter out special tracking keys (_spurious_profiles, _missed_profiles)
+        cell_metrics = {k: v for k, v in metrics.items() if not k.startswith('_')}
+        assert len(cell_metrics) == len(cell_type_names)
+        for cell_type, values in cell_metrics.items():
             assert values['RMSE'] < 0.01
             assert values['NRMSE'] < 0.01
             assert values['MAE'] < 0.01
@@ -387,8 +389,9 @@ class TestExpressionMetrics:
         )
 
         # Metrics should show significant error
-        assert len(metrics) == len(cell_type_names)
-        for cell_type, values in metrics.items():
+        cell_metrics = {k: v for k, v in metrics.items() if not k.startswith('_')}
+        assert len(cell_metrics) == len(cell_type_names)
+        for cell_type, values in cell_metrics.items():
             assert values['RMSE'] > 0
             assert values['NRMSE'] > 0
             assert values['MAE'] > 0
@@ -414,8 +417,9 @@ class TestExpressionMetrics:
             pass_number=1
         )
 
-        assert len(metrics) == len(cell_type_names)
-        for cell_type, values in metrics.items():
+        cell_metrics = {k: v for k, v in metrics.items() if not k.startswith('_')}
+        assert len(cell_metrics) == len(cell_type_names)
+        for cell_type, values in cell_metrics.items():
             assert 'NRMSE' in values
             assert values['NRMSE'] >= 0
 

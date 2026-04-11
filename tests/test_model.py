@@ -69,7 +69,7 @@ class TestModelInitialization:
 
     def test_init_non_simulation_missing_adata(self, temp_output_dir, sample_name):
         """Test initialization fails without adata in non-simulation mode."""
-        with pytest.raises(ValueError, match="adata must be provided"):
+        with pytest.raises(ValueError, match=r"`?adata`?.*must be provided"):
             CitegeistModel(
                 sample_name=sample_name,
                 output_folder=temp_output_dir,

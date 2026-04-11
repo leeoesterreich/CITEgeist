@@ -91,7 +91,7 @@ class CheckpointManager:
         return set(), {}
 
     def save_checkpoint(
-        self, completed_spots, spotwise_profiles, _N, T, M
+        self, completed_spots, spotwise_profiles, N, T, M
     ):  # pylint: disable=too-many-positional-arguments
         """
         Save current progress as checkpoint.
@@ -107,9 +107,8 @@ class CheckpointManager:
             n_completed = len(completed_spots)
             checkpoint_path = self.output_dir / f"{self.sample_name}_gene_expression_checkpoint_{n_completed}.npz"
 
-            # Convert dictionary to numpy array
-            max_spot = max(spotwise_profiles.keys())
-            profiles_array = np.full((max_spot + 1, T, M), np.nan)
+            # Always allocate the full (N, T, M) array so loaders can verify shape.
+            profiles_array = np.full((N, T, M), np.nan)
 
             for spot_idx, profile in spotwise_profiles.items():
                 profiles_array[spot_idx] = profile
@@ -132,7 +131,7 @@ class CheckpointManager:
             logging.error("Failed to save checkpoint: %s", e)
 
     def save_final_results(
-        self, spotwise_profiles, completed_spots, _N, T, M
+        self, spotwise_profiles, completed_spots, N, T, M
     ):  # pylint: disable=too-many-positional-arguments
         """
         Save final results.
@@ -145,8 +144,7 @@ class CheckpointManager:
             M (int): Number of genes/features
         """
         final_path = self.output_dir / f"{self.sample_name}_gene_expression_complete.npz"
-        max_spot = max(spotwise_profiles.keys())
-        final_profiles = np.full((max_spot + 1, T, M), np.nan)
+        final_profiles = np.full((N, T, M), np.nan)
 
         for spot_idx, profile in spotwise_profiles.items():
             final_profiles[spot_idx] = profile

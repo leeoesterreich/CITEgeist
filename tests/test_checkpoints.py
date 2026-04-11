@@ -88,19 +88,19 @@ class TestCheckpointSaving:
         assert len(checkpoints) > 0
 
     def test_save_multiple_checkpoints(self, temp_output_dir, sample_name, checkpoint_params):
-        """Test saving multiple checkpoints."""
+        """Test saving multiple checkpoints — cleanup keeps only the latest."""
         manager = CheckpointManager(temp_output_dir, sample_name)
         N, T, M = checkpoint_params['N'], checkpoint_params['T'], checkpoint_params['M']
 
-        # Save multiple checkpoints
-        for i in range(3):
-            profiles = {j: np.random.rand(T, M) for j in range(i * 10, (i + 1) * 10)}
-            completed_spots = set(profiles.keys())
-            manager.save_checkpoint(completed_spots, profiles, N, T, M)
+        # Save progressively larger checkpoints (cumulative state — realistic usage).
+        for count in (10, 20, 30):
+            profiles = {j: np.random.rand(T, M) for j in range(count)}
+            manager.save_checkpoint(set(profiles.keys()), profiles, N, T, M)
 
-        # Check that multiple checkpoint files exist
+        # _cleanup_old_checkpoints keeps only the latest; see test_cleanup_old_checkpoints.
         checkpoints = list(manager.output_dir.glob(f"{sample_name}_gene_expression_checkpoint_*.npz"))
-        assert len(checkpoints) == 3
+        assert len(checkpoints) == 1
+        assert checkpoints[0].name.endswith("_checkpoint_30.npz")
 
     def test_save_checkpoint_empty(self, temp_output_dir, sample_name, checkpoint_params):
         """Test saving checkpoint with no completed spots."""
