@@ -160,8 +160,8 @@ Target coverage thresholds:
 ## Continuous Integration
 
 Tests run automatically on:
-- Push to `main`, `develop`, or `claude/*` branches
-- Pull requests to `main` or `develop`
+- Push to `main`, `dev`, or `feature/**` branches
+- Pull requests to `main` or `dev`
 
 CI workflow:
 1. Runs unit tests
