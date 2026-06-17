@@ -1,11 +1,16 @@
-"""Spatially-Adaptive Compositional EM (SACE) for per-cell GEX deconvolution.
+"""Spatially Anchored Cell Expression (SACE) for per-cell GEX deconvolution.
 
-Replaces heuristic per-cell GEX allocation with iterative Poisson-multinomial
-EM that learns spatially-varying type profiles and between-type RNA mass.
+Single-pass Poisson-multinomial allocation of spot-level GEX counts to
+individual cells, guided by QP proportions and marker-derived gene profiles.
+
+Grid search (1125 configs × 5 Xenium RCC regions) showed all internal
+parameters are inert at single-pass: eps, n_0, and bandwidth affect only
+the M-step diagnostic output, not the allocation itself.
+These are hardcoded below.
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -14,6 +19,22 @@ import scipy.sparse as sp
 from scipy.spatial import KDTree
 
 logger = logging.getLogger(__name__)
+
+
+class SaceInternals(NamedTuple):
+    """Internal SACE arrays needed by project_sace_to_cells."""
+
+    B: "np.ndarray"  # (N, T) — type mass per spot
+    mu: "np.ndarray"  # (N, T, G) — gene profiles per spot-type
+    K: "sp.csr_matrix"  # (N, N) — spatial kernel
+
+
+# Internal constants — validated as inert via grid search (range < 0.007 r).
+# With single-pass allocation, these only affect .obs diagnostic columns
+# (shrinkage_alpha, n_eff_type), not the actual GEX predictions.
+_EPS = 1e-8
+_N_0 = 10.0  # Fixed smoothing constant for effective-count shrinkage
+_BANDWIDTH = None  # auto-computed from median nearest-neighbor distance
 
 
 def build_kernel_matrix(
@@ -98,8 +119,6 @@ def _m_step_mu(
     E_x: np.ndarray,
     K: sp.csr_matrix,
     *,
-    n_0: float = 10.0,
-    eps: float = 1e-6,
     min_mass_threshold: float = 1.0,
     mu_prev: Optional[np.ndarray] = None,
 ) -> np.ndarray:
@@ -107,11 +126,14 @@ def _m_step_mu(
 
     Uses Kish ESS for shrinkage: n_eff = (Sum K*B)^2 / Sum (K*B)^2.
     Rare types (total mass < threshold) are frozen at previous/global profile.
+
+    Note: With single-pass allocation (production default), this output only
+    populates per-cell diagnostic columns — it does not feed back into allocation.
     """
     N, T, G = E_x.shape
 
     # Global profiles
-    global_num = E_x.sum(axis=0) + eps
+    global_num = E_x.sum(axis=0) + _EPS
     global_den = global_num.sum(axis=1, keepdims=True)
     mu_global = global_num / global_den
 
@@ -121,7 +143,7 @@ def _m_step_mu(
         smoothed = K @ E_x[:, t, :]
         smoothed_total = smoothed.sum(axis=1, keepdims=True)
         smoothed_total = np.where(smoothed_total > 0, smoothed_total, 1.0)
-        mu_local[:, t, :] = (smoothed + eps) / (smoothed_total + G * eps)
+        mu_local[:, t, :] = (smoothed + _EPS) / (smoothed_total + G * _EPS)
 
     # Kish ESS shrinkage — element-wise (K*B)^2 in denominator
     B = E_x.sum(axis=2)
@@ -138,7 +160,7 @@ def _m_step_mu(
         K_bt = K.multiply(b_t[np.newaxis, :])
         KB2 = np.array(K_bt.multiply(K_bt).sum(axis=1)).ravel()
         n_eff = np.where(KB2 > 0, KB**2 / KB2, 0.0)
-        alpha[:, t] = n_eff / (n_eff + n_0)
+        alpha[:, t] = n_eff / (n_eff + _N_0)
 
     # Blend local + global
     mu = alpha[:, :, None] * mu_local + (1 - alpha[:, :, None]) * mu_global[None, :, :]
@@ -177,8 +199,6 @@ def _marker_guided_init(
     antibody_names: List[str],
     cell_profile_dict: dict,
     type_names: List[str],
-    *,
-    eps: float = 1e-10,
 ) -> tuple:
     """Marker-guided initialization for SACE mu_global.
 
@@ -195,7 +215,6 @@ def _marker_guided_init(
         cell_profile_dict: Dict mapping type name to marker dict,
             e.g. {"TypeA": {"Major": ["marker1", "marker2"]}}.
         type_names: Ordered type names matching proportions columns.
-        eps: Numerical floor.
 
     Returns:
         Tuple of (mu_global, diagnostics) where:
@@ -220,13 +239,11 @@ def _marker_guided_init(
     # SACE needs 0.01 floor for profile init (shared helper clips to [0,1])
     gene_mask = Y.sum(axis=0) > 0
     H = np.maximum(H, 0.01)
-    H = np.maximum(H, eps)
-    # Zero-expression genes stay at eps (not 0.01) to match original behavior
-    H[:, ~gene_mask] = eps
+    H[:, ~gene_mask] = _EPS
 
     # Check degeneracy (on nonzero genes only, matching original)
     H_nz = H[:, gene_mask]
-    H_norm = H_nz / (np.linalg.norm(H_nz, axis=1, keepdims=True) + eps)
+    H_norm = H_nz / (np.linalg.norm(H_nz, axis=1, keepdims=True) + _EPS)
     corr_matrix = H_norm @ H_norm.T
     mask = ~np.eye(T, dtype=bool)
     mean_corr = float(corr_matrix[mask].mean())
@@ -236,8 +253,8 @@ def _marker_guided_init(
         return None, {"status": "degenerate", "mean_row_corr": mean_corr}
 
     # Build mu_global: normalize nonzero genes, eps-fill zero genes
-    mu_global = np.full((T, G), eps)
-    H_nz_normalized = H_nz / (H_nz.sum(axis=1, keepdims=True) + eps)
+    mu_global = np.full((T, G), _EPS)
+    H_nz_normalized = H_nz / (H_nz.sum(axis=1, keepdims=True) + _EPS)
     mu_global[:, gene_mask] = H_nz_normalized
 
     G_nz = int(gene_mask.sum())
@@ -245,54 +262,97 @@ def _marker_guided_init(
     return mu_global, {"status": "ok", "mean_row_corr": mean_corr, "G_nonzero": G_nz}
 
 
-def run_sace(
+def _largest_remainder_round(values: np.ndarray, total: int) -> np.ndarray:
+    """Round non-negative floats to integers summing to total."""
+    if total == 0:
+        return np.zeros_like(values, dtype=int)
+    prop_sum = values.sum()
+    if prop_sum > 0:
+        values = values / prop_sum
+    raw = values * total
+    floored = np.floor(raw).astype(int)
+    remainders = raw - floored
+    deficit = total - floored.sum()
+    if deficit > 0:
+        top_idx = np.argsort(-remainders)[:deficit]
+        floored[top_idx] += 1
+    return floored
+
+
+def integerize_spot_type_gex(
+    spot_type_gex: Dict[int, np.ndarray],
+    spot_counts: np.ndarray,
+) -> Dict[int, np.ndarray]:
+    """Round continuous SACE allocations to integers conserving spot totals.
+
+    For each spot s and gene g, applies largest-remainder rounding to the
+    (T,) allocation vector so that allocations are non-negative integers
+    summing to exactly spot_counts[s, g].
+
+    Args:
+        spot_type_gex: Dict[spot_idx -> (T, G) ndarray], continuous.
+        spot_counts: (N, G) integer count matrix (raw observed counts).
+
+    Returns:
+        Dict[spot_idx -> (T, G) ndarray] with integer values.
+    """
+    if hasattr(spot_counts, "toarray"):
+        spot_counts = spot_counts.toarray()
+    spot_counts = np.asarray(spot_counts, dtype=int)
+
+    result = {}
+    for s_idx, alloc in spot_type_gex.items():
+        T, G = alloc.shape
+        int_alloc = np.zeros((T, G), dtype=int)
+        for g in range(G):
+            obs_total = int(spot_counts[s_idx, g])
+            type_vals = alloc[:, g]
+            int_alloc[:, g] = _largest_remainder_round(type_vals, obs_total)
+        result[s_idx] = int_alloc
+    return result
+
+
+def run_sace_layers(
     spot_counts: np.ndarray,
     proportions: pd.DataFrame,
-    cell_assignments: Dict[str, str],
-    cell_spot_map: pd.DataFrame,
     spot_coords: np.ndarray,
     *,
     gene_names: List[str],
     spotwise_profiles_init: Optional[Dict[int, np.ndarray]] = None,
-    n_0: float = 10.0,
-    bandwidth: Optional[float] = None,
-    max_iter: int = 10,
-    tol: float = 1e-4,
-    eps: float = 1e-6,
     min_mass_threshold: float = 1.0,
-    damping_eta: float = 1.0,
     antibody_data: Optional[np.ndarray] = None,
     antibody_names: Optional[List[str]] = None,
     cell_profile_dict: Optional[dict] = None,
-) -> Tuple[Dict[int, np.ndarray], sc.AnnData, Dict]:
-    """Run Spatially-Adaptive Compositional EM for per-cell GEX.
+    init_method: str = "marker",
+) -> Tuple[Dict[int, np.ndarray], np.ndarray, "SaceInternals", Dict]:
+    """Core SACE E-step: allocate spot counts to types without cell projection.
+
+    This is the compute-intensive layer of SACE.  It produces spot-level
+    allocations and all internal arrays required for downstream per-cell
+    projection via ``_assemble_cell_adata``.
 
     Args:
         spot_counts: (N, G) raw count matrix (NOT normalized).
         proportions: (N, T) DataFrame of cell type proportions from Pass 1.
-        cell_assignments: Dict[cell_id -> type_name].
-        cell_spot_map: DataFrame with columns: cell_id, spot_barcode, spot_idx, x, y.
         spot_coords: (N, 2) spot spatial coordinates.
         gene_names: List of gene names matching columns of spot_counts.
         spotwise_profiles_init: Optional Pass 1 deconvolved profiles for initialization.
-        n_0: Shrinkage prior strength.
-        bandwidth: Kernel bandwidth (None=auto).
-        max_iter: Maximum EM iterations.
-        tol: Convergence threshold.
-        eps: Dirichlet floor.
-        min_mass_threshold: Mass threshold for type freeze.
-        damping_eta: Update damping (1.0 = no damping).
+        min_mass_threshold: Mass threshold for type freeze in diagnostics.
         antibody_data: Optional (N, M) raw antibody capture matrix for
             marker-guided initialization.
         antibody_names: List of antibody names matching antibody_data columns.
         cell_profile_dict: Dict mapping type name to marker dict for
             marker-guided initialization, e.g. {"TypeA": {"Major": [...]}}.
+        init_method: Initialization strategy for mu_global. "marker" uses
+            antibody-guided init (current default). "prop" uses proportion-weighted
+            GEX (confounded proportional init from validated QP proportions).
 
     Returns:
-        Tuple of:
+        4-tuple of:
         - spot_type_gex: Dict[spot_idx -> (T, G) array]
-        - cell_adata: AnnData (n_cells, G)
-        - diagnostics: Dict with convergence info
+        - E_x: (N, T, G) ndarray of allocated counts
+        - internals: SaceInternals(B, mu, K) for downstream cell projection
+        - diagnostics: Dict with log_likelihood and init_method
     """
     # Handle sparse matrices (common when raw_counts layer is CSR)
     if hasattr(spot_counts, "toarray"):
@@ -303,10 +363,10 @@ def run_sace(
     T = len(type_names)
     props = proportions.values.astype(float)  # (N, T)
 
-    logger.info("SACE: N=%d spots, T=%d types, G=%d genes, %d cells", N, T, G, len(cell_assignments))
+    logger.info("SACE: N=%d spots, T=%d types, G=%d genes", N, T, G)
 
-    # --- Build kernel matrix ---
-    K = build_kernel_matrix(spot_coords, bandwidth=bandwidth)
+    # --- Build kernel matrix (for diagnostic M-step only) ---
+    K = build_kernel_matrix(spot_coords, bandwidth=_BANDWIDTH)
 
     # --- Initialize mu and B ---
     lib_sizes = Y.sum(axis=1)  # (N,)
@@ -327,7 +387,18 @@ def run_sace(
             else:
                 mu_global[t] = 1.0 / G
         # Normalize global profiles
-        mu_global = (mu_global + eps) / (mu_global + eps).sum(axis=1, keepdims=True)
+        mu_global = (mu_global + _EPS) / (mu_global + _EPS).sum(axis=1, keepdims=True)
+    elif init_method == "prop":
+        logger.info("Using proportion-weighted init (confounded proportional)")
+        mu_global = np.zeros((T, G))
+        for t in range(T):
+            weighted = props[:, t : t + 1] * Y
+            total_w = weighted.sum()
+            if total_w > 0:
+                mu_global[t] = weighted.sum(axis=0) / total_w
+            else:
+                mu_global[t] = 1.0 / G
+        mu_global = (mu_global + _EPS) / (mu_global + _EPS).sum(axis=1, keepdims=True)
     else:
         mu_global = None
         # Try marker-guided init if antibody data is available
@@ -338,7 +409,6 @@ def run_sace(
                 antibody_names or [],
                 cell_profile_dict,
                 type_names,
-                eps=eps,
             )
             mu_global, mg_diag = mg_result
             if mu_global is not None:
@@ -358,7 +428,7 @@ def run_sace(
                     mu_global[t] = weighted.sum(axis=0) / total_w
                 else:
                     mu_global[t] = 1.0 / G
-            mu_global = (mu_global + eps) / (mu_global + eps).sum(axis=1, keepdims=True)
+            mu_global = (mu_global + _EPS) / (mu_global + _EPS).sum(axis=1, keepdims=True)
 
     # Initialize local mu = global everywhere
     mu = np.broadcast_to(mu_global[None, :, :], (N, T, G)).copy()
@@ -366,107 +436,138 @@ def run_sace(
     # Initialize B from proportions and library sizes
     B = props * lib_sizes[:, None]  # (N, T)
 
-    # --- EM loop ---
-    ll_trace = []
-    change_trace = []  # type: ignore[var-annotated]
-    damping_activated = False
-    E_x_prev = None
+    # --- Single-pass allocation ---
+    E_x = _e_step(Y, B, mu)
+    ll = _poisson_log_likelihood(Y, B, mu)
 
-    for iteration in range(max_iter):
-        # E-step
-        E_x = _e_step(Y, B, mu)
+    # M-step: populates per-cell diagnostics (entropy, Kish ESS, shrinkage
+    # alpha) but does NOT affect the allocation itself at single-pass.
+    mu = _m_step_mu(E_x, K, min_mass_threshold=min_mass_threshold, mu_prev=mu)
+    mu_sum = mu.sum(axis=2, keepdims=True)
+    mu_sum = np.where(mu_sum > 0, mu_sum, 1.0)
+    mu = mu / mu_sum
+    B = _m_step_B(E_x)
 
-        # Convergence check
-        if E_x_prev is not None:
-            max_change = np.abs(E_x - E_x_prev).max()
-            rel_change = max_change / max(E_x.max(), 1.0)
-            change_trace.append(float(rel_change))
-            if rel_change < tol:
-                logger.info("SACE converged at iteration %d (change=%.2e)", iteration, rel_change)
-                break
-        E_x_prev = E_x.copy()
-
-        # Log-likelihood
-        ll = _poisson_log_likelihood(Y, B, mu)
-        ll_trace.append(ll)
-
-        # Check for likelihood drop -> enable damping
-        if len(ll_trace) >= 2 and ll_trace[-1] < ll_trace[-2]:
-            if damping_eta >= 1.0:
-                damping_eta = 0.5
-                damping_activated = True
-                logger.warning(
-                    "SACE: log-likelihood dropped at iter %d, " "enabling damping (eta=%.2f)", iteration, damping_eta
-                )
-
-        # M-step: profiles
-        mu_new = _m_step_mu(E_x, K, n_0=n_0, eps=eps, min_mass_threshold=min_mass_threshold, mu_prev=mu)
-
-        # M-step: RNA mass
-        B_new = _m_step_B(E_x)
-
-        # Apply damping
-        mu = (1 - damping_eta) * mu + damping_eta * mu_new
-        B = (1 - damping_eta) * B + damping_eta * B_new
-
-        # Re-normalize mu after damping
-        mu_sum = mu.sum(axis=2, keepdims=True)
-        mu_sum = np.where(mu_sum > 0, mu_sum, 1.0)
-        mu = mu / mu_sum
-
-        logger.info("SACE iter %d: LL=%.1f%s", iteration, ll, f" change={change_trace[-1]:.2e}" if change_trace else "")
-
-    # Final E-step with converged parameters.
-    # Skip when max_iter <= 1: the loop's E-step already used the init mu,
-    # and the M-step overwrote mu with confounded profiles. Re-running E-step
-    # here would discard the marker-guided init signal.
-    if max_iter > 1:
-        E_x = _e_step(Y, B, mu)
+    logger.info("SACE single-pass: LL=%.1f", ll)
 
     # --- Build outputs ---
-    # 1. Spot-type profiles: Dict[spot_idx -> (T, G)]
     spot_type_gex = {}
     for s in range(N):
-        spot_type_gex[s] = E_x[s]  # (T, G)
+        spot_type_gex[s] = E_x[s]
 
-    # 2. Per-cell AnnData
-    cell_adata = _assemble_cell_adata(
+    internals = SaceInternals(B=B, mu=mu, K=K)
+    diagnostics = {
+        "log_likelihood": ll,
+        "init_method": init_method,
+    }
+
+    return spot_type_gex, E_x, internals, diagnostics
+
+
+def run_sace(
+    spot_counts: np.ndarray,
+    proportions: pd.DataFrame,
+    cell_assignments: Dict[str, str],
+    cell_spot_map: pd.DataFrame,
+    spot_coords: np.ndarray,
+    *,
+    gene_names: List[str],
+    spotwise_profiles_init: Optional[Dict[int, np.ndarray]] = None,
+    min_mass_threshold: float = 1.0,
+    antibody_data: Optional[np.ndarray] = None,
+    antibody_names: Optional[List[str]] = None,
+    cell_profile_dict: Optional[dict] = None,
+    init_method: str = "marker",
+) -> Tuple[Dict[int, np.ndarray], sc.AnnData, Dict]:
+    """Backward-compatible wrapper: run SACE layers + cell projection.
+
+    Allocates spot-level GEX counts to individual cells via Poisson-multinomial
+    E-step using QP proportions and marker-guided gene profiles. Grid search
+    (1125 configs × 5 Xenium RCC regions) validated that internal parameters
+    (eps, n_0, bandwidth) are inert at single-pass — they affect only diagnostic
+    metadata, not predictions.
+
+    Args:
+        spot_counts: (N, G) raw count matrix (NOT normalized).
+        proportions: (N, T) DataFrame of cell type proportions from Pass 1.
+        cell_assignments: Dict[cell_id -> type_name].
+        cell_spot_map: DataFrame with columns: cell_id, spot_barcode, spot_idx, x, y.
+        spot_coords: (N, 2) spot spatial coordinates.
+        gene_names: List of gene names matching columns of spot_counts.
+        spotwise_profiles_init: Optional Pass 1 deconvolved profiles for initialization.
+        min_mass_threshold: Mass threshold for type freeze in diagnostics.
+        antibody_data: Optional (N, M) raw antibody capture matrix for
+            marker-guided initialization.
+        antibody_names: List of antibody names matching antibody_data columns.
+        cell_profile_dict: Dict mapping type name to marker dict for
+            marker-guided initialization, e.g. {"TypeA": {"Major": [...]}}.
+        init_method: Initialization strategy for mu_global. "marker" uses
+            antibody-guided init (current default). "prop" uses proportion-weighted
+            GEX (confounded proportional init from validated QP proportions).
+
+    Returns:
+        Tuple of:
+        - spot_type_gex: Dict[spot_idx -> (T, G) array]
+        - cell_adata: AnnData (n_cells, G)
+        - diagnostics: Dict with convergence info
+    """
+    spot_type_gex, E_x, internals, diagnostics = run_sace_layers(
+        spot_counts=spot_counts,
+        proportions=proportions,
+        spot_coords=spot_coords,
+        gene_names=gene_names,
+        spotwise_profiles_init=spotwise_profiles_init,
+        min_mass_threshold=min_mass_threshold,
+        antibody_data=antibody_data,
+        antibody_names=antibody_names,
+        cell_profile_dict=cell_profile_dict,
+        init_method=init_method,
+    )
+
+    type_names = list(proportions.columns)
+    cell_adata = project_sace_to_cells(
         E_x,
-        B,
-        mu,
-        K,
-        n_0,
+        internals,
         cell_assignments,
         cell_spot_map,
         gene_names,
         type_names,
     )
 
-    # 3. Diagnostics
-    diagnostics = {
-        "log_likelihood_trace": ll_trace,
-        "allocation_change": change_trace,
-        "damping_activated": damping_activated,
-        "n_iterations": len(ll_trace),
-        "final_bandwidth": float(bandwidth) if bandwidth else "auto",
-    }
-
     return spot_type_gex, cell_adata, diagnostics
 
 
-def _assemble_cell_adata(  # pylint: disable=too-many-positional-arguments
-    E_x: np.ndarray,  # (N, T, G) final allocated counts
-    B: np.ndarray,  # (N, T)
-    mu: np.ndarray,  # (N, T, G)
-    K: sp.csr_matrix,  # (N, N)
-    n_0: float,
+def project_sace_to_cells(  # pylint: disable=too-many-positional-arguments
+    E_x: np.ndarray,
+    sace_internals: "SaceInternals",
     cell_assignments: Dict[str, str],
     cell_spot_map: pd.DataFrame,
     gene_names: List[str],
     type_names: List[str],
 ) -> sc.AnnData:
-    """Assemble per-cell AnnData from SACE results."""
+    """Project spot-level SACE layers to per-cell AnnData.
+
+    Each cell receives E_x[s,t,:] / n_st (equal split among cells of the
+    same type in a spot). Orphan counts (types with mass but no cells)
+    are redistributed proportionally.
+
+    Args:
+        E_x: (N, T, G) final allocated counts from run_sace_layers.
+        sace_internals: SaceInternals namedtuple from run_sace_layers.
+        cell_assignments: Dict mapping cell_id -> type_name.
+        cell_spot_map: DataFrame with columns: cell_id, spot_barcode,
+            spot_idx, x, y.
+        gene_names: List of gene names matching the G axis of E_x.
+        type_names: List of cell type names matching the T axis of E_x.
+
+    Returns:
+        AnnData of shape (n_cells, G) with per-cell expression, obs
+        metadata, and obsm["spatial"] coordinates.
+    """
     N, T, G = E_x.shape
+    B = sace_internals.B
+    mu = sace_internals.mu
+    K = sace_internals.K
     type_to_idx = {t: i for i, t in enumerate(type_names)}
 
     cell_ids = cell_spot_map["cell_id"].values
@@ -528,7 +629,7 @@ def _assemble_cell_adata(  # pylint: disable=too-many-positional-arguments
         n_eff_arr[:, t] = np.where(KB2 > 0, KB**2 / KB2, 0.0)
 
     # Shrinkage alpha per (spot, type)
-    alpha_arr = n_eff_arr / (n_eff_arr + n_0)
+    alpha_arr = n_eff_arr / (n_eff_arr + _N_0)
 
     obs_data = {
         "cell_id": cell_ids,
@@ -552,3 +653,7 @@ def _assemble_cell_adata(  # pylint: disable=too-many-positional-arguments
     adata.obsm["spatial"] = coords
 
     return adata
+
+
+# Backward-compatible alias (used internally and by external callers).
+_assemble_cell_adata = project_sace_to_cells

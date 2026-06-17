@@ -1,4 +1,5 @@
 """Tests for SACE per-cell GEX deconvolution."""
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -17,6 +18,7 @@ class TestBuildKernelMatrix:
 
     def test_returns_sparse_csr(self, grid_coords):
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         K = build_kernel_matrix(grid_coords, bandwidth=200.0)
         assert issparse(K)
         assert K.format == "csr"
@@ -24,18 +26,21 @@ class TestBuildKernelMatrix:
 
     def test_rows_sum_to_one(self, grid_coords):
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         K = build_kernel_matrix(grid_coords, bandwidth=200.0)
         row_sums = np.array(K.sum(axis=1)).ravel()
         np.testing.assert_allclose(row_sums, 1.0, atol=1e-10)
 
     def test_all_weights_nonnegative(self, grid_coords):
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         K = build_kernel_matrix(grid_coords, bandwidth=200.0)
         assert K.min() >= 0.0
 
     def test_diagonal_is_largest_per_row(self, grid_coords):
         """Self-weight should be >= any neighbor weight."""
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         K = build_kernel_matrix(grid_coords, bandwidth=200.0)
         dense = K.toarray()
         for i in range(dense.shape[0]):
@@ -43,6 +48,7 @@ class TestBuildKernelMatrix:
 
     def test_auto_bandwidth(self, grid_coords):
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         K = build_kernel_matrix(grid_coords, bandwidth=None)
         assert K.shape == (4, 4)
         assert K.nnz > 4
@@ -50,6 +56,7 @@ class TestBuildKernelMatrix:
     def test_small_bandwidth_is_sparse(self):
         """Very small bandwidth should mostly keep self-weights."""
         from CITEgeist.model.gex.sace_gex import build_kernel_matrix
+
         coords = np.array([[0, 0], [1000, 0], [0, 1000]], dtype=float)
         K = build_kernel_matrix(coords, bandwidth=1.0)
         dense = K.toarray()
@@ -63,21 +70,16 @@ class TestSaceEmInternals:
     def simple_problem(self):
         """2 spots, 2 types, 3 genes. Known analytical solution."""
         N, T, G = 2, 2, 3
-        Y = np.array([[100, 50, 30],
-                       [60, 80, 40]], dtype=float)
-        proportions = np.array([[0.8, 0.2],
-                                 [0.3, 0.7]])
-        mu = np.array([[[0.5, 0.3, 0.2],
-                         [0.2, 0.4, 0.4]],
-                        [[0.5, 0.3, 0.2],
-                         [0.2, 0.4, 0.4]]])
+        Y = np.array([[100, 50, 30], [60, 80, 40]], dtype=float)
+        proportions = np.array([[0.8, 0.2], [0.3, 0.7]])
+        mu = np.array([[[0.5, 0.3, 0.2], [0.2, 0.4, 0.4]], [[0.5, 0.3, 0.2], [0.2, 0.4, 0.4]]])
         lib_sizes = Y.sum(axis=1)
         B = proportions * lib_sizes[:, None]
-        return {"Y": Y, "proportions": proportions, "mu": mu, "B": B,
-                "N": N, "T": T, "G": G}
+        return {"Y": Y, "proportions": proportions, "mu": mu, "B": B, "N": N, "T": T, "G": G}
 
     def test_e_step_conserves_counts(self, simple_problem):
         from CITEgeist.model.gex.sace_gex import _e_step
+
         p = simple_problem
         E_x = _e_step(p["Y"], p["B"], p["mu"])
         assert E_x.shape == (2, 2, 3)
@@ -86,6 +88,7 @@ class TestSaceEmInternals:
 
     def test_e_step_absent_type_gets_zero(self, simple_problem):
         from CITEgeist.model.gex.sace_gex import _e_step
+
         p = simple_problem
         B = p["B"].copy()
         B[0, 1] = 0.0
@@ -95,6 +98,7 @@ class TestSaceEmInternals:
 
     def test_m_step_B_equals_allocated_total(self, simple_problem):
         from CITEgeist.model.gex.sace_gex import _e_step, _m_step_B
+
         p = simple_problem
         E_x = _e_step(p["Y"], p["B"], p["mu"])
         B_new = _m_step_B(E_x)
@@ -103,28 +107,14 @@ class TestSaceEmInternals:
 
     def test_m_step_mu_is_normalized(self, simple_problem):
         from CITEgeist.model.gex.sace_gex import _e_step, _m_step_mu
+
         p = simple_problem
         E_x = _e_step(p["Y"], p["B"], p["mu"])
         K = sp.eye(2, format="csr")
-        mu_new = _m_step_mu(E_x, K, n_0=10, eps=1e-6)
+        mu_new = _m_step_mu(E_x, K)
         profile_sums = mu_new.sum(axis=2)
         np.testing.assert_allclose(profile_sums, 1.0, atol=1e-6)
 
-    def test_m_step_mu_global_shrinkage(self):
-        """With n_0 very large, local profiles should equal global."""
-        from CITEgeist.model.gex.sace_gex import _e_step, _m_step_mu
-        N, T, G = 3, 2, 4
-        Y = np.random.RandomState(42).poisson(50, size=(N, G)).astype(float)
-        mu = np.ones((N, T, G)) / G
-        B = np.ones((N, T)) * 50.0
-        E_x = _e_step(Y, B, mu)
-        K = sp.eye(N, format="csr")
-        mu_new = _m_step_mu(E_x, K, n_0=1e8, eps=1e-6)
-        for t in range(T):
-            for s in range(1, N):
-                np.testing.assert_allclose(
-                    mu_new[s, t, :], mu_new[0, t, :], atol=1e-4
-                )
 
 
 class TestRunSace:
@@ -167,57 +157,74 @@ class TestRunSace:
                     cell_coords.append(spot_coords[s] + jitter)
 
         cell_assignments = dict(zip(cell_ids, cell_types))
-        cell_spot_map = pd.DataFrame({
-            "cell_id": cell_ids,
-            "spot_barcode": [f"spot_{i}" for i in cell_spot_indices],
-            "spot_idx": cell_spot_indices,
-            "x": [c[0] for c in cell_coords],
-            "y": [c[1] for c in cell_coords],
-        })
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": cell_ids,
+                "spot_barcode": [f"spot_{i}" for i in cell_spot_indices],
+                "spot_idx": cell_spot_indices,
+                "x": [c[0] for c in cell_coords],
+                "y": [c[1] for c in cell_coords],
+            }
+        )
         gene_names = [f"gene_{g}" for g in range(G)]
 
         return {
-            "Y": Y, "proportions": proportions,
+            "Y": Y,
+            "proportions": proportions,
             "cell_assignments": cell_assignments,
             "cell_spot_map": cell_spot_map,
             "spot_coords": spot_coords,
             "gene_names": gene_names,
-            "N": N, "T": T, "G": G,
+            "N": N,
+            "T": T,
+            "G": G,
             "total_cells": len(cell_ids),
         }
 
     def test_returns_correct_types(self, xenium_like_problem):
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         spot_type_gex, cell_adata, diagnostics = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
             cell_assignments=p["cell_assignments"],
             cell_spot_map=p["cell_spot_map"],
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=3)
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
         assert isinstance(spot_type_gex, dict)
         assert isinstance(cell_adata, sc.AnnData)
         assert isinstance(diagnostics, dict)
 
     def test_spot_type_gex_shapes(self, xenium_like_problem):
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         spot_type_gex, _, _ = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
             cell_assignments=p["cell_assignments"],
             cell_spot_map=p["cell_spot_map"],
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=3)
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
         for s_idx, profile in spot_type_gex.items():
             assert profile.shape == (p["T"], p["G"])
 
     def test_count_conservation(self, xenium_like_problem):
         """Sum of per-cell GEX per spot must equal spot total."""
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         _, cell_adata, _ = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
             cell_assignments=p["cell_assignments"],
             cell_spot_map=p["cell_spot_map"],
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=3)
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
         spot_barcodes = cell_adata.obs["spot_barcode"].values
         for s in range(p["N"]):
             spot_name = f"spot_{s}"
@@ -226,35 +233,46 @@ class TestRunSace:
                 continue
             cell_sum = cell_adata.X[mask].sum(axis=0)
             np.testing.assert_allclose(
-                np.asarray(cell_sum).ravel(), p["Y"][s], atol=1e-6,
-                err_msg=f"Count conservation violated for {spot_name}")
+                np.asarray(cell_sum).ravel(),
+                p["Y"][s],
+                atol=1e-6,
+                err_msg=f"Count conservation violated for {spot_name}",
+            )
 
     def test_cell_adata_has_diagnostics(self, xenium_like_problem):
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         _, cell_adata, _ = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
             cell_assignments=p["cell_assignments"],
             cell_spot_map=p["cell_spot_map"],
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=3)
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
         for col in ["allocation_entropy", "n_eff_type", "shrinkage_alpha", "B_st"]:
             assert col in cell_adata.obs.columns, f"Missing diagnostic: {col}"
 
     def test_convergence_diagnostics(self, xenium_like_problem):
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         _, _, diagnostics = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
             cell_assignments=p["cell_assignments"],
             cell_spot_map=p["cell_spot_map"],
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=5)
-        assert "log_likelihood_trace" in diagnostics
-        assert "allocation_change" in diagnostics
-        assert len(diagnostics["log_likelihood_trace"]) <= 5
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
+        assert "log_likelihood" in diagnostics
+        assert "init_method" in diagnostics
 
     def test_single_cell_spot(self, xenium_like_problem):
         """Spots with 1 cell should give that cell all counts."""
         from CITEgeist.model.gex.sace_gex import run_sace
+
         p = xenium_like_problem
         mask = p["cell_spot_map"]["spot_barcode"] == "spot_0"
         first_cell = p["cell_spot_map"][mask].iloc[0]["cell_id"]
@@ -263,9 +281,13 @@ class TestRunSace:
         assignments = {k: v for k, v in p["cell_assignments"].items() if k in csm["cell_id"].values}
 
         _, cell_adata, _ = run_sace(
-            spot_counts=p["Y"], proportions=p["proportions"],
-            cell_assignments=assignments, cell_spot_map=csm,
-            spot_coords=p["spot_coords"], gene_names=p["gene_names"], max_iter=3)
+            spot_counts=p["Y"],
+            proportions=p["proportions"],
+            cell_assignments=assignments,
+            cell_spot_map=csm,
+            spot_coords=p["spot_coords"],
+            gene_names=p["gene_names"],
+        )
         solo_mask = cell_adata.obs["spot_barcode"] == "spot_0"
         assert solo_mask.sum() == 1
         solo_expr = np.asarray(cell_adata.X[solo_mask]).ravel()
@@ -279,7 +301,7 @@ class TestMarkerGuidedInit:
         """Create structured data where each type has distinct marker-gene correlations."""
         # True gene profiles: each type has a distinct set of marker genes
         true_profiles = np.zeros((T, G))
-        true_profiles[0, :30] = 1.0   # Type A -> genes 0-29
+        true_profiles[0, :30] = 1.0  # Type A -> genes 0-29
         true_profiles[1, 30:60] = 1.0  # Type B -> genes 30-59
         true_profiles[2, 60:90] = 1.0  # Type C -> genes 60-89
         true_profiles += 0.01
@@ -313,20 +335,31 @@ class TestMarkerGuidedInit:
         type_names = ["TypeA", "TypeB", "TypeC"]
 
         return {
-            "Y": Y, "props": props, "lib_sizes": lib_sizes,
-            "antibody_data": antibody_data, "antibody_names": antibody_names,
-            "cell_profile_dict": cell_profile_dict, "type_names": type_names,
-            "true_profiles": true_profiles, "N": N, "T": T, "G": G,
+            "Y": Y,
+            "props": props,
+            "lib_sizes": lib_sizes,
+            "antibody_data": antibody_data,
+            "antibody_names": antibody_names,
+            "cell_profile_dict": cell_profile_dict,
+            "type_names": type_names,
+            "true_profiles": true_profiles,
+            "N": N,
+            "T": T,
+            "G": G,
         }
 
     def test_returns_correct_shapes(self):
         from CITEgeist.model.gex.sace_gex import _marker_guided_init
+
         rng = np.random.RandomState(42)
         p = self._make_structured_problem(rng)
 
         mu_global, diag = _marker_guided_init(
-            p["Y"], p["antibody_data"], p["antibody_names"],
-            p["cell_profile_dict"], p["type_names"],
+            p["Y"],
+            p["antibody_data"],
+            p["antibody_names"],
+            p["cell_profile_dict"],
+            p["type_names"],
         )
 
         assert mu_global is not None
@@ -335,12 +368,16 @@ class TestMarkerGuidedInit:
 
     def test_profiles_are_normalized(self):
         from CITEgeist.model.gex.sace_gex import _marker_guided_init
+
         rng = np.random.RandomState(42)
         p = self._make_structured_problem(rng)
 
         mu_global, _ = _marker_guided_init(
-            p["Y"], p["antibody_data"], p["antibody_names"],
-            p["cell_profile_dict"], p["type_names"],
+            p["Y"],
+            p["antibody_data"],
+            p["antibody_names"],
+            p["cell_profile_dict"],
+            p["type_names"],
         )
 
         row_sums = mu_global.sum(axis=1)
@@ -349,12 +386,16 @@ class TestMarkerGuidedInit:
     def test_profiles_differ_across_types(self):
         """Marker-guided init should produce distinguishable type profiles."""
         from CITEgeist.model.gex.sace_gex import _marker_guided_init
+
         rng = np.random.RandomState(42)
         p = self._make_structured_problem(rng)
 
         mu_global, diag = _marker_guided_init(
-            p["Y"], p["antibody_data"], p["antibody_names"],
-            p["cell_profile_dict"], p["type_names"],
+            p["Y"],
+            p["antibody_data"],
+            p["antibody_names"],
+            p["cell_profile_dict"],
+            p["type_names"],
         )
 
         # Profiles should have low pairwise correlation (types are distinct)
@@ -368,6 +409,7 @@ class TestMarkerGuidedInit:
     def test_missing_markers_falls_back_to_uniform(self):
         """Type with no matching markers should get uniform profile."""
         from CITEgeist.model.gex.sace_gex import _marker_guided_init
+
         rng = np.random.RandomState(42)
         p = self._make_structured_problem(rng)
 
@@ -379,8 +421,11 @@ class TestMarkerGuidedInit:
         }
 
         mu_global, diag = _marker_guided_init(
-            p["Y"], p["antibody_data"], p["antibody_names"],
-            cell_profile_dict_partial, p["type_names"],
+            p["Y"],
+            p["antibody_data"],
+            p["antibody_names"],
+            cell_profile_dict_partial,
+            p["type_names"],
         )
 
         # Should not raise; TypeA gets uniform profile but result is valid
@@ -390,6 +435,7 @@ class TestMarkerGuidedInit:
     def test_zero_genes_get_eps_floor(self):
         """Genes with zero counts across all spots should get eps profile."""
         from CITEgeist.model.gex.sace_gex import _marker_guided_init
+
         rng = np.random.RandomState(42)
         p = self._make_structured_problem(rng)
 
@@ -397,8 +443,11 @@ class TestMarkerGuidedInit:
         Y_sparse[:, 90:] = 0  # last 10 genes zero
 
         mu_global, diag = _marker_guided_init(
-            Y_sparse, p["antibody_data"], p["antibody_names"],
-            p["cell_profile_dict"], p["type_names"],
+            Y_sparse,
+            p["antibody_data"],
+            p["antibody_names"],
+            p["cell_profile_dict"],
+            p["type_names"],
         )
 
         assert diag["G_nonzero"] == 90
@@ -407,6 +456,7 @@ class TestMarkerGuidedInit:
     def test_run_sace_uses_marker_guided_init(self):
         """run_sace with antibody_data should use marker-guided init path."""
         from CITEgeist.model.gex.sace_gex import run_sace
+
         rng = np.random.RandomState(42)
         N, T, G, M = 10, 3, 20, 6
         Y = rng.poisson(30, size=(N, G)).astype(float)
@@ -417,13 +467,15 @@ class TestMarkerGuidedInit:
         )
         spot_coords = rng.uniform(0, 1000, size=(N, 2))
         cell_assignments = {f"cell_{i}": "TypeA" for i in range(N)}
-        cell_spot_map = pd.DataFrame({
-            "cell_id": [f"cell_{i}" for i in range(N)],
-            "spot_barcode": [f"spot_{i}" for i in range(N)],
-            "spot_idx": list(range(N)),
-            "x": spot_coords[:, 0],
-            "y": spot_coords[:, 1],
-        })
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": [f"cell_{i}" for i in range(N)],
+                "spot_barcode": [f"spot_{i}" for i in range(N)],
+                "spot_idx": list(range(N)),
+                "x": spot_coords[:, 0],
+                "y": spot_coords[:, 1],
+            }
+        )
         antibody_data = rng.poisson(10, size=(N, M)).astype(float)
         antibody_names = ["mA1", "mA2", "mB1", "mB2", "mC1", "mC2"]
         cell_profile_dict = {
@@ -434,9 +486,13 @@ class TestMarkerGuidedInit:
 
         # Should not raise -- marker-guided path is exercised
         spot_type_gex, cell_adata, diagnostics = run_sace(
-            Y, props, cell_assignments, cell_spot_map,
-            spot_coords, [f"gene_{g}" for g in range(G)],
-            spotwise_profiles_init=None, max_iter=1,
+            Y,
+            props,
+            cell_assignments,
+            cell_spot_map,
+            spot_coords,
+            gene_names=[f"gene_{g}" for g in range(G)],
+            spotwise_profiles_init=None,
             antibody_data=antibody_data,
             antibody_names=antibody_names,
             cell_profile_dict=cell_profile_dict,
@@ -446,6 +502,7 @@ class TestMarkerGuidedInit:
     def test_run_sace_falls_back_without_antibody_data(self):
         """run_sace without antibody_data uses confounded proportional init."""
         from CITEgeist.model.gex.sace_gex import run_sace
+
         rng = np.random.RandomState(42)
         N, T, G = 10, 3, 20
         Y = rng.poisson(30, size=(N, G)).astype(float)
@@ -456,18 +513,211 @@ class TestMarkerGuidedInit:
         )
         spot_coords = rng.uniform(0, 1000, size=(N, 2))
         cell_assignments = {f"cell_{i}": "TypeA" for i in range(N)}
-        cell_spot_map = pd.DataFrame({
-            "cell_id": [f"cell_{i}" for i in range(N)],
-            "spot_barcode": [f"spot_{i}" for i in range(N)],
-            "spot_idx": list(range(N)),
-            "x": spot_coords[:, 0],
-            "y": spot_coords[:, 1],
-        })
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": [f"cell_{i}" for i in range(N)],
+                "spot_barcode": [f"spot_{i}" for i in range(N)],
+                "spot_idx": list(range(N)),
+                "x": spot_coords[:, 0],
+                "y": spot_coords[:, 1],
+            }
+        )
 
         # Should not raise -- confounded init fallback is used
         spot_type_gex, cell_adata, diagnostics = run_sace(
-            Y, props, cell_assignments, cell_spot_map,
-            spot_coords, [f"gene_{g}" for g in range(G)],
-            spotwise_profiles_init=None, max_iter=1,
+            Y,
+            props,
+            cell_assignments,
+            cell_spot_map,
+            spot_coords,
+            gene_names=[f"gene_{g}" for g in range(G)],
+            spotwise_profiles_init=None,
         )
         assert len(spot_type_gex) == N
+
+
+class TestRunSaceLayers:
+    def test_returns_four_tuple(self):
+        from CITEgeist.model.gex.sace_gex import SaceInternals, run_sace_layers
+
+        N, T, G = 10, 3, 20
+        spot_counts = np.random.poisson(5, (N, G)).astype(float)
+        props = np.random.dirichlet([1] * T, N)
+        proportions = pd.DataFrame(props, columns=[f"type_{i}" for i in range(T)])
+        coords = np.random.rand(N, 2) * 100
+        gene_names = [f"gene_{i}" for i in range(G)]
+
+        result = run_sace_layers(
+            spot_counts=spot_counts,
+            proportions=proportions,
+            spot_coords=coords,
+            gene_names=gene_names,
+            init_method="prop",
+        )
+
+        assert len(result) == 4
+        spot_type_gex, E_x, internals, diagnostics = result
+        assert isinstance(spot_type_gex, dict)
+        assert len(spot_type_gex) == N
+        assert E_x.shape == (N, T, G)
+        assert isinstance(internals, SaceInternals)
+        assert internals.B.shape == (N, T)
+        assert internals.mu.shape == (N, T, G)
+        assert "log_likelihood" in diagnostics
+
+    def test_layers_match_run_sace(self):
+        """run_sace_layers + _assemble_cell_adata == run_sace."""
+        from CITEgeist.model.gex.sace_gex import run_sace, run_sace_layers
+
+        N, T, G = 8, 2, 15
+        np.random.seed(42)
+        spot_counts = np.random.poisson(5, (N, G)).astype(float)
+        props = np.random.dirichlet([1] * T, N)
+        proportions = pd.DataFrame(props, columns=["A", "B"])
+        coords = np.random.rand(N, 2) * 100
+        gene_names = [f"g{i}" for i in range(G)]
+
+        cell_assignments = {"c0": "A", "c1": "B", "c2": "A"}
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": ["c0", "c1", "c2"],
+                "spot_barcode": [proportions.index[0]] * 2 + [proportions.index[1]],
+                "spot_idx": [0, 0, 1],
+                "x": [1.0, 2.0, 3.0],
+                "y": [1.0, 2.0, 3.0],
+            }
+        )
+
+        np.random.seed(42)
+        stg_old, _, diag_old = run_sace(
+            spot_counts=spot_counts,
+            proportions=proportions,
+            cell_assignments=cell_assignments,
+            cell_spot_map=cell_spot_map,
+            spot_coords=coords,
+            gene_names=gene_names,
+            init_method="prop",
+        )
+
+        np.random.seed(42)
+        stg_new, E_x, internals, diag_new = run_sace_layers(
+            spot_counts=spot_counts,
+            proportions=proportions,
+            spot_coords=coords,
+            gene_names=gene_names,
+            init_method="prop",
+        )
+
+        for s in range(N):
+            np.testing.assert_array_equal(stg_old[s], stg_new[s])
+        assert diag_old["log_likelihood"] == diag_new["log_likelihood"]
+
+
+class TestProjectSaceToCells:
+    def test_produces_anndata_with_correct_shape(self):
+        from CITEgeist.model.gex.sace_gex import (
+            project_sace_to_cells,
+            run_sace_layers,
+        )
+
+        N, T, G = 6, 2, 10
+        np.random.seed(0)
+        spot_counts = np.random.poisson(5, (N, G)).astype(float)
+        props = np.random.dirichlet([1] * T, N)
+        proportions = pd.DataFrame(props, columns=["TypeA", "TypeB"])
+        coords = np.random.rand(N, 2) * 100
+        gene_names = [f"g{i}" for i in range(G)]
+
+        _, E_x, internals, _ = run_sace_layers(
+            spot_counts=spot_counts,
+            proportions=proportions,
+            spot_coords=coords,
+            gene_names=gene_names,
+            init_method="prop",
+        )
+
+        cell_assignments = {"c0": "TypeA", "c1": "TypeB", "c2": "TypeA", "c3": "TypeB"}
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": ["c0", "c1", "c2", "c3"],
+                "spot_barcode": [proportions.index[0]] * 2 + [proportions.index[1]] * 2,
+                "spot_idx": [0, 0, 1, 1],
+                "x": [1.0, 2.0, 3.0, 4.0],
+                "y": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+
+        cell_adata = project_sace_to_cells(
+            E_x,
+            internals,
+            cell_assignments,
+            cell_spot_map,
+            gene_names,
+            ["TypeA", "TypeB"],
+        )
+
+        assert cell_adata.shape == (4, G)
+        assert "cell_type" in cell_adata.obs.columns
+        assert "spatial" in cell_adata.obsm
+        assert set(cell_adata.obs["cell_type"]) == {"TypeA", "TypeB"}
+
+    def test_count_conservation(self):
+        """Total per-cell GEX sums to total spot counts per spot."""
+        from CITEgeist.model.gex.sace_gex import (
+            project_sace_to_cells,
+            run_sace_layers,
+        )
+
+        N, T, G = 4, 2, 8
+        np.random.seed(1)
+        spot_counts = np.random.poisson(10, (N, G)).astype(float)
+        props = np.random.dirichlet([1] * T, N)
+        proportions = pd.DataFrame(props, columns=["X", "Y"])
+        coords = np.random.rand(N, 2) * 100
+        gene_names = [f"g{i}" for i in range(G)]
+
+        _, E_x, internals, _ = run_sace_layers(
+            spot_counts=spot_counts,
+            proportions=proportions,
+            spot_coords=coords,
+            gene_names=gene_names,
+            init_method="prop",
+        )
+
+        cell_ids = []
+        types = []
+        spots = []
+        idxs = []
+        for s in range(N):
+            for t_name in ["X", "Y"]:
+                cid = f"c{s}_{t_name}"
+                cell_ids.append(cid)
+                types.append(t_name)
+                spots.append(proportions.index[s])
+                idxs.append(s)
+
+        cell_assignments = dict(zip(cell_ids, types))
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": cell_ids,
+                "spot_barcode": spots,
+                "spot_idx": idxs,
+                "x": np.random.rand(len(cell_ids)),
+                "y": np.random.rand(len(cell_ids)),
+            }
+        )
+
+        cell_adata = project_sace_to_cells(
+            E_x,
+            internals,
+            cell_assignments,
+            cell_spot_map,
+            gene_names,
+            ["X", "Y"],
+        )
+
+        for s in range(N):
+            mask = cell_adata.obs["spot_barcode"] == proportions.index[s]
+            cell_total = cell_adata.X[mask.values].sum()
+            spot_total = spot_counts[s].sum()
+            np.testing.assert_allclose(cell_total, spot_total, rtol=1e-6)

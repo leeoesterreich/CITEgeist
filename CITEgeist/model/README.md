@@ -10,14 +10,15 @@ model/
 ├── utils.py                    # Shared utilities (logging, I/O, memory)
 ├── checkpoints.py              # Checkpoint manager
 ├── unified_config.py           # Pipeline configuration constants
+├── module2_proposal_builder.py # M2 profile proposal construction
+├── proposal_review_loader.py   # Proposal review result loader
 │
 ├── discovery/                  # M1 + M2: Marker scoring & profile building
 │   ├── marker_interest.py      #   Kurtosis, GMM SNR, Moran's I
-│   ├── spatial_colocalization.py #  Colocalization, profile discovery/selection
-│   └── module2_proposal_builder.py
+│   └── spatial_colocalization.py #  Colocalization, profile discovery/selection
 │
 ├── deconvolution/              # M3: QP solver & cell-type detection
-│   ├── cuopt_impl.py           #   cuOPT GPU-accelerated QP (production)
+│   ├── qp_solver.py            #   QP-based cell proportion solver (production)
 │   ├── detection.py            #   GMM-based detection gating
 │   ├── detection_refinement.py #   GEX-informed detection fusion
 │   ├── emission_init.py        #   Marker config, beta init
@@ -45,6 +46,14 @@ model/
 ├── programs/                   # M4 + M5: Programs & integration
 │   ├── anchored_program_discovery.py  # NMF programs, bivariate analysis
 │   └── cross_sample_integration.py    # Harmony alignment, conservation
+│
+├── qc/                         # Quality control checks
+│   ├── canonical_markers.py    #   Canonical marker validation
+│   ├── gex_qc.py              #   GEX quality metrics
+│   ├── marker_enrichment.py   #   Marker enrichment analysis
+│   ├── proportion_qc.py       #   Proportion QC checks
+│   ├── report.py              #   QC report generation
+│   └── single_cell_qc.py     #   Single-cell QC
 │
 ├── morphology/                 # Vision, segmentation, SSL
 │   ├── segmentation.py         #   StarDist patchwise (production)
@@ -89,5 +98,5 @@ For direct imports: `from CITEgeist.model.<subpackage>.<module> import ...`
 Example:
 ```python
 from CITEgeist.model import CitegeistModel  # via __init__.py
-from CITEgeist.model.deconvolution.cuopt_impl import optimize_cell_proportions_per_marker  # direct
+from CITEgeist.model.deconvolution.qp_solver import optimize_cell_proportions_per_marker  # direct
 ```

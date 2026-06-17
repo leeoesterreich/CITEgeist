@@ -23,8 +23,7 @@ ALL_CELL_TYPES = [
     "Monocytes",
     "CD8_T_Cells",
     "CD4_T_Cells",
-    "Cancer_Luminal",
-    "Cancer_Basal",
+    "Epithelial",
     "Dendritic_Cells",
 ]
 
@@ -46,37 +45,36 @@ class TestActiveMask:
         assert mask[0, 0] == 1, "PDCD1 should be active for CD8_T_Cells"
         assert mask[1, 0] == 0, "PDCD1 should NOT be active for Macrophages"
 
-    def test_pdl1_on_cancer_and_mac(self):
-        """CD274 (PD-L1) should be active on Cancer_Luminal, Cancer_Basal, Macrophages."""
+    def test_pdl1_on_epithelial_and_mac(self):
+        """CD274 (PD-L1) should be active on Epithelial and Macrophages, not T cells."""
         markers = ["CD274"]
-        cell_types = ["Cancer_Luminal", "Cancer_Basal", "Macrophages", "CD8_T_Cells"]
+        cell_types = ["Epithelial", "Macrophages", "CD8_T_Cells"]
         mask = build_active_mask(markers, cell_types)
 
-        assert mask[0, 0] == 1, "CD274 active on Cancer_Luminal"
-        assert mask[1, 0] == 1, "CD274 active on Cancer_Basal"
-        assert mask[2, 0] == 1, "CD274 active on Macrophages"
-        assert mask[3, 0] == 0, "CD274 NOT active on CD8_T_Cells"
+        assert mask[0, 0] == 1, "CD274 active on Epithelial"
+        assert mask[1, 0] == 1, "CD274 active on Macrophages"
+        assert mask[2, 0] == 0, "CD274 NOT active on CD8_T_Cells"
 
     def test_pcna_all_types(self):
-        """PCNA should be active for ALL 10 canonical cell types."""
+        """PCNA should be active for ALL 9 canonical cell types."""
         markers = ["PCNA"]
         mask = build_active_mask(markers, ALL_CELL_TYPES)
 
-        assert mask.shape == (10, 1)
-        assert mask[:, 0].sum() == 10, "PCNA should be active on all 10 cell types"
+        assert mask.shape == (9, 1)
+        assert mask[:, 0].sum() == 9, "PCNA should be active on all 9 cell types"
 
     def test_unknown_marker_inactive(self):
         """An unrecognized marker name should yield all zeros."""
         markers = ["TOTALLY_FAKE_MARKER_XYZ"]
         mask = build_active_mask(markers, ALL_CELL_TYPES)
 
-        assert mask.shape == (10, 1)
+        assert mask.shape == (9, 1)
         assert mask.sum() == 0, "Unknown marker should have all-zero mask"
 
     def test_shape(self):
         """Mask shape should exactly be (len(cell_types), len(functional_markers))."""
         markers = ["PCNA", "PDCD1", "CD274"]
-        cell_types = ["CD8_T_Cells", "Macrophages", "Cancer_Luminal"]
+        cell_types = ["CD8_T_Cells", "Macrophages", "Epithelial"]
         mask = build_active_mask(markers, cell_types)
 
         assert mask.shape == (3, 3), f"Expected (3, 3), got {mask.shape}"

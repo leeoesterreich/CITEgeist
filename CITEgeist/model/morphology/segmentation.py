@@ -9,7 +9,6 @@ cell proportion optimization.
 from __future__ import annotations
 
 import logging
-import warnings
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -115,10 +114,9 @@ class StarDistSegmenter:
 
     # StarDist's 2D_versatile_fluo was trained at 0.25 um/pixel
     TRAINING_PIXEL_SIZE_UM = 0.25
-    # Default prob_thresh — conservative default for quantitative work.
-    # StarDist's own default (0.479) is optimized for visual recall, not
-    # counting accuracy.  0.6 removes low-confidence debris.
-    DEFAULT_PROB_THRESH = 0.6
+    # Default prob_thresh — matches ENACT; 20–500 µm² area filter removes
+    # sub-nuclear fragments that the low threshold catches.
+    DEFAULT_PROB_THRESH = 0.005
     # Nuclear area bounds in µm² (biology constraint, tissue-agnostic).
     # Smallest human nucleus ~5 µm diameter (lymphocyte) → ~20 µm².
     # Largest plausible single nucleus ~25 µm diameter → ~500 µm².
@@ -204,7 +202,13 @@ class StarDistSegmenter:
             # Compute area per label via bincount (memory-efficient)
             areas_px = np.bincount(masks.ravel())  # index 0 = background
             # labels are 1..n_raw
-            label_areas = areas_px[1 : n_raw + 1] if len(areas_px) > n_raw else areas_px[1:]
+            # Ensure label_areas has exactly n_raw entries (one per detected nucleus)
+            if len(areas_px) > n_raw:
+                label_areas = areas_px[1 : n_raw + 1]
+            else:
+                label_areas = areas_px[1:]
+                if len(label_areas) < n_raw:
+                    label_areas = np.pad(label_areas, (0, n_raw - len(label_areas)), constant_values=0)
 
             keep_mask = (label_areas >= min_area_px) & (label_areas <= max_area_px)
             n_small = int(np.sum(label_areas < min_area_px))
@@ -311,43 +315,6 @@ def run_nuclei_segmentation(
     # Stash QC on the function for callers that need it
     run_nuclei_segmentation._last_qc = getattr(segmenter, "_last_qc", None)  # type: ignore[attr-defined]
     return masks, centroids_df
-
-
-def run_cellpose_nuclei_segmentation(
-    image_rgb_uint8: np.ndarray,
-    *,
-    _use_gpu: bool = False,
-    _diameter: Optional[float] = None,
-    _flow_threshold: float = 0.4,
-    _cellprob_threshold: float = 0.0,
-    _model=None,
-    _model_type: str = "nuclei",
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Deprecated: use ``run_nuclei_segmentation(image, modality='dapi')`` instead.
-
-    This wrapper calls StarDist under the hood and converts the output to the
-    legacy ``(masks, centroids_xy)`` format expected by old callers.
-    """
-    warnings.warn(
-        "run_cellpose_nuclei_segmentation() is deprecated. "
-        "Use run_nuclei_segmentation(image, modality='dapi') instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    masks, centroids_df = run_nuclei_segmentation(image_rgb_uint8, modality="dapi")
-
-    # Convert centroids_df to legacy (x, y) array format
-    if len(centroids_df) == 0:
-        centroids_xy = np.zeros((0, 2), dtype=np.float64)
-    else:
-        centroids_xy = np.column_stack(
-            [
-                centroids_df["x_pixel"].to_numpy(dtype=np.float64),
-                centroids_df["y_pixel"].to_numpy(dtype=np.float64),
-            ]
-        )
-
-    return masks, centroids_xy
 
 
 def estimate_pixel_size_um(

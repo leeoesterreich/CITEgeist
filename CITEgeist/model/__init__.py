@@ -12,10 +12,10 @@ _EXPORTS = {
     "CitegeistModel": (".citegeist_model", "CitegeistModel"),
     "RESOLUTION_DEFAULTS": (".citegeist_model", "RESOLUTION_DEFAULTS"),
     # Optimization (cuOPT backend)
-    "map_antibodies_to_profiles": (".deconvolution.cuopt_impl", "map_antibodies_to_profiles"),
-    "optimize_cell_proportions_per_marker": (".deconvolution.cuopt_impl", "optimize_cell_proportions_per_marker"),
-    "optimize_gene_expression": (".deconvolution.cuopt_impl", "optimize_gene_expression"),
-    "estimate_true_expression_cell": (".deconvolution.cuopt_impl", "estimate_true_expression_cell"),
+    "map_antibodies_to_profiles": (".deconvolution.qp_solver", "map_antibodies_to_profiles"),
+    "optimize_cell_proportions_per_marker": (".deconvolution.qp_solver", "optimize_cell_proportions_per_marker"),
+    "optimize_gene_expression": (".deconvolution.qp_solver", "optimize_gene_expression"),
+    "estimate_true_expression_cell": (".deconvolution.qp_solver", "estimate_true_expression_cell"),
     # GEX module-aware enrichment
     "discover_anchor_genes": (".gex.gex_modules", "discover_anchor_genes"),
     "compute_module_aware_enrichment": (".gex.gex_modules", "compute_module_aware_enrichment"),
@@ -85,6 +85,9 @@ _EXPORTS = {
     "NucleusAssignmentResult": (".assignment.module3b_nucleus_assignment", "NucleusAssignmentResult"),
     "distribute_gex_to_cells": (".gex.cell_level_gex", "distribute_gex_to_cells"),
     "allocate_gex_type_reference": (".gex.cell_level_gex", "allocate_gex_type_reference"),
+    "project_sace_to_cells": (".gex.sace_gex", "project_sace_to_cells"),
+    "SaceInternals": (".gex.sace_gex", "SaceInternals"),
+    "run_sace_layers": (".gex.sace_gex", "run_sace_layers"),
     "create_single_cell_adata": (".assignment.single_cell_output", "create_single_cell_adata"),
     # Module 3.5 benchmark/projection helpers
     "aggregate_module3_5_results": (".annotation.module3_5_benchmark", "aggregate_module3_5_results"),
@@ -118,7 +121,7 @@ _EXPORTS = {
     "QCResult": (".qc", "QCResult"),
     "run_qc": (".qc", "run_qc"),
     # Per-type beta optimization
-    "optimize_cell_proportions_per_type_beta": (".deconvolution.cuopt_impl", "optimize_cell_proportions_per_type_beta"),
+    "optimize_cell_proportions_per_type_beta": (".deconvolution.qp_solver", "optimize_cell_proportions_per_type_beta"),
     "MARKER_TYPE_TABLE": (".deconvolution.emission_init", "MARKER_TYPE_TABLE"),
     "CELL_TYPES": (".deconvolution.emission_init", "CELL_TYPES"),
     "build_marker_config": (".deconvolution.emission_init", "build_marker_config"),

@@ -11,34 +11,28 @@
 
 CITEgeist is a comprehensive computational framework for analyzing spatial multi-omic data, with a focus on integrating CITE-seq and spatial transcriptomics. Our toolkit enables researchers to uncover spatial patterns in cellular organization and gene expression, providing deeper insights into tissue architecture and function.
 
-## 🚀 Key Features
+## Key Features
 
 - Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
 - GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
-- SACE per-cell gene expression allocation using Poisson-multinomial EM
+- SACE per-cell gene expression deconvolution via single-pass Poisson-multinomial allocation
 - Morphology-informed cell assignment via ViT fine-tuned with label learning from proportions (LLP)
 - Spatial gene program discovery and cross-sample integration (Modules 4–5)
 - Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
 
-## 📚 Documentation
+## Documentation
 
 - [Quick Start Guide](CITEgeist/README.md)
-- [Benchmarking Results](Benchmarking/README.md)
-- [Example Notebooks](CITEgeist/examples)
-- [Manuscript Reproducibility Hub (v5)](repro/README.md)
+- [Running on Real Visium Data (end-to-end tutorial)](docs/quickstart_real_visium.md)
+- [Benchmarking Results](docs/Benchmarking/README.md)
+- [Example Scripts](examples/scripts)
 
-## 🔁 Manuscript Reproducibility (v8)
+## Reproducibility
 
-Canonical manuscript submission reproduction now lives under `repro/`.
+Example end-to-end pipelines for each module are in [`examples/scripts`](examples/scripts).
+See the [end-to-end Visium tutorial](docs/quickstart_real_visium.md) to run CITEgeist on real data.
 
-```bash
-python -m repro.cli.validate_env --config repro/config/example.paths.yaml
-python -m repro.cli.run_figures --set v5_all --config repro/config/example.paths.yaml
-```
-
-Reviewer-oriented runbook: `repro/runbooks/reviewer_quickstart.md`.
-
-## 💻 System Requirements
+## System Requirements
 
 ### Minimum Requirements
 - Python 3.10
@@ -47,7 +41,7 @@ Reviewer-oriented runbook: `repro/runbooks/reviewer_quickstart.md`.
 - NVIDIA GPU with 8GB+ VRAM (required for cuOPT QP solver, Module 3)
 - Linux, macOS, or Windows 10 with WSL2
 
-## 🔧 Quick Installation
+## Quick Installation
 
 You can install CITEgeist using pip:
 
@@ -63,7 +57,7 @@ cd CITEgeist
 pip install -e .[dev]
 ```
 
-## 🛠️ Development Setup
+## Development Setup
 
 ### For Contributors
 
@@ -80,9 +74,6 @@ conda activate CITEgeist_env
 
 # Install in development mode with dev dependencies
 pip install -e ".[dev]"
-
-# Install pre-commit hooks for automatic code quality checks
-pre-commit install
 ```
 
 ### Code Quality Tools
@@ -110,28 +101,23 @@ pylint CITEgeist/
 pytest
 ```
 
-Or run pre-commit hooks on all files:
-```bash
-pre-commit run --all-files
-```
-
 **CI enforcement (blocks sync to main):** black, isort, flake8, pytest/coverage
 
 **Advisory (badge only, no merge gate):** pylint, mypy
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
-## 📜 License
+## License
 
 This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details. This license ensures that all modifications and derivative works must also be open source.
 
-## 📫 Contact
+## Contact
 
 - **Lab Website**: [Lee/Oesterreich Laboratory](https://leeoesterreich.org/)
 - **Issues**: [GitHub Issues](https://github.com/leeoesterreich/CITEgeist/issues)
-- **Email**: [Contact Us](mailto:alc376@pitt.edu)
+- **Email**: [Contact Us](mailto:leeav@upmc.edu)
 
-## 📝 Citation
+## Citation
 
 If you use CITEgeist in your research, please cite our paper:
 (to be updated)
@@ -153,7 +139,7 @@ If you use CITEgeist in your research, please cite our paper:
 
 ```
 
-## 📝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
 - Setting up your development environment
@@ -161,7 +147,7 @@ We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for 
 - Testing requirements
 - Pull request process
 
-## 📝 Support
+## Support
 
 For support, please:
 - Open an issue on our [GitHub issue tracker](https://github.com/leeoesterreich/CITEgeist/issues)

@@ -41,6 +41,29 @@ def temp_output_dir():
         shutil.rmtree(temp_dir)
 
 
+@pytest.fixture(autouse=True)
+def _isolate_matplotlib_state():
+    """Snapshot and restore matplotlib global state around every test.
+
+    Some figure helpers mutate ``plt.rcParams`` globally without restoring
+    them — notably the figure style helper's ``apply_style`` sets
+    ``figure.constrained_layout.use=True``. Once leaked, later tests that build
+    a figure with a bare ``plt.subplots()``, add a colorbar, then call
+    ``fig.tight_layout()`` crash under matplotlib >=3.10 ("Colorbar layout of
+    new layout engine not compatible with old engine"). ``mpl.rc_context``
+    snapshots rcParams on entry and restores them on exit; ``plt.close("all")``
+    clears the other piece of global pyplot state (open figures).
+    """
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+
+    with mpl.rc_context():
+        try:
+            yield
+        finally:
+            plt.close("all")
+
+
 @pytest.fixture
 def mock_gurobi_license(temp_output_dir):
     """Create a mock Gurobi license file for testing."""
@@ -177,8 +200,11 @@ def mock_protein_adata(mock_protein_expression, mock_protein_names, mock_spot_na
 def mock_combined_adata(mock_gex_adata, mock_protein_adata):
     """Create a combined AnnData with both gene expression and protein data."""
     import scanpy as sc
-    # Concatenate along variable axis
-    combined = sc.concat([mock_gex_adata, mock_protein_adata], axis=1)
+    # Concatenate along the variable axis. merge="first" carries over aligned
+    # mappings (e.g. obsm['spatial']) from the inputs; the default merge=None
+    # drops all obsm on an axis=1 concat, which breaks the
+    # spatial-coordinate-preservation test.
+    combined = sc.concat([mock_gex_adata, mock_protein_adata], axis=1, merge="first")
     return combined
 
 

@@ -33,7 +33,7 @@ from numpy.typing import NDArray
 from scipy.stats import pearsonr, spearmanr
 from sklearn.decomposition import NMF
 
-from ..deconvolution.cuopt_impl import build_spatial_laplacian
+from ..deconvolution.qp_solver import build_spatial_laplacian
 from ..discovery.spatial_colocalization import ProfileDiscoveryResult
 
 logger = logging.getLogger(__name__)
@@ -1307,6 +1307,8 @@ def anchored_spatial_nmf(
         init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
+        solver="cd",  # Frobenius norm, coordinate descent
+        loss="frobenius",
         alpha_W=lambda_sparsity,
         l1_ratio=0.5,  # Balance L1 and L2 for W
     )

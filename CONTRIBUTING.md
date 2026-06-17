@@ -39,9 +39,6 @@ conda activate CITEgeist_env
 
 # Install development dependencies
 pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
 ```
 
 ### Option 2: pip + venv
@@ -53,9 +50,6 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install package with dev dependencies
 pip install -e ".[dev]"
-
-# Install pre-commit hooks
-pre-commit install
 ```
 
 ### Verify Installation
@@ -79,7 +73,7 @@ Pre-commit hooks automatically run when you commit. They check:
 
 **Run manually on all files:**
 ```bash
-pre-commit run --all-files
+black CITEgeist/ && isort CITEgeist/ && flake8 CITEgeist/
 ```
 
 ### Code Formatting
@@ -222,9 +216,6 @@ git checkout -b feature/your-feature-name
 pytest
 
 # Run quality checks
-pre-commit run --all-files
-
-# Or run specific checks
 black --check CITEgeist/
 isort --check-only CITEgeist/
 flake8 CITEgeist/
@@ -236,11 +227,7 @@ flake8 CITEgeist/
 # Stage changes
 git add .
 
-# Commit (pre-commit hooks will run automatically)
-git commit -m "Add feature: brief description"
-
-# If pre-commit modifies files, review and commit again
-git add .
+# Commit
 git commit -m "Add feature: brief description"
 ```
 
@@ -336,7 +323,6 @@ CITEgeist/
 ├── tests/                  # Pytest target (root)
 │   ├── _archive/           # Stale tests excluded by pytest
 │   └── test_figures/       # Figure test package
-├── Benchmarking/           # Benchmarking code (not in pytest scope)
 ├── .github/
 │   └── workflows/          # ci.yml (enforced), quality.yml (advisory)
 ├── docs/                   # MkDocs documentation + codebase index
@@ -347,7 +333,7 @@ CITEgeist/
 
 - **Issues**: [GitHub Issues](https://github.com/leeoesterreich/CITEgeist/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/leeoesterreich/CITEgeist/discussions)
-- **Email**: alc376@pitt.edu
+- **Email**: leeav@upmc.edu
 
 ## License
 

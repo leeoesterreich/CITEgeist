@@ -14,13 +14,26 @@ This test suite provides extensive coverage of CITEgeist functionality including
 
 ```
 tests/
-├── conftest.py              # Pytest configuration and shared fixtures
-├── test_utils.py            # Tests for utility functions
-├── test_checkpoints.py      # Tests for checkpoint management
-├── test_model.py            # Tests for model preprocessing and core functionality
-├── test_gurobi_impl.py      # Tests for optimization (mocked, no Gurobi required)
-├── test_integration.py      # Integration tests for full pipeline
-└── README.md                # This file
+├── conftest.py                    # Shared fixtures and configuration
+├── fixtures/                      # Test data fixtures
+├── test_figures/                  # Figure generation tests
+├── test_qc/                       # QC module tests
+├── benchmarking/                  # Benchmark-specific tests
+├── test_model.py                  # Core model tests
+├── test_integration.py            # Full pipeline integration tests
+├── test_cuopt_qp.py               # cuOPT QP solver tests
+├── test_cell_assignment.py        # Cell assignment tests
+├── test_functional_annotation.py  # M3.5 annotation tests
+├── test_detection.py              # Detection tests
+├── test_detection_refinement.py   # Detection refinement tests
+├── test_marker_interest.py        # M1 marker scoring tests
+├── test_module2_profile_discovery.py   # M2 profile discovery tests
+├── test_module2b_relaxed.py            # M2b relaxed profile tests
+├── test_module2c_profile_selection.py  # M2c profile selection tests
+├── test_anchored_programs.py      # M4 program tests
+├── test_cross_sample_integration.py    # M5 integration tests
+├── ... (44 test files total)
+└── README.md
 ```
 
 ## Running Tests
@@ -71,7 +84,7 @@ Tests are organized using pytest markers:
 - `@pytest.mark.unit`: Unit tests for individual functions
 - `@pytest.mark.integration`: Integration tests for component interactions
 - `@pytest.mark.slow`: Tests that take a long time to run
-- `@pytest.mark.requires_gurobi`: Tests that require Gurobi license (skipped by default)
+- `@pytest.mark.requires_gurobi`: Legacy marker for Gurobi-dependent tests (Gurobi replaced by cuOPT; no active test files use this)
 - `@pytest.mark.requires_data`: Tests that require actual data files
 
 ## Test Fixtures
@@ -88,7 +101,7 @@ Common fixtures are defined in `conftest.py`:
 ### Utility Fixtures
 - `temp_output_dir`: Temporary directory for test outputs
 - `sample_name`: Standard sample name for tests
-- `mock_gurobi_license`: Mock Gurobi license file
+- `mock_gurobi_license`: Mock Gurobi license file (legacy; retained in conftest.py but unused by active tests)
 - `mock_ground_truth_layers`: Mock ground truth expression layers
 
 ## Writing New Tests
@@ -176,11 +189,7 @@ pip install -r requirements-dev.txt
 
 ### Gurobi-Related Test Failures
 
-Tests requiring Gurobi are skipped by default. To run them:
-
-1. Install Gurobi
-2. Set up Gurobi license
-3. Run: `pytest -m requires_gurobi`
+Gurobi has been replaced by cuOPT as the production QP solver. No active test files require Gurobi. The `requires_gurobi` marker is retained in conftest.py for legacy compatibility but will match no current tests.
 
 ### Slow Test Performance
 

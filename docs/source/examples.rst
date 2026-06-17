@@ -18,7 +18,7 @@ A complete example of CITEgeist analysis:
 
    import scanpy as sc
    import pandas as pd
-   from citegeist_model import CitegeistModel
+   from CITEgeist.model.citegeist_model import CitegeistModel
    
    # Load data
    adata = sc.read_h5ad("spatial_data.h5ad")
@@ -29,9 +29,6 @@ A complete example of CITEgeist analysis:
        adata=adata,
        output_folder="./citegeist_results"
    )
-   
-   # Configure Gurobi (if needed)
-   model.register_gurobi("/path/to/gurobi.lic")
    
    # Process data
    model.split_adata()

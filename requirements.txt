@@ -23,3 +23,4 @@ ipykernel>=6.0.0
 # Additional utilities
 tqdm>=4.62.0
 scikit-learn>=1.0.0
+ruamel.yaml>=0.18,<0.19

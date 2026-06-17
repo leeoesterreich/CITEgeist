@@ -32,18 +32,11 @@ pip install citegeist
 - **Python**: 3.10
 - **NVIDIA GPU** with 8GB+ VRAM (required for cuOPT QP solver)
 #### Key Python Dependencies
-- scanpy==1.10.4
-- anndata==0.11.3
-- numpy==1.26.4
-- pandas==2.2.3
-- scipy==1.13.1
-- scikit-learn==1.6.1
-- cuopt (GPU-accelerated QP; installed via conda environment — see `CITEgeist_env.yml`)
-- matplotlib==3.10.0
-- seaborn==0.13.2
-- h5py==3.12.1
-- squidpy==1.6.2
-- spatialdata==0.2.5.post0
+
+See `requirements.txt` for exact version pins. Core dependencies include:
+- scanpy, anndata, numpy, pandas, scipy, scikit-learn
+- cuopt (GPU-accelerated QP; installed via conda — see `CITEgeist_env.yml`)
+- matplotlib, seaborn, squidpy, spatialdata
 
 It is recommended to install the dependencies in the `CITEgeist_env.yml` file for running the notebooks.
 
@@ -111,14 +104,15 @@ Key constructor parameters:
 
 #### B. Using SLURM (HPC)
 
-For large-scale analyses on HPC clusters, use the provided sbatch scripts:
+For large-scale analyses on HPC clusters, use the provided sbatch scripts in `examples/`:
 
 ```bash
-sbatch CITEgeist/examples/sbatch_patient_phase1.sh   # M1→M3: discovery + deconvolution
-sbatch CITEgeist/examples/sbatch_patient_phase2.sh   # M3-post: cell assignment
-sbatch CITEgeist/examples/sbatch_patient_phase3.sh   # M3-gex: SACE GEX allocation
-sbatch CITEgeist/examples/sbatch_patient_phase4.sh   # M3.5: protein annotation
-sbatch CITEgeist/examples/sbatch_patient_phase5_validate.sh  # Validation
+sbatch examples/sbatch_patient_phase1.sh      # StarDist nuclei segmentation
+sbatch examples/sbatch_patient_phase2.sh      # M3: cuOPT QP proportions (GPU)
+sbatch examples/sbatch_patient_phase3.sh      # ViT feature extraction
+sbatch examples/sbatch_patient_phase4.sh      # MIL training + cell assignment
+sbatch examples/sbatch_patient_phase5_validate.sh  # Validation
+sbatch examples/sbatch_bivariate_morans_v3.sh # M4b: bivariate Moran's I
 ```
 
 Adapt paths and `--gres=gpu:1` directives for your cluster.

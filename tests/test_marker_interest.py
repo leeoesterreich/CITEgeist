@@ -213,7 +213,7 @@ class TestMarkerInterestSimulated:
         gt_markers = simulated_cite_data["gt_markers"]
         ns_markers = simulated_cite_data["ns_markers"]
 
-        snr_values, signal_fractions = _fit_gmm_per_marker(X, seed=1234)
+        snr_values, signal_fractions, _ = _fit_gmm_per_marker(X, seed=1234)
 
         gt_indices = [i for i, m in enumerate(marker_names) if m in gt_markers]
         ns_indices = [i for i, m in enumerate(marker_names) if m in ns_markers]
@@ -293,8 +293,8 @@ class TestMarkerInterestRealData:
         """Load real patient data if available."""
         # Try to find real patient data
         potential_paths = [
-            REPO_ROOT / "data" / "HCC22-088-P4-S2_CITE.h5ad",
-            Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/spatial_cite_seq_combined/h5ad/HCC22-088-P4-S2_combined.h5ad"),
+            REPO_ROOT / "data" / "sample-P4-S2_CITE.h5ad",
+            Path(os.environ.get("CITEGEIST_PATIENT_H5AD", "/path/to/CITEgeist_public_data/sample_combined.h5ad")),
         ]
 
         for path in potential_paths:

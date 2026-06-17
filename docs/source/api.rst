@@ -1,127 +1,178 @@
 API Reference
 =============
 
-This page provides a comprehensive reference for CITEgeist's public API, organized by workflow and functionality.
+This page provides a comprehensive reference for CITEgeist's public API, organized by workflow and module.
 
 Quick Start
 -----------
 
 For most users, the typical workflow involves:
 
-1. **Initialize**: :class:`~citegeist_model.CitegeistModel`
-2. **Preprocess**: :meth:`~citegeist_model.CitegeistModel.split_adata`, :meth:`~citegeist_model.CitegeistModel.filter_gex`
-3. **Analyze**: :meth:`~citegeist_model.CitegeistModel.run_cell_proportion_model`
+1. **Initialize**: :class:`~CITEgeist.model.citegeist_model.CitegeistModel`
+2. **Preprocess**: :meth:`~CITEgeist.model.citegeist_model.CitegeistModel.split_adata`, :meth:`~CITEgeist.model.citegeist_model.CitegeistModel.filter_gex`
+3. **Analyze**: :meth:`~CITEgeist.model.citegeist_model.CitegeistModel.run_cell_proportion_model`
 
-Core Classes
-------------
+Core Model
+----------
 
 CitegeistModel
 ~~~~~~~~~~~~~~
 
 The main analysis class for spatial transcriptomics deconvolution.
 
-.. autoclass:: citegeist_model.CitegeistModel
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: __init__
    :show-inheritance:
 
 **Initialization & Setup**
 
-.. autoclass:: citegeist_model.CitegeistModel
-   :members: load_cell_profile_dict, register_gurobi, split_adata
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
+   :members: load_cell_profile_dict, split_adata
    :noindex:
 
-**Data Preprocessing** 
+**Data Preprocessing**
 
-.. autoclass:: citegeist_model.CitegeistModel  
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: copy_gex_to_protein_adata, filter_gex, preprocess_antibody, preprocess_gex
    :noindex:
 
 **Core Analysis Methods**
 
-.. autoclass:: citegeist_model.CitegeistModel
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: compute_expression_prior, run_cell_expression_pass1, run_cell_proportion_model
    :noindex:
 
 **Results & Export**
 
-.. autoclass:: citegeist_model.CitegeistModel
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: append_gex_to_adata, append_proportions_to_adata, get_adata
    :noindex:
 
 **Validation & Utilities**
 
-.. autoclass:: citegeist_model.CitegeistModel
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: cleanup, validate_neighborhood_size
    :noindex:
 
 **Static Methods**
 
-.. autoclass:: citegeist_model.CitegeistModel
+.. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
    :members: global_clr, row_normalize, winsorize
    :noindex:
 
-Optimization Engine
--------------------
+Configuration
+~~~~~~~~~~~~~
 
-Low-level optimization functions (advanced users).
-
-**Cell Proportion Optimization**
-
-.. automodule:: gurobi_impl
-   :members: deconvolute_local_cell_proportions, finetune_cell_proportions, optimize_cell_proportions
+.. automodule:: CITEgeist.model.unified_config
+   :members:
    :show-inheritance:
 
-**Gene Expression Deconvolution**
+Checkpoints
+~~~~~~~~~~~
 
-.. automodule:: gurobi_impl  
-   :members: deconvolute_spot_with_neighbors_with_prior, optimize_gene_expression
-   :noindex:
+.. automodule:: CITEgeist.model.checkpoints
+   :members:
+   :show-inheritance:
 
-**Prior Computation**
+Deconvolution (Module 3 — QP Proportions)
+------------------------------------------
 
-.. automodule:: gurobi_impl
-   :members: compute_global_prior, validate_prior_effect
-   :noindex:
+.. automodule:: CITEgeist.model.deconvolution.qp_solver
+   :members:
+   :show-inheritance:
 
-**Data Processing**
+.. automodule:: CITEgeist.model.deconvolution.detection
+   :members:
+   :show-inheritance:
 
-.. automodule:: gurobi_impl
-   :members: map_antibodies_to_profiles, normalize_counts, scale_genes, unscale_genes
-   :noindex:
+.. automodule:: CITEgeist.model.deconvolution.detection_refinement
+   :members:
+   :show-inheritance:
 
-**Analysis & Logging**
+GEX Deconvolution (SACE, Module 3-gex)
+---------------------------------------
 
-.. automodule:: gurobi_impl
-   :members: log_marker_gene_patterns
-   :noindex:
+.. automodule:: CITEgeist.model.gex.sace_gex
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.gex.gex_modules
+   :members:
+   :show-inheritance:
+
+Cell Assignment (Module 3-post)
+--------------------------------
+
+.. automodule:: CITEgeist.model.assignment.cell_assignment
+   :members:
+   :show-inheritance:
+
+Discovery (Modules 1, 2a/b/c)
+------------------------------
+
+.. automodule:: CITEgeist.model.discovery.marker_interest
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.discovery.spatial_colocalization
+   :members:
+   :show-inheritance:
+
+Programs (Modules 4, 4b, 5)
+-----------------------------
+
+.. automodule:: CITEgeist.model.programs.anchored_program_discovery
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.programs.cross_sample_integration
+   :members:
+   :show-inheritance:
+
+Annotation (Module 3.5)
+------------------------
+
+.. automodule:: CITEgeist.model.annotation.functional_annotation
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.annotation.subtype_splitting
+   :members:
+   :show-inheritance:
+
+Morphology
+----------
+
+.. automodule:: CITEgeist.model.morphology.morphology_prior
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.morphology.segmentation
+   :members:
+   :show-inheritance:
+
+Quality Control
+---------------
+
+.. automodule:: CITEgeist.model.qc.proportion_qc
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.qc.gex_qc
+   :members:
+   :show-inheritance:
+
+.. automodule:: CITEgeist.model.qc.report
+   :members:
+   :show-inheritance:
 
 Utility Functions
 -----------------
 
-Helper functions for analysis and validation.
-
-**Neighborhood Analysis**
-
-.. automodule:: utils
-   :members: assert_neighborhood_size, find_fixed_radius_neighbors, get_neighbors_with_fixed_radius, plot_neighbors_with_fixed_radius
+.. automodule:: CITEgeist.model.utils
+   :members:
    :show-inheritance:
 
-**Performance Evaluation**
-
-.. automodule:: utils
-   :members: benchmark_cell_proportions, calculate_expression_metrics
-   :noindex:
-
-**Data Export & Management**
-
-.. automodule:: utils
-   :members: export_anndata_layers, save_results_to_output
-   :noindex:
-
-**System Utilities**
-
-.. automodule:: utils
-   :members: cleanup_memory, setup_logging, validate_cell_profile_dict
-   :noindex:
-
-
+.. automodule:: CITEgeist.model.module2_proposal_builder
+   :members:
+   :show-inheritance:

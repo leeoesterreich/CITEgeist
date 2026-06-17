@@ -101,14 +101,12 @@ Runtime performance is tracked for each method:
 
 ```
 benchmarking/
-├── src/
+├── src/                          # Benchmarking modules and method wrappers
 │   ├── benchmarking_gex.py       # Gene expression benchmarking
 │   ├── benchmarking_spot_deconv.py # Cell type deconvolution benchmarking
-│   └── citegeist_bench_wrapper.py # Wrapper for running benchmarks
-├── Figures/
-│   ├── CITEgeist_GEX_figures.Rmd # Gene expression visualization
-│   └── CITEgeist_prop_figures.Rmd # Proportion prediction visualization
-└── Runtime/
-    ├── high_seg/                 # Runtime analysis for highly segmented patterns
-    └── mixed/                    # Runtime analysis for mixed patterns
+│   ├── *_bench_wrapper.py        # Per-method wrappers (CITEgeist, C2L, RCTD, CARD, Tangram, Seurat)
+│   ├── compare_gex_methods.py    # Cross-method GEX comparison
+│   └── compare_prop_methods.py   # Cross-method proportion comparison
+├── Figures/                      # R visualization scripts
+└── Runtime/                      # Runtime analysis
 ```

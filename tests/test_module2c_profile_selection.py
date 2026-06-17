@@ -11,13 +11,15 @@ import scipy.sparse as sp
 import pandas as pd
 import scanpy as sc
 import logging
+import pytest
 import sys
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Add project root to path
-sys.path.insert(0, '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CITEgeist"))
 
 from CITEgeist.model import (
     identify_interesting_markers,
@@ -27,8 +29,9 @@ from CITEgeist.model import (
 )
 
 # Data paths
-DATA_FOLDER = "/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
-SIMULATED_DATA = "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/Wu_rep_1_CITE.h5ad"
+import os
+DATA_FOLDER = os.environ.get("CITEGEIST_TEST_DATA", "/path/to/CITEgeist_public_data/processed_files/")
+SIMULATED_DATA = os.environ.get("CITEGEIST_SIM_DATA", "/path/to/CITEgeist_public_data/Wu_rep_1_CITE.h5ad")
 
 
 def load_real_patient_data(sample: str):
@@ -69,6 +72,9 @@ def load_real_patient_data(sample: str):
     return antibody_X[idx], coords, list(antibody_names)
 
 
+@pytest.mark.slow
+@pytest.mark.requires_data
+@pytest.mark.skipif(not Path(os.environ.get("CITEGEIST_SIM_DATA", "/path/to/CITEgeist_public_data/Wu_rep_1_CITE.h5ad")).exists(), reason="requires CITEgeist public test data (set CITEGEIST_SIM_DATA)")
 def test_simulated_data():
     """Test Module 2c on simulated data with known ground truth."""
     logger.info("=" * 70)
@@ -98,7 +104,7 @@ def test_simulated_data():
     coloc_result = analyze_marker_colocalization(
         X, coords, marker_names,
         markers_to_analyze=result1.interesting_markers,
-        n_permutations=5000,
+        n_permutations=199,  # smoke test (no p-value assertion); keep fast
         verbose=False
     )
     logger.info(f"Pairs analyzed: {len(coloc_result.pairs)}")
@@ -107,7 +113,6 @@ def test_simulated_data():
     logger.info("\nRunning Module 2b (profile discovery, k=3)...")
     profile_result = discover_profiles(
         coloc_result,
-        fdr_alpha=0.05,
         top_k=3,
         verbose=True
     )
@@ -116,10 +121,10 @@ def test_simulated_data():
     # Module 2c: Profile selection
     logger.info("\nRunning Module 2c (reconstruction-based selection)...")
     selection = select_profiles_by_reconstruction(
-        X, marker_names, profile_result.profiles,
-        colocalization_result=coloc_result,
-        interesting_markers=result1.interesting_markers,  # Pass interesting markers
-        verbose=True
+        X, coords, marker_names, profile_result.profiles,
+        result1.interesting_markers,
+        _colocalization_result=coloc_result,
+        verbose=True,
     )
 
     logger.info("\n" + "=" * 50)
@@ -131,9 +136,9 @@ def test_simulated_data():
     logger.info("\nReconstruction curve:")
     logger.info(f"{'n':>3} {'RMSE':>10} {'VarExpl':>10}")
     logger.info("-" * 25)
-    for i, (rmse, ve) in enumerate(zip(selection.reconstruction_errors, selection.variance_explained)):
+    for i, (gain, ve) in enumerate(zip(selection.marginal_gains, selection.variance_explained)):
         marker = " <-- elbow" if i + 1 == selection.optimal_n else ""
-        logger.info(f"{i+1:>3} {rmse:>10.4f} {ve:>9.1%}{marker}")
+        logger.info(f"{i+1:>3} {gain:>10.4f} {ve:>9.1%}{marker}")
 
     # Check ground truth recovery
     gt_profiles = {ct: set([f'{ct}_Protein_1', f'{ct}_Protein_2']) for ct in gt_cell_types}
@@ -143,13 +148,16 @@ def test_simulated_data():
     return selection
 
 
+@pytest.mark.slow
+@pytest.mark.requires_data
+@pytest.mark.skipif(not Path(os.environ.get("CITEGEIST_TEST_DATA", "/path/to/CITEgeist_public_data/processed_files/")).exists(), reason="requires CITEgeist public test data (set CITEGEIST_TEST_DATA)")
 def test_real_patient_data():
     """Test Module 2c on real patient data."""
     logger.info("\n" + "=" * 70)
-    logger.info("TEST: REAL PATIENT DATA (HCC22-088-P1-S2)")
+    logger.info("TEST: REAL PATIENT DATA (sample-P1-S2)")
     logger.info("=" * 70)
 
-    sample = "HCC22-088-P1-S2"
+    sample = "sample-P1-S2"
     X, coords, marker_names = load_real_patient_data(sample)
     logger.info(f"Loaded: {X.shape[0]} spots, {len(marker_names)} markers")
 
@@ -163,7 +171,7 @@ def test_real_patient_data():
     coloc_result = analyze_marker_colocalization(
         X, coords, marker_names,
         markers_to_analyze=result1.interesting_markers,
-        n_permutations=5000,
+        n_permutations=199,  # smoke test (no p-value assertion); 5000 caused 3h+ timeout
         verbose=False
     )
     logger.info(f"Pairs analyzed: {len(coloc_result.pairs)}")
@@ -172,7 +180,6 @@ def test_real_patient_data():
     logger.info("\nRunning Module 2b (profile discovery, k=3)...")
     profile_result = discover_profiles(
         coloc_result,
-        fdr_alpha=0.05,
         top_k=3,
         verbose=True
     )
@@ -181,10 +188,10 @@ def test_real_patient_data():
     # Module 2c: Profile selection
     logger.info("\nRunning Module 2c (reconstruction-based selection)...")
     selection = select_profiles_by_reconstruction(
-        X, marker_names, profile_result.profiles,
-        colocalization_result=coloc_result,
-        interesting_markers=result1.interesting_markers,  # Pass interesting markers
-        verbose=True
+        X, coords, marker_names, profile_result.profiles,
+        result1.interesting_markers,
+        _colocalization_result=coloc_result,
+        verbose=True,
     )
 
     logger.info("\n" + "=" * 50)
@@ -196,9 +203,9 @@ def test_real_patient_data():
     logger.info("\nReconstruction curve:")
     logger.info(f"{'n':>3} {'RMSE':>10} {'VarExpl':>10}")
     logger.info("-" * 25)
-    for i, (rmse, ve) in enumerate(zip(selection.reconstruction_errors, selection.variance_explained)):
+    for i, (gain, ve) in enumerate(zip(selection.marginal_gains, selection.variance_explained)):
         marker = " <-- elbow" if i + 1 == selection.optimal_n else ""
-        logger.info(f"{i+1:>3} {rmse:>10.4f} {ve:>9.1%}{marker}")
+        logger.info(f"{i+1:>3} {gain:>10.4f} {ve:>9.1%}{marker}")
 
     # Biological interpretation of selected profiles
     logger.info("\nSelected profiles with interpretation:")
@@ -239,9 +246,9 @@ def main():
     logger.info("\n" + "=" * 70)
     logger.info("SUMMARY")
     logger.info("=" * 70)
-    logger.info(f"Simulated: Selected {sim_result.optimal_n}/{len(sim_result.all_profiles_ranked)} profiles")
+    logger.info(f"Simulated: Selected {sim_result.optimal_n}/{len(sim_result.all_profiles)} profiles")
     logger.info(f"  Variance explained: {sim_result.variance_explained[sim_result.optimal_n - 1]:.1%}")
-    logger.info(f"Real data: Selected {real_result.optimal_n}/{len(real_result.all_profiles_ranked)} profiles")
+    logger.info(f"Real data: Selected {real_result.optimal_n}/{len(real_result.all_profiles)} profiles")
     logger.info(f"  Variance explained: {real_result.variance_explained[real_result.optimal_n - 1]:.1%}")
 
     return 0

@@ -18,18 +18,20 @@ import pandas as pd
 import scanpy as sc
 import logging
 import sys
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 # Add project root to path
-sys.path.insert(0, '/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist')
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "CITEgeist"))
 
 from CITEgeist.model import identify_interesting_markers, analyze_marker_colocalization, discover_profiles
 
 # Data paths
-DATA_FOLDER = "/ix1/alee/LO_LAB/General/Lab_Data/20250210_CITEGeistPublicData_GEO_Alex/processed_files/"
-SIMULATED_DATA = "/ix1/alee/LO_LAB/Personal/Alexander_Chang/alc376/CITEgeist/replicates/high_seg/h5ad_objects/Wu_rep_1_CITE.h5ad"
+import os
+DATA_FOLDER = os.environ.get("CITEGEIST_TEST_DATA", "/path/to/CITEgeist_public_data/processed_files/")
+SIMULATED_DATA = os.environ.get("CITEGEIST_SIM_DATA", "/path/to/CITEgeist_public_data/Wu_rep_1_CITE.h5ad")
 
 # Test configurations: compare hierarchical at different k values
 TEST_CONFIGS = [
@@ -108,7 +110,7 @@ def load_real_patient_data(sample: str):
     return antibody_X[idx], coords, list(antibody_names)
 
 
-def test_simulated_data(coloc_result, config):
+def run_simulated_discovery(coloc_result, config):
     """Test profile discovery on simulated data with known ground truth."""
     logger.info(f"\n--- Testing {config['label']} ---")
 
@@ -147,7 +149,7 @@ def test_simulated_data(coloc_result, config):
     }
 
 
-def test_real_patient_data(coloc_result, config, marker_names):
+def run_real_discovery(coloc_result, config, marker_names):
     """Test profile discovery on real patient data."""
     logger.info(f"\n--- Testing {config['label']} ---")
 
@@ -251,16 +253,16 @@ def main():
     # Test each config
     sim_results = []
     for config in TEST_CONFIGS:
-        sim_results.append(test_simulated_data(sim_coloc, config))
+        sim_results.append(run_simulated_discovery(sim_coloc, config))
 
     # =================================================================
     # TEST 2: REAL PATIENT DATA
     # =================================================================
     logger.info("\n" + "=" * 70)
-    logger.info("TEST 2: REAL PATIENT DATA (HCC22-088-P1-S2)")
+    logger.info("TEST 2: REAL PATIENT DATA (sample-P1-S2)")
     logger.info("=" * 70)
 
-    sample = "HCC22-088-P1-S2"
+    sample = "sample-P1-S2"
     X, coords, marker_names = load_real_patient_data(sample)
     logger.info(f"Loaded: {X.shape[0]} spots, {len(marker_names)} markers")
 
@@ -288,7 +290,7 @@ def main():
     # Test each config
     real_results = []
     for config in TEST_CONFIGS:
-        real_results.append(test_real_patient_data(real_coloc, config, marker_names))
+        real_results.append(run_real_discovery(real_coloc, config, marker_names))
 
     # =================================================================
     # SUMMARY

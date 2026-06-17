@@ -294,85 +294,6 @@ def _compute_bivariate_morans_i(
     return float(bivariate_i)
 
 
-def _compute_bivariate_morans_i_with_weights(
-    values_a: NDArray[np.floating],
-    values_b: NDArray[np.floating],
-    spatial_weights: NDArray[np.floating],
-) -> float:
-    """
-    Fast bivariate Moran's I using precomputed spatial weights matrix.
-
-    This is optimized for repeated calls during tree building where the
-    spatial structure doesn't change but markers do.
-
-    Args:
-        values_a: Expression values for marker A (n_spots,).
-        values_b: Expression values for marker B (n_spots,).
-        spatial_weights: Row-normalized spatial weights matrix (n_spots, n_spots).
-            W[i,j] > 0 if j is a neighbor of i, rows should sum to 1.
-
-    Returns:
-        Bivariate Moran's I in range approximately [-1, 1].
-    """
-    # Center and standardize
-    mean_a = np.mean(values_a)
-    mean_b = np.mean(values_b)
-    std_a = np.std(values_a)
-    std_b = np.std(values_b)
-
-    if std_a < 1e-10 or std_b < 1e-10:
-        return 0.0
-
-    a_centered = (values_a - mean_a) / std_a
-    b_centered = (values_b - mean_b) / std_b
-
-    # Spatially-lagged B using matrix multiplication (fast!)
-    b_lagged = spatial_weights @ b_centered
-
-    # Bivariate Moran's I
-    bivariate_i = np.mean(a_centered * b_lagged)
-
-    return float(bivariate_i)
-
-
-def _build_spatial_weights_matrix(
-    coords: NDArray[np.floating],
-    k: int = 6,
-) -> NDArray[np.floating]:
-    """
-    Build row-normalized spatial weights matrix from coordinates.
-
-    Args:
-        coords: Spatial coordinates (n_spots, 2).
-        k: Number of nearest neighbors.
-
-    Returns:
-        Row-normalized spatial weights matrix (n_spots, n_spots).
-    """
-    from sklearn.neighbors import NearestNeighbors  # pylint: disable=import-outside-toplevel
-
-    n_spots = coords.shape[0]
-
-    # Find k nearest neighbors
-    nn = NearestNeighbors(n_neighbors=k + 1, algorithm="ball_tree")
-    nn.fit(coords)
-    _, indices = nn.kneighbors(coords)
-
-    # Build sparse-ish weights matrix (dense for simplicity, could optimize later)
-    W = np.zeros((n_spots, n_spots), dtype=np.float64)
-    for i in range(n_spots):
-        # Skip self (index 0), use neighbors (indices 1:k+1)
-        neighbor_indices = indices[i, 1:]
-        W[i, neighbor_indices] = 1.0
-
-    # Row-normalize
-    row_sums = W.sum(axis=1, keepdims=True)
-    row_sums[row_sums == 0] = 1.0  # Avoid division by zero
-    W = W / row_sums
-
-    return W
-
-
 def _compute_bivariate_morans_i_pvalue(
     values_a: NDArray[np.floating],
     values_b: NDArray[np.floating],
@@ -882,8 +803,12 @@ def analyze_marker_colocalization(
     # Determine number of workers (use environment variable or default to -1 for all CPUs)
     n_jobs = int(os.environ.get("CITEGEIST_N_JOBS", -1))
     if verbose:
-        n_cpus = os.cpu_count() or 1
-        logging.info("Running parallel colocalization analysis with %s workers...", n_cpus if n_jobs == -1 else n_jobs)
+        # Report the worker count joblib will actually use. os.cpu_count() is
+        # the whole node (e.g. 48-64) and is misleading under SLURM, which caps
+        # the cgroup to the allocated cores; effective_n_jobs() is affinity-aware.
+        from joblib import effective_n_jobs
+
+        logging.info("Running parallel colocalization analysis with %s workers...", effective_n_jobs(n_jobs))
 
     # Build multi-scale neighbor graphs if requested
     if multi_scale_k is not None and len(multi_scale_k) > 1:
@@ -1251,159 +1176,6 @@ def _compute_nmf_weights(
         return weights
 
 
-def _apply_fdr_correction(
-    pairs: List[MarkerPairColocalization],
-    alpha: float = 0.05,
-    fallback_to_raw: bool = True,
-    pvalue_source: str = "bivariate_morans",
-) -> Tuple[List[MarkerPairColocalization], NDArray[np.bool_], str]:
-    """
-    Apply Benjamini-Hochberg FDR correction to p-values.
-
-    Args:
-        pairs: List of marker pair colocalization results.
-        alpha: FDR threshold (default: 0.05 for q < 5%).
-        fallback_to_raw: If True and FDR finds nothing but raw p-values
-            suggest signal exists, fall back to raw p-value threshold.
-        pvalue_source: Which p-value to use for FDR correction:
-            - 'bivariate_morans' (default): Tests spatial cross-correlation
-              between markers. Works well for both mixed and high-seg data.
-            - 'neighbor_enrichment': Binary-based, tests if marker B is enriched
-              in neighbors of A-positive spots. Best for high-segregation data.
-            - 'correlation': Uses correlation p-value (Pearson/Spearman).
-
-    Returns:
-        Tuple of (filtered pairs, boolean mask, method_used).
-        method_used is "fdr" or "raw_pvalue".
-    """
-    if len(pairs) == 0:
-        return [], np.array([], dtype=bool), "fdr"
-
-    # Select p-value source based on data characteristics
-    if pvalue_source == "bivariate_morans":
-        pvalues = np.array([p.bivariate_morans_pvalue for p in pairs])
-    elif pvalue_source == "correlation":
-        pvalues = np.array([p.correlation_pvalue for p in pairs])
-    else:  # neighbor_enrichment
-        pvalues = np.array([p.neighbor_enrichment_pvalue for p in pairs])
-
-    # Benjamini-Hochberg procedure
-    n = len(pvalues)
-    sorted_indices = np.argsort(pvalues)
-    sorted_pvalues = pvalues[sorted_indices]
-
-    # BH critical values: (rank / n) * alpha
-    bh_critical = (np.arange(1, n + 1) / n) * alpha
-
-    # Find largest k where p_(k) <= (k/n) * alpha
-    below_threshold = sorted_pvalues <= bh_critical
-
-    if np.any(below_threshold):
-        # FDR found significant pairs
-        max_k = np.max(np.where(below_threshold)[0])
-        significant_sorted_indices = sorted_indices[: max_k + 1]
-
-        is_significant = np.zeros(n, dtype=bool)
-        is_significant[significant_sorted_indices] = True
-
-        filtered_pairs = [p for p, sig in zip(pairs, is_significant) if sig]
-        return filtered_pairs, is_significant, "fdr"
-
-    # FDR found nothing - check if this is a permutation resolution issue
-    min_pval = sorted_pvalues[0]
-    n_below_alpha = np.sum(pvalues < alpha)
-
-    if fallback_to_raw and n_below_alpha > 0:
-        # There are pairs with p < alpha, but FDR is too strict
-        # This happens when permutation resolution (1/n_perms) > alpha/n_tests
-        # Fall back to raw p-value threshold
-
-        # Use the minimum p-value as threshold (all pairs at min_pval are signal)
-        # This is conservative: only keep pairs with the best possible p-value
-        is_significant = pvalues <= min_pval
-
-        logging.warning(
-            "FDR correction found 0 significant pairs, but %s have p < %s. "
-            "Permutation resolution (min_p=%s) may be insufficient for "
-            "%s tests. Falling back to raw p-value threshold (p <= %s).",
-            n_below_alpha,
-            alpha,
-            round(min_pval, 4),
-            n,
-            round(min_pval, 4),
-        )
-
-        filtered_pairs = [p for p, sig in zip(pairs, is_significant) if sig]
-        return filtered_pairs, is_significant, "raw_pvalue"
-
-    # No discoveries
-    return [], np.zeros(n, dtype=bool), "fdr"
-
-
-def _apply_mutual_topk(
-    pairs: List[MarkerPairColocalization],
-    k: int = 3,
-    specificity: Optional[Dict[str, float]] = None,
-) -> List[MarkerPairColocalization]:
-    """
-    Apply mutual top-k sparsification to edges.
-
-    For each marker, keep only its top-k partners by colocalization score.
-    Then keep an edge only if BOTH markers rank each other in their top-k.
-
-    This prevents the "one giant component" collapse by limiting hub markers.
-
-    Args:
-        pairs: List of marker pair colocalization results.
-        k: Number of top partners to keep per marker (default: 3).
-        specificity: Optional dict mapping marker names to specificity scores [0,1].
-            If provided, effective score = score * sqrt(s_a * s_b), which
-            downweights edges involving broad/ubiquitous markers.
-
-    Returns:
-        Filtered list of pairs that pass mutual top-k criterion.
-    """
-    if len(pairs) == 0 or k <= 0:
-        return pairs
-
-    # Build marker -> [(partner, effective_score, pair)] mapping
-    marker_edges: Dict[str, List[Tuple[str, float, MarkerPairColocalization]]] = defaultdict(list)
-    for p in pairs:
-        score = p.colocalization_score
-        # Apply specificity weighting if provided
-        if specificity is not None:
-            s_a = specificity.get(p.marker_a, 0.5)
-            s_b = specificity.get(p.marker_b, 0.5)
-            score = score * np.sqrt(s_a * s_b)
-        marker_edges[p.marker_a].append((p.marker_b, score, p))
-        marker_edges[p.marker_b].append((p.marker_a, score, p))
-
-    # For each marker, keep top-k by score
-    topk_partners: Dict[str, Set[str]] = {}
-    for marker, edges in marker_edges.items():
-        # Sort by score descending, take top k
-        sorted_edges = sorted(edges, key=lambda x: x[1], reverse=True)[:k]
-        topk_partners[marker] = {e[0] for e in sorted_edges}
-
-    # Keep only mutual edges (both rank each other in top-k)
-    kept = []
-    seen: Set[Tuple[str, str]] = set()
-    for p in pairs:
-        key = tuple(sorted([p.marker_a, p.marker_b]))
-        if key in seen:
-            continue
-
-        # Check mutual: A has B in top-k AND B has A in top-k
-        a_has_b = p.marker_b in topk_partners.get(p.marker_a, set())
-        b_has_a = p.marker_a in topk_partners.get(p.marker_b, set())
-
-        if a_has_b and b_has_a:
-            kept.append(p)
-            seen.add(key)
-
-    return kept
-
-
 def _compute_marker_specificity(
     X: NDArray[np.floating],
     marker_names: List[str],
@@ -1484,41 +1256,6 @@ def _find_connected_components(
         components[find(m)].add(m)
 
     return list(components.values())
-
-
-def _build_distance_matrix(
-    markers: List[str],
-    pairs: List[MarkerPairColocalization],
-) -> NDArray[np.floating]:
-    """
-    Build a distance matrix from colocalization scores.
-
-    Distance = 1 - colocalization_score (so high colocalization = low distance).
-
-    Args:
-        markers: List of marker names (defines matrix order).
-        pairs: Colocalization pairs with scores.
-
-    Returns:
-        Distance matrix (n_markers, n_markers).
-    """
-    n = len(markers)
-    marker_to_idx = {m: i for i, m in enumerate(markers)}
-
-    # Initialize with max distance
-    dist = np.ones((n, n))
-    np.fill_diagonal(dist, 0)
-
-    # Fill in distances from colocalization scores
-    for pair in pairs:
-        if pair.marker_a in marker_to_idx and pair.marker_b in marker_to_idx:
-            i = marker_to_idx[pair.marker_a]
-            j = marker_to_idx[pair.marker_b]
-            d = 1.0 - pair.colocalization_score
-            dist[i, j] = d
-            dist[j, i] = d
-
-    return dist
 
 
 def _find_gap_threshold_gmm(
@@ -2624,97 +2361,6 @@ def select_profiles(
 # =============================================================================
 
 
-def _detect_adaptive_threshold(
-    topk_pairs: List[MarkerPairColocalization],
-    fdr_pairs: List[MarkerPairColocalization],
-    fallback: float = 0.85,
-    verbose: bool = True,
-) -> float:
-    """
-    Automatically detect the optimal adaptive ratio threshold for this sample.
-
-    Approach: Compute edge ratios (score / min(best_a, best_b)) and find the
-    largest gap in the distribution. Within-celltype edges cluster near 1.0,
-    cross-celltype bridges have lower ratios. The gap separates them.
-
-    Args:
-        topk_pairs: Pairs after top-k filtering
-        fdr_pairs: Pairs after FDR filtering (for computing best scores)
-        fallback: Fallback threshold if no clear gap is found
-        verbose: Log detection details
-
-    Returns:
-        Detected threshold ratio (between 0.75 and 0.95)
-    """
-    if len(topk_pairs) < 3:
-        return fallback
-
-    # Build per-marker best scores
-    marker_best: Dict[str, float] = defaultdict(float)
-    for p in fdr_pairs:
-        marker_best[p.marker_a] = max(marker_best[p.marker_a], p.colocalization_score)
-        marker_best[p.marker_b] = max(marker_best[p.marker_b], p.colocalization_score)
-
-    # Compute ratio for each edge
-    edge_ratios = []
-    for p in topk_pairs:
-        best_a = marker_best.get(p.marker_a, 0)
-        best_b = marker_best.get(p.marker_b, 0)
-        if min(best_a, best_b) > 0:
-            ratio = p.colocalization_score / min(best_a, best_b)
-            edge_ratios.append(ratio)
-
-    if len(edge_ratios) < 3:
-        return fallback
-
-    edge_ratios = np.array(sorted(edge_ratios))  # type: ignore[assignment]
-
-    # Find largest gap in the distribution
-    # Only consider gaps in the range [0.75, 0.95] - outside this range is unlikely to be useful
-    gaps = []
-    for i in range(len(edge_ratios) - 1):
-        lower = edge_ratios[i]
-        upper = edge_ratios[i + 1]
-        midpoint = (lower + upper) / 2
-        gap_size = upper - lower
-
-        # Only consider gaps where the midpoint is in [0.75, 0.95]
-        if 0.75 <= midpoint <= 0.95 and gap_size > 0.02:  # Min gap size of 2%
-            gaps.append((gap_size, midpoint, lower, upper))
-
-    if gaps:
-        # Use the largest gap
-        gaps.sort(reverse=True)
-        best_gap = gaps[0]
-        detected_threshold = best_gap[1]  # Use midpoint of gap
-
-        if verbose:
-            logger.info(
-                "Auto-detected threshold: %s (gap of %s between %s and %s)",
-                round(detected_threshold, 3),
-                round(best_gap[0], 3),
-                round(best_gap[2], 3),
-                round(best_gap[3], 3),
-            )
-
-        return detected_threshold
-
-    # No clear gap found - use elbow detection
-    # Find where removing edges causes the biggest change in edge count
-    # This is a simpler heuristic: use the ratio at the 25th percentile
-    # (keeping top 75% of edges by ratio)
-    if len(edge_ratios) >= 4:
-        percentile_threshold = np.percentile(edge_ratios, 25)
-        if 0.75 <= percentile_threshold <= 0.95:
-            if verbose:
-                logger.info("Auto-detected threshold (25th percentile): %s", round(percentile_threshold, 3))
-            return percentile_threshold  # type: ignore[return-value]
-
-    if verbose:
-        logger.info("No clear gap found, using fallback threshold: %s", fallback)
-    return fallback
-
-
 def discover_hierarchical_profiles_continuous(
     coloc_result: ColocalizationResult,
     antibody_expression: NDArray[np.floating],
@@ -2802,45 +2448,6 @@ def discover_hierarchical_profiles_continuous(
         shared_markers=shared_markers,
         reconstruction_error=final_error,
     )
-
-
-def _filter_coloc_result_for_markers(
-    coloc_result: ColocalizationResult,
-    markers: List[str],
-) -> ColocalizationResult:
-    """Filter colocalization result to only include specified markers."""
-    marker_set = set(markers)
-    filtered_pairs = [p for p in coloc_result.pairs if p.marker_a in marker_set and p.marker_b in marker_set]
-    return ColocalizationResult(
-        pairs=filtered_pairs,
-        marker_names=markers,
-        n_spots=coloc_result.n_spots,
-        neighbor_k=coloc_result.neighbor_k,
-        marker_specificity=(
-            {m: coloc_result.marker_specificity.get(m, 0.5) for m in markers}
-            if coloc_result.marker_specificity
-            else None
-        ),
-    )
-
-
-def _compute_all_nmf_weights(
-    node: ProfileTreeNode,
-    X: NDArray[np.floating],
-    marker_names: List[str],
-    all_weights: Dict[str, Dict[str, Dict[str, float]]],
-) -> None:
-    """Recursively compute NMF weights for all internal nodes."""
-    if node.is_leaf:
-        return
-
-    # Compute weights for this node
-    weights = _compute_nmf_weights(X, marker_names, node)
-    all_weights[node.node_id] = weights
-
-    # Recurse on children
-    for child in node.children:
-        _compute_all_nmf_weights(child, X, marker_names, all_weights)
 
 
 def _compute_final_reconstruction_error(

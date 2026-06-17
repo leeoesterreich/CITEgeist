@@ -133,6 +133,10 @@ checkpoints/
 # Word documents (use markdown source)
 *.docx
 
+# Zotero import helpers (regenerated per render from references.json)
+manuscript/*_zotero_dois.txt
+manuscript/*_zotero_manual.ris
+
 # ============================================
 # Generated outputs (regenerable)
 # ============================================
@@ -143,8 +147,8 @@ images/*
 # Intermediate files
 intermediate_files/*
 
-# Output directories
-output/
+# Output directories (root only — not manuscript/figures/supplementary/output/)
+/output/
 
 # Simulation replicates
 replicates/
@@ -152,13 +156,144 @@ replicates/
 # Log files
 *.log
 
-# midkine — intermediate analysis (only CSV result is tracked)
-midkine/
-!midkine/if_analysis/
-!midkine/if_analysis/bivariate_morans_results.csv
+# midkine — archive is local-only; scripts/slurm/data/outputs are tracked
+/midkine/
 
 # Dead/archived code — kept locally, not tracked
 CITEgeist/model/_archive/
 CITEgeist/junk/
 CITEgeist/examples/_archive/
 CITEgeist/tests/
+
+# Examples archive and transient outputs
+examples/_archive/
+examples/slurm_log/
+examples/output/
+examples/output_module5_pydeseq/
+examples/.ipynb_checkpoints/
+examples/__pycache__/
+.rctd_reference_path
+
+# Reference sensitivity benchmark — entire directory archived/deleted
+Benchmarking/reference_sensitivity/
+
+# Simulation benchmarking — per-method result directories (large, regenerable)
+Benchmarking/simulation_benchmarking/CITEgeist/debug/
+Benchmarking/simulation_benchmarking/CITEgeist/results_qp/
+Benchmarking/simulation_benchmarking/CITEgeist/results_sace/
+Benchmarking/simulation_benchmarking/CITEgeist/results_sace_*/
+Benchmarking/simulation_benchmarking/CITEgeist/results_gex_detection/
+Benchmarking/simulation_benchmarking/Cell2Location/*/cell2location_map_*/
+Benchmarking/simulation_benchmarking/Tangram/*/tangram_map_*/
+Benchmarking/simulation_benchmarking/CARD/reference_csv/
+
+# ============================================
+# Persistent local memory (handoffs, vault notes)
+# ============================================
+docs/handoffs/
+
+# ============================================
+# AI / editor tooling
+# ============================================
+.codex
+.cursor/
+.fleet/
+.serena/
+.superpowers/
+.babysit/
+
+# ============================================
+# Stale experiment outputs (regenerable)
+# ============================================
+test_results/
+qc_output/
+/figures/
+repro/
+
+# ============================================
+# SLURM job logs (promoted from info/exclude)
+# ============================================
+*.err
+*.out
+.npm-cache/
+error_log.txt
+
+# ============================================
+# Benchmark result CSVs (regenerable)
+# ============================================
+Benchmarking/simulation_benchmarking/CARD/**/*.csv
+Benchmarking/simulation_benchmarking/CITEgeist/**/*.csv
+Benchmarking/simulation_benchmarking/Tangram/**/*.csv
+Benchmarking/simulation_benchmarking/RCTD/**/*.csv
+Benchmarking/simulation_benchmarking/scResolve/**/*.csv
+Benchmarking/simulation_benchmarking/evaluation/*.csv
+Benchmarking/simulation_benchmarking/Figures/*.csv
+
+# ============================================
+# Xenium benchmark generated data
+# ============================================
+Benchmarking/xenium_benchmarking/evaluation/results_granular/*.csv
+Benchmarking/xenium_pseudovisium/data_protein_gt/*.csv
+Benchmarking/xenium_benchmarking/CITEgeist/results*/*.csv
+Benchmarking/xenium_benchmarking/evaluation/*.csv
+
+# ============================================
+# Archived/deleted benchmarks (kept on disk, not tracked)
+# ============================================
+Benchmarking/_archive/
+Benchmarking/xenium_pseudovisium/_archive/
+Benchmarking/xenium_benchmarking/_archive/
+Benchmarking/simulation_benchmarking/_archive/
+# Any nested _archive/ or _archive_<suffix>/ anywhere under the tree.
+# Without these, only the top-level _archive/ above is ignored, and dirs like
+# Benchmarking/xenium_benchmarking/CITEgeist/_archive/ leak in on `git add`.
+**/_archive/
+**/_archive_*/
+# Method-comparison results directory (re-derived from per-method outputs)
+Benchmarking/xenium_benchmarking/evaluation/results/method_comparison/
+
+# ============================================
+# Example / vignette outputs
+# ============================================
+CITEgeist/examples/output_vignette4_mdk/
+
+# ============================================
+# GeoMx benchmark generated data (regenerable)
+# ============================================
+Benchmarking/geomx_benchmarking/CITEgeist/output/
+Benchmarking/geomx_benchmarking/data/
+Benchmarking/geomx_benchmarking/evaluation/results/
+Benchmarking/geomx_benchmarking/reference_data
+
+# ============================================
+# Xenium benchmark data directories (large, not tracked)
+# ============================================
+Benchmarking/xenium_benchmarking/data_breast/
+Benchmarking/xenium_benchmarking/reference_data/
+Benchmarking/xenium_benchmarking/ground_truth_singler/
+Benchmarking/xenium_pseudovisium/data/
+Benchmarking/xenium_pseudovisium/data_protein_gt/
+Benchmarking/xenium_benchmarking/evaluation/results/gex_rerun_v8/
+Benchmarking/xenium_benchmarking/evaluation/results_breast/
+Benchmarking/xenium_benchmarking/CITEgeist/gridsearch/results/
+Benchmarking/xenium_benchmarking/CITEgeist/results_sace/
+Benchmarking/xenium_benchmarking/CITEgeist/results_sace_*/
+
+# Simulation benchmark result/reference/evaluation outputs
+Benchmarking/simulation_benchmarking/evaluation/
+Benchmarking/simulation_benchmarking/refsens/evaluation/
+Benchmarking/simulation_benchmarking/refsens/reference/
+Benchmarking/simulation_benchmarking/refsens/results/
+Benchmarking/simulation_benchmarking/Tangram/high_seg/_old_unfiltered_ref/
+Benchmarking/simulation_benchmarking/Tangram/mixed/_old_unfiltered_ref/
+Benchmarking/simulation_benchmarking/models/*.Rds
+
+# Perceptual test framework runs
+manuscript/.figure-assemble/tests/perceptual/_runs/
+manuscript/review/
+.repowise/
+/_repo_audit_archive/
+manuscript/figures/midkine/outputs/
+# Persistent docx backups created by scripts/swap_docx_media.py (local-only)
+/manuscript/bak/
+/docs/figure_audit/renders/

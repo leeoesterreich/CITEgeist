@@ -39,4 +39,4 @@ All tests should pass. Tests marked `requires_cuopt` need a GPU node.
 
 - Patient data: SpaceRanger output directory (GEX + antibody TIFF)
 - Reference scRNA-seq: AnnData `.h5ad` with cell type annotations
-- See `examples/run_module3_unified.py` for a complete single-sample workflow
+- See `examples/scripts/run_module3_unified.py` for a complete single-sample workflow

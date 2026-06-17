@@ -11,6 +11,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import os
 import pytest
 import scanpy as sc
 
@@ -236,8 +237,8 @@ class TestColocalizationRealData:
     def real_patient_data(self):
         """Load real patient data if available."""
         potential_paths = [
-            REPO_ROOT / "data" / "HCC22-088-P4-S2_CITE.h5ad",
-            Path("/ix1/alee/LO_LAB/Personal/Alexander_Chang/spatial_cite_seq_combined/h5ad/HCC22-088-P4-S2_combined.h5ad"),
+            REPO_ROOT / "data" / "sample-P4-S2_CITE.h5ad",
+            Path(os.environ.get("CITEGEIST_PATIENT_H5AD", "/path/to/CITEgeist_public_data/sample_combined.h5ad")),
         ]
 
         for path in potential_paths:

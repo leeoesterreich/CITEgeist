@@ -27,7 +27,7 @@ from .assignment.module3b_nucleus_assignment import (  # noqa: F401  # pylint: d
 
 # Local imports
 # Production-path imports (cuOPT backend)
-from .deconvolution.cuopt_impl import (  # pylint: disable=unused-import
+from .deconvolution.qp_solver import (  # pylint: disable=unused-import
     compute_global_prior,
     compute_marker_exclusivity,
     map_antibodies_to_profiles_v2,
@@ -284,7 +284,7 @@ class CitegeistModel:
     # Preprocessing Functions
     # -----------------------------------------
 
-    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.1, min_counts=10):
+    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.0, min_counts=10):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
 
@@ -1231,12 +1231,12 @@ class CitegeistModel:
 
             if method == "per_type_beta":
                 # --- Per-type beta EM path ---
-                from .deconvolution.cuopt_impl import (  # pylint: disable=import-outside-toplevel
-                    optimize_cell_proportions_per_type_beta,
-                )
                 from .deconvolution.emission_init import (  # pylint: disable=import-outside-toplevel
                     build_beta_prior_sigma,
                     initialize_beta_matrix,
+                )
+                from .deconvolution.qp_solver import (  # pylint: disable=import-outside-toplevel
+                    optimize_cell_proportions_per_type_beta,
                 )
 
                 # Build beta init from marker-level data
@@ -1542,7 +1542,7 @@ class CitegeistModel:
                     marker_level_data=marker_level_data,
                     Y_values=Y_values,
                     marker_owners=marker_owners,
-                    assignment_matrix=assignment_matrix,
+                    _assignment_matrix=assignment_matrix,
                 )
 
                 # Log exclusivity scores
@@ -1781,24 +1781,11 @@ class CitegeistModel:
 
         return cell_counts
 
-    def run_cell_expression_pass1(
-        self,
-        cell_assignments=None,
-        cell_spot_map=None,
-        *,
-        sace_max_iter: int = 1,
-        sace_n_0: float = 10.0,
-        sace_bandwidth=None,
-    ):
-        """
-        Run gene expression deconvolution using SACE (Spatially-Adaptive Compositional EM).
+    def run_cell_expression_pass1(self):
+        """Run gene expression deconvolution using SACE (single-pass allocation).
 
-        Args:
-            cell_assignments (dict): Dict[cell_id -> type_name] from cell_assignment.py.
-            cell_spot_map (DataFrame): Mapping of cells to spots with cell_id, spot_barcode, x, y columns.
-            sace_max_iter (int): Maximum EM iterations (default 1, recommended).
-            sace_n_0 (float): Shrinkage prior strength (default 10.0).
-            sace_bandwidth (float, optional): Kernel bandwidth (None=auto).
+        Convenience wrapper that calls run_sace_allocation(output_mode="layers")
+        and stores results under the canonical 'gene_expression_pass1' key.
 
         Returns:
             Dict[str, Any]: {
@@ -1809,26 +1796,13 @@ class CitegeistModel:
         if not self.preprocessed_gex:
             raise ValueError("Gene expression data not preprocessed. Run preprocess_gex() first.")
 
-        if cell_assignments is None or cell_spot_map is None:
-            raise ValueError(
-                "SACE requires cell_assignments (Dict[cell_id -> type_name]) "
-                "and cell_spot_map (DataFrame with cell_id, spot_barcode, x, y columns). "
-                "Run cell_assignment.assign_cells() first to obtain these."
-            )
-        logging.info("Using SACE GEX deconvolution (1.7s, no solver required)")
+        logging.info("Using SACE GEX deconvolution (single-pass, no solver required)")
 
-        # Delegate to run_sace_allocation
-        spot_type_gex, cell_adata, _ = self.run_sace_allocation(
-            cell_assignments=cell_assignments,
-            cell_spot_map=cell_spot_map,
-            n_0=sace_n_0,
-            bandwidth=sace_bandwidth,
-            max_iter=sace_max_iter,
+        spot_type_gex, _ = self.run_sace_allocation(
+            output_mode="layers",
         )
 
-        # Store in the canonical key for backward compatibility
         self.results["gene_expression_pass1"] = spot_type_gex
-        self.results["sace_cell_adata"] = cell_adata
 
         return {"spotwise_profiles": spot_type_gex, "dimensions": None}
 
@@ -1954,6 +1928,7 @@ class CitegeistModel:
 
         # Load proportions CSV
         spot_by_celltype_df = pd.read_csv(proportions_path, index_col=0)
+        spot_by_celltype_df.columns = spot_by_celltype_df.columns.str.replace(" ", "_")
 
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
@@ -2230,45 +2205,97 @@ class CitegeistModel:
 
         return result
 
+    @staticmethod
+    def _validate_he_resolution(source_adata, resolution_mode: str):
+        """Validate H&E image resolution for single-cell segmentation."""
+        from .morphology.segmentation import (
+            _get_first_library_payload,
+            estimate_pixel_size_um,
+            get_resolution_image_and_scale,
+        )
+
+        MIN_SEGMENTATION_UM_PER_PX = 1.0
+
+        try:
+            _, scale = get_resolution_image_and_scale(source_adata, resolution_mode)
+        except ValueError as e:
+            raise ValueError(
+                f"Single-cell output requires a high-resolution H&E image for "
+                f"nuclei segmentation. No '{resolution_mode}' image found in "
+                f"uns['spatial']. Load data with sq.read.visium(load_images=True) "
+                f"or provide a fullres image."
+            ) from e
+
+        if resolution_mode == "fullres":
+            lib = _get_first_library_payload(source_adata)
+            if "fullres" not in lib.get("images", {}):
+                raise ValueError(
+                    "No true fullres image found. The 'fullres' resolution mode "
+                    "falls back to upscaling hires, which does not improve optical "
+                    "resolution. Use resolution_mode='hires' or provide a real "
+                    "fullres image."
+                )
+
+        pixel_size = estimate_pixel_size_um(source_adata)
+        if pixel_size is None:
+            raise ValueError(
+                "Cannot determine image resolution from scalefactors. "
+                "Single-cell output requires known pixel size. "
+                "Ensure scalefactors['spot_diameter_fullres'] is present."
+            )
+
+        effective_um_per_px = pixel_size / scale
+        if effective_um_per_px > MIN_SEGMENTATION_UM_PER_PX:
+            raise ValueError(
+                f"Image resolution too coarse for nuclei segmentation "
+                f"({effective_um_per_px:.2f} µm/px in {resolution_mode} frame, "
+                f"need ≤{MIN_SEGMENTATION_UM_PER_PX} µm/px). "
+                f"Provide a hires or fullres H&E image."
+            )
+
     def run_sace_allocation(
         self,
-        cell_assignments,
-        cell_spot_map,
         *,
-        n_0=10.0,
-        bandwidth=None,
-        max_iter=1,
-        tol=1e-4,
+        output_mode: str = "layers",
+        init_method: str = "marker",
+        integer_allocation: bool = False,
+        resolution_mode: str = "hires",
+        modality: str = "he",
+        assignment_method: str = "hungarian",
+        morphology_weight: float = 0.5,
+        stardist_kwargs: dict = None,
     ):
         """Run SACE per-cell GEX allocation.
 
-        Requires run_cell_proportion_model() to have been called first.
-        Optionally uses run_cell_expression_pass1() output for initialization.
-
-        Note: max_iter=1 is the recommended default. Xenium benchmark shows
-        EM spatial smoothing (max_iter>1) overfits: percell r drops 0.310→0.300
-        across 5 regions while log-likelihood increases. The single-E-step
-        initialization with confounded profiles already captures the between-type
-        signal; additional iterations smooth away useful local variation.
-
         Args:
-            cell_assignments: Dict[cell_id -> type_name] from cell_assignment.py.
-            cell_spot_map: DataFrame with cell_id/nucleus_id, spot_barcode/spot_id,
-                spot_idx, x/x_pixel, y/y_pixel columns. Column naming is flexible.
-            n_0: Shrinkage prior strength.
-            bandwidth: Kernel bandwidth (None=auto).
-            max_iter: Maximum EM iterations.
-            tol: Convergence threshold.
+            output_mode: "layers" (spot-level type compartments, no nuclei
+                needed) or "single_cell" (auto-runs StarDist + assignment +
+                per-cell projection; requires high-res H&E).
+            init_method: "marker" (default) or "prop".
+            integer_allocation: If True, apply largest-remainder rounding.
+            resolution_mode: Image resolution for StarDist (single_cell only).
+            modality: StarDist modality "he" or "dapi" (single_cell only).
+            assignment_method: "hungarian" (default) or "bayesian" (single_cell only).
+            morphology_weight: Bayesian morphology nudge (single_cell only).
+            stardist_kwargs: Extra args for StarDist (single_cell only).
 
         Returns:
-            Tuple of (spot_type_gex, cell_adata, diagnostics).
+            layers mode: (spot_type_gex, diagnostics)
+            single_cell mode: (spot_type_gex, cell_adata, diagnostics)
         """
-        from .gex.sace_gex import run_sace  # pylint: disable=import-outside-toplevel
+        if output_mode not in ("layers", "single_cell"):
+            raise ValueError(f"output_mode must be 'layers' or 'single_cell', got '{output_mode}'")
+
+        from .gex.sace_gex import integerize_spot_type_gex, project_sace_to_cells, run_sace_layers
 
         if "cell_prop" not in self.results:
             raise ValueError("Run run_cell_proportion_model() first.")
 
-        # Use raw counts (SACE requires unnormalized data)
+        # Fail fast: validate H&E before any computation in single_cell mode
+        if output_mode == "single_cell":
+            source_adata = self.antibody_capture_adata or self.gene_expression_adata or self.adata
+            self._validate_he_resolution(source_adata, resolution_mode)
+
         adata = self.gene_expression_adata
         if "raw_counts" in adata.layers:
             raw_X = adata.layers["raw_counts"]
@@ -2276,31 +2303,11 @@ class CitegeistModel:
             logging.warning("No raw_counts layer found — using .X (may be normalized)")
             raw_X = adata.X
 
-        # Adapt column naming: accept nucleus_id/spot_id as aliases
-        csm = cell_spot_map.copy()
-        if "nucleus_id" in csm.columns and "cell_id" not in csm.columns:
-            csm = csm.rename(columns={"nucleus_id": "cell_id"})
-        if "spot_id" in csm.columns and "spot_barcode" not in csm.columns:
-            csm = csm.rename(columns={"spot_id": "spot_barcode"})
-        if "x_pixel" in csm.columns and "x" not in csm.columns:
-            csm = csm.rename(columns={"x_pixel": "x", "y_pixel": "y"})
-        # Ensure spot_idx exists
-        if "spot_idx" not in csm.columns:
-            spot_names = list(adata.obs_names)
-            spot_to_idx = {s: i for i, s in enumerate(spot_names)}
-            csm["spot_idx"] = csm["spot_barcode"].map(spot_to_idx)
-            csm = csm.dropna(subset=["spot_idx"])
-            csm["spot_idx"] = csm["spot_idx"].astype(int)
-
-        # Align antibody data to the (possibly filtered) GEX spots.
-        # filter_gex() subsets gene_expression_adata but not antibody_capture_adata,
-        # so antibody may have more spots than GEX.
         ab_data = None
         ab_names = None
         if hasattr(self, "antibody_capture_adata") and self.antibody_capture_adata is not None:
             ab_adata = self.antibody_capture_adata
             ab_names = list(ab_adata.var_names)
-            # Subset antibody to GEX spots
             gex_spots = set(adata.obs_names)
             ab_mask = ab_adata.obs_names.isin(gex_spots)
             if ab_mask.sum() < len(adata):
@@ -2311,7 +2318,6 @@ class CitegeistModel:
                 )
             else:
                 ab_sub = ab_adata[ab_mask]
-                # Reorder to match GEX spot order
                 ab_sub = ab_sub[adata.obs_names]
                 ab_raw = ab_sub.layers.get("raw_counts", ab_sub.X)
                 ab_data = np.asarray(ab_raw)
@@ -2321,26 +2327,142 @@ class CitegeistModel:
                     ab_data.shape[1],
                 )
 
-        spot_type_gex, cell_adata, diagnostics = run_sace(
+        spot_type_gex, E_x, internals, diagnostics = run_sace_layers(
             spot_counts=raw_X,
             proportions=self.results["cell_prop"],
-            cell_assignments=cell_assignments,
-            cell_spot_map=csm,
             spot_coords=adata.obsm["spatial"],
             gene_names=list(adata.var_names),
             spotwise_profiles_init=self.results.get("gene_expression_pass1"),
-            n_0=n_0,
-            bandwidth=bandwidth,
-            max_iter=max_iter,
-            tol=tol,
             antibody_data=ab_data,
             antibody_names=ab_names,
             cell_profile_dict=getattr(self, "cell_profile_dict", None),
+            init_method=init_method,
         )
 
+        if integer_allocation:
+            spot_type_gex = integerize_spot_type_gex(spot_type_gex, raw_X)
+            logging.info("Applied LR integer allocation (conserving spot totals)")
+
         self.results["sace_spot_type_gex"] = spot_type_gex
-        self.results["sace_cell_adata"] = cell_adata
         self.results["sace_diagnostics"] = diagnostics
+
+        if output_mode == "layers":
+            return spot_type_gex, diagnostics
+
+        # --- single_cell mode ---
+        source_adata = self.antibody_capture_adata or self.gene_expression_adata or self.adata
+
+        from .morphology.segmentation import (
+            compute_spot_nuclei_counts_from_adata,
+            detect_spot_diameter_pixels,
+            get_resolution_image_and_scale,
+            normalize_nuclei_counts_for_prior,
+            save_segmentation_artifacts,
+        )
+        from .morphology.segmentation_qc import generate_segmentation_qc_pdf
+
+        seg_result = compute_spot_nuclei_counts_from_adata(
+            adata=source_adata,
+            resolution_mode=resolution_mode,
+            modality=modality,
+            **(stardist_kwargs or {}),
+        )
+        self.results["segmentation_result"] = seg_result
+
+        save_segmentation_artifacts(
+            output_folder=self.output_folder,
+            sample_name=self.sample_name,
+            result=seg_result,
+            save_masks=True,
+        )
+
+        image, scale = get_resolution_image_and_scale(source_adata, resolution_mode)
+        spot_centers_fullres = np.asarray(source_adata.obsm["spatial"], dtype=np.float64)
+        spot_centers_image = spot_centers_fullres * float(scale)
+        spot_diam_fullres = detect_spot_diameter_pixels(adata=source_adata)
+        spot_radius_image = (spot_diam_fullres * float(scale)) / 2.0
+
+        generate_segmentation_qc_pdf(
+            output_folder=self.output_folder,
+            sample_name=self.sample_name,
+            image=image,
+            masks=seg_result.masks,
+            centroids_xy=seg_result.centroids_xy,
+            spot_centers_xy=spot_centers_image,
+            spot_radius_px=spot_radius_image,
+            nuclei_count_raw=seg_result.nuclei_count_raw,
+            qc=seg_result.qc,
+        )
+
+        nucleus_spot_map = seg_result.nucleus_spot_map
+        if nucleus_spot_map is None or len(nucleus_spot_map) == 0:
+            raise ValueError(
+                "StarDist segmentation found no nuclei assigned to spots. "
+                "Check that the H&E image covers the tissue area."
+            )
+
+        nuclei_counts = seg_result.nuclei_count_raw
+        target_counts = normalize_nuclei_counts_for_prior(nuclei_counts)
+
+        for ad in (self.gene_expression_adata, self.antibody_capture_adata, self.adata):
+            if ad is None:
+                continue
+            common = ad.obs_names.intersection(nuclei_counts.index)
+            if len(common) == 0:
+                continue
+            ad.obs.loc[common, "nuclei_count_raw"] = nuclei_counts.loc[common].astype(float).values
+            ad.obs.loc[common, "nuclei_count_target"] = target_counts.loc[common].astype(float).values
+
+        spot_names = list(adata.obs_names)
+        spot_to_idx = {s: i for i, s in enumerate(spot_names)}
+        nsm = nucleus_spot_map.copy()
+        nsm["spot_idx"] = nsm["spot_id"].map(spot_to_idx)
+        nsm = nsm.dropna(subset=["spot_idx"])
+        nsm["spot_idx"] = nsm["spot_idx"].astype(int)
+        cell_to_spot = nsm["spot_idx"].values
+        cell_ids = nsm["nucleus_id"].values.astype(str)
+
+        assignment_result = self.assign_cells(
+            nuclei_counts=nuclei_counts,
+            cell_to_spot=cell_to_spot,
+            cell_ids=cell_ids,
+            assignment_method=assignment_method,
+            morphology_weight=morphology_weight,
+        )
+
+        cell_assignments_dict = dict(
+            zip(
+                assignment_result["cell_id"].astype(str),
+                assignment_result["assigned_type"],
+            )
+        )
+
+        cell_spot_map = pd.DataFrame(
+            {
+                "cell_id": cell_ids,
+                "spot_barcode": nsm["spot_id"].values,
+                "spot_idx": cell_to_spot,
+                "x": nsm["x_pixel"].values.astype(float),
+                "y": nsm["y_pixel"].values.astype(float),
+            }
+        )
+
+        type_names = list(self.results["cell_prop"].columns)
+        cell_adata = project_sace_to_cells(
+            E_x,
+            internals,
+            cell_assignments_dict,
+            cell_spot_map,
+            list(adata.var_names),
+            type_names,
+        )
+
+        self.results["sace_cell_adata"] = cell_adata
+        logging.info(
+            "Single-cell SACE: %d cells × %d genes",
+            cell_adata.n_obs,
+            cell_adata.n_vars,
+        )
 
         return spot_type_gex, cell_adata, diagnostics
 
@@ -2563,9 +2685,6 @@ class CitegeistModel:
         *,
         module3_5_candidates_df: Optional["pd.DataFrame"] = None,
         functional_table: Optional[Dict] = None,
-        max_iter: int = 1,
-        n_0: float = 10.0,
-        bandwidth: Optional[float] = None,
         bimodality_threshold: float = 1.5,
         posterior_threshold: float = 0.5,
         min_high_component_log_mean: float = 1.0,
@@ -2587,9 +2706,6 @@ class CitegeistModel:
             functional_table: Optional dict in DEFAULT_FUNCTIONAL_TABLE format
                 (marker -> {"active_types": [...]}). If provided, replaces
                 DEFAULT_FUNCTIONAL_TABLE. Use to pass M1-filtered per-sample tables.
-            max_iter: SACE EM iterations (1 = init-only allocation, recommended).
-            n_0: SACE shrinkage prior strength.
-            bandwidth: Kernel bandwidth (None=auto).
             bimodality_threshold: Forwarded to gmm_gate_cells(); separation
                 multiplier on pooled_std (default 1.5).
             posterior_threshold: Forwarded to gmm_gate_cells(); min posterior
@@ -2745,9 +2861,6 @@ class CitegeistModel:
             spot_coords=self.gene_expression_adata.obsm["spatial"],
             gene_names=unused_canon,
             spotwise_profiles_init=spotwise_init,
-            n_0=n_0,
-            bandwidth=bandwidth,
-            max_iter=max_iter,
         )
 
         # Extract per-cell protein from cell_adata.X

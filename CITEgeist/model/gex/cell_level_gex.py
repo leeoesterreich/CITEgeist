@@ -1,5 +1,6 @@
 """Distribute deconvolved GEX to individual cells."""
 
+import warnings
 from typing import Dict, List
 
 import numpy as np
@@ -25,6 +26,11 @@ def distribute_gex_to_cells(
     Returns:
         DataFrame indexed by nucleus_id with genes as columns
     """
+    warnings.warn(
+        "distribute_gex_to_cells is deprecated. Use " "CITEgeist.model.gex.sace_gex.project_sace_to_cells instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     # Build nucleus info
     nucleus_info = nucleus_spot_map.copy()
     nucleus_info["cell_type"] = nucleus_info["nucleus_id"].map(assignments)

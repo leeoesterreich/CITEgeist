@@ -28,7 +28,7 @@ class TestShouldSkipPath:
         assert bci.should_skip_path(pathlib.Path("model/foo.pyc"))
 
     def test_normal_path_not_skipped(self):
-        assert not bci.should_skip_path(pathlib.Path("model/deconvolution/cuopt_impl.py"))
+        assert not bci.should_skip_path(pathlib.Path("model/deconvolution/qp_solver.py"))
 
 
 class TestFormatSignature:
@@ -55,9 +55,9 @@ class TestFormatSignature:
 
     def test_type_annotations_excluded_from_args(self):
         # type hints on args should NOT appear, but return type SHOULD
-        assert bci.format_signature(
-            self._parse("def foo(a: int, b: str = 'x') -> bool: pass")
-        ) == "foo(a, b='x') -> bool"
+        assert (
+            bci.format_signature(self._parse("def foo(a: int, b: str = 'x') -> bool: pass")) == "foo(a, b='x') -> bool"
+        )
 
     def test_positional_only_args(self):
         node = self._parse("def foo(a, /, b): pass")
@@ -144,9 +144,9 @@ class TestExtractFullDetail:
         f = tmp_path / "mod.py"
         f.write_text(
             "class Solver:\n"
-            "    \"\"\"A solver.\"\"\"\n"
+            '    """A solver."""\n'
             "    def solve(self, x):\n"
-            "        \"\"\"Solve it.\"\"\"\n"
+            '        """Solve it."""\n'
             "        pass\n"
             "    def _internal(self):\n"
             "        pass\n"
@@ -195,18 +195,16 @@ class TestIntegration:
         (pkg / "__init__.py").write_text("")
         (pkg / "solver.py").write_text(
             '"""Solve things."""\n\n'
-            'def run(data, lam=1.0):\n'
+            "def run(data, lam=1.0):\n"
             '    """Run the solver."""\n'
-            '    pass\n\n'
-            'def _internal(): pass\n'
+            "    pass\n\n"
+            "def _internal(): pass\n"
         )
 
         # Script dir (file-level only)
         scripts = tmp_path / "scripts"
         scripts.mkdir()
-        (scripts / "run_benchmark.py").write_text(
-            "# Benchmark runner script\nimport os\n"
-        )
+        (scripts / "run_benchmark.py").write_text("# Benchmark runner script\nimport os\n")
 
         return tmp_path
 
@@ -217,7 +215,7 @@ class TestIntegration:
         result = bci.build_tier2(full_roots, file_roots, proj)
         assert "solver.py" in result
         assert "run(data, lam=1.0)" in result
-        assert "_internal" not in result   # private excluded
+        assert "_internal" not in result  # private excluded
 
     def test_generates_tier1_table(self, tmp_path):
         proj = self._make_project(tmp_path)
@@ -292,9 +290,9 @@ class TestInstallHook:
         hook.write_text(
             "#!/usr/bin/env bash\n"
             "status=0\n"
-            "if [ \"$status\" -ne 0 ]; then\n"
+            'if [ "$status" -ne 0 ]; then\n'
             "    echo 'commit aborted'\n"
-            "    exit 1\n"   # indented — must NOT be used as insertion point
+            "    exit 1\n"  # indented — must NOT be used as insertion point
             "fi\n"
         )
         bci.install_hook(proj)

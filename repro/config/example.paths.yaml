@@ -1,6 +1,0 @@
-paths:
-  CITEGEIST_DATA_ROOT: "/path/to/GEO/processed_files"
-  CITEGEIST_OUTPUT_ROOT: "/path/to/output"
-  CITEGEIST_LICENSE_FILE: "/path/to/gurobi.lic"
-  CITEGEIST_TMPDIR: "/tmp"
-

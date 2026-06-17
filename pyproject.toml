@@ -14,7 +14,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "BSD-3-Clause"}
 authors = [
-    {name = "Alexander Chih-Chieh Chang", email = "alc376@pitt.edu"},
+    {name = "Alexander Chih-Chieh Chang", email = "leeav@upmc.edu"},
     {name = "Lee/Oesterreich Laboratory"},
 ]
 keywords = [

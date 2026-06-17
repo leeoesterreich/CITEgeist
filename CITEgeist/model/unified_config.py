@@ -33,20 +33,21 @@ RNA_MARKERS = {
     "Dendritic_Cells": ["ITGAX", "HLA-DRA", "CLEC10A"],
 }
 
-# === Patient Sample List (12 canonical) ===
+# === Patient Sample List ===
+# Placeholder sample IDs — replace with your own (e.g. from the GEO accession in the manuscript).
 PATIENT_SAMPLES = [
-    "HCC22-088-P1-S1",
-    "HCC22-088-P1-S2",
-    "HCC22-088-P2-S1",
-    "HCC22-088-P2-S2",
-    "HCC22-088-P3-S1_A",
-    "HCC22-088-P3-S2",
-    "HCC22-088-P4-S1",
-    "HCC22-088-P4-S2_1i_rep",
-    "HCC22-088-P5-S1",
-    "HCC22-088-P5-S2_F_rep",
-    "HCC22-088-P6-S1",
-    "HCC22-088-P6-S2_D",
+    "sample_P1_S1",
+    "sample_P1_S2",
+    "sample_P2_S1",
+    "sample_P2_S2",
+    "sample_P3_S1",
+    "sample_P3_S2",
+    "sample_P4_S1",
+    "sample_P4_S2",
+    "sample_P5_S1",
+    "sample_P5_S2",
+    "sample_P6_S1",
+    "sample_P6_S2",
 ]
 
 # === Paths ===

@@ -114,7 +114,7 @@ def test_largest_remainder_zero_total():
 
 def test_extract_cell_features_single_cell():
     """Test cell feature extraction from nucleus + cell masks."""
-    from CITEgeist.model.morphology_features import extract_cell_features
+    from CITEgeist.model.morphology.morphology_features import extract_cell_features
 
     # Create nucleus (small circle) and cell (larger circle) masks
     nucleus_mask = np.zeros((50, 50), dtype=np.int32)
@@ -151,7 +151,7 @@ def test_extract_cell_features_single_cell():
 
 def test_extract_cell_features_multiple_cells():
     """Test cell features with multiple cells of different shapes."""
-    from CITEgeist.model.morphology_features import extract_cell_features
+    from CITEgeist.model.morphology.morphology_features import extract_cell_features
 
     nucleus_mask = np.zeros((100, 100), dtype=np.int32)
     cell_mask = np.zeros((100, 100), dtype=np.int32)

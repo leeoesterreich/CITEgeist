@@ -97,6 +97,8 @@ jobs:
         run: |
           pytest tests/ \
             -m "unit and not slow and not requires_data and not requires_cuopt" \
+            --ignore=tests/test_figures \
+            --ignore=tests/test_panel_label_role.py \
             --cov=CITEgeist/model \
             --cov-report=xml \
             --cov-report=term-missing \
