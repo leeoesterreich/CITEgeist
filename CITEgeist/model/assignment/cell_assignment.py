@@ -3,7 +3,7 @@
 Post-processing pipeline that converts spot-level proportions into
 per-cell type assignments using:
   Stage 1: Largest-remainder rounding (proportions -> integer counts)
-  Stage 2: Optional morphology scoring via prototype-contrastive LLP
+  Stage 2: Optional morphology scoring from precomputed scores (bayesian only)
   Stage 3: Hungarian assignment (cells -> types within each spot)
 """
 
@@ -11,15 +11,11 @@ __all__ = [
     "assign_cells",
     "bayesian_assign_cells",
     "discretize_proportions",
-    "fit_morphology_scores",
-    "extract_embeddings",
     "hungarian_assign_spot",
     "assign_cells_to_types",
 ]
 
-import hashlib
 import logging
-import os
 from typing import List, Optional
 
 import numpy as np
@@ -230,89 +226,6 @@ def assign_cells_to_types(
     return pd.DataFrame(rows)
 
 
-def fit_morphology_scores(
-    embeddings: np.ndarray,
-    cell_to_spot: np.ndarray,
-    oracle_props: np.ndarray,
-    num_types: int,
-    *,
-    n_epochs: int = 100,
-    device: str = "cpu",
-    seed: int = 42,
-) -> np.ndarray:
-    """Fit prototype-contrastive LLP on embeddings and return per-cell scores.
-
-    Stage 2 of the cell assignment pipeline.  Trains a prototype-contrastive
-    model on precomputed morphology embeddings supervised by spot-level
-    proportion labels (label-level proportions / LLP), then returns soft
-    per-cell type probabilities.
-
-    Sharpening (Stage 2B) is intentionally disabled (``n_epochs_2b=0``) because
-    it is known to destroy accuracy (see MEMORY.md:
-    feedback_sharpening_destructive.md).
-
-    Args:
-        embeddings: (C, 384) precomputed morphology embeddings.
-        cell_to_spot: (C,) integer spot index per cell.
-        oracle_props: (S, T) spot-level proportions used as LLP supervision.
-        num_types: Number of cell types T.
-        n_epochs: Training epochs for Stage 2A (default 100, no sharpening).
-        device: Torch device string (e.g. ``"cpu"`` or ``"cuda"``).
-        seed: Random seed for reproducible training.  Passed to
-            ``train_prototype_contrastive``.  Default 42.
-
-    Returns:
-        (C, T) numpy array of per-cell type probabilities (rows sum to 1).
-    """
-    import torch  # pylint: disable=import-outside-toplevel
-
-    from ..morphology.prototype_contrastive import (  # pylint: disable=import-outside-toplevel
-        PrototypeContrastiveModel,
-        run_inference_tta,
-        train_prototype_contrastive,
-    )
-
-    patches_tensor = torch.from_numpy(embeddings).float()
-    cell_to_spot_tensor = torch.from_numpy(cell_to_spot.astype(np.int64))
-    oracle_tensor = torch.from_numpy(oracle_props).float()
-    num_spots = len(oracle_props)  # matches training spot count (not cell_to_spot.max()+1)
-
-    # Train with from_embeddings=True: bypasses ViT encoder, disables image augmentation
-    result = train_prototype_contrastive(
-        patches=patches_tensor,
-        cell_to_spot=cell_to_spot_tensor,
-        oracle_props=oracle_tensor,
-        num_types=num_types,
-        embed_dim=128,
-        n_epochs_2a=n_epochs,
-        n_epochs_2b=0,  # No sharpening — destroys accuracy per benchmark findings
-        from_embeddings=True,
-        device=device,
-        seed=seed,
-    )
-
-    # Reconstruct model and load trained weights for inference
-    model = PrototypeContrastiveModel(
-        num_types=num_types,
-        embed_dim=128,
-        from_embeddings=True,
-    )
-    model.load_state_dict(result["model_state"])
-    model.to(device)
-    model.eval()
-
-    # Run inference (TTA rotations are skipped automatically for embeddings mode)
-    inf_result = run_inference_tta(
-        model=model,
-        patches=patches_tensor,
-        cell_to_spot=cell_to_spot_tensor,
-        num_spots=num_spots,
-        device=device,
-    )
-
-    return inf_result["q_class"].numpy()
-
-
 def bayesian_assign_cells(
     morph_scores: np.ndarray,
     cell_to_spot: np.ndarray,
@@ -394,14 +307,10 @@ def assign_cells(
     cell_to_spot: np.ndarray,
     *,
     cell_ids: Optional[np.ndarray] = None,
-    morphology_embeddings: Optional[np.ndarray] = None,
-    patches: Optional[np.ndarray] = None,
-    encoder_checkpoint: Optional[str] = None,
     morphology_weight: float = 0.5,
     existing_integer_counts: Optional[pd.DataFrame] = None,
     output_folder: Optional[str] = None,
     sample_name: str = "sample",
-    n_morph_epochs: int = 100,
     device: str = "cpu",
     random_state: int = 42,
     assignment_method: str = "hungarian",
@@ -413,7 +322,7 @@ def assign_cells(
 
     Three-stage pipeline:
       Stage 1: Discretize proportions -> integer counts per spot
-      Stage 2: (optional) Fit prototype-contrastive LLP for morphology scores
+      Stage 2: (bayesian only) morph_scores_precomputed supplies morphology scores
       Stage 3: Hungarian assignment of cells to types within each spot
 
     Args:
@@ -421,14 +330,10 @@ def assign_cells(
         nuclei_counts: (I,) nuclei count per spot.
         cell_to_spot: (C,) int spot index per cell (positional into cell_prop).
         cell_ids: (C,) cell/nucleus identifiers, or None.
-        morphology_embeddings: (C, 384) precomputed embeddings, or None.
-        patches: (C, ch, 96, 96) DAPI patches for embedding extraction, or None.
-        encoder_checkpoint: SimCLR checkpoint path (required if patches provided).
         morphology_weight: Nudge strength (0=none, 1=full). Default 0.5.
         existing_integer_counts: (I, T) pre-computed integer counts to reuse.
-        output_folder: Directory for embedding cache. Required if patches provided.
+        output_folder: Directory for embedding cache.
         sample_name: Sample name for cache key.
-        n_morph_epochs: Prototype-contrastive training epochs. Default 100.
         device: Torch device for morphology scoring. Default "cpu".
         random_state: Seed for deterministic assignment. Default 42.
         assignment_method: "hungarian" or "bayesian". Default "hungarian".
@@ -441,7 +346,6 @@ def assign_cells(
 
     Raises:
         ValueError: If cell_to_spot indices exceed the number of spots in cell_prop.
-        ValueError: If output_folder is not provided when patches are given.
     """
     cell_types = cell_prop.columns.tolist()
     n_cells = len(cell_to_spot)
@@ -462,42 +366,14 @@ def assign_cells(
     integer_counts = discretize_proportions(cell_prop, nuclei_counts, existing_integer_counts)
     logger.info("Stage 1: Discretized proportions to integer counts")
 
-    # --- Stage 2: Morphology scores (optional) ---
+    # --- Stage 2: Morphology scores (optional, bayesian only) ---
     morph_scores = None
-    if morphology_embeddings is None and patches is not None:
-        if output_folder is None:
-            raise ValueError("output_folder required when patches are provided (for caching)")
-        morphology_embeddings = extract_embeddings(
-            patches=patches,
-            encoder_checkpoint=encoder_checkpoint,
-            output_folder=output_folder,
-            sample_name=sample_name,
-            device=device,
-        )
-
-    if morphology_embeddings is not None and morphology_weight > 0.0:
-        oracle_props = cell_prop.values.astype(np.float32)
-        morph_scores = fit_morphology_scores(
-            embeddings=morphology_embeddings,
-            cell_to_spot=cell_to_spot,
-            oracle_props=oracle_props,
-            num_types=len(cell_types),
-            n_epochs=n_morph_epochs,
-            device=device,
-            seed=random_state,
-        )
-        logger.info("Stage 2: Fitted morphology scores (%d cells, %d types)", *morph_scores.shape)
-    else:
-        logger.info("Stage 2: Skipped (no morphology provided or weight=0)")
 
     # --- Bayesian dispatch ---
     if assignment_method == "bayesian":
         effective_morph = morph_scores_precomputed if morph_scores_precomputed is not None else morph_scores
         if effective_morph is None:
-            raise ValueError(
-                "Morphology scores required for bayesian assignment. "
-                "Provide morphology_embeddings, patches, or morph_scores_precomputed."
-            )
+            raise ValueError("Provide morph_scores_precomputed (a (C, n_types) array) for bayesian assignment.")
         if detection_mask is None:
             raise ValueError("detection_mask required for bayesian assignment.")
         effective_prior = proportion_prior if proportion_prior is not None else cell_prop.values
@@ -525,73 +401,3 @@ def assign_cells(
     logger.info("Stage 3: Assigned %d cells to types", len(result))
 
     return result
-
-
-def extract_embeddings(
-    patches: np.ndarray,
-    encoder_checkpoint: Optional[str],
-    output_folder: str,
-    sample_name: str,
-    device: str = "cpu",
-) -> np.ndarray:
-    """Extract morphology embeddings from DAPI patches with hash-based caching.
-
-    Args:
-        patches: (C, ch, 96, 96) DAPI patches. ch must be 2 or 3.
-        encoder_checkpoint: Path to SimCLR checkpoint, or None for random weights.
-        output_folder: Directory for cache file.
-        sample_name: Sample name for cache key.
-        device: Torch device string.
-
-    Returns:
-        (C, 384) numpy array of embeddings.
-
-    Raises:
-        ValueError: If patch shape is not (C, {2,3}, 96, 96).
-    """
-    # Validate patch shape
-    if patches.ndim != 4 or patches.shape[2] != 96 or patches.shape[3] != 96:
-        raise ValueError(
-            f"Patches must be (C, ch, 96, 96), got {patches.shape}. " "Only DAPI 96x96 patches are supported in v1."
-        )
-    in_channels = patches.shape[1]
-    if in_channels not in (2, 3):
-        raise ValueError(f"Patch channels must be 2 or 3, got {in_channels}.")
-
-    # Cache key: sample_name + checkpoint hash + n_cells
-    ckpt_hash = "none"
-    if encoder_checkpoint is not None:
-        ckpt_hash = hashlib.md5(encoder_checkpoint.encode()).hexdigest()[:8]
-    cache_name = f"morphology_embeddings_{sample_name}_{ckpt_hash}.npy"
-    cache_path = os.path.join(output_folder, cache_name)
-
-    # Check cache
-    if os.path.exists(cache_path):
-        cached = np.load(cache_path)
-        if cached.shape == (len(patches), 384):  # pylint: disable=no-else-return
-            logger.info("Loading cached embeddings from %s", cache_path)
-            return cached
-        else:
-            logger.warning(
-                "Cache shape mismatch (%s vs expected %s), re-extracting.",
-                cached.shape,
-                (len(patches), 384),
-            )
-
-    # Extract via DAPIBackbone
-    from ..morphology.morphology_backbone import DAPIBackbone  # pylint: disable=import-outside-toplevel
-
-    backbone = DAPIBackbone(
-        checkpoint=encoder_checkpoint,
-        in_channels=in_channels,
-        img_size=96,
-        device=device,
-    )
-    embeddings = backbone.extract_numpy(patches, batch_size=64, device=device)
-
-    # Cache
-    os.makedirs(output_folder, exist_ok=True)
-    np.save(cache_path, embeddings)
-    logger.info("Cached embeddings to %s", cache_path)
-
-    return embeddings

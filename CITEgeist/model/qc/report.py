@@ -155,7 +155,6 @@ def run_qc(
                 fig.savefig(fig_path, dpi=150, bbox_inches="tight")
                 logger.info("Saved: %s", fig_path)
             except (OSError, ValueError) as e:
-
                 logger.warning("Could not save figure %s: %s", fig_path, e)
             finally:
                 plt.close(fig)

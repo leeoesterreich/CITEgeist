@@ -7,6 +7,8 @@ import scanpy as sc
 import scipy.sparse as sp
 from scipy.sparse import issparse
 
+pytestmark = pytest.mark.unit
+
 
 class TestBuildKernelMatrix:
     """Test spatial kernel matrix construction."""

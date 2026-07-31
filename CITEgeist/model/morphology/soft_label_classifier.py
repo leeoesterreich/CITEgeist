@@ -56,7 +56,6 @@ class SoftLabelClassifier:
 
         # Fit logistic regression
         self._model = LogisticRegression(
-            multi_class="multinomial",
             solver="lbfgs",
             C=self.C,
             max_iter=self.max_iter,

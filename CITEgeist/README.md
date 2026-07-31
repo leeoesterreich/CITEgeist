@@ -4,10 +4,12 @@ CITEgeist is a computational method for deconvolving spatial transcriptomics dat
 
 ## Quick Installation
 
-You can now also install CITEgeist using pip:
+CITEgeist is not yet published on PyPI. Install from source:
 
 ```bash
-pip install citegeist
+git clone https://github.com/leeoesterreich/CITEgeist.git
+cd CITEgeist
+pip install -e .
 ```
 
 ## Table of Contents
@@ -52,17 +54,17 @@ It is recommended to install the dependencies in the `CITEgeist_env.yml` file fo
 
 ### 1. Installation
 
-Install CITEgeist using pip:
-
-```bash
-pip install citegeist
-```
-
-For development installation:
+Install CITEgeist from source:
 
 ```bash
 git clone https://github.com/leeoesterreich/CITEgeist.git
 cd CITEgeist
+pip install -e .
+```
+
+From the cloned repo root, for a development installation (adds test and lint dependencies):
+
+```bash
 pip install -e .[dev]
 ```
 
@@ -102,20 +104,22 @@ Key constructor parameters:
 
 **Note:** Module 3 (cuOPT QP) requires a GPU node. Runs on CPU nodes will fail silently.
 
-#### B. Using SLURM (HPC)
+#### B. Example Scripts
 
-For large-scale analyses on HPC clusters, use the provided sbatch scripts in `examples/`:
+End-to-end runner scripts for each module ship alongside the package in
+[`examples/`](examples):
 
-```bash
-sbatch examples/sbatch_patient_phase1.sh      # StarDist nuclei segmentation
-sbatch examples/sbatch_patient_phase2.sh      # M3: cuOPT QP proportions (GPU)
-sbatch examples/sbatch_patient_phase3.sh      # ViT feature extraction
-sbatch examples/sbatch_patient_phase4.sh      # MIL training + cell assignment
-sbatch examples/sbatch_patient_phase5_validate.sh  # Validation
-sbatch examples/sbatch_bivariate_morans_v3.sh # M4b: bivariate Moran's I
-```
+| Script | Module(s) |
+|--------|-----------|
+| `run_module12_discovery.py` | Modules 1–2: marker interest + protein-profile discovery |
+| `run_module3_unified.py` | Module 3: cuOPT QP cell-type proportions (GPU) |
+| `run_single_cell_assignment.py` | Module 3-post: StarDist nuclei + Hungarian assignment + SACE per-cell GEX (GPU) |
+| `run_module4_discovery.py` | Module 4: anchored spatial gene programs |
+| `run_module4b_bivariate.py` | Module 4b: bivariate Moran's I between programs |
+| `run_module5_integration.py` | Module 5: cross-sample program integration |
 
-Adapt paths and `--gres=gpu:1` directives for your cluster.
+Run any script with `python examples/<script>.py --help` to see its options. Wrap the
+GPU stages (Modules 3 and 3-post) in an sbatch script with `--gres=gpu:1`.
 
 ---
 
@@ -124,4 +128,3 @@ Adapt paths and `--gres=gpu:1` directives for your cluster.
 For specific reproduction of benchmarking tests and detailed methodology, please refer to the 'examples' and 'benchmarking' section in the documentation.
 
 ---
-

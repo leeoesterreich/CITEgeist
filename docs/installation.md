@@ -10,7 +10,7 @@
 Create the production environment (note: name is case-sensitive):
 
 ```bash
-conda env create -f requirements.txt -n CITEgeist_env
+conda env create -f CITEgeist_env.yml -n CITEgeist_env
 conda activate CITEgeist_env
 pip install -e .
 ```
@@ -21,8 +21,6 @@ CITEgeist is designed for HPC clusters using SLURM. Key requirements:
 
 - **GPU nodes required for Module 3 (QP deconvolution).** The cuOPT solver
   fails silently on CPU nodes. Submit with `--gres=gpu:1`.
-- On PITT CRC, use `gpu-race-submit.sh <script.sbatch>` to race across
-  `l40s`, `a100`, and `a100_nvlink` partitions.
 - Module 3b (StarDist segmentation) requires `HDF5_USE_FILE_LOCKING=FALSE`
   for array jobs on NFS.
 

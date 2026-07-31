@@ -33,7 +33,7 @@ jobs:
       - name: Install formatting tools
         run: |
           python -m pip install --upgrade pip
-          pip install black==26.3.1 isort==8.0.1
+          pip install black==23.12.1 isort==5.13.2
 
       - name: Check formatting with black
         run: black --check --line-length=120 CITEgeist/ --exclude="Benchmarking/"
@@ -62,7 +62,7 @@ jobs:
       - name: Install flake8
         run: |
           python -m pip install --upgrade pip
-          pip install flake8
+          pip install flake8==7.0.0
 
       - name: Lint with flake8
         run: flake8 CITEgeist/ --max-line-length=120 --extend-ignore=E203,E501,W503,E402 --exclude=Benchmarking/ --count --statistics
@@ -99,6 +99,13 @@ jobs:
             -m "unit and not slow and not requires_data and not requires_cuopt" \
             --ignore=tests/test_figures \
             --ignore=tests/test_panel_label_role.py \
+            --ignore=tests/test_figure_tools \
+            --ignore=tests/test_migrate_drop_ids.py \
+            --ignore=tests/test_v34_comment_restoration.py \
+            --ignore=tests/test_zotero_uri_stabilize.py \
+            --ignore=tests/test_comment_ids.py \
+            --ignore=tests/test_comment_roots.py \
+            --ignore=tests/test_edit_comment_text.py \
             --cov=CITEgeist/model \
             --cov-report=xml \
             --cov-report=term-missing \

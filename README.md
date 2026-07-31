@@ -16,21 +16,21 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 - Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
 - GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
 - SACE per-cell gene expression deconvolution via single-pass Poisson-multinomial allocation
-- Morphology-informed cell assignment via ViT fine-tuned with label learning from proportions (LLP)
+- Per-cell type assignment from spot proportions via StarDist nuclei segmentation + Hungarian matching (optional Bayesian assignment when per-nucleus morphology scores are precomputed)
 - Spatial gene program discovery and cross-sample integration (Modules 4–5)
 - Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
 
 ## Documentation
 
-- [Quick Start Guide](CITEgeist/README.md)
-- [Running on Real Visium Data (end-to-end tutorial)](docs/quickstart_real_visium.md)
-- [Benchmarking Results](docs/Benchmarking/README.md)
-- [Example Scripts](examples/scripts)
+- [Quick Start Guide](https://github.com/leeoesterreich/CITEgeist/blob/main/CITEgeist/README.md)
+- [Running on Real Visium Data (end-to-end tutorial)](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md)
+- [Benchmarking Results](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/Benchmarking/README.md)
+- [Example Scripts](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts)
 
 ## Reproducibility
 
-Example end-to-end pipelines for each module are in [`examples/scripts`](examples/scripts).
-See the [end-to-end Visium tutorial](docs/quickstart_real_visium.md) to run CITEgeist on real data.
+Example end-to-end pipelines for each module are in [`examples/scripts`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts).
+See the [end-to-end Visium tutorial](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md) to run CITEgeist on real data.
 
 ## System Requirements
 
@@ -43,17 +43,31 @@ See the [end-to-end Visium tutorial](docs/quickstart_real_visium.md) to run CITE
 
 ## Quick Installation
 
-You can install CITEgeist using pip:
-
-```bash
-pip install citegeist
-```
-
-For development installation:
+CITEgeist is not yet published on PyPI. Install from source:
 
 ```bash
 git clone https://github.com/leeoesterreich/CITEgeist.git
 cd CITEgeist
+pip install -e .
+```
+
+> **Note — package name vs import name:** The installed distribution is named
+> `citegeist` (lowercase), but the importable package is `CITEgeist` (capital C). After installation:
+>
+> ```python
+> import CITEgeist                          # bare import (lightweight)
+> from CITEgeist import CitegeistModel      # lazy re-export — heavy stack loaded on demand
+> ```
+
+> **GPU requirement:** CITEgeist's QP deconvolution (Module 3) requires an **NVIDIA GPU with
+> CUDA** and the [cuOPT](https://developer.nvidia.com/cuopt-logistics-optimization) library.
+> cuOPT is **not available on PyPI** — install it via NVIDIA RAPIDS or NGC
+> (`pip install cuopt-cu12` from the NVIDIA index, or use a pre-built RAPIDS container).
+> CPU-only environments **cannot run** the cell-type proportion solver.
+
+From the cloned repo root, for a development installation with test and lint dependencies:
+
+```bash
 pip install -e .[dev]
 ```
 
@@ -105,11 +119,11 @@ pytest
 
 **Advisory (badge only, no merge gate):** pylint, mypy
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
+See [CONTRIBUTING.md](https://github.com/leeoesterreich/CITEgeist/blob/main/CONTRIBUTING.md) for detailed contribution guidelines.
 
 ## License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details. This license ensures that all modifications and derivative works must also be open source.
+This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE) file for details. BSD 3-Clause is a permissive license: you may use, modify, and redistribute the code, including in proprietary work, provided you retain the copyright notice and do not use the authors' names to endorse derived products.
 
 ## Contact
 
@@ -141,7 +155,7 @@ If you use CITEgeist in your research, please cite our paper:
 
 ## Contributing
 
-We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on:
+We welcome contributions! Please see our [CONTRIBUTING.md](https://github.com/leeoesterreich/CITEgeist/blob/main/CONTRIBUTING.md) for detailed guidelines on:
 - Setting up your development environment
 - Code quality standards
 - Testing requirements

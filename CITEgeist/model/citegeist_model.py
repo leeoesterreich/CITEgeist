@@ -20,11 +20,6 @@ try:
 except ImportError:  # pragma: no cover - exercised only in reduced environments
     pq = None
 
-from .assignment.module3b_nucleus_assignment import (  # noqa: F401  # pylint: disable=unused-import
-    NucleusAssignmentResult,
-    run_nucleus_assignment,
-)
-
 # Local imports
 # Production-path imports (cuOPT backend)
 from .deconvolution.qp_solver import (  # pylint: disable=unused-import
@@ -34,8 +29,7 @@ from .deconvolution.qp_solver import (  # pylint: disable=unused-import
     normalize_counts,
     optimize_cell_proportions_per_marker,
 )
-from .deconvolution.reference_model import ReferenceProfile
-from .deconvolution.reference_model import train_reference as _train_reference
+from .marker_utils import strip_antibody_suffix
 from .morphology.segmentation import (
     compute_spot_nuclei_counts_from_adata,
     normalize_nuclei_counts_for_prior,
@@ -85,6 +79,20 @@ def _require_pyarrow(feature_name: str) -> None:
 
 
 class CitegeistModel:
+    """Orchestrates the CITEgeist pipeline for one sample.
+
+    Typical sequence: ``split_adata()`` -> ``run_cell_proportion_model()`` (M3 cuOPT QP)
+    -> ``run_sace_allocation()`` (M3-gex SACE). See module docstrings for details.
+
+    Attributes:
+        results (dict): Pipeline outputs keyed by stage; ``results["cell_prop"]`` holds
+            the finetuned per-spot proportion DataFrame consumed by SACE allocation.
+        resolution (str): Active resolution mode ("spot" or "cell").
+        resolution_params (dict): Parameter preset for the active resolution.
+        cell_profile_dict (dict | None): Antibody -> cell-type profiles once loaded.
+        output_folder (str): Directory for logs and saved outputs.
+    """
+
     def __init__(
         self,
         sample_name,
@@ -101,11 +109,20 @@ class CitegeistModel:
         Initialize the CitegeistModel with an AnnData object and output folder.
 
         Args:
+            sample_name (str): Required sample identifier; used for logging setup and output
+                file/log naming.
             adata (AnnData, optional): Spatial transcriptomics data object.
             output_folder (str): Path to save results and outputs.
             simulation (bool): Flag indicating if the data comes from a simulation framework.
             gene_expression_adata (AnnData, optional): Gene expression AnnData object (for simulations).
             antibody_capture_adata (AnnData, optional): Antibody capture AnnData object (for simulations).
+            resolution (str): Resolution mode selecting parameter presets from
+                ``RESOLUTION_DEFAULTS`` — "spot" (default) or "cell". Governs spatial-smoothing
+                defaults (e.g. laplacian_k, lambda_spatial, lambda_sparse) and the classification
+                dispatch path used by ``run_cell_proportion_model``.
+            resolution_overrides (dict, optional): Per-key overrides applied on top of the
+                selected resolution preset; each key must already exist in that preset, or a
+                ValueError is raised.
         """
         if simulation:
             if gene_expression_adata is None or antibody_capture_adata is None:
@@ -147,7 +164,7 @@ class CitegeistModel:
                     raise ValueError(f"Unknown resolution parameter: '{key}'")
                 self.resolution_params[key] = val
 
-        print("CitegeistModel initialized successfully.")
+        logging.info("CitegeistModel initialized successfully.")
 
     def __repr__(self):
         """
@@ -192,8 +209,8 @@ class CitegeistModel:
         # Set only the license file environment variable
         os.environ["GRB_LICENSE_FILE"] = license_file_path
 
-        print("✅ Gurobi license file has been successfully configured.")
-        print(f" - GRB_LICENSE_FILE: {os.environ['GRB_LICENSE_FILE']}")
+        logging.info("✅ Gurobi license file has been successfully configured.")
+        logging.info(f" - GRB_LICENSE_FILE: {os.environ['GRB_LICENSE_FILE']}")
 
     # -----------------------------------------
     # Data Splitting
@@ -234,7 +251,7 @@ class CitegeistModel:
         self.gene_expression_adata = self.adata[:, gene_expression_idx].copy()
         self.antibody_capture_adata = self.adata[:, antibody_capture_idx].copy()
 
-        print("AnnData has been successfully split into 'gene_expression_adata' and 'antibody_capture_adata'.")
+        logging.info("AnnData has been successfully split into 'gene_expression_adata' and 'antibody_capture_adata'.")
 
     # -----------------------------------------
     # Utility Functions
@@ -335,7 +352,7 @@ class CitegeistModel:
 
         sc.pp.filter_cells(self.gene_expression_adata, min_counts=min_counts)
 
-        print(
+        logging.info(
             f"Filtered gene expression data: {initial_gene_count} → {filtered_gene_count} genes "
             f"(count > 0 in at least {nonzero_percentage*100}% of spots, mean expression > {mean_expression_threshold} "
             f"in nonzero spots). Remaining spots: {self.gene_expression_adata.shape[0]} "
@@ -440,7 +457,7 @@ class CitegeistModel:
         # Update status flag
         self.preprocessed_antibody = True
 
-        print("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
+        logging.info("Antibody capture data preprocessing completed: Winsorized, CLR applied, no NaNs detected.")
 
     def preprocess_antibody_discrete(
         self,
@@ -549,7 +566,7 @@ class CitegeistModel:
             row_sums.mean(),
             row_sums.std(),
         )
-        print(
+        logging.info(
             f"Antibody capture data preprocessing completed for discrete mode: "
             f"Winsorized [{winsorize_lower}%, {winsorize_upper}%], "
             f"scale_mode={scale_mode}, no per-spot normalization."
@@ -629,45 +646,6 @@ class CitegeistModel:
         )
         return seg_result.nuclei_count_raw
 
-    def train_reference(
-        self,
-        reference_adata: sc.AnnData,
-        *,
-        cell_type_col: str = "cell_type",
-        n_markers_per_type: int = 20,
-        de_method: str = "wilcoxon",
-        type_mapping: Optional[Dict[str, str]] = None,
-    ) -> "ReferenceProfile":
-        """Train NB reference profiles from annotated scRNA-seq.
-
-        Must be called after preprocess_gex() so the spatial gene universe
-        is available for filtering.
-
-        Args:
-            reference_adata: Annotated scRNA-seq AnnData with raw counts in .X.
-            cell_type_col: Column in .obs with cell type annotations.
-            n_markers_per_type: Number of top DE marker genes per type.
-            de_method: scanpy DE method ("wilcoxon" or "t-test").
-            type_mapping: Optional dict mapping reference type names to
-                CITEgeist type names.
-
-        Returns:
-            Frozen ReferenceProfile for use in run_cell_proportion_model().
-        """
-        if not self.preprocessed_gex:
-            raise RuntimeError("Must call preprocess_gex() before train_reference().")
-
-        spatial_genes = list(self.gene_expression_adata.var_names)
-
-        return _train_reference(
-            reference_adata=reference_adata,
-            cell_type_col=cell_type_col,
-            spatial_genes=spatial_genes,
-            n_markers_per_type=n_markers_per_type,
-            de_method=de_method,
-            type_mapping=type_mapping,
-        )
-
     def run_cell_proportion_model(
         self,
         *,
@@ -732,7 +710,7 @@ class CitegeistModel:
         threshold_method="auto",
         use_negative_gates=False,
         # Method selection
-        method="qp",  # "qp" (cuOPT, default), "nb" (Gurobi-free NB), or "per_type_beta"
+        method="qp",  # "qp" (cuOPT, default) or "per_type_beta"
         # Per-type beta params (ignored when method != "per_type_beta")
         sigma_scale=1.0,
         # NB-specific params (ignored when method="qp")
@@ -742,14 +720,7 @@ class CitegeistModel:
         nb_detection_threshold=0.5,
         nb_gpu_adam_steps=200,
         # Morphology prior (refinement)
-        morphology_prior=None,
-        morphology_patches=None,
-        morphology_cell_to_spot=None,
-        lambda_morphology=0.1,
         morphology_device="cpu",
-        # NB reference refinement (optional scRNA-seq integration)
-        reference=None,  # ReferenceProfile from train_reference()
-        kappa=10.0,  # Dirichlet prior concentration for NB refinement
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -767,6 +738,27 @@ class CitegeistModel:
             beta_min (float): Minimum allowed beta value for per-marker optimization (default: 0.1)
             beta_max (float): Maximum allowed beta value for per-marker optimization (default: 2.0)
             lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. Default: 1.0
+
+        Args (production-relevant; see signature for the full set):
+            method: proportion solver variant ("qp" — per-marker cuOPT QP — is production;
+                also "per_type_beta").
+            fusion_mode: detection-mask fusion mode ("union" default).
+            use_gex_detection / gex_detection_k / gex_detection_min_corr: GEX-informed detection fusion.
+            use_detection_gating / detection_gate_ub: GMM detection gating controls.
+            radius: neighborhood radius for spatial terms.
+            nuclei_counts: optional per-spot nuclei counts (pd.Series) enabling the
+                cellularity-scaled count-space QP; None disables it.
+            use_nuclei_prior / nuclei_prior_lambda / nuclei_target_col: optional
+                nuclei-abundance row-sum prior (spot mode).
+            use_cellularity_laplacian / cellularity_col / cellularity_sigma: bilateral
+                spatial smoothing weighted by per-spot nuclei similarity.
+
+        Returns:
+            tuple[pandas.DataFrame, pandas.DataFrame]: (global, finetuned) per-spot cell-type
+            proportions (rows = spot barcodes, columns = cell types); the finetuned frame is also
+            stored on the model (``self.results["cell_prop"]``) for downstream SACE allocation.
+            Other dispatch paths (cell-resolution gating) return their own
+            result type instead.
         """
 
         # --- Detection gating guard ---
@@ -783,74 +775,9 @@ class CitegeistModel:
                 stacklevel=2,
             )
 
-        # --- Two-pass morphology orchestration ---
-        if morphology_patches is not None and morphology_prior is None:
-            if morphology_cell_to_spot is None:
-                raise ValueError("morphology_cell_to_spot required when morphology_patches provided")
-
-            # Pass 1: Base proportions (no morphology)
-            logging.info("Morphology two-pass: Pass 1 (base proportions)...")
-            self.run_cell_proportion_model(
-                method=method,
-                radius=radius,
-                tolerance=tolerance,
-                max_iterations=max_iterations,
-                lambda_reg=lambda_reg,
-                alpha=alpha,
-                lambda_laplacian=lambda_laplacian,
-                laplacian_k=laplacian_k,
-                beta_min=beta_min,
-                beta_max=beta_max,
-                lambda_coverage=lambda_coverage,
-                nuclei_counts=nuclei_counts,
-                use_detection_gating=use_detection_gating,
-                detection_gate_ub=detection_gate_ub,
-                nb_device=nb_device,
-                nb_n_iter=nb_n_iter,
-                nb_gpu_adam_steps=nb_gpu_adam_steps,
-            )
-            p_base = self.results["cell_prop"].values
-            self.results["cell_prop_base"] = self.results["cell_prop"].copy()
-
-            # Stage 0: Compute morphology prior via LLP
-            from .morphology.morphology_prior import compute_morphology_prior  # pylint: disable=import-outside-toplevel
-
-            detection_mask = self.results.get("detection_masks", None)
-            num_spots = len(self.results["cell_prop"])
-
-            logging.info("Morphology two-pass: computing morphology prior (LLP)...")
-            morphology_prior = compute_morphology_prior(
-                patches=morphology_patches,
-                cell_to_spot=morphology_cell_to_spot,
-                oracle_props=p_base,
-                num_types=p_base.shape[1],
-                num_spots=num_spots,
-                n_epochs=100,
-                device=morphology_device,
-                detection_mask=detection_mask,
-            )
-            logging.info("Morphology two-pass: prior computed, running Pass 2 (refinement)...")
-            # Fall through to solver dispatch below with morphology_prior set
-
-        if morphology_prior is not None:
-            self.results["morphology_prior"] = morphology_prior
-
         # --- Method dispatch ---
-        if method == "nb":  # pylint: disable=no-else-return
-            return self._run_nb_proportion_model(
-                device=nb_device,
-                n_iter=nb_n_iter,
-                use_detection=nb_use_detection,
-                detection_threshold=nb_detection_threshold,
-                gpu_adam_steps=nb_gpu_adam_steps,
-                nuclei_counts=nuclei_counts,
-                lambda_laplacian=lambda_laplacian,
-                laplacian_k=laplacian_k,
-                morphology_prior=morphology_prior,
-                lambda_morphology=lambda_morphology,
-            )
-        elif method not in ("qp", "per_type_beta"):
-            raise ValueError(f"Unknown method '{method}'. Use 'qp', 'nb', or 'per_type_beta'.")
+        if method not in ("qp", "per_type_beta"):
+            raise ValueError(f"Unknown method '{method}'. Use 'qp' or 'per_type_beta'.")
 
         # --- QP path (cuOPT backend) ---
 
@@ -1056,7 +983,7 @@ class CitegeistModel:
 
             def _strip_suffix(name: str) -> str:
                 """Strip -1 suffix from antibody names (e.g., CD68-1 -> CD68)."""
-                return name[:-2] if name.endswith("-1") else name
+                return strip_antibody_suffix(name)
 
             var_names = list(self.antibody_capture_adata.var_names)
             m2raw = {}
@@ -1260,26 +1187,31 @@ class CitegeistModel:
                     sigma_scale,
                 )
 
-                Y_values, _, marker_beta_matrix_dict, alpha_values, recon_error, objective_history = (
-                    optimize_cell_proportions_per_type_beta(
-                        marker_level_data=marker_level_data,
-                        marker_names=marker_names,
-                        cell_type_names=cell_type_names,
-                        beta_init=beta_init,
-                        prior_sigma=prior_sigma,
-                        tolerance=tolerance,
-                        max_iterations=max_iterations,
-                        lambda_reg=lambda_reg,
-                        alpha_elastic=alpha,
-                        beta_max=beta_max,
-                        lambda_laplacian=lambda_laplacian,
-                        coords=coords,
-                        laplacian_k=laplacian_k,
-                        row_sum_bounds=row_sum_bounds,
-                        sparsity_mask=sparsity_mask,
-                        spot_weights=cellularity_spot_weights,
-                        marker_weight=marker_weight,
-                    )
+                (
+                    Y_values,
+                    _,
+                    marker_beta_matrix_dict,
+                    alpha_values,
+                    recon_error,
+                    objective_history,
+                ) = optimize_cell_proportions_per_type_beta(
+                    marker_level_data=marker_level_data,
+                    marker_names=marker_names,
+                    cell_type_names=cell_type_names,
+                    beta_init=beta_init,
+                    prior_sigma=prior_sigma,
+                    tolerance=tolerance,
+                    max_iterations=max_iterations,
+                    lambda_reg=lambda_reg,
+                    alpha_elastic=alpha,
+                    beta_max=beta_max,
+                    lambda_laplacian=lambda_laplacian,
+                    coords=coords,
+                    laplacian_k=laplacian_k,
+                    row_sum_bounds=row_sum_bounds,
+                    sparsity_mask=sparsity_mask,
+                    spot_weights=cellularity_spot_weights,
+                    marker_weight=marker_weight,
                 )
 
                 # Store per_type_beta-specific results
@@ -1583,108 +1515,6 @@ class CitegeistModel:
         if "cell_prop_base" not in self.results:
             self.results["cell_prop_base"] = self.results["cell_prop"].copy()
 
-        # --- Optional NB refinement with scRNA-seq reference ---
-        if reference is not None:
-            logging.info("Running NB proportion refinement with scRNA-seq reference (kappa=%.1f)", kappa)
-            import torch  # pylint: disable=import-outside-toplevel
-
-            from .deconvolution.reference_model import refine_proportions_nb  # pylint: disable=import-outside-toplevel
-
-            # Store protein-only proportions for comparison
-            self.results["cell_prop_protein"] = self.results["cell_prop"].copy()
-
-            # Extract marker gene counts from spatial data
-            marker_genes_in_spatial = [g for g in reference.gene_names if g in self.gene_expression_adata.var_names]
-            if len(marker_genes_in_spatial) < len(reference.gene_names):
-                logging.warning(
-                    "Only %d/%d reference marker genes found in spatial data",
-                    len(marker_genes_in_spatial),
-                    len(reference.gene_names),
-                )
-
-            # Get raw counts for marker genes
-            gex_adata = self.gene_expression_adata
-            raw_counts = gex_adata.layers.get("raw_counts", gex_adata.X)
-            marker_idx = [list(gex_adata.var_names).index(g) for g in marker_genes_in_spatial]
-            if hasattr(raw_counts, "toarray"):
-                spot_marker_counts = raw_counts[:, marker_idx].toarray()
-            else:
-                spot_marker_counts = np.asarray(raw_counts[:, marker_idx])
-
-            # Build reference subset matching available genes
-            ref_gene_idx = [reference.gene_names.index(g) for g in marker_genes_in_spatial]
-            ref_mu_subset = reference.mu[:, ref_gene_idx]
-            ref_alpha_subset = reference.alpha[ref_gene_idx]
-
-            # Map reference types to proportion columns
-            prop_df = self.results["cell_prop"]
-            all_cols = list(prop_df.columns)
-            ref_type_cols = [t for t in reference.type_names if t in all_cols]
-            if len(ref_type_cols) < len(reference.type_names):
-                logging.warning(
-                    "Reference types not in proportions (frozen): %s",
-                    set(reference.type_names) - set(all_cols),
-                )
-
-            pi_protein_full = prop_df.values
-            covered_idx = [all_cols.index(t) for t in ref_type_cols]
-            uncovered_idx = [i for i in range(len(all_cols)) if i not in covered_idx]
-            pi_covered = pi_protein_full[:, covered_idx]
-
-            # Reorder ref mu/alpha to match ref_type_cols order
-            ref_type_order = [reference.type_names.index(t) for t in ref_type_cols]
-
-            ref_subset = ReferenceProfile(
-                mu=ref_mu_subset[ref_type_order],
-                alpha=ref_alpha_subset,
-                gene_names=marker_genes_in_spatial,
-                type_names=ref_type_cols,
-                de_results=reference.de_results,
-                n_cells_per_type=reference.n_cells_per_type,
-            )
-
-            # Determine device
-            device = "cpu"
-            try:
-                if torch.cuda.is_available():
-                    device = "cuda"
-            except Exception:  # pylint: disable=broad-exception-caught
-                pass
-
-            # Compute residual mass for uncovered types (stays fixed)
-            uncovered_mass = pi_protein_full[:, uncovered_idx].sum(axis=1, keepdims=True)  # (N, 1)
-            covered_mass = 1.0 - uncovered_mass  # (N, 1)
-
-            # Normalize covered proportions to their own simplex before refinement
-            covered_sum = pi_covered.sum(axis=1, keepdims=True)
-            pi_covered_norm = pi_covered / (covered_sum + 1e-10)
-
-            pi_refined_covered = refine_proportions_nb(
-                spot_counts=spot_marker_counts,
-                pi_protein=pi_covered_norm,
-                reference=ref_subset,
-                kappa=kappa,
-                device=device,
-            )
-
-            # Scale refined covered types back to residual mass (uncovered stays fixed)
-            pi_refined_full = pi_protein_full.copy()
-            for i, col_idx in enumerate(covered_idx):
-                pi_refined_full[:, col_idx] = pi_refined_covered[:, i] * covered_mass.ravel()
-
-            refined_df = pd.DataFrame(pi_refined_full, index=prop_df.index, columns=prop_df.columns)
-            self.results["cell_prop"] = refined_df
-            self.results["cell_prop_base"] = refined_df.copy()
-
-            # Save to CSV
-            refined_df.to_csv(
-                os.path.join(
-                    self.output_folder,
-                    f"{self.sample_name}_cell_prop_refined_results.csv",
-                )
-            )
-            logging.info("NB refinement complete. Refined proportions stored in self.results['cell_prop'].")
-
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 
     def discretize_proportions(
@@ -1724,6 +1554,10 @@ class CitegeistModel:
             3. Allocates remaining cells to cell types with largest fractional parts
             This guarantees exact sum while minimizing total rounding error.
         """
+        from .assignment.cellularity_utils import (  # pylint: disable=import-outside-toplevel
+            round_counts_largest_remainder,
+        )
+
         # Align indices
         common_spots = proportions_df.index.intersection(nuclei_counts.index)
         if len(common_spots) == 0:
@@ -1749,26 +1583,7 @@ class CitegeistModel:
                 cell_counts.loc[spot] = 0
                 continue
 
-            # Ensure proportions sum to 1
-            p_sum = p.sum()
-            if p_sum > 0:
-                p = p / p_sum
-
-            # Initial floor allocation
-            raw_counts = p * N
-            floor_counts = np.floor(raw_counts).astype(int)
-
-            # Remainders for largest remainder method
-            remainders = raw_counts - floor_counts
-
-            # How many more cells to allocate
-            deficit = N - floor_counts.sum()
-
-            # Allocate to largest remainders
-            if deficit > 0:
-                indices = np.argsort(-remainders)
-                for i in range(int(deficit)):
-                    floor_counts[indices[i]] += 1
+            floor_counts = round_counts_largest_remainder(p, N)
 
             cell_counts.loc[spot] = floor_counts
 
@@ -1933,11 +1748,6 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data not available")
 
-        # Debug prints before sorting
-        print("\nBefore sorting:")
-        print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
-        print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
-
         if "spot_" in str(spot_by_celltype_df.index[0]):
             # Sort both numerically by the spot number
             def get_spot_number(x):
@@ -1950,11 +1760,6 @@ class CitegeistModel:
             spot_by_celltype_df = spot_by_celltype_df.reindex(sorted_csv_idx)
             self.gene_expression_adata = self.gene_expression_adata[sorted_adata_idx].copy()
 
-            # Debug prints after sorting
-            print("\nAfter sorting:")
-            print("CSV spots 1-10:", list(spot_by_celltype_df.index[:10]))
-            print("AnnData spots 1-10:", list(self.gene_expression_adata.obs_names[:10]))
-
         # Check if indices match after sorting
         if not all(spot_by_celltype_df.index == self.gene_expression_adata.obs_names):
             raise ValueError("Spot indices still don't match after sorting. Please verify your data.")
@@ -1965,7 +1770,7 @@ class CitegeistModel:
 
         self.results["cell_prop"] = spot_by_celltype_df
 
-        print("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
+        logging.info("✅ Cell type proportions have been appended to adata.obs and results['cell_prop']")
 
     def append_gex_to_adata(self, parquet_path=None, pass_number=1):
         """
@@ -1983,7 +1788,7 @@ class CitegeistModel:
         # Step 1: Read the Parquet file into a pandas DataFrame
         table = pq.read_table(parquet_path)
         df = table.to_pandas()
-        print(f"Parquet file for pass {pass_number} loaded successfully.")
+        logging.info(f"Parquet file for pass {pass_number} loaded successfully.")
 
         # Step 2: Reset the index to extract 'Spot' and 'CellType'
         df = df.reset_index()
@@ -1993,7 +1798,7 @@ class CitegeistModel:
         if ":::" in sample_index:
             # New format: spot_1:::CellType
             df[["Spot", "CellType"]] = df["index"].str.split(":::", n=1, expand=True)
-            print("Spot and CellType successfully split (using ::: delimiter).")
+            logging.info("Spot and CellType successfully split (using ::: delimiter).")
         else:
             # Legacy format: spot_1_CellType - need to match against known cell types
             # Get cell type names from the dictionary for parsing
@@ -2020,14 +1825,9 @@ class CitegeistModel:
 
             df["Spot"] = spots
             df["CellType"] = cell_types
-            print("Spot and CellType successfully split (using legacy _ delimiter with cell type matching).")
+            logging.info("Spot and CellType successfully split (using legacy _ delimiter with cell type matching).")
 
         df = df.drop(columns=["index"])
-
-        # Debug print spot names
-        print("\nSpot name formats:")
-        print("AnnData spot names format:", self.gene_expression_adata.obs_names[:5])
-        print("Parquet spot names format:", df["Spot"].unique()[:5])
 
         # Get cell type names from the dictionary for validation
         if self.cell_profile_dict is None:
@@ -2078,7 +1878,7 @@ class CitegeistModel:
             # Add as layer with consistent naming
             layer_name = f"{cell_type.replace(' ', '_')}_genes_pass{pass_number}"
             self.gene_expression_adata.layers[layer_name] = celltype_matrix
-            print(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
+            logging.info(f"Added layer: {layer_name} (Shape: {celltype_matrix.shape})")
 
             # After adding each layer, verify it was added correctly
             if layer_name not in self.gene_expression_adata.layers:
@@ -2096,7 +1896,7 @@ class CitegeistModel:
         if self.gene_expression_adata is None:
             raise ValueError("AnnData object is not initialized in the model.")
 
-        print("✅ Returning the internal AnnData object.")
+        logging.info("✅ Returning the internal AnnData object.")
         return self.gene_expression_adata
 
     def cleanup(self):
@@ -2117,36 +1917,31 @@ class CitegeistModel:
         cell_to_spot: np.ndarray,
         *,
         cell_ids: np.ndarray = None,
-        morphology_embeddings: np.ndarray = None,
-        patches: np.ndarray = None,
-        encoder_checkpoint: str = None,
-        morphology_weight: float = 0.5,
         random_state: int = 42,
-        device: str = "cpu",
         assignment_method: str = "hungarian",
         detection_mask: np.ndarray = None,
         proportion_prior: np.ndarray = None,
         morph_scores_precomputed: np.ndarray = None,
+        morphology_weight: float = 0.5,
     ) -> "pd.DataFrame":
-        """Assign individual cells to types using proportions + optional morphology.
+        """Assign individual cells to types using proportions.
 
         Post-processing step that runs after run_cell_proportion_model().
-        Discretizes spot-level proportions into per-cell type assignments,
-        optionally using morphology embeddings as a soft prior via
-        prototype-contrastive LLP.
+        Discretizes spot-level proportions into per-cell type assignments via
+        Hungarian matching, or Bayesian posterior assignment when
+        morph_scores_precomputed is supplied.
 
         Args:
             nuclei_counts: Per-spot nuclei counts.
             cell_to_spot: (C,) int array mapping each cell to a spot index
                 (positional into self.results["cell_prop"]).
             cell_ids: (C,) cell/nucleus identifiers. Defaults to integer indices.
-            morphology_embeddings: (C, 384) precomputed embeddings, or None.
-            patches: (C, ch, 96, 96) DAPI patches for embedding extraction, or None.
-            encoder_checkpoint: SimCLR checkpoint path (required if patches provided).
-            morphology_weight: Nudge strength (0=none, 1=full). Default 0.5.
             random_state: Seed for deterministic no-morphology assignment.
-            device: Torch device for morphology scoring (e.g. "cpu" or "cuda").
-                Default "cpu".
+            assignment_method: "hungarian" or "bayesian". Default "hungarian".
+            detection_mask: (I, T) boolean mask required for bayesian assignment.
+            proportion_prior: (I, T) alternative prior for bayesian assignment.
+            morph_scores_precomputed: (C, T) precomputed morphology scores for bayesian.
+            morphology_weight: Hungarian morphology nudge in [0,1]; ignored by bayesian.
 
         Returns:
             DataFrame (C rows): spot_id, cell_id, per-type scores, assigned_type, confidence.
@@ -2179,27 +1974,19 @@ class CitegeistModel:
             nuclei_counts=nuclei_counts,
             cell_to_spot=cell_to_spot,
             cell_ids=cell_ids,
-            morphology_embeddings=morphology_embeddings,
-            patches=patches,
-            encoder_checkpoint=encoder_checkpoint,
-            morphology_weight=morphology_weight,
             existing_integer_counts=existing_int,
             output_folder=getattr(self, "output_folder", None),
             sample_name=getattr(self, "sample_name", "sample"),
-            device=device,
             random_state=random_state,
             assignment_method=assignment_method,
             detection_mask=detection_mask,
             proportion_prior=proportion_prior,
             morph_scores_precomputed=morph_scores_precomputed,
+            morphology_weight=morphology_weight,
         )
 
         self.results["cell_assignments"] = result
         self.results["cell_types_hard"] = result["assigned_type"].values
-
-        if morphology_embeddings is not None or patches is not None:
-            cell_types = self.results["cell_prop"].columns.tolist()
-            self.results["morphology_scores"] = result[cell_types].values
 
         logging.info("Assigned %d cells to %d types", len(result), len(self.results["cell_prop"].columns))
 
@@ -2262,8 +2049,9 @@ class CitegeistModel:
         resolution_mode: str = "hires",
         modality: str = "he",
         assignment_method: str = "hungarian",
-        morphology_weight: float = 0.5,
         stardist_kwargs: dict = None,
+        use_morphology: bool = True,
+        morphology_weight: float = 0.5,
     ):
         """Run SACE per-cell GEX allocation.
 
@@ -2275,9 +2063,16 @@ class CitegeistModel:
             integer_allocation: If True, apply largest-remainder rounding.
             resolution_mode: Image resolution for StarDist (single_cell only).
             modality: StarDist modality "he" or "dapi" (single_cell only).
-            assignment_method: "hungarian" (default) or "bayesian" (single_cell only).
-            morphology_weight: Bayesian morphology nudge (single_cell only).
+            assignment_method: "hungarian" (default) or "bayesian" (single_cell only,
+                requires morph_scores_precomputed via assign_cells).
             stardist_kwargs: Extra args for StarDist (single_cell only).
+            use_morphology: compute non-DL morphology scores and assign with the
+                Bayesian posterior (the benchmarked winner: 0.434 pooled vs 0.336
+                Hungarian on Xenium RCC); default True. If morphology scoring
+                fails, falls back to count-constrained Hungarian. Set False for
+                byte-identical, proportion-consistent Hungarian assignment.
+            morphology_weight: Hungarian morphology nudge in [0,1], forwarded to
+                assign_cells; ignored by bayesian.
 
         Returns:
             layers mode: (spot_type_gex, diagnostics)
@@ -2422,11 +2217,32 @@ class CitegeistModel:
         cell_to_spot = nsm["spot_idx"].values
         cell_ids = nsm["nucleus_id"].values.astype(str)
 
+        morph_scores_precomputed = None
+        sc_method = assignment_method
+        if use_morphology:
+            from .morphology.nucleus_scores import compute_morphology_scores_safe
+
+            morph_scores_precomputed = compute_morphology_scores_safe(
+                labeled_mask=seg_result.masks,
+                nuclei_spot_map=cell_to_spot,
+                spot_proportions=self.results["cell_prop"].values,
+                cell_type_names=list(self.results["cell_prop"].columns),
+                nucleus_ids=nsm["nucleus_id"].values.astype(int),
+            )
+            if morph_scores_precomputed is not None:
+                sc_method = "bayesian"
+            else:
+                logging.warning(
+                    "Morphology-informed Bayesian assignment unavailable; using "
+                    "count-constrained Hungarian assignment instead."
+                )
+
         assignment_result = self.assign_cells(
             nuclei_counts=nuclei_counts,
             cell_to_spot=cell_to_spot,
             cell_ids=cell_ids,
-            assignment_method=assignment_method,
+            assignment_method=sc_method,
+            morph_scores_precomputed=morph_scores_precomputed,
             morphology_weight=morphology_weight,
         )
 
@@ -2535,7 +2351,7 @@ class CitegeistModel:
         if len(functional_markers) == 0:
             panel_stripped = {}
             for pm in panel_markers:
-                stripped = pm[:-2] if pm.endswith("-1") else pm
+                stripped = strip_antibody_suffix(pm)
                 panel_stripped[stripped] = pm
             functional_markers = [m for m in functional_marker_table if m in panel_stripped]
             marker_to_panel = {m: panel_stripped[m] for m in functional_markers}
@@ -2746,9 +2562,7 @@ class CitegeistModel:
         # Handle -1 suffix: "CD68-1" -> "CD68" for matching, but preserve
         # names that naturally end in "-1" like "PD-1"
         def _canon(name):
-            if name.endswith("-1") and not name.endswith("PD-1"):
-                return name[:-2]
-            return name
+            return strip_antibody_suffix(name)
 
         panel_stripped = {_canon(m): m for m in panel_markers}
 

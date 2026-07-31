@@ -18,6 +18,8 @@ import scanpy as sc
 import scipy.sparse as sp
 from scipy.spatial import KDTree
 
+from ..assignment.cellularity_utils import round_counts_largest_remainder
+
 logger = logging.getLogger(__name__)
 
 
@@ -264,19 +266,7 @@ def _marker_guided_init(
 
 def _largest_remainder_round(values: np.ndarray, total: int) -> np.ndarray:
     """Round non-negative floats to integers summing to total."""
-    if total == 0:
-        return np.zeros_like(values, dtype=int)
-    prop_sum = values.sum()
-    if prop_sum > 0:
-        values = values / prop_sum
-    raw = values * total
-    floored = np.floor(raw).astype(int)
-    remainders = raw - floored
-    deficit = total - floored.sum()
-    if deficit > 0:
-        top_idx = np.argsort(-remainders)[:deficit]
-        floored[top_idx] += 1
-    return floored
+    return round_counts_largest_remainder(np.asarray(values, dtype=float), int(total))
 
 
 def integerize_spot_type_gex(

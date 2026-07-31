@@ -73,16 +73,11 @@ _EXPORTS = {
     "JointProgram": (".programs.anchored_program_discovery", "JointProgram"),
     "JointDiscoveryResult": (".programs.anchored_program_discovery", "JointDiscoveryResult"),
     "discover_joint_programs": (".programs.anchored_program_discovery", "discover_joint_programs"),
-    # Module 3b: Single-cell resolution
+    # Single-cell resolution: morphology features, GEX projection, AnnData output
     "extract_nucleus_features": (".morphology.morphology_features", "extract_nucleus_features"),
     "extract_cell_features": (".morphology.morphology_features", "extract_cell_features"),
     "largest_remainder_discretize": (".morphology.morphology_features", "largest_remainder_discretize"),
     "SoftLabelClassifier": (".morphology.soft_label_classifier", "SoftLabelClassifier"),
-    "assign_nuclei_to_types": (".assignment.hungarian_assignment", "assign_nuclei_to_types"),
-    "run_nucleus_assignment": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment"),
-    "run_nucleus_assignment_mil": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment_mil"),
-    "run_nucleus_assignment_mil_em": (".assignment.module3b_nucleus_assignment", "run_nucleus_assignment_mil_em"),
-    "NucleusAssignmentResult": (".assignment.module3b_nucleus_assignment", "NucleusAssignmentResult"),
     "distribute_gex_to_cells": (".gex.cell_level_gex", "distribute_gex_to_cells"),
     "allocate_gex_type_reference": (".gex.cell_level_gex", "allocate_gex_type_reference"),
     "project_sace_to_cells": (".gex.sace_gex", "project_sace_to_cells"),
@@ -97,11 +92,6 @@ _EXPORTS = {
     "should_enrich_single_cell_output": (".annotation.module3_5_projection", "should_enrich_single_cell_output"),
     "normalized_validated_pairs": (".annotation.module3_5_projection", "normalized_validated_pairs"),
     # Per-cell GEX pipeline components
-    "MarkerGenes": (".gex.gex_modules", "MarkerGenes"),
-    "GeneModule": (".gex.gex_modules", "GeneModule"),
-    "GeneModules": (".gex.gex_modules", "GeneModules"),
-    "discover_marker_genes": (".gex.gex_modules", "discover_marker_genes"),
-    "build_gene_modules": (".gex.gex_modules", "build_gene_modules"),
     "IdentifiabilityReport": (".annotation.subtype_splitting", "IdentifiabilityReport"),
     "audit_gate_identifiability": (".annotation.subtype_splitting", "audit_gate_identifiability"),
     "build_subtype_proportions": (".annotation.subtype_splitting", "build_subtype_proportions"),
@@ -127,14 +117,6 @@ _EXPORTS = {
     "build_marker_config": (".deconvolution.emission_init", "build_marker_config"),
     "initialize_beta_matrix": (".deconvolution.emission_init", "initialize_beta_matrix"),
     "build_beta_prior_sigma": (".deconvolution.emission_init", "build_beta_prior_sigma"),
-    # Vision/SSL backbone
-    "MorphologyBackbone": (".morphology.morphology_backbone", "MorphologyBackbone"),
-    "DAPIBackbone": (".morphology.morphology_backbone", "DAPIBackbone"),
-    "HEBackbone": (".morphology.morphology_backbone", "HEBackbone"),
-    "ViTFeatureExtractor": (".morphology.vit_extractor", "ViTFeatureExtractor"),
-    "load_uni_extractor": (".morphology.vit_extractor", "load_uni_extractor"),
-    "ViTEncoder": (".morphology.vit_encoder", "ViTEncoder"),
-    "create_vit_small": (".morphology.vit_encoder", "create_vit_small"),
 }
 
 __all__ = sorted(_EXPORTS)
@@ -150,8 +132,9 @@ def __getattr__(name: str) -> Any:
     except ImportError as exc:
         raise ImportError(
             f"Failed to import '{name}' from '{module_name}'. Install the optional "
-            "dependencies needed for that feature, or use `pip install -e .[dev]` "
-            "for the standard development environment."
+            "dependencies needed for that feature — e.g. for imaging/segmentation support, "
+            'run `pip install -e ".[imaging]"` from a cloned repo (CITEgeist is not yet on '
+            'PyPI; once published, `pip install "citegeist[imaging]"` will also work).'
         ) from exc
 
     value = getattr(module, attr_name)

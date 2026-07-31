@@ -1,8 +1,17 @@
 #!/usr/bin/env bash
 # sync_to_main.sh — Copy allowlisted paths from dev to main, remove excluded paths.
-# Usage: ./scripts/sync_to_main.sh [--simulate|--dry-run]
-#   --simulate  safe read-only audit of the would-ship public tree (no branch mutation)
-#   --dry-run   deprecated alias for --simulate
+#
+# MAINTAINERS ONLY: this is the Lee/Oesterreich lab's public-mirror tool. It publishes
+# the curated public subset of the private development repository to the public GitHub
+# mirror; it is not part of the CITEgeist analysis workflow and end users never run it.
+#
+# Usage: ./scripts/sync_to_main.sh [--simulate|--dry-run] [--expected-tree SHA]
+#   --simulate       safe read-only audit of the would-ship public tree (no branch mutation);
+#                     does NOT require --expected-tree
+#   --dry-run        deprecated alias for --simulate
+#   --expected-tree  REQUIRED for the real (mutating) sync — abort unless the staged public
+#                     tree matches this frozen tree_sha. Absent -> exit 5. This is the last
+#                     gate before a public push and does not apply to --simulate.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
@@ -13,6 +22,36 @@ for _arg in "$@"; do
   [[ "$_arg" == "--dry-run"  ]] && DRY_RUN=true
   [[ "$_arg" == "--simulate" ]] && SIMULATE=true
 done
+
+EXPECTED_TREE=""
+_expected_tree_flag_seen=false
+_prev=""
+for _arg in "$@"; do
+  if [[ "$_prev" == "--expected-tree" ]]; then
+    EXPECTED_TREE="$_arg"
+  elif [[ "$_arg" == "--expected-tree" ]]; then
+    _expected_tree_flag_seen=true
+  elif [[ "$_arg" == --expected-tree=* ]]; then
+    EXPECTED_TREE="${_arg#*=}"
+    _expected_tree_flag_seen=true
+  elif [[ "$_arg" == --expected* ]]; then
+    echo "ERROR: unrecognized flag '$_arg' (did you mean --expected-tree?)" >&2
+    exit 4
+  fi
+  _prev="$_arg"
+done
+# A caller who believes they pinned the tree must not get an unpinned publish:
+# a flag that appeared but never captured a value (trailing flag, explicit
+# empty value, or bare `--expected-tree=`) is a hard error, not a warning —
+# that warning path is reserved for the flag being ABSENT entirely.
+if $_expected_tree_flag_seen && [[ -z "$EXPECTED_TREE" ]]; then
+  echo "ERROR: --expected-tree given without a value" >&2
+  exit 4
+fi
+if [[ -n "$EXPECTED_TREE" ]] && [[ ! "$EXPECTED_TREE" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "ERROR: --expected-tree value '$EXPECTED_TREE' is not a 40-char lowercase hex SHA" >&2
+  exit 4
+fi
 
 # ── Safe read-only simulation (MUST come before any working-tree mutation) ──
 # --dry-run is a deprecated alias for --simulate: routes to the safe read-only
@@ -83,9 +122,6 @@ ALLOWLIST=(
   "docs/CITEgeist/"
   "docs/Benchmarking/"
   "docs/installation.md"
-  "docs/analysis/"
-  "docs/detection_estimation_algorithm.md"
-  "docs/detection_post_filtering.md"
   "docs/quickstart_real_visium.md"
   "docs/source/"
   "CITEgeist_env.yml"
@@ -96,6 +132,7 @@ ALLOWLIST=(
   "CONTRIBUTING.md"
   "LICENSE"
   "pyproject.toml"
+  "MANIFEST.in"
   "pytest.ini"
   "requirements.txt"
   "requirements-dev.txt"
@@ -180,6 +217,10 @@ EXCLUDELIST=(
   "docs/diagram.md"
   "docs/mdk_evidence_ledger.md"
   "docs/module-1-2-leiden-comparison.md"
+  # Archived Gurobi-IQP / NB dead-end design docs — cite removed files, would demand gurobipy; internal-only (Tier 2)
+  "docs/detection_estimation_algorithm.md"
+  "docs/detection_post_filtering.md"
+  "docs/analysis/"
   "Benchmarking/"
   "midkine/"
   "repro/"
@@ -187,7 +228,7 @@ EXCLUDELIST=(
   "docs/codebase_index.md"
   "docs/codebase_index_summary.md"
   "docs/core_scripts/"
-  "CITEgeist/examples/"
+  "CITEgeist/examples/_archive/"
   "CITEgeist/slurm/"
   "examples/slurm/"
   "examples/_archive/"
@@ -202,19 +243,27 @@ EXCLUDELIST=(
   "tests/test_v34_manuscript.py"
   "tests/test_v34_comment_restoration.py"
   "tests/test_manuscript_data.py"
+  "tests/test_build_manuscript_preserve_cache.py"  # manuscript-data-build cache test (references manuscript/data/)
   "tests/test_validate_docx_package.py"
   "tests/test_swap_docx_media.py"
+  "tests/test_migrate_drop_ids.py"  # docx comment-migration test (references manuscript/ fixture docx)
+  "tests/test_zotero_uri_stabilize.py"  # tests manuscript/zotero_uri_stabilize.py
+  "tests/test_renumber_supplementary.py"  # imports the excluded scripts/ renumberer + references manuscript/
+  "tests/test_edit_comment_text.py"  # references manuscript/ via path-joined (non-literal) fixture path — audit's string scan can't see it
   "tests/test_smoke_benchmark_outputs.py"
   "tests/test_integrate_summary.py"
   "tests/test_if_analysis.py"
   "tests/test_elisa_analysis.py"
+  "tests/test_bulk_rna_interaction.py"  # imports the excluded midkine/ tree — errors on a clean public clone (Tier 2)
   "tests/test_compute_gex_rmse_sd_ratio.py"
   "tests/test_panel_label_role.py"
+  "tests/test_module2b_relaxed.py"  # path-joined dependency on the excluded Benchmarking/ tree — invisible to the string scan
   "tests/sbatch_module2c_slow.sh"
   "tests/sbatch_test_sweep.sh"
   "docs/source/notebooks/"         # patient vignette notebooks with private /bgfs paths + executed outputs
   "tests/test_v22_regressions.py"  # manuscript-regression test referencing private patient data
   "tests/test_smoke_patient_pipeline.py"  # private-patient-data integration test
+  "tests/manuscript_contracts/"  # manuscript placeholder-resolution contracts (references excluded manuscript/ tree)
   "docs/CITEgeist/REPRODUCIBILITY.md"    # references removed repro/ hub
   "examples/sample_paths.txt"      # bare patient specimen-ID list
   "output/"
@@ -254,11 +303,16 @@ echo "=== Auditing staged public tree ==="
 AUDIT_DIR=$(mktemp -d)
 git show dev:scripts/audit_public_tree.py > "${AUDIT_DIR}/audit_public_tree.py"
 git show dev:scripts/sync_to_main.sh       > "${AUDIT_DIR}/sync_to_main.sh"
+# The claims policy also lives only on `dev` (docs/readiness/ is not
+# allowlisted) — materialize it the same way, or the auditor's default
+# CWD-relative lookup 404s once we're on `main` post-checkout.
+git show dev:docs/readiness/public_claims_policy.yaml > "${AUDIT_DIR}/public_claims_policy.yaml"
 # HEAD is still the last main commit; audit the WORKING TREE + index instead.
 # Stage everything so git ls-tree of a temp tree reflects what will be committed:
 AUDIT_TREE=$(git write-tree)
 if ! python "${AUDIT_DIR}/audit_public_tree.py" \
-      --ref "$AUDIT_TREE" --allow-from "${AUDIT_DIR}/sync_to_main.sh"; then
+      --ref "$AUDIT_TREE" --allow-from "${AUDIT_DIR}/sync_to_main.sh" \
+      --policy "${AUDIT_DIR}/public_claims_policy.yaml"; then
   echo "AUDIT FAILED — staged tree has leakage/management violations (see above)." >&2
   echo "Reverting to dev." >&2
   rm -rf "${AUDIT_DIR}"
@@ -267,6 +321,26 @@ if ! python "${AUDIT_DIR}/audit_public_tree.py" \
 fi
 rm -rf "${AUDIT_DIR}"
 echo "Audit clean."
+
+# ── Drift guard: refuse to publish a tree that was never audited ──────────
+# Refs can move between the audit run and this invocation. AUDIT_TREE is the
+# staged result computed above; if it differs from the tree the auditor
+# actually reviewed, abort rather than publish untested content.
+if [[ -n "$EXPECTED_TREE" ]]; then
+  if [[ "$AUDIT_TREE" != "$EXPECTED_TREE" ]]; then
+    echo "ERROR: staged tree $AUDIT_TREE != audited tree $EXPECTED_TREE" >&2
+    echo "       Refs moved since the audit. Re-run the audit; do NOT push." >&2
+    revert_and_return_to_dev
+    exit 3
+  fi
+  echo "Tree matches audited freeze ($EXPECTED_TREE)."
+else
+  echo "ERROR: --expected-tree is required — refusing to publish an unpinned tree." >&2
+  echo "       This is the last gate before a public push; run --simulate to compute" >&2
+  echo "       the tree_sha, then re-run with --expected-tree <sha>." >&2
+  revert_and_return_to_dev
+  exit 5
+fi
 
 # ── Confirm + commit + push ───────────────────────────────────────────────
 read -p "Proceed with commit and push to origin main? [y/N] " -n 1 -r

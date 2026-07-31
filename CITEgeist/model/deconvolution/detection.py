@@ -128,7 +128,6 @@ def detect_cell_types(
         try:
             gmm.fit(marker_data)
         except (ValueError, RuntimeError) as e:
-
             logger.warning("GMM fit failed for %s: %s. Marking all as not detected.", cell_type, e)
             continue
 

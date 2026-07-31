@@ -26,6 +26,8 @@ from CITEgeist.model.discovery.spatial_colocalization import (
     _compute_neighbor_enrichment,
 )
 
+pytestmark = pytest.mark.unit
+
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO)
 
@@ -176,6 +178,7 @@ class TestColocalizationSimulatedData:
         assert len(df) == len(result.pairs)
         assert "colocalization_score" in df.columns
 
+    @pytest.mark.slow
     def test_same_celltype_markers_colocalize(self, simulated_cite_data):
         """Markers from the same cell type should colocalize."""
         # Get pairs of markers from same cell type

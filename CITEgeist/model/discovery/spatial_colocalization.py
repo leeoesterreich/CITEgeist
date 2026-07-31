@@ -212,7 +212,6 @@ def _compute_correlation(
         p_value = max(p_pearson, p_spearman)
         return float(pearson_r), float(spearman_rho), float(p_value)
     except (ValueError, RuntimeError):
-
         return 0.0, 0.0, 1.0
 
 
@@ -1166,7 +1165,6 @@ def _compute_nmf_weights(
         return weights
 
     except (ValueError, RuntimeError) as e:
-
         logger.warning("NMF failed at node %s: %s", node.node_id, e)
         # Fallback: equal weights
         weights = {}
@@ -1305,7 +1303,6 @@ def _find_gap_threshold_gmm(
                 best_gmm = gmm
                 best_k = k
         except (ValueError, RuntimeError):
-
             continue
 
     if best_gmm is None or best_k == 1:
@@ -1392,7 +1389,6 @@ def _split_dendrogram_by_gaps(
     try:
         clusters = fcluster(linkage_matrix, t=cut_distance, criterion="distance")
     except (ValueError, RuntimeError, TypeError):
-
         return [markers]
 
     # Group markers by cluster
@@ -1488,7 +1484,6 @@ def _dynamic_tree_cut(
                 # Would create singletons - keep as single cluster
                 return np.zeros(n_markers, dtype=int)
         except (ValueError, RuntimeError, TypeError):
-
             return np.zeros(n_markers, dtype=int)
 
     # For larger lineages (6+ markers), use adaptive GMM-based method
@@ -1507,7 +1502,6 @@ def _dynamic_tree_cut(
             clusters = fcluster(linkage_matrix, t=cut_distance, criterion="distance")
             return clusters
         except (ValueError, RuntimeError):
-
             pass
 
     # Fallback for large lineages: use inconsistency-based method
@@ -1543,7 +1537,6 @@ def _dynamic_tree_cut(
         clusters = fcluster(linkage_matrix, t=best_t, criterion="inconsistent", depth=2)
         return clusters
     except (ValueError, RuntimeError, TypeError):
-
         # Ultimate fallback - keep as single cluster
         return np.zeros(n_markers, dtype=int)
 
@@ -1982,7 +1975,6 @@ def _compute_spatial_variance_explained(
         W = LibPySAL_KNN.from_array(coords, k=neighbor_k)
         W.transform = "r"  # Row-standardize
     except (ImportError, OSError) as e:
-
         logger.warning("Could not build spatial weights: %s", e)
         return 0.0
 
@@ -1996,7 +1988,6 @@ def _compute_spatial_variance_explained(
             mi = Moran(col, W)
             total_spatial_var += np.var(col) * abs(mi.I)
         except (ValueError, RuntimeError):
-
             continue
 
     if total_spatial_var < 1e-10:
@@ -2012,7 +2003,6 @@ def _compute_spatial_variance_explained(
             mi = Moran(activity, W)
             explained_var += np.var(activity) * abs(mi.I)
         except (ValueError, RuntimeError):
-
             continue
 
     return min(1.0, explained_var / total_spatial_var)
@@ -2047,7 +2037,6 @@ def _compute_proportion_smoothness(
         W = LibPySAL_KNN.from_array(coords, k=neighbor_k)
         W.transform = "r"
     except (ImportError, OSError):
-
         return 0.0
 
     morans = []
@@ -2059,7 +2048,6 @@ def _compute_proportion_smoothness(
             mi = Moran(activity, W)
             morans.append(mi.I)
         except (ImportError, OSError):
-
             continue
 
     return float(np.mean(morans)) if morans else 0.0
@@ -2490,7 +2478,6 @@ def _compute_final_reconstruction_error(
             error = np.mean((y - y_pred) ** 2)
             total_error += error
         except (ValueError, RuntimeError, TypeError):
-
             total_error += 1.0
 
     return total_error / max(len(all_markers), 1)

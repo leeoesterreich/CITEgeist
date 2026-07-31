@@ -39,7 +39,7 @@ The main analysis class for spatial transcriptomics deconvolution.
 **Core Analysis Methods**
 
 .. autoclass:: CITEgeist.model.citegeist_model.CitegeistModel
-   :members: compute_expression_prior, run_cell_expression_pass1, run_cell_proportion_model
+   :members: assign_cells, compute_expression_prior, run_cell_expression_pass1, run_cell_proportion_model, run_sace_allocation
    :noindex:
 
 **Results & Export**
@@ -142,10 +142,6 @@ Annotation (Module 3.5)
 
 Morphology
 ----------
-
-.. automodule:: CITEgeist.model.morphology.morphology_prior
-   :members:
-   :show-inheritance:
 
 .. automodule:: CITEgeist.model.morphology.segmentation
    :members:

@@ -19,6 +19,8 @@ import pytest
 
 from CITEgeist.model import identify_interesting_markers
 
+pytestmark = pytest.mark.unit
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 

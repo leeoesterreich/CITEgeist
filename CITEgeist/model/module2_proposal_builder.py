@@ -1,3 +1,6 @@
+"""Module 2 proposal builder: rank candidate cell-type profiles into Module 3 (lineage)
+and Module 3.5 (functional-marker) candidate tables for review."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -7,6 +10,15 @@ import pandas as pd
 
 @dataclass(frozen=True)
 class MarkerRoleConfig:
+    """Marker role assignments used to rank profiles.
+
+    Attributes:
+        lineage_anchors: marker -> parent cell-type name (lineage discriminators).
+        functional_markers: markers treated as functional (Module 3.5) signals.
+        ambiguous_markers: markers that penalize a profile's rank score.
+        excluded_markers: markers dropped from every profile before ranking.
+    """
+
     lineage_anchors: dict[str, str]
     functional_markers: set[str]
     ambiguous_markers: set[str]
@@ -25,6 +37,18 @@ def build_candidate_rank_lists(
     role_config: MarkerRoleConfig,
     ontology_name: str,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Rank profiles into Module 3 and Module 3.5 candidate tables.
+
+    Args:
+        profiles: list of profile dicts with keys ``profile_id``, ``markers``, ``selection_score``.
+        role_config: MarkerRoleConfig assigning lineage/functional/ambiguous/excluded roles.
+        ontology_name: label stamped onto every emitted row.
+
+    Returns:
+        (module3_df, module3_5_df): two DataFrames sorted by descending rank_score;
+        module3_df has one row per profile with a lineage anchor, module3_5_df has one
+        row per (profile, functional marker) pair.
+    """
     module3_rows: list[dict[str, object]] = []
     module3_5_rows: list[dict[str, object]] = []
 

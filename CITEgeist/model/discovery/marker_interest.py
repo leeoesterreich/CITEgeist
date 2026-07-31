@@ -173,7 +173,6 @@ def _fit_gmm_per_marker(
             signal_masks[:, m] = posteriors[:, signal_idx] > 0.5
 
         except (ValueError, RuntimeError) as e:
-
             logging.debug("GMM fitting failed for marker %s: %s", m, e)
             snr_values[m] = 0.0
             signal_fractions[m] = 0.0
@@ -378,7 +377,6 @@ def _fit_kurtosis_gmm(
         return float(learned_threshold), passed_kurtosis
 
     except (ValueError, RuntimeError) as e:
-
         logging.warning("Kurtosis GMM fitting failed: %s, falling back to threshold=2.0", e)
         return 2.0, kurtosis_values >= 2.0
 
@@ -461,7 +459,6 @@ def _fit_morans_gmm(
         return float(learned_threshold), passed_morans
 
     except (ValueError, RuntimeError) as e:
-
         logging.warning("Moran's I GMM fitting failed: %s, falling back to threshold=0.1", e)
         return 0.1, morans_values >= 0.1
 

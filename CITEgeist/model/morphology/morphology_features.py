@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from skimage.measure import regionprops_table
 
+from ..assignment.cellularity_utils import round_counts_largest_remainder
+
 
 def extract_nucleus_features(mask: np.ndarray) -> pd.DataFrame:
     """
@@ -216,26 +218,4 @@ def largest_remainder_discretize(proportions: np.ndarray, n_total: int) -> np.nd
     """
     if n_total == 0:
         return np.zeros(len(proportions), dtype=int)
-
-    # Scale proportions to target total
-    scaled = proportions * n_total
-
-    # Take floor as initial allocation
-    counts = np.floor(scaled).astype(int)
-
-    # Compute remainders
-    remainders = scaled - counts
-
-    # Number of additional units to allocate
-    n_remaining = n_total - counts.sum()
-
-    # Allocate to types with largest remainders
-    if n_remaining > 0:
-        # Get indices sorted by remainder (descending)
-        indices = np.argsort(-remainders)
-        n_types = len(proportions)
-        # Give one extra count to top n_remaining types (wrap around if needed)
-        for i in range(n_remaining):
-            counts[indices[i % n_types]] += 1
-
-    return counts
+    return round_counts_largest_remainder(proportions, n_total)

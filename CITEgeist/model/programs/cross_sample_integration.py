@@ -385,10 +385,7 @@ def load_multi_sample_results(
     sample_dirs: List[Path],
     module4_pattern: str = "*_module4*programs.csv",
     module4b_pattern: str = "*_module4b*relationships.csv",
-) -> Tuple[
-    Dict[str, AnchoredProgramDiscoveryResult],
-    Dict[str, BivariateProgramResult],
-]:
+) -> Tuple[Dict[str, AnchoredProgramDiscoveryResult], Dict[str, BivariateProgramResult],]:
     """
     Load Module 4 and 4b results from multiple sample directories.
 
@@ -469,7 +466,7 @@ def align_gene_sets(
     logger.info("Gene set alignment: %s genes across %s samples", len(all_genes), len(results_by_sample))
 
     # Create aligned W matrices
-    aligned_W = {}
+    aligned_W: Dict[Tuple[str, str], NDArray] = {}
     metadata_records = []
 
     for sample_name, result in results_by_sample.items():
@@ -708,7 +705,6 @@ def match_programs_across_samples(
         )
         labels = clustering.fit_predict(distance_matrix)
     except (ValueError, RuntimeError) as e:
-
         logger.warning("Clustering failed: %s. Using fallback method.", e)
         # Fallback: each program is its own cluster
         labels = np.arange(len(Z))

@@ -626,7 +626,7 @@ def estimate_true_expression_cell(
     cells_to_optimize = np.where(~unassigned_mask)[0]
 
     # Process cells in parallel
-    workers = max_workers if max_workers is not None else os.cpu_count()
+    workers = max_workers if max_workers is not None else (os.cpu_count() or 1)
 
     # Store worker data in module-level variable for pickling
     global _cell_pass2_worker_data
@@ -782,7 +782,6 @@ def _solve_single_cell_pass2(cell_idx: int):
         return cell_idx, result
 
     except (ValueError, RuntimeError) as e:
-
         logging.warning("Cell %s optimization failed: %s", cell_idx, e)
         return cell_idx, wd["X_obs"][cell_idx].copy()
 
@@ -1211,7 +1210,6 @@ def optimize_gene_expression(
                             )
                             spots_since_last_save = 0
                 except (OSError, ValueError) as e:
-
                     logging.error("Solve failed for spot %s: %s", spot_idx, e)
                     continue
 
@@ -1271,8 +1269,6 @@ def optimize_cell_proportions_per_marker(
     cellularity_sigma: float = 0.5,
     sparsity_mask: Optional[np.ndarray] = None,
     spot_weights: Optional[np.ndarray] = None,
-    morphology_prior: Optional[np.ndarray] = None,
-    lambda_morphology: float = 0.0,
     freeze_globals: bool = False,
     marker_weight: Optional[np.ndarray] = None,
     _confusion_pairs: Optional[List[Tuple[int, int]]] = None,
@@ -1500,16 +1496,6 @@ def optimize_cell_proportions_per_marker(
                 row_sum = sum(Y_vars[i, j] for j in range(T))
                 target_i = float(spot_abundance_target[i])
                 obj += lambda_abundance_prior * (row_sum - target_i) * (row_sum - target_i)
-
-        # Morphology prior penalty: λ_morph * ||Y - p_morph||²
-        # Expands to: λ*(Y² - 2*p_morph*Y) + const (const dropped)
-        if morphology_prior is not None and lambda_morphology > 0:
-            for i in range(N):
-                for j in range(T):
-                    pm_ij = float(morphology_prior[i, j])
-                    obj += lambda_morphology * Y_vars[i, j] * Y_vars[i, j]
-                    obj += lambda_morphology * (-2 * pm_ij) * Y_vars[i, j]
-            logging.info("Morphology prior penalty added (lambda=%.3f)", lambda_morphology)
 
         p.setObjective(obj)
 

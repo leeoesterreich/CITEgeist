@@ -1338,7 +1338,6 @@ def anchored_spatial_nmf(
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)  # Keep non-negative
         except (ImportError, OSError) as e:
-
             logger.debug("Spatial smoothing failed: %s. Using unsmoothed H.", e)
 
     # Compute reconstruction error
@@ -2201,7 +2200,6 @@ def contrastive_anchored_nmf(
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)
         except (ImportError, OSError) as e:
-
             logger.debug("Spatial smoothing failed: %s", e)
 
     # Reconstruction error (on original weighted data)
@@ -2543,7 +2541,6 @@ def _deconvolved_spatial_nmf(
                 H_smooth[:, k] = spsolve(smoothing_matrix.tocsc(), H[:, k])
             H = np.maximum(H_smooth, 0)
         except (ImportError, OSError) as e:
-
             logger.debug("Spatial smoothing failed: %s", e)
 
     # Compute reconstruction error

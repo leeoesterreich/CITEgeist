@@ -43,6 +43,8 @@ from CITEgeist.model import (
     save_integration_results,
 )
 
+pytestmark = pytest.mark.unit
+
 
 logging.basicConfig(
     level=logging.INFO,

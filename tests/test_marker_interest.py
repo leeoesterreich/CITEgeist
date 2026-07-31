@@ -25,6 +25,8 @@ from CITEgeist.model.discovery.marker_interest import (
     _compute_morans_i_batch,
 )
 
+pytestmark = pytest.mark.unit
+
 # Configure logging for tests
 logging.basicConfig(level=logging.INFO)
 

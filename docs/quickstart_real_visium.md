@@ -31,8 +31,8 @@ SpaceRanger output
           │ proportions CSV
           ▼
 ┌─────────────────────┐
-│ Module 3-post:      │  StarDist nuclei segmentation → ViT embeddings →
-│ Cell Assignment     │  Bayesian assignment → SACE per-cell GEX
+│ Module 3-post:      │  StarDist nuclei segmentation →
+│ Cell Assignment     │  Hungarian assignment → SACE per-cell GEX
 └─────────┬───────────┘
           │
           ▼
@@ -263,7 +263,7 @@ At this point you have spot-level deconvolution. Continue to Step 3 for single-c
 
 ## Step 3: Single-Cell Assignment + GEX (Module 3-post)
 
-This step segments individual nuclei from the H&E image, extracts morphology features, assigns each nucleus a cell type, and allocates gene expression per cell via SACE.
+This step segments individual nuclei from the H&E image, assigns each nucleus a cell type from the spot-level proportions (Hungarian matching), and allocates gene expression per cell via SACE.
 
 The production script is `examples/scripts/run_single_cell_assignment.py`, which handles this in stages. Below is the conceptual flow:
 
@@ -322,18 +322,7 @@ nuc_map.to_csv(OUTPUT_DIR / "nucleus_spot_mapping.csv", index=False)
 del fullres_img
 
 # =========================================================================
-# Stage 2: ViT-Small morphology embeddings (one patch per nucleus)
-# =========================================================================
-# Uses vit_extractor.ViTFeatureExtractor + extract_patches_he utilities.
-# For each nucleus centroid, extracts a 224x224 H&E patch and embeds via
-# ViT-Small → 384-dim feature vector per nucleus.
-# Output: per-spot directories with embeddings.npy (N_nuclei_in_spot, 384)
-#
-# See examples/scripts/run_single_cell_assignment.py stage2_extract_features() for
-# the full implementation including batch processing and caching.
-
-# =========================================================================
-# Stage 3: Bayesian cell assignment + SACE GEX
+# Stage 2: Hungarian cell assignment + SACE GEX
 # =========================================================================
 # Load pre-computed Module 3 proportions
 prop_df = pd.read_csv(
@@ -363,32 +352,21 @@ nuclei_counts = nuc_map.groupby("spot_barcode")["nucleus_id"].count().reindex(
     prop_df.index, fill_value=0
 )
 
-# Assemble morphology embeddings (load from Stage 2 output)
-# ... (concatenate per-spot embeddings.npy, align to cell_ids order)
-morphology_embeddings = ...  # shape (N_nuclei, 384)
-
-# Bayesian assignment: proportions as prior, morphology as soft nudge
+# Hungarian assignment: discretize spot proportions into per-nucleus types.
+# (Bayesian mode is available via assignment_method="bayesian" only when a
+# per-nucleus (C, n_types) morphology-score array is passed as
+# morph_scores_precomputed; the post-E3 build ships no score producer.)
 assignments_df = model.assign_cells(
     nuclei_counts=nuclei_counts,
     cell_to_spot=cell_to_spot,
     cell_ids=cell_ids,
-    morphology_embeddings=morphology_embeddings,
-    morphology_weight=0.5,
-    assignment_method="bayesian",  # Falls back to "hungarian" without embeddings
+    assignment_method="hungarian",
     detection_mask=np.ones((len(prop_df), len(prop_df.columns)), dtype=bool),
 )
 
-# SACE per-cell GEX allocation (Poisson-multinomial EM, 1 iteration)
-cell_assignments_dict = dict(zip(
-    assignments_df["cell_id"].astype(str),
-    assignments_df["assigned_type"],
-))
-cell_spot_map = nuc_map.rename(columns={
-    "nucleus_id": "cell_id", "centroid_x": "x", "centroid_y": "y",
-})
-cell_spot_map["cell_id"] = cell_spot_map["cell_id"].astype(str)
-
-# Single-cell mode auto-runs StarDist + assignment + SACE projection
+# SACE per-cell GEX allocation. output_mode="single_cell" auto-orchestrates
+# StarDist + assignment + SACE projection behind an H&E resolution gate
+# (requires <=1.0 um/px), so the assign_cells call above is illustrative.
 spot_type_gex, cell_adata, _ = model.run_sace_allocation(
     output_mode="single_cell",
 )
@@ -401,7 +379,7 @@ print(f"Cell types: {cell_adata.obs['cell_type'].value_counts().to_dict()}")
 
 > **In practice**, use the production script directly:
 > ```bash
-> python examples/scripts/run_single_cell_assignment.py --sample sample_P1_S1 --stages 1,2,5
+> python examples/scripts/run_single_cell_assignment.py --sample sample_P1_S1 --stages 1,5,6
 > ```
 > It handles all the data loading, alignment, and edge cases (NaN coords, missing embeddings, image fallbacks, etc.).
 
@@ -445,7 +423,7 @@ python ../examples/scripts/run_module3_unified.py --sample sample_P1_S1 \
 
 # Step 3: Single-cell assignment + GEX
 python ../examples/scripts/run_single_cell_assignment.py --sample sample_P1_S1 \
-    --stages 1,2,5
+    --stages 1,5,6
 ```
 
 For GPU jobs on CRC, use `gpu-race-submit.sh` instead of direct `sbatch` to race across available GPU partitions.
@@ -459,9 +437,8 @@ For GPU jobs on CRC, use `gpu-race-submit.sh` instead of direct `sbatch` to race
 | `min_counts` | 100 | Lower to 25 for surgical/low-depth samples |
 | `method` | `"qp"` | Only option for production (cuOPT) |
 | `use_gex_detection` | `True` | Disable if antibody panel is very sparse |
-| `assignment_method` | `"bayesian"` | Fall back to `"hungarian"` if no H&E available |
+| `assignment_method` | `"hungarian"` | Use `"bayesian"` only with precomputed per-nucleus morphology scores |
 | `max_iter` (SACE) | `1` | Do not increase — EM overfits beyond iteration 1 |
-| `morphology_weight` | `0.5` | Increase if morphology is highly informative for your tissue |
 
 ---
 

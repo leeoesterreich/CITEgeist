@@ -10,8 +10,8 @@ model/
 ├── utils.py                    # Shared utilities (logging, I/O, memory)
 ├── checkpoints.py              # Checkpoint manager
 ├── unified_config.py           # Pipeline configuration constants
+├── marker_utils.py             # Antibody marker-name utilities
 ├── module2_proposal_builder.py # M2 profile proposal construction
-├── proposal_review_loader.py   # Proposal review result loader
 │
 ├── discovery/                  # M1 + M2: Marker scoring & profile building
 │   ├── marker_interest.py      #   Kurtosis, GMM SNR, Moran's I
@@ -21,13 +21,10 @@ model/
 │   ├── qp_solver.py            #   QP-based cell proportion solver (production)
 │   ├── detection.py            #   GMM-based detection gating
 │   ├── detection_refinement.py #   GEX-informed detection fusion
-│   ├── emission_init.py        #   Marker config, beta init
-│   └── reference_model.py      #   Optional NB reference refinement
+│   └── emission_init.py        #   Marker config, beta init
 │
 ├── assignment/                 # M3-post: Spot → cell resolution
 │   ├── cell_assignment.py      #   Bayesian/Hungarian assignment (production)
-│   ├── hungarian_assignment.py #   Cost-matrix solver
-│   ├── module3b_nucleus_assignment.py
 │   ├── cellularity_utils.py    #   Cellularity scaling helpers
 │   └── single_cell_output.py   #   AnnData assembly
 │
@@ -55,17 +52,12 @@ model/
 │   ├── report.py              #   QC report generation
 │   └── single_cell_qc.py     #   Single-cell QC
 │
-├── morphology/                 # Vision, segmentation, SSL
+├── morphology/                 # StarDist segmentation & non-DL morphology
 │   ├── segmentation.py         #   StarDist patchwise (production)
-│   ├── morphology_backbone.py  #   DAPI/HE backbone wrappers
+│   ├── segmentation_qc.py      #   Segmentation QC report
 │   ├── morphology_features.py  #   Nucleus/cell feature extraction
-│   ├── morphology_prior.py     #   LLP morphology prior
-│   ├── patch_extraction.py     #   Image patch extraction
-│   ├── prototype_contrastive.py #  Prototype-contrastive LLP
-│   ├── simclr.py               #   SimCLR training backbone
-│   ├── soft_label_classifier.py
-│   ├── vit_encoder.py          #   ViT-Small encoder
-│   └── vit_extractor.py        #   ViT feature extraction (UNI)
+│   ├── nucleus_scores.py       #   Non-DL morphology scores (regionprops)
+│   └── soft_label_classifier.py
 │
 └── _archive/                   # Dead-end experiments (git-excluded)
 ```

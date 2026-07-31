@@ -16,12 +16,10 @@ This test suite provides extensive coverage of CITEgeist functionality including
 tests/
 ├── conftest.py                    # Shared fixtures and configuration
 ├── fixtures/                      # Test data fixtures
-├── test_figures/                  # Figure generation tests
 ├── test_qc/                       # QC module tests
-├── benchmarking/                  # Benchmark-specific tests
 ├── test_model.py                  # Core model tests
 ├── test_integration.py            # Full pipeline integration tests
-├── test_cuopt_qp.py               # cuOPT QP solver tests
+├── test_qp_solver.py              # cuOPT QP solver tests
 ├── test_cell_assignment.py        # Cell assignment tests
 ├── test_functional_annotation.py  # M3.5 annotation tests
 ├── test_detection.py              # Detection tests
@@ -32,7 +30,7 @@ tests/
 ├── test_module2c_profile_selection.py  # M2c profile selection tests
 ├── test_anchored_programs.py      # M4 program tests
 ├── test_cross_sample_integration.py    # M5 integration tests
-├── ... (44 test files total)
+├── ... (53 test files total)
 └── README.md
 ```
 
@@ -151,7 +149,7 @@ def test_full_pipeline(temp_output_dir, sample_name, mock_gex_adata,
 
 Target coverage thresholds:
 
-- **Overall**: ≥ 60% (enforced in CI)
+- **Overall**: ≥ 15% (enforced in CI via ``--cov-fail-under=15``)
 - **Utils module**: ≥ 80%
 - **Checkpoints module**: ≥ 85%
 - **Model module**: ≥ 70%
@@ -168,7 +166,7 @@ CI workflow:
 2. Runs integration tests
 3. Generates coverage report
 4. Uploads coverage to Codecov
-5. Fails if coverage drops below 60%
+5. Fails if coverage drops below 15%
 
 ## Test Data
 

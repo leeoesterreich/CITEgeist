@@ -81,3 +81,13 @@ class TestOutputModeLayers:
                 model,
                 output_mode="layers",
             )
+
+
+def test_use_morphology_defaults_to_true():
+    """SACE single-cell defaults to morphology-informed Bayesian assignment."""
+    import inspect
+
+    from CITEgeist.model.citegeist_model import CitegeistModel
+
+    sig = inspect.signature(CitegeistModel.run_sace_allocation)
+    assert sig.parameters["use_morphology"].default is True

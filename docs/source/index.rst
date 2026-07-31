@@ -18,7 +18,6 @@ CITEgeist is a computational framework for spatial transcriptomics analysis that
 
    tutorial
    examples
-   notebooks
 
 .. toctree::
    :maxdepth: 2

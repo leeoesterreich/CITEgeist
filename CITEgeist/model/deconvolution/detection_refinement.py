@@ -175,7 +175,6 @@ def detect_cell_types_gex(
         try:
             gmm.fit(score.reshape(-1, 1))
         except (ValueError, RuntimeError) as e:
-
             logger.warning("GMM fit failed for %s: %s. All-True fallback.", type_names[t], e)
             continue
 

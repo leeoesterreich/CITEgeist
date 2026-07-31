@@ -104,8 +104,10 @@ class StarDistSegmenter:
             from stardist.models import StarDist2D  # noqa: F401  # pylint: disable=import-outside-toplevel
         except ImportError as exc:
             raise ImportError(
-                "StarDist is required for segmentation. Install with "
-                '`pip install stardist csbdeep` or `pip install "citegeist[imaging]"`.'
+                "StarDist is required for segmentation. Install directly with "
+                "`pip install stardist csbdeep`, or via the `imaging` extra: "
+                '`pip install -e ".[imaging]"` from a cloned repo (CITEgeist is not yet on '
+                'PyPI; once published, `pip install "citegeist[imaging]"` will also work).'
             ) from exc
 
         model_name = self.MODELS[modality]

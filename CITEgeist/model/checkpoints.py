@@ -45,7 +45,6 @@ class CheckpointManager:
                     if profiles.shape == (N, T, M):
                         return {i: profiles[i] for i in range(N)}
             except (OSError, ValueError) as e:
-
                 logging.error("Error loading complete file: %s", e)
                 self._cleanup_corrupted_files()
         return None
@@ -84,7 +83,6 @@ class CheckpointManager:
                     return completed_spots, spotwise_profiles
 
         except (OSError, ValueError) as e:
-
             logging.error("Error loading checkpoint: %s", e)
             self._cleanup_corrupted_files()
 
@@ -127,7 +125,6 @@ class CheckpointManager:
             logging.info("Saved checkpoint after %s completed spots", n_completed)
 
         except (OSError, ValueError) as e:
-
             logging.error("Failed to save checkpoint: %s", e)
 
     def save_final_results(
@@ -159,7 +156,6 @@ class CheckpointManager:
                 file.unlink()
                 logging.info("Deleted corrupted checkpoint: %s", file)
             except (OSError, ValueError) as e:
-
                 logging.warning("Failed to delete %s: %s", file, e)
 
     def _cleanup_old_checkpoints(self, current_checkpoint):
@@ -169,5 +165,4 @@ class CheckpointManager:
                 try:
                     checkpoint.unlink()
                 except (OSError, ValueError) as e:
-
                     logging.warning("Failed to delete old checkpoint %s: %s", checkpoint, e)

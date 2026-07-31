@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 import scanpy as sc
 
 # Add parent directory to path
@@ -42,6 +43,8 @@ from CITEgeist.model import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+pytestmark = pytest.mark.unit
 
 
 def test_anchored_programs_synthetic():
@@ -339,6 +342,7 @@ def test_deconvolved_layer_approach():
     return result
 
 
+@pytest.mark.slow
 def test_bivariate_program_relationships():
     """
     Test Module 4b: Bivariate Program Relationships.

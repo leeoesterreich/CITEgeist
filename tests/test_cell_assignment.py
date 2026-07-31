@@ -1,113 +1,16 @@
 """Tests for discrete cell assignment with morphology nudge."""
 
-import os
-import tempfile
-
 import numpy as np
 import pandas as pd
 import pytest
-import torch
 
 from CITEgeist.model.assignment.cell_assignment import (
     discretize_proportions,
     hungarian_assign_spot,
     assign_cells_to_types,
-    extract_embeddings,
-    fit_morphology_scores,
     assign_cells,
     bayesian_assign_cells,
 )
-from CITEgeist.model.morphology.prototype_contrastive import PrototypeContrastiveModel
-
-
-class TestPrototypeContrastiveEmbeddingsMode:
-    """Test that PrototypeContrastiveModel accepts precomputed embeddings."""
-
-    def test_from_embeddings_forward(self):
-        """Model with from_embeddings=True accepts (B, 384) tensors."""
-        model = PrototypeContrastiveModel(
-            num_types=6,
-            embed_dim=128,
-            from_embeddings=True,
-        )
-        model.eval()
-        embeddings = torch.randn(10, 384)
-        result = model(embeddings)
-        assert result["q_proto"].shape == (10, 6)
-        assert result["q_class"].shape == (10, 6)
-        assert result["z"].shape == (10, 128)
-
-    def test_from_embeddings_no_encoder(self):
-        """Model with from_embeddings=True should not have a ViT encoder."""
-        model = PrototypeContrastiveModel(
-            num_types=6,
-            embed_dim=128,
-            from_embeddings=True,
-        )
-        assert model.encoder is None
-
-    def test_from_embeddings_flag_stored(self):
-        """from_embeddings attribute is stored on the model."""
-        model = PrototypeContrastiveModel(
-            num_types=4,
-            embed_dim=64,
-            from_embeddings=True,
-        )
-        assert model.from_embeddings is True
-
-    def test_default_mode_has_encoder(self):
-        """Default model (from_embeddings=False) still has a ViT encoder."""
-        model = PrototypeContrastiveModel(
-            num_types=4,
-            embed_dim=64,
-            from_embeddings=False,
-        )
-        assert model.encoder is not None
-        assert model.from_embeddings is False
-
-    def test_freeze_encoder_noop_when_from_embeddings(self):
-        """freeze_encoder() is a no-op (no AttributeError) when from_embeddings=True."""
-        model = PrototypeContrastiveModel(
-            num_types=4,
-            embed_dim=64,
-            from_embeddings=True,
-        )
-        # Should not raise
-        model.freeze_encoder()
-
-    def test_unfreeze_last_n_blocks_noop_when_from_embeddings(self):
-        """unfreeze_last_n_blocks() is a no-op when from_embeddings=True."""
-        model = PrototypeContrastiveModel(
-            num_types=4,
-            embed_dim=64,
-            from_embeddings=True,
-        )
-        # Should not raise
-        model.unfreeze_last_n_blocks(2)
-
-    def test_output_probabilities_sum_to_one(self):
-        """Softmax outputs should sum to 1 across types."""
-        model = PrototypeContrastiveModel(
-            num_types=5,
-            embed_dim=64,
-            from_embeddings=True,
-        )
-        model.eval()
-        embeddings = torch.randn(8, 384)
-        result = model(embeddings)
-        # q_proto and q_class are softmax outputs — must sum to 1
-        torch.testing.assert_close(
-            result["q_proto"].sum(dim=-1),
-            torch.ones(8),
-            atol=1e-5,
-            rtol=1e-5,
-        )
-        torch.testing.assert_close(
-            result["q_class"].sum(dim=-1),
-            torch.ones(8),
-            atol=1e-5,
-            rtol=1e-5,
-        )
 
 
 class TestDiscretizeProportions:
@@ -341,95 +244,6 @@ class TestEdgeCases:
         assert (result["assigned_type"] == "T_Cell").sum() == 4
 
 
-class TestFitMorphologyScores:
-    """Test Stage 2: morphology scoring via prototype-contrastive LLP."""
-
-    def test_returns_correct_shape(self):
-        """Morphology scores are (C, T) probabilities."""
-        np.random.seed(42)
-        n_cells = 100
-        n_types = 4
-        embeddings = np.random.randn(n_cells, 384).astype(np.float32)
-        cell_to_spot = np.repeat(np.arange(10), 10)
-        oracle_props = np.random.dirichlet(np.ones(n_types), size=10).astype(np.float32)
-
-        scores = fit_morphology_scores(
-            embeddings=embeddings,
-            cell_to_spot=cell_to_spot,
-            oracle_props=oracle_props,
-            num_types=n_types,
-            n_epochs=5,  # minimal for test speed
-            device="cpu",
-        )
-
-        assert scores.shape == (n_cells, n_types)
-        # Probabilities sum to ~1 per cell
-        row_sums = scores.sum(axis=1)
-        np.testing.assert_allclose(row_sums, 1.0, atol=0.01)
-        # All non-negative
-        assert (scores >= 0).all()
-
-
-class TestExtractEmbeddings:
-    """Test embedding extraction from patches with caching."""
-
-    def test_extract_from_patches(self):
-        """Extracts (C, 384) embeddings from (C, 3, 96, 96) patches."""
-        np.random.seed(42)
-        patches = np.random.randn(10, 3, 96, 96).astype(np.float32)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            embeddings = extract_embeddings(
-                patches=patches,
-                encoder_checkpoint=None,
-                output_folder=tmpdir,
-                sample_name="test",
-                device="cpu",
-            )
-
-            assert embeddings.shape == (10, 384)
-            assert embeddings.dtype == np.float32
-
-    def test_caching(self):
-        """Second call loads from cache instead of re-extracting."""
-        np.random.seed(42)
-        patches = np.random.randn(5, 2, 96, 96).astype(np.float32)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            e1 = extract_embeddings(
-                patches=patches,
-                encoder_checkpoint=None,
-                output_folder=tmpdir,
-                sample_name="test",
-                device="cpu",
-            )
-            cache_files = [f for f in os.listdir(tmpdir) if f.startswith("morphology_embeddings_")]
-            assert len(cache_files) == 1
-
-            e2 = extract_embeddings(
-                patches=patches,
-                encoder_checkpoint=None,
-                output_folder=tmpdir,
-                sample_name="test",
-                device="cpu",
-            )
-            np.testing.assert_array_equal(e1, e2)
-
-    def test_rejects_invalid_patch_shape(self):
-        """Rejects patches that aren't (C, ch, 96, 96) with ch in {2, 3}."""
-        patches_bad_spatial = np.random.randn(5, 3, 224, 224).astype(np.float32)
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with pytest.raises(ValueError, match="96x96"):
-                extract_embeddings(
-                    patches=patches_bad_spatial,
-                    encoder_checkpoint=None,
-                    output_folder=tmpdir,
-                    sample_name="test",
-                    device="cpu",
-                )
-
-
 class TestAssignCellsFullPipeline:
     """Test the top-level assign_cells() orchestrator."""
 
@@ -460,59 +274,6 @@ class TestAssignCellsFullPipeline:
         spot0 = result[result["spot_id"] == "spot_0"]
         assert (spot0["assigned_type"] == "Cancer").sum() == 3
         assert (spot0["assigned_type"] == "T_Cell").sum() == 2
-
-    def test_with_morphology_embeddings(self):
-        """Full pipeline with morphology: discretize -> score -> assign."""
-        cell_prop = pd.DataFrame(
-            {"Cancer": [0.5], "T_Cell": [0.5]},
-            index=["spot_0"],
-        )
-        nuclei_counts = pd.Series([4], index=["spot_0"])
-        cell_to_spot = np.array([0, 0, 0, 0])
-        embeddings = np.random.randn(4, 384).astype(np.float32)
-
-        result = assign_cells(
-            cell_prop=cell_prop,
-            nuclei_counts=nuclei_counts,
-            cell_to_spot=cell_to_spot,
-            morphology_embeddings=embeddings,
-            morphology_weight=0.5,
-            n_morph_epochs=5,
-            device="cpu",
-        )
-
-        assert len(result) == 4
-        assert "assigned_type" in result.columns
-        # 2 Cancer + 2 T_Cell (0.5 * 4 = 2 each)
-        assert (result["assigned_type"] == "Cancer").sum() == 2
-        assert (result["assigned_type"] == "T_Cell").sum() == 2
-
-    def test_morphology_weight_zero_matches_no_morphology(self):
-        """morphology_weight=0 produces same result as no morphology."""
-        cell_prop = pd.DataFrame(
-            {"Cancer": [0.6], "T_Cell": [0.4]},
-            index=["spot_0"],
-        )
-        nuclei_counts = pd.Series([5], index=["spot_0"])
-        cell_to_spot = np.array([0, 0, 0, 0, 0])
-
-        r_no_morph = assign_cells(
-            cell_prop=cell_prop,
-            nuclei_counts=nuclei_counts,
-            cell_to_spot=cell_to_spot,
-        )
-
-        r_zero_weight = assign_cells(
-            cell_prop=cell_prop,
-            nuclei_counts=nuclei_counts,
-            cell_to_spot=cell_to_spot,
-            morphology_embeddings=np.random.randn(5, 384).astype(np.float32),
-            morphology_weight=0.0,
-            n_morph_epochs=5,
-            device="cpu",
-        )
-
-        assert list(r_no_morph["assigned_type"]) == list(r_zero_weight["assigned_type"])
 
     def test_validates_cell_to_spot_alignment(self):
         """Raises ValueError if cell_to_spot indices exceed cell_prop."""
@@ -835,7 +596,7 @@ class TestAssignCellsBayesianDispatch:
         cell_prop = pd.DataFrame({"A": [0.5]}, index=["spot_0"])
         mask = np.array([[True]])
 
-        with pytest.raises(ValueError, match="[Mm]orphology"):
+        with pytest.raises(ValueError, match="morph_scores_precomputed"):
             assign_cells(
                 cell_prop=cell_prop,
                 nuclei_counts=pd.Series([1], index=["spot_0"]),

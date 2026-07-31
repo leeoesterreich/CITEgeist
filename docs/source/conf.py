@@ -7,41 +7,41 @@ import os
 import sys
 
 # Add the project root to sys.path
-project_root = os.path.abspath('../../')
+project_root = os.path.abspath("../../")
 sys.path.insert(0, project_root)
-sys.path.insert(0, os.path.join(project_root, 'CITEgeist'))
-sys.path.insert(0, os.path.join(project_root, 'CITEgeist', 'model'))
+sys.path.insert(0, os.path.join(project_root, "CITEgeist"))
+sys.path.insert(0, os.path.join(project_root, "CITEgeist", "model"))
 
 
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = 'CITEgeist'
-copyright = '2025, Lee/Oesterreich Lab'
-author = 'Lee/Oesterreich Lab'
-release = '0.1.1'
-version = '0.1.1'
+project = "CITEgeist"
+copyright = "2025, Lee/Oesterreich Lab"
+author = "Lee/Oesterreich Lab"
+release = "2.0.0"
+version = "2.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon',
-    'sphinx.ext.viewcode',
-    'sphinx.ext.autosummary',
-    'sphinx.ext.intersphinx',
-    'sphinx.ext.mathjax',
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.mathjax",
 ]
 
-templates_path = ['_templates']
+templates_path = ["_templates"]
 exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
 
 html_theme_options = {
     "navigation_depth": 4,
@@ -75,4 +75,3 @@ napoleon_use_rtype = True
 napoleon_preprocess_types = False
 napoleon_type_aliases = None
 napoleon_attr_annotations = True
-

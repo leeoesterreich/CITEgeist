@@ -8,11 +8,27 @@ exclude = ["repro*", "figures*", "Benchmarking*", "manuscript*", "tests*"]
 
 [project]
 name = "citegeist"
-version = "0.1.1"
+version = "2.0.0"
 description = "Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "BSD-3-Clause"}
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "scanpy>=1.9.0",
+    "squidpy>=1.2.0",
+    "anndata>=0.8.0",
+    "scikit-learn>=1.0.0",
+    "scikit-image>=0.22.0",
+    "matplotlib>=3.5.0",
+    "networkx",
+    "tqdm>=4.62.0",
+    "joblib",
+    "esda",
+    "libpysal",
+]
 authors = [
     {name = "Alexander Chih-Chieh Chang", email = "leeav@upmc.edu"},
     {name = "Lee/Oesterreich Laboratory"},
@@ -25,7 +41,7 @@ keywords = [
     "single-cell",
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
@@ -35,7 +51,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/leeoesterreich/CITEgeist"
-Documentation = "https://github.com/leeoesterreich/CITEgeist"
+Documentation = "https://citegeist.readthedocs.io/"
 Repository = "https://github.com/leeoesterreich/CITEgeist"
 "Bug Tracker" = "https://github.com/leeoesterreich/CITEgeist/issues"
 
@@ -50,10 +66,7 @@ dev = [
     "pylint>=3.0",
     "pre-commit>=3.0",
 ]
-imaging = [
-    "stardist",
-    "scikit-image>=0.22.0",
-]
+imaging = ["stardist"]
 
 [tool.black]
 line-length = 120

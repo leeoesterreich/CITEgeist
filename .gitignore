@@ -297,3 +297,4 @@ manuscript/figures/midkine/outputs/
 # Persistent docx backups created by scripts/swap_docx_media.py (local-only)
 /manuscript/bak/
 /docs/figure_audit/renders/
+docs/handoffs/

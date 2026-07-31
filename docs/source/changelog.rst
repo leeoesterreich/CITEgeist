@@ -3,41 +3,42 @@ Changelog
 
 All notable changes to CITEgeist will be documented in this file.
 
-Version 1.0.0 (Unreleased)
---------------------------
+Version 2.0.0 (unreleased)
+---------------------------
 
-* Initial release of CITEgeist
-* Spatial transcriptomics deconvolution framework
-* Cell type proportion estimation
-* Gene expression profile deconvolution
-* Gurobi-based optimization
-* Comprehensive documentation
+CITEgeist is not yet published on PyPI (see :doc:`installation` for the source install). This
+section describes the state of the 2.0 codebase ahead of that release.
+
+* Production stack: **cuOPT QP** for cell-type proportion estimation (Module 3) +
+  **SACE GEX** for per-cell gene-expression deconvolution (Module 3-GEX)
+* Requires Python 3.10+ and an NVIDIA GPU with CUDA for the QP solver (no CPU fallback)
+* Runtime dependencies are now fully declared in ``pyproject.toml``
+* The installed distribution will be named ``citegeist`` (lowercase); the importable package is ``CITEgeist``
 
 Features
 ~~~~~~~~
 
-* **CitegeistModel**: Main class for spatial transcriptomics analysis
-* **Cell Proportion Optimization**: Estimate cell type proportions using antibody capture data
-* **Gene Expression Deconvolution**: Estimate cell-type-specific gene expression profiles
-* **Spatial Regularization**: Incorporate spatial neighborhood information
-* **Checkpointing**: Save and resume long-running optimization processes
-* **Parallel Processing**: Multi-core optimization support
+* **CitegeistModel**: Main class orchestrating all modules (Modules 1–5)
+* **Cell Proportion Optimization**: GPU-accelerated QP deconvolution via cuOPT
+* **SACE GEX Deconvolution**: Single-pass Poisson-multinomial per-cell GEX allocation
+* **Per-cell Type Assignment**: StarDist nuclei segmentation + Hungarian matching from spot proportions (optional Bayesian assignment when morphology scores are precomputed)
+* **Spatial Gene Program Discovery**: NMF-based programs with bivariate Moran's I
+* **Cross-sample Integration**: Harmony-style program alignment across specimens
 
 API Reference
 ~~~~~~~~~~~~~
 
-* `citegeist_model.CitegeistModel`: Main model class
-* `gurobi_impl`: Core optimization functions
-* `utils`: Helper functions and utilities
-* `checkpoints.CheckpointManager`: Checkpoint management
+* ``CITEgeist.CitegeistModel``: Top-level model class (lazy re-export)
+* ``CITEgeist.model.citegeist_model.CitegeistModel``: Full import path
+* ``CITEgeist.model.deconvolution.qp_solver``: cuOPT QP solver (GPU required)
+* ``CITEgeist.model.gex.sace_gex``: SACE GEX deconvolution
+* ``CITEgeist.model.assignment.cell_assignment``: Per-cell type assignment
 
 Dependencies
 ~~~~~~~~~~~~
 
-* Python 3.7+
-* numpy
-* pandas
-* scanpy
-* scipy
-* pyarrow
-* gurobipy (requires Gurobi license)
+* Python 3.10+
+* numpy, pandas, scipy, scanpy, squidpy, anndata
+* scikit-learn, scikit-image, matplotlib, networkx, tqdm, joblib
+* esda, libpysal
+* cuOPT (NVIDIA RAPIDS/NGC — not on PyPI, GPU required)
