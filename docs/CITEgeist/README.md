@@ -20,7 +20,19 @@ CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Explorati
 
 ## Installation Guide
 
-### Step 1: Set up Python Environment
+### Quick install (PyPI)
+
+```bash
+pip install citegeist
+```
+
+The `cuOPT` GPU solver (Module 3) is not on PyPI — install it separately via NVIDIA RAPIDS/NGC
+(`pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com`), or use the conda
+environment below, which includes it.
+
+### From source
+
+#### Step 1: Set up Python Environment
 
 ```bash
 # Install via conda environment (recommended — includes cuOPT)
@@ -31,7 +43,7 @@ conda activate CITEgeist_env
 pip install -r requirements.txt
 ```
 
-### Step 2: Install CITEgeist
+#### Step 2: Install CITEgeist
 ```bash
 git clone https://github.com/leeoesterreich/CITEgeist.git
 cd CITEgeist

@@ -133,8 +133,8 @@ def __getattr__(name: str) -> Any:
         raise ImportError(
             f"Failed to import '{name}' from '{module_name}'. Install the optional "
             "dependencies needed for that feature — e.g. for imaging/segmentation support, "
-            'run `pip install -e ".[imaging]"` from a cloned repo (CITEgeist is not yet on '
-            'PyPI; once published, `pip install "citegeist[imaging]"` will also work).'
+            'run `pip install "citegeist[imaging]"` (or `pip install -e ".[imaging]"` from a '
+            "cloned repo for a source install)."
         ) from exc
 
     value = getattr(module, attr_name)

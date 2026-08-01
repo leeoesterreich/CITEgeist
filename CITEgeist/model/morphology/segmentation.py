@@ -106,8 +106,8 @@ class StarDistSegmenter:
             raise ImportError(
                 "StarDist is required for segmentation. Install directly with "
                 "`pip install stardist csbdeep`, or via the `imaging` extra: "
-                '`pip install -e ".[imaging]"` from a cloned repo (CITEgeist is not yet on '
-                'PyPI; once published, `pip install "citegeist[imaging]"` will also work).'
+                '`pip install "citegeist[imaging]"` (or `pip install -e ".[imaging]"` from a '
+                "cloned repo for a source install)."
             ) from exc
 
         model_name = self.MODELS[modality]

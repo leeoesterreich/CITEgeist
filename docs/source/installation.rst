@@ -40,7 +40,11 @@ without a GPU.
 Installation
 ------------
 
-CITEgeist is not yet published on PyPI. Install from source::
+CITEgeist is published on PyPI::
+
+   pip install citegeist
+
+To install from source instead::
 
    git clone https://github.com/leeoesterreich/CITEgeist.git
    cd CITEgeist

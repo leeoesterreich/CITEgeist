@@ -43,12 +43,10 @@ See the [end-to-end Visium tutorial](https://github.com/leeoesterreich/CITEgeist
 
 ## Quick Installation
 
-CITEgeist is not yet published on PyPI. Install from source:
+CITEgeist is published on PyPI:
 
 ```bash
-git clone https://github.com/leeoesterreich/CITEgeist.git
-cd CITEgeist
-pip install -e .
+pip install citegeist
 ```
 
 > **Note — package name vs import name:** The installed distribution is named
@@ -65,7 +63,15 @@ pip install -e .
 > (`pip install cuopt-cu12` from the NVIDIA index, or use a pre-built RAPIDS container).
 > CPU-only environments **cannot run** the cell-type proportion solver.
 
-From the cloned repo root, for a development installation with test and lint dependencies:
+To install from source instead:
+
+```bash
+git clone https://github.com/leeoesterreich/CITEgeist.git
+cd CITEgeist
+pip install -e .
+```
+
+For a development installation with test and lint dependencies:
 
 ```bash
 pip install -e .[dev]

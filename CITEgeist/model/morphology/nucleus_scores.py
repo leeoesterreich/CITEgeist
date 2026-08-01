@@ -126,8 +126,10 @@ def compute_morphology_scores_safe(*args, **kwargs) -> Optional[np.ndarray]:
     Returns the ``(C, n_types)`` score matrix on success. If scoring raises for
     any reason (degenerate features, classifier failure, mask/id misalignment),
     logs a warning and returns ``None`` so the caller can fall back to a
-    count-constrained assignment instead of crashing the pipeline. See
-    ``docs/superpowers/specs/2026-07-12-morph-bayesian-default-design.md``.
+    count-constrained (Hungarian) assignment instead of crashing the pipeline.
+    That fallback is proportion-consistent by construction, unlike the
+    morphology-Bayesian assignment it replaces, which is the tradeoff for
+    degrading gracefully rather than failing the whole run.
     """
     import logging
 

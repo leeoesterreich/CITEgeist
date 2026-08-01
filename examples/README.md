@@ -24,8 +24,9 @@ The processed data are deposited at NCBI GEO; the accession is released with the
 
 ## Requirements
 
-- A Python environment with CITEgeist installed from source (`git clone` the repo, then
-  `pip install -e .`; the repo `CITEgeist_env.yml` reproduces the full analysis environment).
+- A Python environment with CITEgeist installed (`pip install citegeist`, or from source —
+  `git clone` the repo, then `pip install -e .`; the repo `CITEgeist_env.yml` reproduces the
+  full analysis environment).
 - **A GPU node with the NVIDIA cuOPT library** for the Module 3 QP solver
   (`run_module3_unified.py`, `run_cuopt_qp_patient.py`). cuOPT has no CPU fallback.
 - StarDist (H&E nuclei segmentation) for `run_single_cell_assignment.py` Stage 1

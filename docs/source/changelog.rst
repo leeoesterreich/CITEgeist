@@ -3,17 +3,17 @@ Changelog
 
 All notable changes to CITEgeist will be documented in this file.
 
-Version 2.0.0 (unreleased)
+Version 2.0.0 (2026-07-31)
 ---------------------------
 
-CITEgeist is not yet published on PyPI (see :doc:`installation` for the source install). This
-section describes the state of the 2.0 codebase ahead of that release.
+CITEgeist is published on PyPI (see :doc:`installation`). This section describes the state
+of the 2.0 codebase.
 
 * Production stack: **cuOPT QP** for cell-type proportion estimation (Module 3) +
   **SACE GEX** for per-cell gene-expression deconvolution (Module 3-GEX)
 * Requires Python 3.10+ and an NVIDIA GPU with CUDA for the QP solver (no CPU fallback)
 * Runtime dependencies are now fully declared in ``pyproject.toml``
-* The installed distribution will be named ``citegeist`` (lowercase); the importable package is ``CITEgeist``
+* The installed distribution is named ``citegeist`` (lowercase); the importable package is ``CITEgeist``
 
 Features
 ~~~~~~~~

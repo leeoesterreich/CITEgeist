@@ -4,7 +4,13 @@ CITEgeist is a computational method for deconvolving spatial transcriptomics dat
 
 ## Quick Installation
 
-CITEgeist is not yet published on PyPI. Install from source:
+CITEgeist is published on PyPI:
+
+```bash
+pip install citegeist
+```
+
+To install from source instead:
 
 ```bash
 git clone https://github.com/leeoesterreich/CITEgeist.git
@@ -54,7 +60,13 @@ It is recommended to install the dependencies in the `CITEgeist_env.yml` file fo
 
 ### 1. Installation
 
-Install CITEgeist from source:
+Install CITEgeist from PyPI:
+
+```bash
+pip install citegeist
+```
+
+To install from source instead:
 
 ```bash
 git clone https://github.com/leeoesterreich/CITEgeist.git

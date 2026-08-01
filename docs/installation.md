@@ -1,11 +1,23 @@
 # Installation
 
-## Prerequisites
+## Quick install (PyPI)
+
+```bash
+pip install citegeist
+```
+
+The `cuOPT` GPU solver (Module 3) is not on PyPI — install it separately via NVIDIA
+RAPIDS/NGC (`pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com`), or use the
+conda environment below, which includes it.
+
+## From source (HPC / dev environment)
+
+### Prerequisites
 
 - Conda or Mamba
 - NVIDIA GPU (required for Module 3 cuOPT QP solver)
 
-## Environment Setup
+### Environment Setup
 
 Create the production environment (note: name is case-sensitive):
 

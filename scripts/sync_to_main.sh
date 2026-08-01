@@ -250,6 +250,9 @@ EXCLUDELIST=(
   "tests/test_zotero_uri_stabilize.py"  # tests manuscript/zotero_uri_stabilize.py
   "tests/test_renumber_supplementary.py"  # imports the excluded scripts/ renumberer + references manuscript/
   "tests/test_edit_comment_text.py"  # references manuscript/ via path-joined (non-literal) fixture path — audit's string scan can't see it
+  "tests/test_comment_ids.py"  # docx comment-id allocator test; depends on a local dev-machine skill, not CITEgeist science
+  "tests/test_comment_roots.py"  # docx root-comment test; depends on a local dev-machine skill, not CITEgeist science
+  "tests/test_comment_anchor_substring.py"  # docx anchor-substring test; manuscript comment tooling, not CITEgeist science
   "tests/test_smoke_benchmark_outputs.py"
   "tests/test_integrate_summary.py"
   "tests/test_if_analysis.py"

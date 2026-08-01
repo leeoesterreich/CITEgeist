@@ -18,7 +18,7 @@ with the cuOPT library installed.
 ## Requirements
 
 - SpaceRanger output directory (Visium GEX) and matched CITE-seq antibody counts (`.h5ad`)
-- Python environment with CITEgeist installed from source (`git clone` the repo, then
-  `pip install -e .`)
+- Python environment with CITEgeist installed (`pip install citegeist`, or from source —
+  `git clone` the repo, then `pip install -e .`)
 - **GPU required** for `run_cuopt_qp_patient.py` and `run_module3_unified.py` (cuOPT QP solver)
 - See each script's header for dataset-specific parameters to configure before running
