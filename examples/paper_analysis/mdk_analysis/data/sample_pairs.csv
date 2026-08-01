@@ -1,0 +1,7 @@
+patient_id,biopsy_sample,surgery_sample,d538g_carrier
+P1,P1-S1,P1-S2,false
+P2,P2-S1,P2-S2,false
+P3,P3-S1,P3-S2,false
+P4,P4-S1,P4-S2,true
+P5,P5-S1,P5-S2,false
+P6,P6-S1,P6-S2,false

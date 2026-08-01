@@ -1,0 +1,13 @@
+sample_id,patient_id,timepoint,included,exclusion_reason
+P1-S1,P1,biopsy,true,
+P1-S2,P1,surgery,true,
+P2-S1,P2,biopsy,true,
+P2-S2,P2,surgery,true,
+P3-S1,P3,biopsy,true,
+P3-S2,P3,surgery,true,
+P4-S1,P4,biopsy,false,MDK below detection threshold in deconvolved cancer-cell layer
+P4-S2,P4,surgery,true,
+P5-S1,P5,biopsy,true,
+P5-S2,P5,surgery,true,
+P6-S1,P6,biopsy,true,
+P6-S2,P6,surgery,true,

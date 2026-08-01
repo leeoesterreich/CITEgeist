@@ -59,7 +59,7 @@ def build_spatial_laplacian(
         normed: If True, return normalized Laplacian (recommended).
         cellularity: Optional per-spot nuclei counts, shape (n_spots,).
             When provided, edges are weighted by cellularity similarity:
-            w_ij = exp(-|log(n_i) - log(n_j)|^2 / (2*sigma^2)).
+            ``w_ij = exp(-|log(n_i) - log(n_j)|^2 / (2*sigma^2))``.
             This preserves tissue boundaries where cellularity changes abruptly.
         cellularity_sigma: Bandwidth for cellularity similarity kernel (default: 0.5).
             Controls how much cellularity difference suppresses smoothing.

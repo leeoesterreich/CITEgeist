@@ -72,7 +72,7 @@ def audit_gate_identifiability(
         type_names: List of parent type names matching gates axis 1.
         func_marker_names: List of functional marker names matching gates axis 2.
         config: Subtype config dict mapping parent_type -> gate_marker, subtypes, etc.
-        collinearity_threshold: Spearman |r| above which gates are flagged collinear.
+        collinearity_threshold: Spearman ``|r|`` above which gates are flagged collinear.
         min_effective_rank: Minimum effective rank for go/no-go.
 
     Returns:

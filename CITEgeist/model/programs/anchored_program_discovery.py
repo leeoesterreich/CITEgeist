@@ -607,7 +607,7 @@ def analyze_program_relationships(
         result: Module 4 output with H matrices per cell type.
         adata: AnnData with spatial coordinates.
         fdr_threshold: FDR threshold for significance.
-        min_bivariate_i: Minimum |bivariate Moran's I| to report as strong.
+        min_bivariate_i: Minimum ``|bivariate Moran's I|`` to report as strong.
         n_permutations: Permutations for p-value calculation.
         neighbor_k: k-NN for spatial weights.
         include_within_anchor: Also compare programs within same cell type.
