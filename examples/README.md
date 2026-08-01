@@ -17,8 +17,8 @@ output directories, each laid out as `<DATA_ROOT>/<sample>/outs/` containing
 `tissue_fullres_image.tif`. CITE-seq antibody capture is in the same SpaceRanger matrix
 (loaded with `gex_only=False`); antibody names carry the `-1` suffix (e.g. `CD68-1`).
 
-The processed data are deposited at NCBI GEO; the accession is released with the manuscript
-(see the paper's Data Availability statement). After downloading, set `DATA_ROOT` /
+The processed data are publicly available at NCBI GEO under accession
+[GSE289326](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE289326). After downloading, set `DATA_ROOT` /
 `PATIENT_DATA_ROOT` in each script to your local
 `.../CITEgeist_public_data/processed_files` directory.
 
@@ -57,7 +57,7 @@ python run_module12_discovery.py --sample sample-P1-S1 --output-dir output/modul
 # 2. Deconvolution (proportions + GEX) — GPU node
 python run_module3_unified.py --sample sample-P1-S1 --output-dir output/module3_unified
 
-# 3. Per-cell assignment (StarDist -> Hungarian assignment from spot proportions -> SACE per-cell GEX)
+# 3. Per-cell assignment (StarDist -> per-nucleus type assignment -> SACE per-cell GEX)
 python run_single_cell_assignment.py --sample sample-P1-S1 --stages 1,5,6
 
 # 4. Anchored gene-program discovery

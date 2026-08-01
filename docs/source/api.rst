@@ -132,6 +132,12 @@ Programs (Modules 4, 4b, 5)
 Annotation (Module 3.5)
 ------------------------
 
+.. warning::
+
+   Module 3.5 is **experimental** and is not part of the production
+   QP + SACE pipeline. It additionally requires PyTorch, which is not a core
+   dependency — install it with ``pip install citegeist[functional]``.
+
 .. automodule:: CITEgeist.model.annotation.functional_annotation
    :members:
    :show-inheritance:

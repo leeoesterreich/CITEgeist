@@ -371,47 +371,6 @@ class TestUtilityFunctions:
         assert not np.any(np.isinf(clr_matrix))
 
 
-# ==================== Gurobi Registration Tests ====================
-
-@pytest.mark.unit
-class TestGurobiRegistration:
-    """Tests for Gurobi license registration."""
-
-    def test_register_gurobi_valid_file(self, temp_output_dir, sample_name,
-                                        mock_gex_adata, mock_protein_adata,
-                                        mock_gurobi_license):
-        """Test registering valid Gurobi license file."""
-        model = CitegeistModel(
-            sample_name=sample_name,
-            output_folder=temp_output_dir,
-            simulation=True,
-            gene_expression_adata=mock_gex_adata,
-            antibody_capture_adata=mock_protein_adata
-        )
-
-        # Should not raise error
-        model.register_gurobi(mock_gurobi_license)
-
-        assert "GRB_LICENSE_FILE" in os.environ
-        assert os.environ["GRB_LICENSE_FILE"] == mock_gurobi_license
-
-    def test_register_gurobi_missing_file(self, temp_output_dir, sample_name,
-                                         mock_gex_adata, mock_protein_adata):
-        """Test registering nonexistent license file."""
-        model = CitegeistModel(
-            sample_name=sample_name,
-            output_folder=temp_output_dir,
-            simulation=True,
-            gene_expression_adata=mock_gex_adata,
-            antibody_capture_adata=mock_protein_adata
-        )
-
-        fake_path = "/nonexistent/path/to/license.lic"
-
-        with pytest.raises(FileNotFoundError, match="License file not found"):
-            model.register_gurobi(fake_path)
-
-
 # ==================== Edge Cases ====================
 
 @pytest.mark.unit

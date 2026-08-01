@@ -36,7 +36,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(MODEL_DIR))
 sys.path.insert(0, str(MODEL_DIR / "morphology"))
 
-# CITEgeist public data — download from GEO (accession in the manuscript) and set this path
+# CITEgeist public data — download from NCBI GEO accession GSE289326 and set this path
 PATIENT_DATA_ROOT = Path("/path/to/CITEgeist_public_data/processed_files")
 MODULE3_ROOT = REPO_ROOT / "output" / "module3_7type"
 OUTPUT_ROOT = REPO_ROOT / "output" / "morphology_assignment"

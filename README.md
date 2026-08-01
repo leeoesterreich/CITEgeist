@@ -16,7 +16,9 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 - Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
 - GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
 - SACE per-cell gene expression deconvolution via single-pass Poisson-multinomial allocation
-- Per-cell type assignment from spot proportions via StarDist nuclei segmentation + Hungarian matching (optional Bayesian assignment when per-nucleus morphology scores are precomputed)
+- Per-cell type assignment from spot proportions via StarDist nuclei segmentation. The default
+  routes nucleus morphology scores (`morphology/nucleus_scores.py`, shipped) through a Bayesian
+  posterior; count-constrained Hungarian matching remains available via `use_morphology=False`
 - Spatial gene program discovery and cross-sample integration (Modules 4–5)
 - Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
 
@@ -24,13 +26,25 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 
 - [Quick Start Guide](https://github.com/leeoesterreich/CITEgeist/blob/main/CITEgeist/README.md)
 - [Running on Real Visium Data (end-to-end tutorial)](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md)
-- [Benchmarking Results](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/Benchmarking/README.md)
+- [Benchmarking Methodology](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/Benchmarking/README.md)
 - [Example Scripts](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts)
+
+## Data Availability
+
+| Dataset | Used for | Source |
+|---|---|---|
+| Visium + CITE-seq clinical-trial samples (this study) | Midkine / ESR1-D538G analyses; competitor-GEX validation | NCBI GEO [GSE289326](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE289326) |
+| Wu et al. 2021 breast cancer scRNA-seq atlas | Reference for reference-based competitor methods; source cells for the simulation | NCBI GEO [GSE176078](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE176078) |
+| Xenium Human Kidney Dataset (renal cell carcinoma) | Real-tissue benchmark | [10x Genomics](https://www.10xgenomics.com/datasets), publicly available |
 
 ## Reproducibility
 
 Example end-to-end pipelines for each module are in [`examples/scripts`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts).
 See the [end-to-end Visium tutorial](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md) to run CITEgeist on real data.
+
+The curated analysis code behind the paper's reported numbers — with a map from each script to
+the figure it produces — is in
+[`examples/paper_analysis`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/paper_analysis).
 
 ## System Requirements
 

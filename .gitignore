@@ -156,7 +156,6 @@ replicates/
 # Log files
 *.log
 
-# midkine — archive is local-only; scripts/slurm/data/outputs are tracked
 /midkine/
 
 # Dead/archived code — kept locally, not tracked

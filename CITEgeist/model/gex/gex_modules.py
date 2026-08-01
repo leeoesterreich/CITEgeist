@@ -275,7 +275,7 @@ def compute_softmax_target(
     exp_logits = np.exp(logits)
     target = exp_logits / exp_logits.sum()
 
-    # Clip to avoid zeros (for KL stability in downstream Gurobi objective)
+    # Clip to avoid zeros (for KL stability in the downstream QP objective)
     target = np.clip(target, 1e-6, 1.0)
 
     # Re-normalize after clipping
@@ -290,7 +290,7 @@ def compute_kl_penalty_coefficients(
     lambda_kl: float = 0.1,
 ) -> Dict[str, np.ndarray]:
     """
-    Compute coefficients for KL-divergence penalty in Gurobi objective.
+    Compute coefficients for the KL-divergence penalty in the QP objective.
 
     The KL penalty is approximated as a quadratic penalty that pulls allocations
     toward the target distribution: lambda * (X[j] - target[j])^2
@@ -309,7 +309,7 @@ def compute_kl_penalty_coefficients(
     Returns:
         Dict containing:
             - 'target_counts': (T,) target allocation in count space
-            - 'penalty_weight': Normalized penalty weight for Gurobi
+            - 'penalty_weight': Normalized penalty weight for the QP solver
 
     Example:
         >>> target = np.array([0.5, 0.3, 0.2])

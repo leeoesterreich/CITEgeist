@@ -1,5 +1,5 @@
 """
-Unit tests for segmentation utilities (non-Cellpose dependent pieces).
+Unit tests for segmentation utilities (non-StarDist dependent pieces).
 """
 
 import numpy as np

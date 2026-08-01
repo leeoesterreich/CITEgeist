@@ -8,7 +8,7 @@ exclude = ["repro*", "figures*", "Benchmarking*", "manuscript*", "tests*"]
 
 [project]
 name = "citegeist"
-version = "2.0.0"
+version = "2.0.1"
 description = "Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -67,6 +67,9 @@ dev = [
     "pre-commit>=3.0",
 ]
 imaging = ["stardist"]
+# Module 3.5 (functional annotation) only. EXPERIMENTAL — not part of the
+# production QP + SACE pipeline; torch is deliberately not a core dependency.
+functional = ["torch"]
 
 [tool.black]
 line-length = 120

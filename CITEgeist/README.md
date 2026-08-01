@@ -43,7 +43,9 @@ pip install -e .
 
 See `requirements.txt` for exact version pins. Core dependencies include:
 - scanpy, anndata, numpy, pandas, scipy, scikit-learn
-- cuopt (GPU-accelerated QP; installed via conda — see `CITEgeist_env.yml`)
+- cuopt (GPU-accelerated QP) — **not on PyPI and not in `CITEgeist_env.yml`**; install it
+  separately from the NVIDIA index (`pip install cuopt-cu12 --extra-index-url
+  https://pypi.nvidia.com`) or use a RAPIDS container. No CPU fallback exists.
 - matplotlib, seaborn, squidpy, spatialdata
 
 It is recommended to install the dependencies in the `CITEgeist_env.yml` file for running the notebooks.
@@ -125,7 +127,7 @@ End-to-end runner scripts for each module ship alongside the package in
 |--------|-----------|
 | `run_module12_discovery.py` | Modules 1–2: marker interest + protein-profile discovery |
 | `run_module3_unified.py` | Module 3: cuOPT QP cell-type proportions (GPU) |
-| `run_single_cell_assignment.py` | Module 3-post: StarDist nuclei + Hungarian assignment + SACE per-cell GEX (GPU) |
+| `run_single_cell_assignment.py` | Module 3-post: StarDist nuclei + cell assignment + SACE per-cell GEX (GPU) |
 | `run_module4_discovery.py` | Module 4: anchored spatial gene programs |
 | `run_module4b_bivariate.py` | Module 4b: bivariate Moran's I between programs |
 | `run_module5_integration.py` | Module 5: cross-sample program integration |

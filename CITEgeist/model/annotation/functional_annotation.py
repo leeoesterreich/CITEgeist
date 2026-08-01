@@ -217,7 +217,15 @@ def learn_functional_emissions(
             "skipped_pairs": list of (type_idx, marker_idx) tuples with
                 insufficient support (< min_spots where p > 0.05)
     """
-    import torch  # pylint: disable=import-outside-toplevel
+    try:
+        import torch  # pylint: disable=import-outside-toplevel
+    except ImportError as exc:  # pragma: no cover - exercised only without torch
+        raise ImportError(
+            "Module 3.5 functional annotation requires PyTorch, which is not a core "
+            "CITEgeist dependency. Install it with `pip install citegeist[functional]` "
+            "(or `pip install torch`). Module 3.5 is EXPERIMENTAL and is not part of the "
+            "production QP + SACE pipeline."
+        ) from exc
 
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)

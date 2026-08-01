@@ -1,0 +1,60 @@
+{
+  "A": {
+    "w_mm": 171.0,
+    "h_mm": 70.66,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    }
+  },
+  "B": {
+    "w_mm": 81.96,
+    "h_mm": 60.71,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    }
+  },
+  "C": {
+    "w_mm": 88.04,
+    "h_mm": 60.71,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    }
+  },
+  "D": {
+    "w_mm": 74.38,
+    "h_mm": 53.12,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    }
+  },
+  "E": {
+    "w_mm": 95.62,
+    "h_mm": 53.12,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    }
+  },
+  "_layout_defaults": {
+    "legend_position": "auto"
+  }
+}

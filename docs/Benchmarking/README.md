@@ -97,16 +97,3 @@ Runtime performance is tracked for each method:
 - Results are aggregated and compared across methods
 - Statistical significance of runtime differences is assessed
 
-## File Structure
-
-```
-benchmarking/
-├── src/                          # Benchmarking modules and method wrappers
-│   ├── benchmarking_gex.py       # Gene expression benchmarking
-│   ├── benchmarking_spot_deconv.py # Cell type deconvolution benchmarking
-│   ├── *_bench_wrapper.py        # Per-method wrappers (CITEgeist, C2L, RCTD, CARD, Tangram, Seurat)
-│   ├── compare_gex_methods.py    # Cross-method GEX comparison
-│   └── compare_prop_methods.py   # Cross-method proportion comparison
-├── Figures/                      # R visualization scripts
-└── Runtime/                      # Runtime analysis
-```

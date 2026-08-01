@@ -1,5 +1,5 @@
-# Keep the research/dev test suite out of the published sdist: it is not useful to
-# pip consumers and carries private institutional paths (e.g. test_smoke_patient_pipeline.py).
+# Keep the research/dev test suite out of the published sdist — it targets the
+# development repository layout and is not useful to pip consumers.
 prune tests
 recursive-exclude tests *
 

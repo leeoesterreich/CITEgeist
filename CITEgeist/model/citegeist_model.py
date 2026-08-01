@@ -196,22 +196,6 @@ class CitegeistModel:
         ]
         return "\n".join(details)
 
-    def register_gurobi(self, license_file_path):
-        """
-        Configure Gurobi by setting only the license file path.
-
-        Args:
-            license_file_path (str): Path to the Gurobi license file.
-        """
-        if not os.path.isfile(license_file_path):
-            raise FileNotFoundError(f"❌ License file not found at: {license_file_path}")
-
-        # Set only the license file environment variable
-        os.environ["GRB_LICENSE_FILE"] = license_file_path
-
-        logging.info("✅ Gurobi license file has been successfully configured.")
-        logging.info(f" - GRB_LICENSE_FILE: {os.environ['GRB_LICENSE_FILE']}")
-
     # -----------------------------------------
     # Data Splitting
     # -----------------------------------------

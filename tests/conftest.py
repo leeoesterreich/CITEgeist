@@ -17,15 +17,14 @@ import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
-# Add the worktree root to sys.path so the reorganized CITEgeist package is
-# found before any installed/editable copies from other repo checkouts.
-_WORKTREE_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.insert(0, _WORKTREE_ROOT)
+# Put this repository root ahead of site-packages so the tests exercise the
+# checked-out CITEgeist package rather than any separately installed copy.
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, _REPO_ROOT)
 
-# Pre-import CITEgeist now so it is cached from the worktree.  Without this,
-# test modules that call sys.path.insert(0, <main-repo-path>) before their own
-# imports would shadow the worktree package, causing subpackage lookup failures
-# (e.g. CITEgeist.model.discovery).
+# Import CITEgeist now so sys.modules is populated from this repository before
+# any test module manipulates sys.path itself; otherwise a later insertion can
+# shadow this package and break subpackage lookups (e.g. CITEgeist.model.discovery).
 import CITEgeist  # noqa: E402, F401  — side-effect import to populate sys.modules
 
 
@@ -62,15 +61,6 @@ def _isolate_matplotlib_state():
             yield
         finally:
             plt.close("all")
-
-
-@pytest.fixture
-def mock_gurobi_license(temp_output_dir):
-    """Create a mock Gurobi license file for testing."""
-    license_path = os.path.join(temp_output_dir, "gurobi.lic")
-    with open(license_path, 'w') as f:
-        f.write("# Mock Gurobi license for testing\n")
-    return license_path
 
 
 # ==================== Data Generation Fixtures ====================
@@ -289,9 +279,6 @@ def pytest_configure(config):
         "markers", "slow: Tests that take a long time to run"
     )
     config.addinivalue_line(
-        "markers", "requires_gurobi: Tests that require Gurobi license"
-    )
-    config.addinivalue_line(
         "markers", "requires_data: Tests that require actual data files"
     )
 
@@ -302,10 +289,6 @@ def pytest_collection_modifyitems(config, items):
         # Mark tests in test_integration_*.py as integration tests
         if "integration" in item.nodeid:
             item.add_marker(pytest.mark.integration)
-
-        # Mark tests with 'gurobi' in name as requiring Gurobi
-        if "gurobi" in item.nodeid.lower():
-            item.add_marker(pytest.mark.requires_gurobi)
 
         # Mark optimization tests as slow
         if "optimize" in item.nodeid.lower() or "optimization" in item.nodeid.lower():

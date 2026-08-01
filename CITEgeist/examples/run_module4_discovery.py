@@ -36,7 +36,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# CITEgeist public data — download from GEO (accession in the manuscript) and set this path
+# CITEgeist public data — download from NCBI GEO accession GSE289326 and set this path
 DATA_ROOT = Path("/path/to/CITEgeist_public_data/processed_files")
 # Use 7-type cuOPT QP Module 3 outputs
 MODULE3_OUTPUT = Path("/path/to/output/module3_cuopt_qp")

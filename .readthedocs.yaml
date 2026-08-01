@@ -8,8 +8,10 @@ build:
 sphinx:
   configuration: docs/source/conf.py
 
+# Docs build only. requirements-dev.txt pulls torch, opencv and the full test
+# stack and exceeds RTD's build resources; the package itself is not installed
+# either. docs/source/conf.py puts the repository on sys.path and mocks the
+# heavy/GPU imports (see autodoc_mock_imports there).
 python:
   install:
-    - requirements: requirements-dev.txt
-    - method: pip
-      path: .
+    - requirements: docs/requirements.txt

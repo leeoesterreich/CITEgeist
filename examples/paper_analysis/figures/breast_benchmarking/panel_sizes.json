@@ -1,0 +1,53 @@
+{
+  "A": {
+    "w_mm": 76.97,
+    "h_mm": 60.14,
+    "fonts": {
+      "tick_label_pt": 10.0,
+      "axis_title_pt": 11.0,
+      "legend_pt": 10.0,
+      "title_pt": 11.0,
+      "annotation_pt": 9.5
+    },
+    "title": "Proportion benchmark"
+  },
+  "B": {
+    "w_mm": 101.03,
+    "h_mm": 60.14,
+    "fonts": {
+      "tick_label_pt": 10.0,
+      "axis_title_pt": 11.0,
+      "legend_pt": 10.0,
+      "title_pt": 11.0,
+      "annotation_pt": 9.5
+    },
+    "title": "Per-type correlation"
+  },
+  "C": {
+    "w_mm": 89.0,
+    "h_mm": 71.77,
+    "fonts": {
+      "tick_label_pt": 10.0,
+      "axis_title_pt": 11.0,
+      "legend_pt": 10.0,
+      "title_pt": 11.0,
+      "annotation_pt": 9.5
+    },
+    "title": "GEX correlation"
+  },
+  "D": {
+    "w_mm": 89.0,
+    "h_mm": 71.77,
+    "fonts": {
+      "tick_label_pt": 10.0,
+      "axis_title_pt": 11.0,
+      "legend_pt": 10.0,
+      "title_pt": 11.0,
+      "annotation_pt": 9.5
+    },
+    "title": "GEX RMSE"
+  },
+  "_layout_defaults": {
+    "legend_position": "auto"
+  }
+}

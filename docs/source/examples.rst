@@ -1,126 +1,117 @@
 Examples
 ========
 
-This section provides practical examples of using CITEgeist for different types of spatial transcriptomics analysis.
-
 .. toctree::
    :maxdepth: 2
    :caption: Interactive Tutorials:
 
    notebooks
 
-Basic Analysis
---------------
+Runnable scripts
+----------------
 
-A complete example of CITEgeist analysis:
+Seven end-to-end runner scripts ship with the repository under ``examples/scripts/``
+(and inside the installed package as ``CITEgeist/examples/``). Each takes
+command-line arguments; run any of them with ``--help`` to see its options.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 46 20
+
+   * - Script
+     - Module(s)
+     - GPU
+   * - ``run_module12_discovery.py``
+     - Modules 1–2: marker interest + protein-profile discovery
+     - no
+   * - ``run_module3_unified.py``
+     - Module 3: cuOPT QP proportions + SACE deconvolved GEX layers
+     - **yes**
+   * - ``run_cuopt_qp_patient.py``
+     - Module 3 proportions only, single patient sample (alternative to the above)
+     - **yes**
+   * - ``run_single_cell_assignment.py``
+     - Module 3-post/3-gex: StarDist nuclei, cell assignment, SACE per-cell GEX
+     - Stage 1
+   * - ``run_module4_discovery.py``
+     - Module 4: anchored spatial gene programs
+     - no
+   * - ``run_module4b_bivariate.py``
+     - Module 4b: bivariate Moran's I between programs
+     - no
+   * - ``run_module5_integration.py``
+     - Module 5: cross-sample program integration
+     - no
+
+Input paths in these scripts are placeholders that you must edit for your own data
+layout; ``examples/README.md`` documents the expected directory structure and the
+order the scripts are meant to be run in.
+
+Worked walkthrough
+------------------
+
+For a narrated version of the same pipeline with real API calls, parameter guidance
+and a troubleshooting table, see
+`docs/quickstart_real_visium.md <https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md>`_,
+or the condensed :doc:`tutorial` page.
+
+Processing several samples
+--------------------------
+
+There is no batch entry point; each sample is an independent model instance. On a
+cluster, submit one job per sample rather than looping in a single process — Module 3
+holds the full antibody matrix and the cuOPT problem in memory.
 
 .. code-block:: python
 
-   import scanpy as sc
-   import pandas as pd
+   import squidpy as sq
    from CITEgeist.model.citegeist_model import CitegeistModel
-   
-   # Load data
-   adata = sc.read_h5ad("spatial_data.h5ad")
-   
-   # Initialize model
-   model = CitegeistModel(
-       sample_name="brain_section_1",
-       adata=adata,
-       output_folder="./citegeist_results"
-   )
-   
-   # Process data
-   model.split_adata()
-   model.filter_gex()
-   model.preprocess_gex()
-   model.preprocess_antibody()
-   
-   # Define cell type profiles
-   cell_profiles = {
-       "Neuron": {"NeuN": 0.9, "MAP2": 0.8},
-       "Astrocyte": {"GFAP": 0.9, "S100B": 0.7},
-       "Microglia": {"Iba1": 0.9, "CD68": 0.6},
-       "Oligodendrocyte": {"Olig2": 0.8, "MBP": 0.7}
-   }
-   model.load_cell_profile_dict(cell_profiles)
-   
-   # Run analysis
-   global_props, finetuned_props = model.run_cell_proportion_model(radius=75)
-   model.run_cell_expression_pass1(radius=75)
-   
-   # Get results
-   results_adata = model.get_adata()
-   print("Analysis complete!")
 
-Parameter Tuning
-----------------
-
-Example of parameter optimization:
-
-.. code-block:: python
-
-   # Test different radius values
-   for radius in [25, 50, 75, 100]:
-       print(f"Testing radius: {radius}")
-       
-       # Run with different parameters
-       props, _ = model.run_cell_proportion_model(
-           radius=radius,
-           lambda_reg=0.5,
-           alpha=0.3
+   def run_one(sample_name, spaceranger_dir, cell_profiles):
+       adata = sq.read.visium(
+           spaceranger_dir,
+           counts_file="filtered_feature_bc_matrix.h5",
+           load_images=True,
+           gex_only=False,
        )
-       
-       # Evaluate results
-       print(f"Mean cell proportions: {props.mean().mean():.3f}")
-
-Batch Processing
-----------------
-
-Process multiple samples:
-
-.. code-block:: python
-
-   samples = ["sample1", "sample2", "sample3"]
-   
-   for sample in samples:
-       print(f"Processing {sample}")
-       
-       # Load sample data
-       adata = sc.read_h5ad(f"{sample}.h5ad")
-       
-       # Initialize model
        model = CitegeistModel(
-           sample_name=sample,
+           sample_name=sample_name,
            adata=adata,
-           output_folder=f"./results/{sample}"
+           output_folder=f"output/{sample_name}",
+           simulation=False,
        )
-       
-       # Run analysis
-       # ... (same workflow as above)
+       model.split_adata()
+       model.filter_gex(min_counts=100)
+       model.copy_gex_to_protein_adata()
+       model.preprocess_gex()
+       model.preprocess_antibody()
+       model.load_cell_profile_dict(cell_profiles)
+       model.run_cell_proportion_model()
+       model.append_proportions_to_adata(key="finetuned")
+       model.cleanup()
+       return model.get_adata()
 
-Visualization
--------------
+Visualizing proportions
+-----------------------
 
-Basic visualization of results:
+``append_proportions_to_adata`` writes one ``adata.obs`` column per cell type, so the
+results plot with the standard squidpy spatial plotting call. Always pass an explicit
+``crop_coord`` — squidpy does not auto-crop to the spot bounding box.
 
 .. code-block:: python
 
-   import matplotlib.pyplot as plt
-   
-   # Plot cell type proportions
-   fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-   
-   cell_types = ["Neuron", "Astrocyte", "Microglia", "Oligodendrocyte"]
-   
-   for i, cell_type in enumerate(cell_types):
-       ax = axes[i//2, i%2]
-       sc.pl.spatial(
-           results_adata, 
-           color=cell_type, 
-           ax=ax,
-           title=f"{cell_type} Proportions"
-       )
-   
-   plt.tight_layout()
-   plt.show()
+   import numpy as np
+   import squidpy as sq
+
+   result_adata = model.get_adata()
+
+   xy = np.asarray(result_adata.obsm["spatial"])
+   crop = (xy[:, 0].min(), xy[:, 1].min(), xy[:, 0].max(), xy[:, 1].max())
+
+   sq.pl.spatial_scatter(
+       result_adata,
+       color="Macrophages",       # a cell-type column added by append_proportions_to_adata
+       crop_coord=crop,
+       cmap="YlOrRd",
+       alpha=0.7,
+   )

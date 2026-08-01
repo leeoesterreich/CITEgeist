@@ -1,0 +1,77 @@
+{
+  "A": {
+    "w_mm": 90.12,
+    "h_mm": 55.97,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Xenium benchmark"
+  },
+  "B": {
+    "w_mm": 87.88,
+    "h_mm": 55.97,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Per-type correlation"
+  },
+  "C": {
+    "w_mm": 89.0,
+    "h_mm": 80.91,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "GEX correlation"
+  },
+  "D": {
+    "w_mm": 89.0,
+    "h_mm": 80.91,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "GEX RMSE"
+  },
+  "E": {
+    "w_mm": 59.11,
+    "h_mm": 67.94,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Matched gene-set comparison"
+  },
+  "F": {
+    "w_mm": 118.89,
+    "h_mm": 67.94,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Spatial deconvolution"
+  },
+  "_layout_defaults": {
+    "legend_position": "auto"
+  }
+}

@@ -179,7 +179,7 @@ git checkout -b feature/your-feature-name
 git push dev-repo feature/your-feature-name
 ```
 
-CI (`ci.yml`) runs on `dev-repo` for all pushes to `dev` and `feature/**`. Ensure `ci.yml` is green before running `scripts/sync_to_main.sh` to promote `dev` → `origin/main`. This is a process convention; GitHub does not enforce it without branch protection rules.
+CI (`ci.yml`) runs on all pushes to `dev` and `feature/**`. Ensure `ci.yml` is green before a branch is promoted to `main`. This is a process convention; GitHub does not enforce it without branch protection rules.
 
 **External contributors** (fork workflow):
 ```bash
@@ -321,12 +321,10 @@ CITEgeist/
 │   ├── model/              # Core model implementation (subpackages: deconvolution, gex, assignment, etc.)
 │   └── examples/           # Patient pipeline scripts and vignettes
 ├── tests/                  # Pytest target (root)
-│   ├── _archive/           # Stale tests excluded by pytest
-│   └── test_figures/       # Figure test package
+├── examples/               # Runnable end-to-end pipeline scripts
 ├── .github/
 │   └── workflows/          # ci.yml (enforced), quality.yml (advisory)
-├── docs/                   # MkDocs documentation + codebase index
-└── scripts/                # sync_to_main.sh and build scripts
+└── docs/                   # Sphinx documentation (docs/source/) + Markdown guides
 ```
 
 ## Questions?

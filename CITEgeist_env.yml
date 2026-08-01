@@ -94,7 +94,6 @@ dependencies:
       - geopandas==1.0.1
       - giddy==2.3.6
       - gseapy==1.1.5
-      - gurobipy==11.0.2
       - h11==0.14.0
       - h5py==3.12.1
       - harmonypy==0.0.10

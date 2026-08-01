@@ -32,7 +32,7 @@ SpaceRanger output
           ▼
 ┌─────────────────────┐
 │ Module 3-post:      │  StarDist nuclei segmentation →
-│ Cell Assignment     │  Hungarian assignment → SACE per-cell GEX
+│ Cell Assignment     │  morphology-Bayesian assignment → SACE per-cell GEX
 └─────────┬───────────┘
           │
           ▼
@@ -47,7 +47,7 @@ SpaceRanger output
 ## Step 0: Environment Setup
 
 ```bash
-conda activate CITEgeist_env   # Case-sensitive! Not citegeist_env
+conda activate CITEgeist_env   # environment name is case-sensitive
 ```
 
 All heavy computation should be submitted via SLURM (`sbatch`), not run on login nodes.
@@ -263,7 +263,7 @@ At this point you have spot-level deconvolution. Continue to Step 3 for single-c
 
 ## Step 3: Single-Cell Assignment + GEX (Module 3-post)
 
-This step segments individual nuclei from the H&E image, assigns each nucleus a cell type from the spot-level proportions (Hungarian matching), and allocates gene expression per cell via SACE.
+This step segments individual nuclei from the H&E image, assigns each nucleus a cell type from the spot-level proportions, and allocates gene expression per cell via SACE.
 
 The production script is `examples/scripts/run_single_cell_assignment.py`, which handles this in stages. Below is the conceptual flow:
 
@@ -322,7 +322,7 @@ nuc_map.to_csv(OUTPUT_DIR / "nucleus_spot_mapping.csv", index=False)
 del fullres_img
 
 # =========================================================================
-# Stage 2: Hungarian cell assignment + SACE GEX
+# Stage 2: cell assignment + SACE GEX
 # =========================================================================
 # Load pre-computed Module 3 proportions
 prop_df = pd.read_csv(
@@ -352,10 +352,12 @@ nuclei_counts = nuc_map.groupby("spot_barcode")["nucleus_id"].count().reindex(
     prop_df.index, fill_value=0
 )
 
-# Hungarian assignment: discretize spot proportions into per-nucleus types.
-# (Bayesian mode is available via assignment_method="bayesian" only when a
-# per-nucleus (C, n_types) morphology-score array is passed as
-# morph_scores_precomputed; the post-E3 build ships no score producer.)
+# Discretize spot proportions into per-nucleus types. assign_cells() itself
+# defaults to assignment_method="hungarian"; pass "bayesian" together with a
+# per-nucleus (C, n_types) array in morph_scores_precomputed to use the
+# morphology posterior instead. Those scores are produced by
+# CITEgeist.model.morphology.nucleus_scores.compute_morphology_scores, which
+# ships with the package -- run_sace_allocation() below calls it for you.
 assignments_df = model.assign_cells(
     nuclei_counts=nuclei_counts,
     cell_to_spot=cell_to_spot,
@@ -367,6 +369,9 @@ assignments_df = model.assign_cells(
 # SACE per-cell GEX allocation. output_mode="single_cell" auto-orchestrates
 # StarDist + assignment + SACE projection behind an H&E resolution gate
 # (requires <=1.0 um/px), so the assign_cells call above is illustrative.
+# It defaults to use_morphology=True, which computes morphology scores and
+# routes assignment through the Bayesian posterior; pass use_morphology=False
+# for count-constrained (proportion-consistent) Hungarian assignment.
 spot_type_gex, cell_adata, _ = model.run_sace_allocation(
     output_mode="single_cell",
 )
@@ -426,8 +431,6 @@ python ../examples/scripts/run_single_cell_assignment.py --sample sample_P1_S1 \
     --stages 1,5,6
 ```
 
-For GPU jobs on CRC, use `gpu-race-submit.sh` instead of direct `sbatch` to race across available GPU partitions.
-
 ---
 
 ## Quick Reference: Key Parameters
@@ -437,7 +440,7 @@ For GPU jobs on CRC, use `gpu-race-submit.sh` instead of direct `sbatch` to race
 | `min_counts` | 100 | Lower to 25 for surgical/low-depth samples |
 | `method` | `"qp"` | Only option for production (cuOPT) |
 | `use_gex_detection` | `True` | Disable if antibody panel is very sparse |
-| `assignment_method` | `"hungarian"` | Use `"bayesian"` only with precomputed per-nucleus morphology scores |
+| `use_morphology` (SACE, `single_cell`) | `True` | Default routes assignment through the morphology-Bayesian posterior. Set `False` for count-constrained Hungarian, which reproduces the QP spot proportions exactly |
 | `max_iter` (SACE) | `1` | Do not increase — EM overfits beyond iteration 1 |
 
 ---

@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(project_root, "CITEgeist", "model"))
 project = "CITEgeist"
 copyright = "2025, Lee/Oesterreich Lab"
 author = "Lee/Oesterreich Lab"
-release = "2.0.0"
-version = "2.0.0"
+release = "2.0.1"
+version = "2.0.1"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -36,6 +36,43 @@ extensions = [
 
 templates_path = ["_templates"]
 exclude_patterns = []
+
+# The docs build does not install CITEgeist or its runtime stack: cuOPT is
+# GPU-only and not on PyPI, and torch/opencv/stardist would exceed Read the
+# Docs' build resources. autodoc imports each module for its docstrings, so
+# every third-party package NOT in docs/requirements.txt must be mocked here.
+# numpy, pandas, scipy and anndata are installed for real so that signatures
+# render true annotations instead of mock reprs.
+autodoc_mock_imports = [
+    "csbdeep",
+    "cuopt",
+    "cv2",
+    "esda",
+    "gurobipy",
+    "joblib",
+    "libpysal",
+    "matplotlib",
+    "networkx",
+    "PIL",
+    "psutil",
+    # NOT pyarrow: pandas parses pyarrow.__version__ with a regex at its own
+    # import time, and a mock's __version__ is a Mock, not a string — mocking it
+    # raises TypeError and breaks pandas entirely, which silently empties every
+    # autodoc page while sphinx-build still exits 0. The package already guards
+    # its pyarrow import (citegeist_model.py:19), so absence is handled.
+    "scanpy",
+    "skimage",
+    "sklearn",
+    "squidpy",
+    "stardist",
+    "statsmodels",
+    "timm",
+    "torch",
+    "torch_geometric",
+    "torch_scatter",
+    "torchvision",
+    "tqdm",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

@@ -17,7 +17,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-# CITEgeist public data — download from GEO (accession in the manuscript) and set this path
+# CITEgeist public data — download from NCBI GEO accession GSE289326 and set this path
 PATIENT_DATA_ROOT = Path("/path/to/CITEgeist_public_data/processed_files")
 OUTPUT_ROOT = REPO_ROOT / "output" / "module3_cuopt_qp"
 

@@ -11,7 +11,7 @@ cell-type-specific deconvolved expression for interpretable program discovery.
 Pipeline integration:
     Module 1 (marker_interest) -> Filter spatially-variable proteins
     Module 2 (spatial_colocalization) -> Discover protein profiles
-    Module 3 (gurobi_impl) -> Cell type proportions + DECONVOLVED GEX LAYERS
+    Module 3 (qp_solver) -> Cell type proportions + DECONVOLVED GEX LAYERS
     Module 4 (THIS MODULE) -> Programs from deconvolved layers
 
 Key architectural change (v3):
@@ -2242,7 +2242,7 @@ def discover_programs_from_layers(
     1. Uses actual deconvolved expression (not approximated)
     2. No need to estimate/subtract background
     3. More accurate cell-type-specific programs
-    4. Leverages Module 3's Gurobi optimization results directly
+    4. Leverages Module 3's QP optimization results directly
 
     Args:
         adata: AnnData with deconvolved layers from Module 3.

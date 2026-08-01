@@ -1,0 +1,65 @@
+{
+  "A": {
+    "w_mm": 53.46,
+    "h_mm": 44.92,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Proportion benchmark"
+  },
+  "B": {
+    "w_mm": 64.24,
+    "h_mm": 44.92,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "GEX accuracy"
+  },
+  "C": {
+    "w_mm": 59.3,
+    "h_mm": 44.92,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Tissue robustness"
+  },
+  "D": {
+    "w_mm": 179.0,
+    "h_mm": 31.85,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Spatial deconvolution (high-seg)"
+  },
+  "E": {
+    "w_mm": 179.0,
+    "h_mm": 31.85,
+    "fonts": {
+      "axis_title_pt": 10,
+      "tick_label_pt": 10,
+      "legend_pt": 10,
+      "annotation_pt": 9,
+      "title_pt": 10
+    },
+    "title": "Spatial deconvolution (mixed)"
+  },
+  "_layout_defaults": {
+    "legend_position": "auto"
+  }
+}

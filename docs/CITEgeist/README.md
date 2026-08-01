@@ -10,7 +10,8 @@ CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Explorati
 - Python 3.10
 - NVIDIA GPU with 8GB+ VRAM (required for cuOPT QP solver, Module 3)
 - Required Python packages: see `requirements.txt` for exact versions
-- cuOPT: installed via conda environment (`CITEgeist_env.yml`)
+- cuOPT: **not on PyPI and not in `CITEgeist_env.yml`** — installed separately from the
+  NVIDIA index or a RAPIDS container. There is no CPU fallback for Module 3.
 
 ### Hardware Requirements
 - RAM: Minimum 16GB, Recommended 64GB+
@@ -26,21 +27,25 @@ CITEgeist (Cellular Indexing of Transcriptomes and Epitopes for Guided Explorati
 pip install citegeist
 ```
 
-The `cuOPT` GPU solver (Module 3) is not on PyPI — install it separately via NVIDIA RAPIDS/NGC
-(`pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com`), or use the conda
-environment below, which includes it.
+The `cuOPT` GPU solver (Module 3) is **not on PyPI and is not included in any environment
+file in this repository** — install it separately via NVIDIA RAPIDS/NGC
+(`pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com`, or use a pre-built
+RAPIDS container). CPU-only environments **cannot run** the cell-type proportion solver.
 
 ### From source
 
 #### Step 1: Set up Python Environment
 
 ```bash
-# Install via conda environment (recommended — includes cuOPT)
+# Install the analysis environment (scientific-Python stack; cuOPT NOT included)
 conda env create -f CITEgeist_env.yml
 conda activate CITEgeist_env
 
 # Or install core dependencies manually (see requirements.txt for versions)
 pip install -r requirements.txt
+
+# Then add the GPU solver separately (required for Module 3):
+pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com
 ```
 
 #### Step 2: Install CITEgeist

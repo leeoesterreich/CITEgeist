@@ -31,7 +31,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 
-# CITEgeist public data — download from GEO (accession in the manuscript) and set this path
+# CITEgeist public data — download from NCBI GEO accession GSE289326 and set this path
 DATA_ROOT = Path("/path/to/CITEgeist_public_data/processed_files")
 
 # All 12 patient samples (deduplicated: P4-S2_1i_rep replaces P4-S2, P5-S2_F_rep replaces P5-S2)

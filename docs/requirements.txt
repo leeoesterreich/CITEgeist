@@ -1,0 +1,18 @@
+# Documentation build dependencies (Read the Docs).
+#
+# Deliberately NOT requirements-dev.txt: that file pulls torch, opencv and the
+# full test stack, which exceeds Read the Docs' build resources. The package is
+# not pip-installed for the docs build either — docs/source/conf.py puts the
+# repository on sys.path and mocks the heavy/GPU imports via autodoc_mock_imports.
+#
+# numpy/pandas/scipy/anndata are installed for real (not mocked) so that autodoc
+# renders true type annotations in signatures rather than mock reprs. Anything
+# added here must stay CPU-only and lightweight.
+
+sphinx>=7.1.0
+sphinx-rtd-theme>=1.3.0
+
+numpy>=1.26.0
+pandas>=2.0.0
+scipy>=1.13.0
+anndata>=0.10.0
