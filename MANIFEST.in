@@ -1,16 +1,3 @@
-# Keep the research/dev test suite out of the published sdist — it targets the
-# development repository layout and is not useful to pip consumers.
-prune tests
-recursive-exclude tests *
-
-# slurm helper scripts are institution-specific and not useful to pip consumers
-prune CITEgeist/slurm
-recursive-exclude CITEgeist/slurm *
-
-# CITEgeist/examples has no __init__.py, so it is only swept into the sdist/wheel
-# as package data (via include_package_data's default pyproject.toml behavior) when
-# MANIFEST.in explicitly lists its non-.py files. The removed [tool.setuptools.package-data]
-# key was the prior mechanism for this; without it, examples/README.md silently drops
-# out of the built package unless included here.
-include CITEgeist/examples/README.md
-recursive-include CITEgeist/examples *.py *.md
+include LICENSE README.md CHANGELOG.md
+recursive-include citegeist *.py py.typed
+global-exclude __pycache__ *.py[cod]

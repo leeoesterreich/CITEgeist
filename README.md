@@ -1,192 +1,53 @@
-# CITEgeist
+# citegeist 0.2.0 (v1 proportions + SACE, for the ERT paper)
 
-[![GitHub stars](https://img.shields.io/github/stars/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/stargazers)
-[![License](https://img.shields.io/github/license/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/leeoesterreich/CITEgeist)](https://github.com/leeoesterreich/CITEgeist/issues)
-[![Python Version](https://img.shields.io/badge/python-3.10-blue.svg)](https://www.python.org/downloads/)
-[![CI](https://github.com/leeoesterreich/CITEgeist/actions/workflows/ci.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/ci.yml)
-[![Code Quality](https://github.com/leeoesterreich/CITEgeist/actions/workflows/quality.yml/badge.svg)](https://github.com/leeoesterreich/CITEgeist/actions/workflows/quality.yml)
+> Install this release with a pin: `pip install citegeist==0.2.0`.
+> `pip install citegeist` without a pin installs the newer 2.x line, which has a different layout
+> (the `CITEgeist.model` package) and does not contain the v1 proportion code.
 
-> Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends
+CITEgeist is the Lee/Oesterreich lab framework for spatial multi-omics (CITE-seq antibody capture
+with Visium). Release 0.2.0 puts two earlier releases in a single install so that the ERT paper
+needs one dependency instead of two:
 
-CITEgeist is a comprehensive computational framework for analyzing spatial multi-omic data, with a focus on integrating CITE-seq and spatial transcriptomics. Our toolkit enables researchers to uncover spatial patterns in cellular organization and gene expression, providing deeper insights into tissue architecture and function.
-
-## Key Features
-
-- Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
-- GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
-- SACE per-cell gene expression deconvolution via single-pass Poisson-multinomial allocation
-- Per-cell type assignment from spot proportions via StarDist nuclei segmentation. The default
-  routes nucleus morphology scores (`morphology/nucleus_scores.py`, shipped) through a Bayesian
-  posterior; count-constrained Hungarian matching remains available via `use_morphology=False`
-- Spatial gene program discovery and cross-sample integration (Modules 4–5)
-- Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
-
-## Documentation
-
-- [Quick Start Guide](https://github.com/leeoesterreich/CITEgeist/blob/main/CITEgeist/README.md)
-- [Running on Real Visium Data (end-to-end tutorial)](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md)
-- [Benchmarking Methodology](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/Benchmarking/README.md)
-- [Example Scripts](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts)
-
-## Data Availability
-
-| Dataset | Used for | Source |
+| Import | What it is | Same as |
 |---|---|---|
-| Visium + CITE-seq clinical-trial samples (this study) | Midkine / ESR1-D538G analyses; competitor-GEX validation | NCBI GEO [GSE289326](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE289326) |
-| Wu et al. 2021 breast cancer scRNA-seq atlas | Reference for reference-based competitor methods; source cells for the simulation | NCBI GEO [GSE176078](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE176078) |
-| Xenium Human Kidney Dataset (renal cell carcinoma) | Real-tissue benchmark | [10x Genomics](https://www.10xgenomics.com/datasets), publicly available |
+| `citegeist.core` | v1 cell-type proportions: Gurobi quadratic program plus radius-400 refinement | PyPI `citegeist==0.1.1` (the six files are byte-identical) |
+| `citegeist.sace` | SACE per-cell gene-expression allocation from spot proportions | `citegeist==2.0.0` (`CITEgeist.model`, only import paths changed) |
 
-## Reproducibility
+## Requirements
 
-Example end-to-end pipelines for each module are in [`examples/scripts`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/scripts).
-See the [end-to-end Visium tutorial](https://github.com/leeoesterreich/CITEgeist/blob/main/docs/quickstart_real_visium.md) to run CITEgeist on real data.
+- Python >= 3.10
+- `gurobipy` and a Gurobi licence for the v1 proportions (`citegeist.core`). SACE does not use Gurobi.
+- The paper results were run with numpy 1.26.4, pandas 2.2.3, scanpy 1.10.4, squidpy 1.6.2 and
+  gurobipy 11.0.2.
 
-The curated analysis code behind the paper's reported numbers — with a map from each script to
-the figure it produces — is in
-[`examples/paper_analysis`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/paper_analysis).
+## Usage
 
-## System Requirements
+Proportions (v1):
 
-### Minimum Requirements
-- Python 3.10
-- 16GB RAM
-- Multi-core processor
-- NVIDIA GPU with 8GB+ VRAM (required for cuOPT QP solver, Module 3)
-- Linux, macOS, or Windows 10 with WSL2
-
-## Quick Installation
-
-CITEgeist is published on PyPI:
-
-```bash
-pip install citegeist
+```python
+from citegeist.core.citegeist_model import CitegeistModel
 ```
 
-> **Note — package name vs import name:** The installed distribution is named
-> `citegeist` (lowercase), but the importable package is `CITEgeist` (capital C). After installation:
->
-> ```python
-> import CITEgeist                          # bare import (lightweight)
-> from CITEgeist import CitegeistModel      # lazy re-export — heavy stack loaded on demand
-> ```
+SACE (previously `from CITEgeist.model.citegeist_model import CitegeistModel` with citegeist 2.0.0):
 
-> **GPU requirement:** CITEgeist's QP deconvolution (Module 3) requires an **NVIDIA GPU with
-> CUDA** and the [cuOPT](https://developer.nvidia.com/cuopt-logistics-optimization) library.
-> cuOPT is **not available on PyPI** — install it via NVIDIA RAPIDS or NGC
-> (`pip install cuopt-cu12` from the NVIDIA index, or use a pre-built RAPIDS container).
-> CPU-only environments **cannot run** the cell-type proportion solver.
-
-To install from source instead:
-
-```bash
-git clone https://github.com/leeoesterreich/CITEgeist.git
-cd CITEgeist
-pip install -e .
+```python
+from citegeist.sace.citegeist_model import CitegeistModel
+# ... same calls as in 2.0.0, for example
+# spot_type_gex, diagnostics = model.run_sace_allocation(output_mode="layers", init_method="marker")
 ```
 
-For a development installation with test and lint dependencies:
+The SACE function code is `citegeist.sace.gex.sace_gex` (`run_sace_layers`, `run_sace`,
+`project_sace_to_cells`). The lazy exports of `citegeist.sace` also work, for example
+`from citegeist.sace import CitegeistModel, run_sace_layers`.
 
-```bash
-pip install -e .[dev]
-```
+`citegeist.core.CitegeistModel` (v1) and `citegeist.sace.CitegeistModel` (2.0.0) are different classes.
+Use the first for proportions and the second for SACE.
 
-## Development Setup
+## Newer code
 
-### For Contributors
+Cell-type proportions by SPOTS marker share with RNA refinement, the cuOPT solver, the QC tools
+and the full 2.x documentation are in the 2.x releases of this package, not in 0.2.0.
 
-If you want to contribute to CITEgeist, follow these steps:
+## Licence
 
-```bash
-# Clone the repository
-git clone https://github.com/leeoesterreich/CITEgeist.git
-cd CITEgeist
-
-# Create conda environment
-conda env create -f CITEgeist_env.yml
-conda activate CITEgeist_env
-
-# Install in development mode with dev dependencies
-pip install -e ".[dev]"
-```
-
-### Code Quality Tools
-
-We use several tools to maintain code quality:
-
-- **black**: Code formatting (120 char line length)
-- **isort**: Import sorting
-- **flake8**: Linting
-- **mypy**: Type checking
-- **pylint**: Static code analysis
-- **pytest**: Testing framework
-
-Run quality checks before committing:
-```bash
-# Format code
-black CITEgeist/
-isort CITEgeist/
-
-# Run linting
-flake8 CITEgeist/
-pylint CITEgeist/
-
-# Run tests
-pytest
-```
-
-**CI enforcement (blocks sync to main):** black, isort, flake8, pytest/coverage
-
-**Advisory (badge only, no merge gate):** pylint, mypy
-
-See [CONTRIBUTING.md](https://github.com/leeoesterreich/CITEgeist/blob/main/CONTRIBUTING.md) for detailed contribution guidelines.
-
-## License
-
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](https://github.com/leeoesterreich/CITEgeist/blob/main/LICENSE) file for details. BSD 3-Clause is a permissive license: you may use, modify, and redistribute the code, including in proprietary work, provided you retain the copyright notice and do not use the authors' names to endorse derived products.
-
-## Contact
-
-- **Lab Website**: [Lee/Oesterreich Laboratory](https://leeoesterreich.org/)
-- **Issues**: [GitHub Issues](https://github.com/leeoesterreich/CITEgeist/issues)
-- **Email**: [Contact Us](mailto:leeav@upmc.edu)
-
-## Citation
-
-If you use CITEgeist in your research, please cite our paper:
-(to be updated)
-```bibtex
-@article{ChangSchlegelCITEgeistCellularIndexing2025,
-  title = {{{CITEgeist}}: {{Cellular Indexing}} of {{Transcriptomes}} and {{Epitopes}} for {{Guided Exploration}} of {{Intrinsic Spatial Trends}}},
-  shorttitle = {{{CITEgeist}}},
-  author = {Chang, Alexander Chih-Chieh and Schlegel, Brent T. and Carleton, Neil and McAulife, Priscilla F. and Oesterreich, Steffi and Schwartz, Russell and Lee, Adrian V.},
-  date = {2025-02-17},
-  eprinttype = {bioRxiv},
-  eprintclass = {New Results},
-  pages = {2025.02.15.638331},
-  doi = {10.1101/2025.02.15.638331},
-  url = {https://www.biorxiv.org/content/10.1101/2025.02.15.638331v1},
-  urldate = {2025-02-17},
-  abstract = {Spatial transcriptomics provides insights into tissue architecture by linking gene expression with spatial localization. Current deconvolution methods rely heavily on single-cell RNA sequencing (scRNA-seq) references, which are costly and often unavailable, mainly if the tissue under evaluation is limited, such as in a core biopsy specimen. We present a novel tool, CITEgeist, that deconvolutes spatial transcriptomics data using antibody capture from the same slide as the reference, directly leveraging cell surface protein measurements from the same tissue section. This approach circumvents the limitations of scRNA-seq as a reference, offering a cost-effective and biologically grounded alternative. Our method employs mathematical optimization to estimate cell type proportions and gene expression profiles, incorporating sparsity constraints for robustness and interpretability. Benchmarks against state-of-the-art deconvolution methods show improved accuracy in cell type resolution, particularly in dense tumor microenvironments, while maintaining computational efficiency. This antibody-based tool advances spatial transcriptomics by providing a scalable, accurate, and reference-independent solution for deconvolution in complex tissues. We validate this tool by using a combined approach of simulated data and clinical samples by applying CITEgeist to translational pre-treatment and post-treatment ER+ breast tumors from an ongoing clinical trial, emphasizing the applicability and robustness of CITEgeist.},
-}
-
-
-```
-
-## Contributing
-
-We welcome contributions! Please see our [CONTRIBUTING.md](https://github.com/leeoesterreich/CITEgeist/blob/main/CONTRIBUTING.md) for detailed guidelines on:
-- Setting up your development environment
-- Code quality standards
-- Testing requirements
-- Pull request process
-
-## Support
-
-For support, please:
-- Open an issue on our [GitHub issue tracker](https://github.com/leeoesterreich/CITEgeist/issues)
-- Check existing issues and discussions
-- Read our documentation and examples
-
----
-Copyright (c) 2025 Lee/Oesterreich Lab
+BSD 3-Clause, see `LICENSE`.

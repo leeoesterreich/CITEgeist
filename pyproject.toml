@@ -1,45 +1,20 @@
 [build-system]
-requires = ["setuptools>=45", "wheel"]
+requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools.packages.find]
-include = ["CITEgeist*"]
-exclude = ["repro*", "figures*", "Benchmarking*", "manuscript*", "tests*"]
 
 [project]
 name = "citegeist"
-version = "2.0.1"
-description = "Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends"
+version = "0.2.0"
+description = "CITEgeist 0.2.0: v1 proportions (Gurobi QP) and SACE per-cell expression allocation in one install, for reproducing the ERT paper"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "BSD-3-Clause"}
-dependencies = [
-    "numpy>=1.21.0",
-    "pandas>=1.3.0",
-    "scipy>=1.7.0",
-    "scanpy>=1.9.0",
-    "squidpy>=1.2.0",
-    "anndata>=0.8.0",
-    "scikit-learn>=1.0.0",
-    "scikit-image>=0.22.0",
-    "matplotlib>=3.5.0",
-    "networkx",
-    "tqdm>=4.62.0",
-    "joblib",
-    "esda",
-    "libpysal",
-]
 authors = [
-    {name = "Alexander Chih-Chieh Chang", email = "leeav@upmc.edu"},
+    {name = "Alexander Chih-Chieh Chang"},
+    {name = "Brent T. Schlegel"},
     {name = "Lee/Oesterreich Laboratory"},
 ]
-keywords = [
-    "spatial-transcriptomics",
-    "CITE-seq",
-    "deconvolution",
-    "computational-biology",
-    "single-cell",
-]
+keywords = ["spatial-transcriptomics", "CITE-seq", "deconvolution", "computational-biology", "single-cell"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -48,98 +23,40 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
 ]
+# Union of the 0.1.1 (v1 proportions) and 2.0.0 (SACE) requirements. psutil and statsmodels are
+# imported unconditionally by citegeist.core.gurobi_impl (0.1.1 left them undeclared).
+dependencies = [
+    "numpy>=1.21.0",
+    "pandas>=1.3.0",
+    "scipy>=1.7.0",
+    "scanpy>=1.9.0",
+    "squidpy>=1.6.2",
+    "anndata>=0.8.0",
+    "pyarrow>=5.0.0",
+    "gurobipy>=9.5.0",
+    "scikit-learn>=1.0.0",
+    "scikit-image>=0.22.0",
+    "matplotlib>=3.5.0",
+    "statsmodels>=0.13.0",
+    "psutil>=5.9.0",
+    "networkx",
+    "tqdm>=4.62.0",
+    "joblib",
+    "esda",
+    "libpysal",
+]
+
+[project.optional-dependencies]
+imaging = ["stardist"]
+dev = ["pytest>=7.0", "black>=22.0", "isort>=5.10"]
 
 [project.urls]
 Homepage = "https://github.com/leeoesterreich/CITEgeist"
-Documentation = "https://citegeist.readthedocs.io/"
 Repository = "https://github.com/leeoesterreich/CITEgeist"
 "Bug Tracker" = "https://github.com/leeoesterreich/CITEgeist/issues"
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "black>=23.0",
-    "isort>=5.12",
-    "flake8>=6.0",
-    "mypy>=1.0",
-    "pylint>=3.0",
-    "pre-commit>=3.0",
-]
-imaging = ["stardist"]
-# Module 3.5 (functional annotation) only. EXPERIMENTAL — not part of the
-# production QP + SACE pipeline; torch is deliberately not a core dependency.
-functional = ["torch"]
+[tool.setuptools.packages.find]
+include = ["citegeist*"]
 
-[tool.black]
-line-length = 120
-target-version = ['py310']
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-  | Benchmarking
-  | _archive
-  | junk
-)/
-'''
-
-[tool.isort]
-profile = "black"
-line_length = 120
-skip_gitignore = true
-known_first_party = ["CITEgeist"]
-known_third_party = ["numpy", "pandas", "scanpy", "anndata", "scipy", "matplotlib"]
-sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"]
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-disallow_incomplete_defs = false
-check_untyped_defs = false
-ignore_missing_imports = true
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = false
-warn_no_return = true
-warn_unreachable = true
-strict_equality = true
-# Suppress numpy/pandas/scipy/torch typing false positives common in scientific Python
-disable_error_code = ["operator", "index", "arg-type", "union-attr", "no-any-return", "assignment"]
-exclude = ["Benchmarking", "_archive", "junk", "CITEgeist/tests"]
-
-[[tool.mypy.overrides]]
-module = [
-    "numpy.*",
-    "pandas.*",
-    "scipy.*",
-    "matplotlib.*",
-    "scanpy.*",
-    "anndata.*",
-]
-ignore_missing_imports = true
-
-[tool.bandit]
-exclude_dirs = [
-    "tests",
-    "Benchmarking",
-]
-skips = [
-    "B101",  # assert_used - common in scientific code
-    "B601",  # paramiko_calls
-]
+[tool.setuptools.package-data]
+citegeist = ["py.typed"]
