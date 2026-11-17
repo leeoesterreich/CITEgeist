@@ -2,13 +2,13 @@
 
 These scripts illustrate the full CITEgeist analysis pipeline on Visium + CITE-seq data.
 They are illustrative entry points; you must supply your own SpaceRanger output and CITE-seq
-antibody count matrix. The QP deconvolution step (Module 3 cuOPT) requires an NVIDIA GPU
-with the cuOPT library installed.
+antibody count matrix. Only the optional QP
+deconvolution step (`method="qp"`, cuOPT) requires an NVIDIA GPU with the cuOPT library installed.
 
 | Script | Module / Step | Description |
 |--------|--------------|-------------|
 | `run_module12_discovery.py` | Modules 1 & 2 | Marker interest detection (M1) and spatial colocalization → cell-type profile discovery (M2a/b/c) |
-| `run_module3_unified.py` | Module 3 | Unified deconvolution: cuOPT QP cell-type proportions + SACE GEX allocation |
+| `run_module3_unified.py` | Module 3 | Unified deconvolution: cell-type proportions (`auto` = RNA refinement, or `marker_share`) + SACE GEX allocation |
 | `run_cuopt_qp_patient.py` | Module 3 (QP only) | Standalone cuOPT quadratic-programming proportion solver for a single patient sample |
 | `run_module4_discovery.py` | Module 4 | Anchored NMF gene-program discovery per cell type |
 | `run_module4b_bivariate.py` | Module 4b | Bivariate Moran's I between program pairs (spatial co-variation) |
@@ -20,5 +20,5 @@ with the cuOPT library installed.
 - SpaceRanger output directory (Visium GEX) and matched CITE-seq antibody counts (`.h5ad`)
 - Python environment with CITEgeist installed (`pip install citegeist`, or from source —
   `git clone` the repo, then `pip install -e .`)
-- **GPU required** for `run_cuopt_qp_patient.py` and `run_module3_unified.py` (cuOPT QP solver)
+- **GPU required** only for `run_cuopt_qp_patient.py` (cuOPT QP solver); `run_module3_unified.py` runs on CPU
 - See each script's header for dataset-specific parameters to configure before running

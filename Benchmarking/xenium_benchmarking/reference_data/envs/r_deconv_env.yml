@@ -1,0 +1,27 @@
+name: r_deconv_env
+channels:
+  - conda-forge
+  - bioconda
+  - r
+dependencies:
+  - python=3.10
+  - r-base=4.3
+  - r-seurat>=5.0
+  - r-matrix
+  - r-dplyr
+  - r-ggplot2
+  - r-optparse
+  - r-hdf5r
+  - r-devtools
+  - r-remotes
+  - r-rcpp
+  - r-jsonlite
+  - bioconductor-rhdf5
+  - anndata
+  - pandas
+  - numpy<2.0
+  - scipy
+  - h5py
+  - pip
+  - pip:
+    - anndata2ri

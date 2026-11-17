@@ -6,7 +6,7 @@ import pandas as pd
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 
 
-def calculate_rmse(ground_truth_dir, predictions_dir, normalize="range"):
+def calculate_rmse(ground_truth_dir, predictions_dir, normalize="range", gene_subset=None):
     metrics_per_cell_type = {}
 
     for gt_filename in os.listdir(ground_truth_dir):
@@ -35,6 +35,8 @@ def calculate_rmse(ground_truth_dir, predictions_dir, normalize="range"):
             gt_df, pred_df = gt_df.loc[common_spots], pred_df.loc[common_spots]
 
             common_genes = gt_df.columns.intersection(pred_df.columns)
+            if gene_subset is not None:  # optional matched-gene-set restriction (upper-case symbols); default unchanged
+                common_genes = common_genes.intersection(gene_subset)
             gt_df, pred_df = gt_df[common_genes], pred_df[common_genes]
 
             if gt_df.empty or pred_df.empty:

@@ -447,6 +447,117 @@ class TestBivariateRelationshipComparison:
                 assert rel.relationship_type == "exclusive"
 
 
+def _make_aligned_group(program_id, cell_type, program_keys):
+    """Aligned group holding the given (specimen, cell_type, program_id) keys."""
+    samples = sorted({k[0] for k in program_keys})
+    return AlignedProgram(
+        program_id=program_id,
+        cell_type=cell_type,
+        samples_present=samples,
+        consensus_signature={},
+        sample_signatures={},
+        sample_program_ids={},
+        embedding=np.zeros(2),
+        conservation_score=1.0,
+        top_genes=[],
+        program_keys=list(program_keys),
+    )
+
+
+def _make_pair(prog1_id, prog2_id, value):
+    return ProgramPairRelationship(
+        anchor1="T",
+        program1_id=prog1_id,
+        anchor2="B",
+        program2_id=prog2_id,
+        bivariate_morans_i=value,
+        bivariate_pvalue=0.5,
+        pearson_correlation=0.0,
+        pearson_pvalue=0.5,
+        n_spots_used=100,
+        top_genes_overlap=[],
+        relationship_type="independent",
+    )
+
+
+def _make_bivariate(pairs):
+    return BivariateProgramResult(
+        significant_pairs=[],
+        all_pairs=pairs,
+        n_programs_total=0,
+        n_pairs_tested=len(pairs),
+        n_significant=0,
+        fdr_threshold=0.05,
+    )
+
+
+def _two_group_setup(values_by_specimen, n_programs_a, n_programs_b, extra_specimens=()):
+    """Groups A (cell type T) and B (cell type B); each specimen has n_programs_a
+    programs in A and n_programs_b in B, and one Module 4b pair per (a, b) combination
+    taking the specimen's values in order."""
+    keys_a, keys_b, results = [], [], {}
+    for specimen, values in values_by_specimen.items():
+        na, nb = n_programs_a[specimen], n_programs_b[specimen]
+        keys_a += [(specimen, "T", i) for i in range(na)]
+        keys_b += [(specimen, "B", j) for j in range(nb)]
+        combos = [(i, j) for i in range(na) for j in range(nb)]
+        assert len(combos) == len(values)
+        results[specimen] = _make_bivariate(
+            [_make_pair(i, j, v) for (i, j), v in zip(combos, values)]
+        )
+    for specimen in extra_specimens:
+        results[specimen] = _make_bivariate([])
+    groups = [_make_aligned_group("A", "T", keys_a), _make_aligned_group("B", "B", keys_b)]
+    return results, groups
+
+
+class TestBivariateSpecimenUnit:
+    """The unit of analysis is the specimen, not the Module 4b pair entry."""
+
+    def test_single_specimen_many_programs_counts_once(self):
+        """3 programs in A x 2 in B for one specimen = 6 entries but 1 specimen."""
+        results, groups = _two_group_setup(
+            {"S1": [0.1, 0.2, 0.3, 0.4, 0.5, 0.3]}, {"S1": 3}, {"S1": 2}
+        )
+        assert compare_bivariate_relationships(results, groups, min_samples=2) == []
+        kept = compare_bivariate_relationships(results, groups, min_samples=1)
+        assert len(kept) == 1
+        assert kept[0].samples_with_relationship == ["S1"]
+        assert len(kept[0].bivariate_i_values) == 1
+
+    def test_specimens_weighted_equally(self):
+        """A 6-entry specimen and a 1-entry specimen count as 2 and weigh equally."""
+        s1 = [0.1, 0.2, 0.3, 0.4, 0.5, 0.3]  # mean 0.3
+        results, groups = _two_group_setup(
+            {"S1": s1, "S2": [-0.1]},
+            {"S1": 3, "S2": 1},
+            {"S1": 2, "S2": 1},
+            extra_specimens=["S3"],
+        )
+        (rel,) = compare_bivariate_relationships(results, groups, min_samples=2)
+
+        assert rel.samples_with_relationship == ["S1", "S2"]
+        assert len(rel.samples_with_relationship) == len(set(rel.samples_with_relationship))
+        np.testing.assert_allclose(rel.bivariate_i_values, [0.3, -0.1])
+        assert rel.conservation_score == pytest.approx(2 / 3)
+        assert rel.conservation_score <= 1.0
+        assert rel.mean_bivariate_i == pytest.approx(0.1)  # not pooled 1.7/7
+        assert rel.std_bivariate_i == pytest.approx(0.2)  # np.std([0.3, -0.1])
+
+    def test_relationship_type_uses_per_specimen_mean(self):
+        """Pooled mean (0.157) is co-localized, per-specimen mean (0.05) is independent."""
+        results, groups = _two_group_setup(
+            {"S1": [0.2] * 6, "S2": [-0.1]},
+            {"S1": 3, "S2": 1},
+            {"S1": 2, "S2": 1},
+        )
+        (rel,) = compare_bivariate_relationships(
+            results, groups, min_samples=2, colocalization_threshold=0.1
+        )
+        assert rel.mean_bivariate_i == pytest.approx(0.05)
+        assert rel.relationship_type == "independent"
+
+
 class TestSimilarityNetwork:
     """Test similarity network construction."""
 

@@ -98,6 +98,7 @@ def run_qp_for_sample(sample_name: str):
     meta = SAMPLE_METADATA[sample_name]
     logger.info("Filtering + preprocessing GEX (min_counts=%d)...", meta["min_counts"])
     model.filter_gex(min_counts=meta["min_counts"])
+    model.copy_gex_to_protein_adata()
     model.preprocess_gex()
 
     logger.info("Preprocessing antibody...")

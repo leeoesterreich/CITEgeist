@@ -1,13 +1,18 @@
 #!/usr/bin/env python
-# Requires: CITEgeist public data from GEO (set DATA_ROOT) and a GPU node for the cuOPT QP solver (Module 3).
+# Requires: CITEgeist public data from GEO (set DATA_ROOT). Proportion estimation (RNA refinement) runs on CPU;
+# nuclei segmentation (StarDist) is needed unless you pass --nuclei-csv.
 """
 Module 3 Runner with Unified Profile.
 
-Runs CITEgeist Module 3 (cell proportion + gene expression deconvolution)
+Runs CITEgeist Module 3 (RNA-refined proportion estimation + gene expression deconvolution)
 using the unified profile derived from Module 1-2 discovery analysis.
 
 Usage:
     python run_module3_unified.py --sample sample-P1-S1 --output-dir output/module3_unified
+
+The default Phase 1 method is RNA refinement, which needs per-spot nuclei counts: either run the built-in
+segmentation (default; needs an H&E image) or pass --nuclei-csv (a CSV with a barcode index column and an
+n_nuclei column). Use --phase1-method marker_share to run plain marker share without nuclei.
 """
 
 import argparse
@@ -18,12 +23,17 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import squidpy as sq
 
 # Add the parent directory to the system path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from CITEgeist.model.citegeist_model import CitegeistModel
+
+# Sibling module: works when run as a script and when loaded by file path (importlib).
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from breast_dictionary import BREAST_PROFILE  # noqa: E402
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -68,31 +78,7 @@ SAMPLE_METADATA = {
 
 # Unified profile from Module 1-2 discovery analysis (expanded version)
 # Note: markers have -1 suffix as per real patient data convention
-UNIFIED_PROFILE = {
-    "Cancer_Cells": {
-        "Major": ["EPCAM-1"],
-        "Minor": ["SDC1-1", "KRT5-1"],
-    },
-    "Macrophages": {
-        "Major": ["CD68-1"],
-        "Minor": ["CD14-1"],
-    },
-    "CD4_T_Cells": {
-        "Major": ["CD3E-1", "CD4-1"],
-    },
-    "CD8_T_Cells": {
-        "Major": ["CD3E-1", "CD8A-1"],
-    },
-    "B_Cells": {
-        "Major": ["MS4A1-1", "CD19-1"],
-    },
-    "Endothelial": {
-        "Major": ["PECAM1-1"],
-    },
-    "Fibroblasts": {
-        "Major": ["ACTA2-1"],
-    },
-}
+UNIFIED_PROFILE = BREAST_PROFILE
 
 
 def run_module3(
@@ -102,7 +88,8 @@ def run_module3(
     skip_gex: bool = False,
     nuclei_segmentation: bool = False,
     segmentation_resolution: str = "hires",
-    nuclei_prior_lambda: float = 1.0,
+    phase1_method: str = "auto",
+    nuclei_csv: Path = None,
 ) -> dict:
     """
     Run Module 3 (cell proportions + gene expression deconvolution).
@@ -114,7 +101,8 @@ def run_module3(
         skip_gex: If True, skip gene expression deconvolution (faster)
         nuclei_segmentation: If True, run built-in nuclei segmentation
         segmentation_resolution: Image resolution mode for segmentation (lowres/hires/fullres)
-        nuclei_prior_lambda: Soft-prior weight for nuclei abundance target
+        phase1_method: "auto" (default; RNA refinement, needs nuclei counts) or "marker_share" (no nuclei needed)
+        nuclei_csv: CSV (barcode index, ``n_nuclei`` column) of per-spot nuclei counts; used instead of segmentation
 
     Returns:
         Dict with result summary
@@ -160,7 +148,14 @@ def run_module3(
 
     # Split and preprocess
     model.split_adata()
-    model.filter_gex(nonzero_percentage=0.01, mean_expression_threshold=1.0, min_counts=min_counts)
+    # RNA refinement (phase1_method="auto") must see the full-gene raw counts, as in the frozen v2 validation;
+    # keep_unfiltered holds them while SACE and the rest of the script keep using the gene-filtered GEX.
+    model.filter_gex(
+        nonzero_percentage=0.01,
+        mean_expression_threshold=1.0,
+        min_counts=min_counts,
+        keep_unfiltered=(phase1_method == "auto"),
+    )
     model.copy_gex_to_protein_adata()
     model.preprocess_gex()
     model.preprocess_antibody()
@@ -174,7 +169,17 @@ def run_module3(
     model.load_cell_profile_dict(profile)
     logger.info(f"Loaded unified profile with {len(profile)} cell types: {list(profile.keys())}")
 
-    if nuclei_segmentation:
+    nuclei_counts = None
+    if nuclei_csv is not None and phase1_method != "auto":
+        logger.warning("nuclei_csv is ignored with phase1_method=%s (only the default RNA refinement uses it)", phase1_method)
+        nuclei_csv = None
+    if nuclei_csv is not None:
+        nuclei_df = pd.read_csv(nuclei_csv, index_col=0)
+        if "n_nuclei" not in nuclei_df.columns:
+            raise ValueError(f"{nuclei_csv} needs an 'n_nuclei' column (barcode index); found {list(nuclei_df.columns)}")
+        nuclei_counts = nuclei_df["n_nuclei"]
+        logger.info("Read nuclei counts for %d spots from %s", len(nuclei_counts), nuclei_csv)
+    elif nuclei_segmentation or phase1_method == "auto":  # RNA refinement needs nuclei counts
         logger.info(
             "Running nuclei segmentation (resolution=%s)...",
             segmentation_resolution,
@@ -189,13 +194,12 @@ def run_module3(
             float(np.median(nuclei_counts.values)),
         )
 
-    # Run cell proportion model (Pass 1) - radius auto-detected
-    logger.info("Running cell proportion model...")
+    # Run proportion estimation (Pass 1) - radius auto-detected
+    logger.info("Running proportion estimation (phase1_method=%s)...", phase1_method)
     global_props, finetuned_props = model.run_cell_proportion_model(
+        method=phase1_method,
+        nuclei_counts=nuclei_counts if phase1_method == "auto" else None,
         validation_warn_only=True,  # Don't fail on rare cell types
-        use_nuclei_prior=nuclei_segmentation,
-        nuclei_prior_lambda=nuclei_prior_lambda,
-        nuclei_target_col="nuclei_count_target",
     )
 
     # Append proportions to adata
@@ -208,6 +212,7 @@ def run_module3(
         "n_genes": model.gene_expression_adata.shape[1],
         "cell_types": list(profile.keys()),
         "n_cell_types": len(profile),
+        "phase1_method": model.results["phase1_method"],
         "proportions_global": f"{sample_name}_cell_prop_global_results.csv",
         "proportions_finetuned": f"{sample_name}_cell_prop_finetuned_results.csv",
     }
@@ -260,7 +265,20 @@ def main():
     parser.add_argument(
         "--nuclei-segmentation",
         action="store_true",
-        help="Run built-in nuclei segmentation and use as soft abundance prior.",
+        help="Run built-in nuclei segmentation (implied by the default RNA-refinement Phase 1).",
+    )
+    parser.add_argument(
+        "--nuclei-csv",
+        type=str,
+        default=None,
+        help="CSV of per-spot nuclei counts (barcode index, n_nuclei column); skips segmentation.",
+    )
+    parser.add_argument(
+        "--phase1-method",
+        type=str,
+        default="auto",
+        choices=["auto", "marker_share"],
+        help="auto = RNA refinement (default; needs nuclei counts); marker_share = plain marker share.",
     )
     parser.add_argument(
         "--segmentation-resolution",
@@ -268,12 +286,6 @@ def main():
         default="hires",
         choices=["lowres", "hires", "fullres"],
         help="Image resolution mode for nuclei segmentation.",
-    )
-    parser.add_argument(
-        "--nuclei-prior-lambda",
-        type=float,
-        default=1.0,
-        help="Soft-prior weight for nuclei abundance target.",
     )
 
     args = parser.parse_args()
@@ -310,7 +322,8 @@ def main():
         skip_gex=args.skip_gex,
         nuclei_segmentation=args.nuclei_segmentation,
         segmentation_resolution=args.segmentation_resolution,
-        nuclei_prior_lambda=args.nuclei_prior_lambda,
+        phase1_method=args.phase1_method,
+        nuclei_csv=args.nuclei_csv,
     )
 
     # Save metadata

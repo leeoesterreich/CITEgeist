@@ -1,0 +1,101 @@
+{
+  "_code_commit": "39515bff76fd7d11d752061b5de95673c347212c",
+  "_code_dirty": false,
+  "_payload_sha256": "c798cd42521f00db589e630824c316ec3cf228719fdfaa4484da72c74428e99e",
+  "_produced_by": "Benchmarking/xenium_benchmarking/gt_rebuild/composition_arms.py",
+  "arm_set": [
+    "natural",
+    "gt_matched",
+    "fibro_skew"
+  ],
+  "decision_status": "USER DECISION 2026-10-24: option 2",
+  "fibro_factor": 5.0,
+  "gt_labels_csv": "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/labels/cell_labels_6type.csv",
+  "gt_labels_sha256": "c4bc107727cd83dd2f8aa943f304202417341e237cca7e92491530a553d3c8d1",
+  "gt_labelset": "rnaprot",
+  "gt_overall": {
+    "B cells": 0.0682244038810306,
+    "Endothelial": 0.10226411687952885,
+    "Epithelial": 0.15937719689364369,
+    "Fibroblasts": 0.12665596201032353,
+    "Macrophages": 0.2724544755766974,
+    "T cells": 0.27102384475877594
+  },
+  "integer_counts": {
+    "fibro_skew": {
+      "B cells": 29,
+      "Endothelial": 961,
+      "Epithelial": 1540,
+      "Fibroblasts": 177,
+      "Macrophages": 713,
+      "T cells": 492
+    },
+    "gt_matched": {
+      "B cells": 267,
+      "Endothelial": 400,
+      "Epithelial": 624,
+      "Fibroblasts": 495,
+      "Macrophages": 1066,
+      "T cells": 1060
+    },
+    "natural": {
+      "B cells": 30,
+      "Endothelial": 998,
+      "Epithelial": 1599,
+      "Fibroblasts": 35,
+      "Macrophages": 740,
+      "T cells": 510
+    }
+  },
+  "n": 3912,
+  "n_arms": 3,
+  "natural_counts": {
+    "B cells": 416,
+    "Endothelial": 13986,
+    "Epithelial": 22416,
+    "Fibroblasts": 495,
+    "Macrophages": 10381,
+    "T cells": 7156
+  },
+  "reference_csv": "Benchmarking/xenium_benchmarking/reference_data/GSE156632/processed/rctd/cell_types_with_sample.csv",
+  "reference_label_map": {
+    "B cells": "B cells",
+    "Endothelial": "Endothelial",
+    "Epithelial": "Epithelial",
+    "Fibroblasts": "Fibroblasts",
+    "Macrophages": "Macrophages",
+    "T cells": "T cells"
+  },
+  "reference_sha256": "7744373deb98f442d342491d5dd521c8ca12520eafc399c67a163a9d01e42ed6",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "vectors": {
+    "fibro_skew": {
+      "B cells": 0.007308045365359083,
+      "Endothelial": 0.24569789057671187,
+      "Epithelial": 0.3937912137256952,
+      "Fibroblasts": 0.04512306289881495,
+      "Macrophages": 0.1823673532158477,
+      "T cells": 0.12571243421757117
+    },
+    "gt_matched": {
+      "B cells": 0.0682244038810306,
+      "Endothelial": 0.10226411687952885,
+      "Epithelial": 0.15937719689364369,
+      "Fibroblasts": 0.12665596201032353,
+      "Macrophages": 0.2724544755766974,
+      "T cells": 0.27102384475877594
+    },
+    "natural": {
+      "B cells": 0.007584320875113947,
+      "Endothelial": 0.25498632634457613,
+      "Epithelial": 0.4086782133090246,
+      "Fibroblasts": 0.00902461257976299,
+      "Macrophages": 0.1892616226071103,
+      "T cells": 0.13046490428441204
+    }
+  }
+}

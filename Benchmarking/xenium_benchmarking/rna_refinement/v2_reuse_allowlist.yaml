@@ -1,0 +1,56 @@
+# Reuse allowlist for v2_official.py (X9): inputs the v42 stages read from earlier work, with the sha256 each must still have.
+# Extracted from the manuscript lineage manifest: the entries whose files live under Benchmarking/ (the two wet-lab well tables
+# are listed at their copies in midkine_remediation/wetlab/, byte-identical). Entries for manuscript-only files are not distributed.
+reuse_allowlist:
+- name: gt_manifest
+  category: gt
+  path: Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/manifest.json
+  sha256: c15180ad2a66c107b18a9c877b5dadd370a9e1a5fc83fbe736391fbea31be240
+- name: gt_excl
+  category: gt
+  path: Benchmarking/xenium_benchmarking/ground_truth_xenium_clusters/labels/exclusion_summary.json
+  sha256: 1a988aeecb11cbc875533087cbd5c0340750b0cafbab5971b5559e43436c40ab
+- name: gt_sigma
+  category: gt
+  path: Benchmarking/xenium_benchmarking/evaluation/rnaprot/gt_gex_sigma.json
+  sha256: 802ef58c9a01eed067f68f5b2c8984f3fe939b3f46c8f66cf2e812da41227175
+- name: breast_gt_sigma
+  category: gt
+  path: Benchmarking/xenium_benchmarking/evaluation/breast_sigma_spot/gt_gex_sigma.json
+  sha256: eb73b2655bb653cc69c0da5dcd121fa6c7004532b32fcb47b705a9fca6c25d34
+- name: canon
+  category: competitor
+  path: Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/canonical_results_all.json
+  sha256: 35fb025062f651d518f9a6bb13dbe4d18b6dc2398fbee67f9eb4ed317980a569
+- name: comp
+  category: competitor
+  path: Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/composition_sensitivity.json
+  sha256: d8b32e62d04dd1d9e71a880831dee45fd33baaf0e2c5bbf3b434978d716dd569
+- name: sim
+  category: competitor
+  path: Benchmarking/simulation_benchmarking/results/sim_summary.json
+  sha256: 55bc427cac922b2a8b82ab5a1480a2442d8dd83fcdc9efe581223bb0adf3dc25
+- name: sim_per_type
+  category: competitor
+  path: Benchmarking/simulation_benchmarking/results/calsim_per_type_canonical_v42_blocksigma.json
+  sha256: b7a9b7e75af62a8dba1d4da7c679f65fd2e823fd9caafaf0442b3b7772cbed4b
+- name: breastgex
+  category: competitor
+  path: Benchmarking/xenium_benchmarking/evaluation/results_breast/gex_comparison.json
+  sha256: eded542d1c985d1247197c282273fc75b164c7c4a8714fd27e166e3bb318c9ea
+- name: ddpcr_wells
+  category: wet_lab
+  path: Benchmarking/midkine_remediation/wetlab/ddpcr_wells.csv
+  sha256: d46b3084b9508c02f440bd226eb848a36974d62b4035fdd2993312336b5f709e
+- name: elisa_plate2_wells
+  category: wet_lab
+  path: Benchmarking/midkine_remediation/wetlab/elisa_plate2_wells.csv
+  sha256: 639f4af4a9d56e4533fb335346145b96e0d6c6f34bc9429fc28f7b0a8a023eea
+- name: x7_conditions_6
+  category: design
+  path: Benchmarking/protein_sensitivity/results/sensitivity_v2_rnaprot/conditions_xenium_6.json
+  sha256: 3c3bb8ee422fa4d3726aaa8a79f0b15497006c56b7739792afcfa153fb58ec99
+- name: x7_conditions_7
+  category: design
+  path: Benchmarking/protein_sensitivity/results/sensitivity_v2_rnaprot/conditions_xenium_7.json
+  sha256: 70311258fbc6065aac266b0415034d35e32e3db5ca13de1fbcc8bad9805cbe8d

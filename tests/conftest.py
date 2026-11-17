@@ -293,3 +293,16 @@ def pytest_collection_modifyitems(config, items):
         # Mark optimization tests as slow
         if "optimize" in item.nodeid.lower() or "optimization" in item.nodeid.lower():
             item.add_marker(pytest.mark.slow)
+
+
+@pytest.fixture(autouse=True)
+def _restore_label_dependent_modules():
+    """Xenium eval scripts bind XEN_LABELSET at import; don't leak a rnaprot-bound copy into other test files."""
+    names = ("eval_sace_arms", "compare_xenium_gex_methods", "matched_gene_r")
+    saved = {n: sys.modules.get(n) for n in names}
+    yield
+    for n, mod in saved.items():
+        if mod is None:
+            sys.modules.pop(n, None)
+        else:
+            sys.modules[n] = mod

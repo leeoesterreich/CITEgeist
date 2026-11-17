@@ -1,0 +1,38 @@
+# Public entry points smoke-tested with `python -I <file> --help`
+# (scripts/smoke_exported_tree.py, tests/test_public_benchmarking_exports.py).
+# One repo-relative path per line; '#' lines and blank lines are ignored.
+# Only shipped runner/scorer .py files that parse args and answer --help on CPU
+# without cuopt/R/data. Excluded (--help needs heavy deps or has no CLI parser):
+#   Cell2Location/src/{train_reference,run_benchmark}.py (import cell2location),
+#   Tangram/src/run_benchmark.py (heavy top-level import, >120 s),
+#   gt_rebuild/{score_methods,rnaprot,record_inputs}.py, spots_baseline/sace_props_ablation.py,
+#   simulation_benchmarking/src/benchmarking_spot_deconv.py, protein_sensitivity/{spots_sensitivity,aggregate_v41p,gate,strict_score}.py,
+#   midkine_remediation/src/rebuild_single_cell.py, geomx_benchmarking/CITEgeist/src/create_pseudo_geomx.py
+#   (positional sys.argv / package-relative or sibling imports / no argparse),
+#   build_canonical_results.py, evaluate_all_{props,gex}.py, hurdle.py, morans.py, build_full_reference.py (no argparse: run work on --help).
+Benchmarking/xenium_benchmarking/spots_baseline/write_marker_share_preds.py
+Benchmarking/geomx_benchmarking/CITEgeist/src/run_pseudo_geomx.py
+Benchmarking/geomx_benchmarking/CITEgeist/src/run_geomx_hnscc.py
+Benchmarking/xenium_benchmarking/evaluation/src/evaluate_benchmark.py
+Benchmarking/xenium_benchmarking/spots_baseline/score_p138_strict.py
+Benchmarking/xenium_benchmarking/evaluation/src/compare_xenium_gex_methods.py
+Benchmarking/xenium_benchmarking/RCTD/src/convert_h5ad.py
+Benchmarking/xenium_benchmarking/reference_data/GSE156632/src/process_reference.py
+Benchmarking/simulation_benchmarking/regen/src/c2l_reconstruct.py
+Benchmarking/xenium_benchmarking/Seurat/src/convert_h5ad.py
+Benchmarking/xenium_benchmarking/CARD/src/convert_h5ad.py
+Benchmarking/simulation_benchmarking/regen/src/tangram_reconstruct.py
+Benchmarking/xenium_benchmarking/evaluation/src/build_native_and_split_layers.py
+Benchmarking/xenium_benchmarking/evaluation/src/matched_gene_r.py
+Benchmarking/geomx_benchmarking/CITEgeist/src/evaluate_geomx_hnscc.py
+Benchmarking/simulation_benchmarking/score_calsim_per_type.py
+Benchmarking/simulation_benchmarking/regen/src/promote_canonical.py
+Benchmarking/simulation_benchmarking/src/benchmarking_gex.py
+Benchmarking/protein_sensitivity/run_sensitivity.py
+Benchmarking/midkine_remediation/src/run_module3_marker_share.py
+Benchmarking/midkine_remediation/src/sace_layers.py
+Benchmarking/midkine_remediation/src/build_compartment_adata.py
+Benchmarking/midkine_remediation/src/commot_runs.py
+Benchmarking/midkine_remediation/src/nmf_module4.py
+Benchmarking/midkine_remediation/src/a12_9_real.py
+Benchmarking/midkine_remediation/src/a12_10_real.py

@@ -3,6 +3,77 @@ Changelog
 
 All notable changes to CITEgeist will be documented in this file.
 
+Version 3.0.0
+-------------
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* ``run_cell_proportion_model()`` now defaults to ``method="auto"``, which resolves to
+  ``"rna_refined"``: SPOTS marker share (Ben-Chetrit et al. 2023) followed by
+  reference-free RNA refinement (multinomial, c = 0.1, 3 passes, no anchor). CPU only, no
+  GPU needed. The output is an RNA compartment (an RNA-mass share), not a cell count.
+* ``auto`` needs a GEX AnnData with a ``raw_counts`` layer and per-spot nuclei counts
+  (``nuclei_counts=`` as a barcode-indexed Series, or ``obs["n_nuclei"]``). Missing inputs
+  raise ``ValueError``; there is no silent fallback. It also raises with ``use_gating=True``.
+* To get 2.0.0 behaviour, pass ``method="qp"`` (cuOPT, GPU only; same API and results).
+  ``method="marker_share"`` (CPU, no nuclei needed) is also available explicitly.
+* ``run_sace_allocation(use_morphology=...)`` now defaults to ``False``
+  (count-constrained Hungarian). ``use_morphology=True`` is unchanged.
+* ``filter_gex(keep_unfiltered=False)``: keeping the unfiltered GEX is opt-in.
+
+Added / fixed
+~~~~~~~~~~~~~
+
+* ``brightness_method`` argument (``None``/"plain" default, ``"gmm"``, RNA-gated methods);
+  ``brightness_correction=True`` is a deprecated alias for ``"gmm"``.
+* Marker share reads raw ADT counts (``layers["raw_counts"]``) when present.
+* New dependency ``scikit-misc``. New experimental extra ``citegeist[functional]``
+  (``torch``). ``citegeist[imaging]`` is StarDist.
+* Experimental dictionary discovery and guided state discovery APIs.
+
+See ``CHANGELOG.md`` in the repository for details.
+
+Version 2.0.2 (2026-11-01)
+---------------------------
+
+A bug-fix release. Results are unchanged for any dataset whose spots were already in
+sorted barcode order, which includes standard SpaceRanger output.
+
+Fixed
+~~~~~
+
+* ``run_cell_proportion_model`` stores proportions sorted by barcode, but the SACE
+  steps read them by position. When the spots in the GEX AnnData were not in sorted
+  barcode order and the row counts matched, each spot silently received another spot's
+  proportions. ``run_sace_allocation`` (layers and single-cell modes), ``assign_cells``
+  and ``run_sace_protein`` now align proportions to the GEX spots by barcode.
+* ``assign_cells`` reused the stored ``cell_counts_integer`` table in antibody spot order
+  while reading ``cell_to_spot`` as a position in the (sorted) proportions, so cells could
+  be given another spot's types. It is now aligned by barcode.
+* ``run_module3_5_functional_annotation`` paired antibody counts with sorted proportions and
+  GEX coordinates by position. It now aligns them by barcode.
+* The GEX-informed detection step of ``run_cell_proportion_model`` paired GEX rows with
+  antibody rows by position. It now pairs them by barcode, so proportions are correct even
+  when the antibody and GEX objects list their spots in different orders.
+* ``assign_cells`` accepts an optional ``cell_prop`` argument (proportions in the row
+  order that ``cell_to_spot`` indexes). For the Bayesian method, the stored detection
+  mask and proportion prior are aligned to those rows by barcode.
+
+Changed
+~~~~~~~
+
+* A mismatch between proportion barcodes and GEX barcodes (missing, extra or duplicated
+  barcodes) now raises ``ValueError`` instead of being paired by position. In
+  ``run_sace_allocation`` and ``run_sace_protein`` the proportion columns must also be
+  the same set of cell types as the cell profile dictionary.
+* ``method="per_type_beta"`` can name its cell types differently from your profile dictionary
+  (it uses its own fixed type names when the panel has the extra markers). Calling
+  ``run_sace_allocation`` or ``run_sace_protein`` after such a run now raises ``ValueError``
+  ("type columns differ; missing [...], extra [...]") instead of continuing silently.
+  Rename the columns of ``model.results["cell_prop"]`` to your profile names first if the
+  types correspond.
+
 Version 2.0.1 (2026-08-01)
 ---------------------------
 

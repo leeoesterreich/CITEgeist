@@ -7,7 +7,7 @@ a main-text figure sub-panel, or is imported by something that does.
 
 If you are looking for how to *use* CITEgeist, start at [`../README.md`](../README.md) and
 [`../../docs/quickstart_real_visium.md`](../../docs/quickstart_real_visium.md) instead. This
-directory is for checking the paper.
+directory is for checking the paper. The newer benchmark code (CITEgeist 3.0.0) is in [`../../Benchmarking/README.md`](../../Benchmarking/README.md).
 
 ---
 
@@ -63,9 +63,10 @@ the competitor methods and a few analysis libraries that are **not** CITEgeist d
 | `mdk_analysis/scripts/analyze_p4s2_commot.py` | `gseapy`, `statsmodels` |
 | `figures/` | `matplotlib`, `adjustText`, `lxml`, `squidpy`, `tifffile`; `rsvg-convert` (or `cairosvg`) for PNG/PDF rasterization |
 
-**GPU:** nothing in this directory runs the CITEgeist QP solver, so no GPU and no cuOPT is
-required to re-run the *evaluations*. Regenerating the CITEgeist predictions that these
-evaluations consume does require a GPU with cuOPT — see [`../README.md`](../README.md).
+**GPU:** nothing in this directory runs the CITEgeist solver. The v41 CITEgeist proportions are plain
+marker share (CPU), so no GPU or cuOPT is needed to re-run the *evaluations*. The earlier GeoMx
+benchmark (legacy, not reported in the paper) used the cuOPT QP solver; see
+[`../../Benchmarking/README.md`](../../Benchmarking/README.md). `run_c2l_*.py` benefits from a GPU.
 
 The manuscript figures were typeset in Arial. Set `CITEGEIST_FIGURE_FONT=/path/to/Arial.ttf`
 to reproduce them exactly; without it matplotlib's default sans-serif is used and text metrics
@@ -122,7 +123,7 @@ For the **breast** arm (Figure 2), `benchmarks/xenium_benchmarking/prepare_breas
 the equivalent pipeline end-to-end (extract → annotate → spots → 5 regions → GT), and
 `convert_breast_h5ad.py` exports per-region counts/coords CSVs for the R-based methods.
 
-The 6-type and 7-type SingleR ground truth used for the *reported* Figure 4 numbers is built by
+The 6-type and 7-type SingleR ground truth used by the scripts below is built by
 `evaluation/src/generate_singler_gex_gt.py`, listed below.
 
 ### Figure 4 — Xenium renal cell carcinoma real-tissue benchmark
@@ -137,21 +138,7 @@ The 6-type and 7-type SingleR ground truth used for the *reported* Figure 4 numb
 Supporting: `evaluate_benchmark.py` (the per-region metric engine `compare_all_methods.py`
 calls) and `benchmark_constants.py` (the 6-type and 7-type ground-truth collapse mappings).
 
-**Reported values to compare against** (5 Xenium regions, CellTypist→SingleR annotated
-ground truth; Pearson *r* on spot-level proportions):
-
-| Method | 6-type *r* | 7-type *r* |
-|---|---|---|
-| **CITEgeist** | **0.763** | **0.722** |
-| Cell2Location | 0.639 | 0.624 |
-| RCTD | 0.517 | 0.589 |
-| Seurat | 0.392 | 0.442 |
-| CARD | 0.385 | −0.190 |
-| Tangram | 0.289 | 0.262 |
-
-GEX, expressed genes: flattened *r* — CITEgeist 0.676, Cell2Location 0.625. RMSE
-(per-block ground-truth-scale normalized) — CITEgeist 0.420, Cell2Location 0.554,
-Tangram 0.674. On Cell2Location's own 180 matched genes: CITEgeist 0.727 vs 0.626.
+**Reported values.** The per-method scores are in the paper; the scripts above write the result files they come from. The numbers are not repeated here so this file cannot drift from the paper.
 
 Use the `*_6type_results.json` files for the 6-type ground truth and `*_7type_results.json`
 for the 7-type one. Mixing them (7-type predictions against 6-type ground truth) splits the
@@ -208,7 +195,7 @@ the figures that read their output.
 
 | Script | Produces | Feeds |
 |---|---|---|
-| `mdk_analysis/scripts/persist_bivariate_morans.py` | `if_analysis/bivariate_morans_results.csv` — cancer-only bivariate Moran's I of MDK vs the secretory score, per specimen (mean 0.254) | Fig 5C (the CITEgeist baseline competitors are compared against) |
+| `mdk_analysis/scripts/persist_bivariate_morans.py` | `if_analysis/bivariate_morans_results.csv` — cancer-only bivariate Moran's I of MDK vs the secretory score, per specimen | Fig 5C (the CITEgeist baseline competitors are compared against) |
 | `mdk_analysis/scripts/spatial_morans.py` | `spatial/trajectory_deltas.csv` — biopsy→surgery change in Moran's I per patient | Fig 5E |
 | `mdk_analysis/scripts/compute_pergene_bivariate_morans.py` | `if_analysis/pergene_bivariate_morans.csv` — MDK vs each of 11 secretory genes across 12 specimens, FDR-corrected, with 11 random non-secretory controls | the supplementary heatmap below |
 | `mdk_analysis/scripts/generate_pergene_morans_heatmap.py` | per-gene bivariate Moran's I heatmap (MDK vs each secretory gene, per specimen) | Supplementary |
@@ -219,8 +206,8 @@ the figures that read their output.
 
 > **One naming caveat, worth stating plainly.** `spatial_morans.py` also writes
 > `cancer_cell_morans.csv`, and despite the name that composite is computed over **all cell
-> types** (mean Moran's I 0.290) — not cancer cells only. The cancer-only value reported in the
-> manuscript (mean 0.254) is the one from `persist_bivariate_morans.py`. The same note is in the
+> types** — not cancer cells only. The cancer-only value reported in the
+> manuscript is the one from `persist_bivariate_morans.py`. The same note is in the
 > script's own docstring. Use `bivariate_morans_results.csv` for the cancer-only figure.
 
 ---

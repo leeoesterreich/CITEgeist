@@ -78,7 +78,7 @@ def compute_optimal_radius(
 
     Example:
         >>> radius = compute_optimal_radius(adata)
-        >>> model.run_cell_proportion_model(radius=radius)
+        >>> model.run_cell_proportion_model(method="qp", radius=radius)
     """
     logger = logging.getLogger(__name__)
 

@@ -1,0 +1,85 @@
+# v42 run ids, fixed BEFORE any submission (v2 rollout Task 1). Keyed by protocol sha12.
+# Keyed by the v2 breast protocol sha12 (Task 3: protocol.json = stamp of protocol.DRAFT.json).
+# min_code_commit (top-level, set by the commit that holds the v2 producers) bounds the code_commit of every stamp from below.
+# Stages (scope map 1C): B1 breast proportions, B2 nuclei, B3 Hungarian rebuild, B4 SACE layers, B5 compartments,
+# B6 COMMOT, B7 positive control, B8 hurdle, B9 Moran's I (+B13 trajectory), B10 NMF/Module 4, B11 program recovery,
+# B12 keratin-secretory, B19-B23 promoted post-hoc checks (ORA Test B, ORA on SACE layers, keratin/E2, Moran's I robustness, keratin-secretory covariate absorption), B17 matched gene controls for Moran's I (promoted from exploratory check 2), B18 MDK-NCL sender/receiver cell-type map
+# (promoted from exploratory check 3; descriptive only); X1 official proportions, X2 strict scoring, X3 SACE no_round, X4 fair GEX, X5 RMSE/sigma,
+# X6 single-cell, X7 protein-input sensitivity, X8 settings/robustness, X9 reused GT/competitors/simulation, X10 withheld-gene cross-fit,
+# X11 leave-one-region-out tuning audit of frozen v2 (recomputed from frozen-v2 inputs; gated against the stored r8 row),
+# X12 EM convergence check of the default refinement (cap 150 vs run to convergence; stamped convergence.json),
+# X51 first rerun of X5 (sample std, ddof=1; evaluation/rnaprot_v2_fair_x5_ddof1; X5 v2x5 stays registered until the manifest is repointed),
+# B221 first rerun of B22 (the same six Moran robustness checks plus check 17, the D5 covariate without self-inclusion / shared denominator; B22 v2b22 stays registered and is no longer read once the manifest is repointed),
+# B24 coverage of the nominal GMR interval under the RNA-total covariate (prod_coverage.py; a stamped input of B8),
+# B25 Modules 4/4b/5 on the v42 SACE layers, Module 5 grouping within cell type (run_module45.py --stamp; the per-specimen outputs, module5.pkl and mdk_readout.json).
+# B26 all-pair COMMOT survey at level 1 (B5 compartments, stage B6 R00 setting, every sender/receiver column) and level 2 (raw Visium spots) plus the check 19 ranking of cancer-sent pathways (commot_survey_v42/commot_survey.py; descriptive; v2b26 is the id of B26, not a rerun of B2).
+# RNA-total covariate fix (protocol deviation 2026-11-06, docs/superpowers/plans/2026-11-06-rna-total-covariate-fix.md): B7, B8, B12, B18, B21, B23 are rerun in place with rna="total"
+# (v2b7 -> v2b71, v2b8 -> v2b81, v2b18 -> v2b181, v2b121 -> v2b122, v2b21 -> v2b211, v2b23 -> v2b231); B221 and B24 are new. v2b22 stays registered (B22) until the manifest is repointed to B221.
+# A run id must match ^v2[bx]\d+$ and be unique. NOT_RUN is allowed but makes any consumer raise.
+# GENERATION RECORD (one place; chain_preflight and submit-v2-breast-chain.sh read it):
+#  - current_v2_ts: the ONLY V2_TS (names output/module3_rna_refined_7type_<ts> and output/nuclei_rebuilt_7type_<ts>) the chain accepts.
+#  - superseded: the first v2 attempt (V2_TS 20261102T083417Z; B2 counts-only; B3 re-segmented in the job and differed from B2 by up to 3 per spot
+#    in all 12 specimens) and the B3/B4/B5 runs built from it. Their folders stay on disk untouched and are refused as inputs.
+#  - B3/B4/B5 have NEW ids because v2b3/v2b4/v2b5 exist on disk; B1/B2 keep v2b1/v2b2 (the frozen protocol text names them) under the new TS.
+#  - B9/B12 (v2b9, v2b12) are superseded by v2b91/v2b121: SpectralNull's eigenbasis in tied eigenspaces depended on the BLAS thread count
+#    (morans.canonical_eigh fixes it); the v2b9/v2b12 p-values are not reproducible across thread counts and must not be consumed.
+#  - B17 (v2b17) is superseded by v2b171: its gate name said 'vs v2b9 per_specimen' although the reference was v2b91. Stale label only, values unchanged.
+#  - B25 (v2b25) is superseded by v2b251: the serial 12 h job was cancelled and replaced by an array job (per-specimen tasks + finalize); the partial v2b25 dir is never read.
+#  - B19/B20 (v2b19, v2b20) are superseded by v2b191/v2b201: their Xenium tasks looked for untracked data inside the clean worktree and failed, so neither stage was stamped.
+# New ids follow <stage id>1 = first rerun (digits only: the run-name rule is ^v2[bx]\d+$).
+schema: 1
+current_v2_ts: 20261102T200000Z
+superseded:
+  v2_ts: [20261102T083417Z]
+  run_ids: [v2b3, v2b4, v2b5, v2b9, v2b12, v2b17, v2b19, v2b20, v2b7, v2b8, v2b18, v2b121, v2b21, v2b23, v2b24, v2b25]
+min_code_commit: edbf3acb29d683ab3bb00e04373efd6979802875
+runs:
+  fc43dbea67bf:
+    B1: v2b1
+    B2: v2b2
+    B3: v2b31
+    B4: v2b41
+    B5: v2b51
+    B6: v2b6
+    B7: v2b71   # rerun with rna="total" (v2b7 superseded)
+    B8: v2b81   # rerun with rna="total" and the B24 coverage (v2b8 superseded)
+    B9: v2b91
+    B10: v2b10
+    B11: v2b11
+    B12: v2b122   # rerun with rna="total" (v2b121 superseded)
+    B17: v2b171   # B13-B16 are named in the scope map, so the promoted stages start at 17; v2b17 is superseded (stale gate label only)
+    B18: v2b181   # reads B8 v2b81; values should not move (v2b18 superseded because its B8 input is)
+    B19: v2b191   # ORA Test B on the rebuilt spots (post-hoc, descriptive)
+    B20: v2b201   # ORA on the SACE layers (post-hoc, descriptive)
+    B21: v2b211   # keratin presence and estrogen covariation (checks 7, 8; descriptive); rerun with rna="total" (v2b21 superseded)
+    B22: v2b22   # bivariate Moran's I robustness (checks 9, 10, 11, 13, 14, 15; descriptive)
+    B221: v2b221   # B22 rerun with check 17 (D5x, D5xc); gated arm by arm against v2b22; v2b22 keeps its own stamps
+    B23: v2b231   # (rerun with rna="total"; v2b23 superseded) covariate absorption of the P4-S2 keratin-secretory association (check 1; descriptive; gated against B12 v2b122)
+    B24: v2b241   # (v2b24 failed at start: the lattice csv is untracked and was read from the clean worktree; fixed by resolving it from the namespace root, B19/B20 mechanism) coverage of the nominal GMR interval under rna="total" (prod_coverage.py main; stamped input of B8)
+    B25: v2b251   # (v2b25 cancelled mid-run as one serial job; its partial dir is never read) Modules 4/4b/5 on the v42 SACE layers with Module 5 grouping within cell type (stratify_by_cell_type default); module45_v42/run_module45.py --stamp; mdk_readout.json
+    B26: v2b26   # all-pair COMMOT survey, level 1 + level 2, and the check 19 cancer-sent pathway ranking (commot_survey_v42/commot_survey.py --level/--specimen/--finalize; descriptive)
+    X1: v2x1
+    X2: v2x2
+    X3: v2x3
+    X4: v2x4
+    X5: v2x5
+    X6: v2x6
+    X7: v2x7
+    X8: v2x8
+    X9: v2x9
+    X10: v2x10   # withheld-gene cross-fit (heldout_genes.json); the stage the heldout rule file pre-registers
+    X51: v2x51   # X5 rerun with ddof=1 (v2_official.py x5_ddof1); v2x5 keeps its own stamps until the manifest is repointed
+    X11: v2x11   # LORO tuning audit (loro_audit.json): 6-type 0.7906 / 7-type 0.7373 beside the frozen 0.792 / 0.722
+    X12: v2x12   # EM convergence check of the default refinement (convergence.json; v2_convergence.py; replaces the unstamped runs/convergence_12146396)
+stage_min_code_commit:   # a stamp for the stage must descend from this commit (canonical_eigh + self-check; src/morans.py is not part of the stamped producer file)
+  B9: c7cdedcf6f7b7312695d46b4ad0ad40894b8428e
+  B12: b9a92a21255d2aea280bbc74ab02de026c79c284
+  B17: c7cdedcf6f7b7312695d46b4ad0ad40894b8428e   # reads B9 (SpectralNull) values; the stamped code must include canonical_eigh
+  B18: b9a92a21255d2aea280bbc74ab02de026c79c284
+  B21: b9a92a21255d2aea280bbc74ab02de026c79c284   # reads B12/B9-era compartments; stamped code must include canonical_eigh
+  B22: c7cdedcf6f7b7312695d46b4ad0ad40894b8428e   # reads B9, B17, B12 (SpectralNull values)
+  B221: b9a92a21255d2aea280bbc74ab02de026c79c284   # same inputs as B22
+  B23: b9a92a21255d2aea280bbc74ab02de026c79c284   # re-runs the B12 SpectralNull surrogates; stamped code must include canonical_eigh
+  B7: b9a92a21255d2aea280bbc74ab02de026c79c284   # RNA-total covariate deviation 2026-11-06: a stamp for these stages must descend from the commit that holds hurdle.rna_total, the deviation file and the D5_percell seed fix
+  B8: b9a92a21255d2aea280bbc74ab02de026c79c284
+  B24: b9a92a21255d2aea280bbc74ab02de026c79c284

@@ -1,0 +1,267 @@
+{
+ "groups": {
+  "cell2location_layers": {
+   "dir": "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type",
+   "files": {
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/B cells_layer.csv": "d601a8488084ca994d573724d0f80798a7898776aecdd8e29aec21bb9ff9420b",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/CD4+ T cells_layer.csv": "690a32e907e6490447f48a26544606864eb1d0d44c3bd88943d069a1017d61af",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/CD8+ T cells_layer.csv": "000ff45a75e034136d4bb9e4fe191855ed8d218cec7780974455e9782d339786",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/Endothelial_layer.csv": "432de9b4fbe494b3cee56cd86a64dd8030d8b66c63101c35d34e8d6bceecd8c1",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/Epithelial_layer.csv": "dc7bc26c412b5aba35d67bff583e2737630e38ee5578aaeab654cc100a1d5386",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/Fibroblasts_layer.csv": "028ac191e6fa12e89fa3a45fa15f19a41bffa2374594980d4b034ddb1fc220bb",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_0/layers/Macrophages_layer.csv": "8309014979ac17990b3957dd3c2d795c8484b99517dc5c758f358e3481f43166",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/B cells_layer.csv": "de1bfabf9b21d2bf5cfc4f013e8e2de5133b14e48134067a0f2a1f8ae6ea4eea",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/CD4+ T cells_layer.csv": "a11aef1d23022e4e25c3bd9db64ebeffc6064d15845f8a90d2116a039ba4783f",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/CD8+ T cells_layer.csv": "81d77a925cf89b49928a65c249b213c2eb1421380d66811787ddc9508a31cd6d",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/Endothelial_layer.csv": "e567f992164d35d41f5f20c5830b1625b5a040528a141f9a16697fb2610e6728",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/Epithelial_layer.csv": "079798881fcd3e394fc325200fac26475e4f5f163b632e994d0ce2120b99250c",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/Fibroblasts_layer.csv": "b28bedc81b0cd0e144fc142bc234b4060c2a2b5fc34517a3871de878ea6ee721",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_1/layers/Macrophages_layer.csv": "11f00ed03d7fc7868be014790b4e5eab7f41a789b7e123dadee273045d37ff89",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/B cells_layer.csv": "b2549ccdd72502aabf33303e61db2884f1b4bab03adbb94313f9fb9c9ef19b5a",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/CD4+ T cells_layer.csv": "a361c7b74967baf5b9079bcf5708be0b2e07ecd4365ce5ffbc1af38a8f5c571d",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/CD8+ T cells_layer.csv": "59b1341971e9f93c8d7634f90ff039765157a819c823f2d9585f48637e90404f",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/Endothelial_layer.csv": "df6cfffae59c92482ab8aa314c25cced2dfbecc3013e5db949d3c04e05ade553",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/Epithelial_layer.csv": "6ab4388fa4d788e0b0f5b0798ded989f4ff972ead49bb7f7a5449462e098679a",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/Fibroblasts_layer.csv": "f1732f87f4e750c0e318d4cdf9bb7f0d7f8a35d312963708de3da99b3dec832e",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_2/layers/Macrophages_layer.csv": "b66e08b837aafce82b8bc7a356f6eafa2719b9d87db028128c3514b6bb393aad",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/B cells_layer.csv": "cb407b6fba3d32bffb0a5a396b8b0037617359c111993fc3dd83afb48f6f5959",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/CD4+ T cells_layer.csv": "ebe263dddc725af007b675d947a5b54d834f2a25042a66054f64fc568af505e2",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/CD8+ T cells_layer.csv": "cfc5172ca68ebd0bf7c6c85b45938d418d63f13eb459182d39c6da277a4b35ea",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/Endothelial_layer.csv": "d97efabc772d2e98a2c962b3f15a9769e85879fd9f3dc08f5cd9f11680ec9f48",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/Epithelial_layer.csv": "b38773f44fdcac593811411bb435fba02d449979fb7310db598944b881cee7d0",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/Fibroblasts_layer.csv": "b092abb668c7c2b25df8fbacc051f260479a0d134b0f3f8ce020cb738d938c6a",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_3/layers/Macrophages_layer.csv": "076690ec68a28811a77d6ea1c2e1ebed460d8baed76f1ec180ad8f82028f67ee",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/B cells_layer.csv": "6eabd62ee53fa60c779a93eb6dadc9f988c7e8f548d81a0f8b156d9a818584cd",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/CD4+ T cells_layer.csv": "c9c2dd9dbb93ef3f63387a5dfbf4dd2729c6bae14c3f3ce08be311686a3d3c08",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/CD8+ T cells_layer.csv": "2853e39791f7dd7dc0a539e80b98c123eec0e0aa0b2bf4ac345603edf7b06eac",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/Endothelial_layer.csv": "89393e9dfd22ee25e216c8cbafccf28c2abd9d49fcf33056f337a996aaf4b26b",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/Epithelial_layer.csv": "fd6176ee18247fb8c28fed0f551e6dc9a891e9e1745e189f3a477e8ba43681b1",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/Fibroblasts_layer.csv": "b1e33f6e6c5805996f5a3743cc176ef8ffd3e46d2c6ee1f0b057a0c70fe5b0e8",
+    "Benchmarking/xenium_benchmarking/Cell2Location/output_singler_7type/Xenium_region_4/layers/Macrophages_layer.csv": "d3d7db1ba379d4db06c242e86f29544d6cb86f0393b6879d72775c03aa7f4c35"
+   },
+   "glob": "*_layer.csv"
+  },
+  "competitor_results_rnagt": {
+   "dir": "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type",
+   "files": {
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/CARD_results.json": "092a08e967a020d40e8adaed3161bd43e81645fdb088099728e3e9c6a8372fd7",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/CITEgeist_6type_results.json": "8e623c6f95d5bb43d46631563bee974143af1f2cb7e66a30e58481b431e46207",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/Cell2Location_6type_results.json": "6e3575fe914740eddf885dfc161578d08efc0e4394efb97f89d3ebcab9a8df67",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/RCTD_6type_results.json": "f83c69e09d03a8f3118cc26137ff48595b8ae646a76fe78c38143837c72cc0c0",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/Seurat_6type_results.json": "41e6bf808535b48c338482a82893739438f039b7897b3baecb847ba2eea4e536",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt/method_comparison_singler_6type/Tangram_6type_results.json": "020649149f463d06f65655ecc3e0adb84cd6510d7b799f8ac2c8e1e675bbb80f"
+   },
+   "glob": "*_results.json"
+  },
+  "competitor_results_rnagt_v41p": {
+   "dir": "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type",
+   "files": {
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/CARD_results.json": "af334efec5aa32482111ccd7205b70ae2b6b716659cb64955b84fc34dfd99db4",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/CITEgeist_6type_results.json": "ec2e44242a05fccd082ede05949e59fb2008d9e2770492ae705f0961ebbc32f7",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/CITEgeist_v41p_6type_results.json": "5fc5cedfdf1df664735c824f290f78c4c2ba1a8b93c3629018eaaffc6fcc65af",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/Cell2Location_6type_results.json": "2b2eb74109871d838550afd6bd01bc7fde980984e7c0b4b374a5bb68911b0a7b",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/RCTD_6type_results.json": "cf7c7f1b8122ec12cf7a2da2647d322f69e94c6aafb4beb97c5bc5e442a7cde6",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/Seurat_6type_results.json": "7e0faa62306c018587edd61124ebcb9c54b747aedbea0915216abc4af212af6e",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnagt_v41p/method_comparison_singler_6type/Tangram_6type_results.json": "aab6b0bc73725dd09147717d246a77f29a0ec1309ce867f47407ef68ddc6a710"
+   },
+   "glob": "*_results.json"
+  },
+  "competitor_results_rnaprot": {
+   "dir": "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type",
+   "files": {
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/CARD_results.json": "580e156d17a7fea974a6148bbf1b97e8f66c8777d5295d52b80c8a3063c3661d",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/CITEgeist_6type_results.json": "798a2e09519edfabf286bcb7970016956b7eac71625b9a69f110327e588df069",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/CITEgeist_v41p_6type_results.json": "616ec489f5cb7e8a5b18486df2168dfc4cf1c0fbe06079be7aac92d4ebffdc65",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/Cell2Location_6type_results.json": "a0770dd43e48ec2ba44224cb7b91c386c18950a9b8373c096fbb19e636a21d01",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/RCTD_6type_results.json": "822bada669099e28c8b4895ddbee5475786ec1817eaaa99a4ae42162c81c7607",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/Seurat_6type_results.json": "79ed568e35f940ae0f5c0215aed999c753af166e2a40df8e2d3d8c32f600a75a",
+    "Benchmarking/xenium_benchmarking/evaluation/results_rnaprot/method_comparison_singler_6type/Tangram_6type_results.json": "6910ce253ba5ace9823fdc3fcac2e8497b0124fbf2e23af928a6a699b4a94257"
+   },
+   "glob": "*_results.json"
+  },
+  "gt_cell_labels": {
+   "dir": "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/labels",
+   "files": {
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/labels/cell_labels_7type.csv": "b2872fbd731f68ce27f260db63bf2a4404b85bdcda6013d14b86e4adfc70b52d"
+   },
+   "glob": "cell_labels_7type.csv"
+  },
+  "gt_gex": {
+   "dir": "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex",
+   "files": {
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/B_cells_GT.csv": "c3ed3ec4645665c116c81ee5105afc49fa700461608ca4992d600a10bc07bc16",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/CD4pos_T_cells_GT.csv": "5bf7cdfc63de4ce4634a5559d9e7ad4b8aee696a19e0b8481098b9f1ed76b4ec",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/CD8pos_T_cells_GT.csv": "fe7b2deee0107bab9bd62bef505c07c0807de008e700247599783289b1dbe345",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/Endothelial_GT.csv": "56239b0ecd5d621a0cf6bd2bc6d6128b3ad96d12edc61a7d2d785c580461ce84",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/Epithelial_GT.csv": "3994c7777a249106698b98a3459bf2ec50b728dc0704bc7af9d58c1f2bfdfb27",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/Fibroblasts_GT.csv": "d0044595eda1f9478d2db74d48f4deb66aa3cb8832f8807655bf8cf133586f44",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_0/Macrophages_GT.csv": "4d39c653924d3e9fdc5b525464fff17f36f95b71c3ba59b813f0ff820d6b10a9",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/B_cells_GT.csv": "24c299192c4f215fe3455e923cf92cb9d82592d30b50e174af62a141fc1c5987",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/CD4pos_T_cells_GT.csv": "2bd11cd1a66a7a76778ed9c2b5792b4d8eb6cec16e998a25658675dab3aa9f6a",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/CD8pos_T_cells_GT.csv": "794a1e8cdb618301b5078d0efaa9dfcce0c5e8e91999359067612efe85d55167",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/Endothelial_GT.csv": "a0ca60bfca1beae390fe56fd166b12e4ab51d2f05d92f33018ce64aa9a5e3f2c",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/Epithelial_GT.csv": "dd2ba6ec92ffe9ffaad9c57f97a8e136e0ff5663c8de0dbd2600ee8d1c19307a",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/Fibroblasts_GT.csv": "f7bc736ca18cc09059c3a4320088c6cfe33b48935f275f30e1b92a8a3551be5f",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_1/Macrophages_GT.csv": "89a80a9ba17091839837ca1b2ec62dd0debb6dae15aa4c87c3673c92fdfa64a2",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/B_cells_GT.csv": "bacaa7bdce4704f4f56a106a2a3ec8c391e3fbea0923f513ae231803b01a4fcd",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/CD4pos_T_cells_GT.csv": "6fdaec34ec8938479e1aef6f53725108727256078b44eceaee9511a54653c2ad",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/CD8pos_T_cells_GT.csv": "730f52291b12f5e72d00d6055a503fcf680df2c7365a9fdb9adb1b4224b9b8a3",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/Endothelial_GT.csv": "98575614562e10f2e76ceb978f397a9f8d0a3192b0e0ee2a25e42ebe6f7e52ce",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/Epithelial_GT.csv": "7f9a3668e9c2309300c34f3b201479e2ba4220ade1515fa45b3c980903ef8c78",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/Fibroblasts_GT.csv": "fc0672febc8a101b1f8cb59542cb7034f09f9ae6b48f0e1b3b85a71132b67404",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_2/Macrophages_GT.csv": "a510f0c82cfb8afd68540b18a89584ed2c9cc7f1c433ae1911d3d6f18c5b8849",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/B_cells_GT.csv": "b81388c11639c0e65e6f04c92578967d5725de029d4e9f4ab8ee71b53adc05bc",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/CD4pos_T_cells_GT.csv": "e01bcac97a062217fb13aac4ed0bbece4dc8eb0145d7da3eab639443412aa704",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/CD8pos_T_cells_GT.csv": "554bb16eff3e336248840915151c4ef9d94c8a5e8fdc766b7557accae7fd7963",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/Endothelial_GT.csv": "3cac25620ebbac0a70d0917309320ffb58592352987874ac1f3fc9ccbb9053e0",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/Epithelial_GT.csv": "178a188e1239d186393c0ce79e148c45e84d5d86b7b7685caab0490453f58f9d",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/Fibroblasts_GT.csv": "d573c26c7fdb21b255000d8f3a75c61169b21faae6da6bfedddd7cab67fa5c08",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_3/Macrophages_GT.csv": "95d7f518cb3bb993193f84b0153dc668bf9c9d3620203643d28b134d6ed97538",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/B_cells_GT.csv": "a04dfc9d8b7268585cd380b1db1921f69ddcc6b53cec4618911157c901947826",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/CD4pos_T_cells_GT.csv": "b746d47cfe7900ff3a106f8592263cccbc3fa5f00734a4e1e5bbeca96a47ef2e",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/CD8pos_T_cells_GT.csv": "cd5a93814f38f9bac89ecdd67043f6785ddc3f1cd1c8dd432143c11ca3ae8f91",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/Endothelial_GT.csv": "f0aa3e87007003f395342bb9793d9882529a84f0bfea4b6b1909a13c6c10c57f",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/Epithelial_GT.csv": "4c36582381da8d00db99906f8967fe46d4e948bf973d6507cc043151cfdc356b",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/Fibroblasts_GT.csv": "be06bcd64987d04d5db25fcf01dc99d1c51dce0946da314670e31d227a8ec9df",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth_gex/Xenium_region_4/Macrophages_GT.csv": "f0cd0f13bd8e0f13afcf63c381bbd93a8c96a25e151eed6611e892b0d4b610b2"
+   },
+   "glob": "*_GT.csv"
+  },
+  "gt_props_6type": {
+   "dir": "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth",
+   "files": {
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth/Xenium_region_0_prop.csv": "4a9fa771f9aba57423b0bead5a5a3e3b8ebf10495658ed45af6eb82f2edc3e4e",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth/Xenium_region_1_prop.csv": "a4da0ef68c081bae7334c2fe6088088cdb4b069e3a8ebda3bf13270630f736ac",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth/Xenium_region_2_prop.csv": "9544c4911a2e145f323a0fef9c63af7ff4779a414510d1b3280d695b07046412",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth/Xenium_region_3_prop.csv": "b90a4c3cb4a27af9a2e5f6747aaa57d18eb4a2ed86faca8d4dafb5554430d15f",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_6type/ground_truth/Xenium_region_4_prop.csv": "c427794e4a24057eaf312a737da71fad21210ea55c9af442f23b2fa1ce54d7f4"
+   },
+   "glob": "*.csv"
+  },
+  "gt_props_7type": {
+   "dir": "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth",
+   "files": {
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth/Xenium_region_0_prop.csv": "88f1c6baead027f07461aa7b159ce4232f507c65fd1e87c0a4904dd181663573",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth/Xenium_region_1_prop.csv": "bea6ebc385d2d11f1a5a55bea2cb503ef2e26dc2c2a5def7c8fc994f0682feb0",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth/Xenium_region_2_prop.csv": "9a091491eb307aa5cc08067c8f68d52c681540279ad82a21d60c2eb88dc96e2b",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth/Xenium_region_3_prop.csv": "c759da9c27baede80ab075eda202731bdbc3b8373bd987e104dde27996bd6faf",
+    "Benchmarking/xenium_benchmarking/ground_truth_xenium_rnaprot/ground_truth_7type/ground_truth/Xenium_region_4_prop.csv": "b6719f6be240ae16af8fa0f7f1b844d4bb9dfbd736fcb5c8a98f070f8277ecfb"
+   },
+   "glob": "*.csv"
+  },
+  "h5ad_inputs": {
+   "dir": "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects",
+   "files": {
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_0_CITE.h5ad": "a813c30f3431dd9a2912ece339efab37324b0983e1a49906372e21bbf0a81e08",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_0_GEX.h5ad": "019bfdfcccf5123b8359a7a68052d6e177a816e0265df8b2d0b4d70494c7b00b",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_1_CITE.h5ad": "23b4ab96afd000899c3cb2497bec281ccf573a1c4bd187b2327341ed39806689",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_1_GEX.h5ad": "52cf8af5b5b47e2d71f07a3913ec7fcafe26a9b60dec091662e16a4f511ccae2",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_2_CITE.h5ad": "64e0c2386ec776e85e9cc5d49ddfca2bd4eccfc138fc0a4ad7dacdec83abdcff",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_2_GEX.h5ad": "99c4098a25f09f45580f9a84f17d4f6a3d02f16545c2e5b1e79092151420eac2",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_3_CITE.h5ad": "5145601e84bd601ad3e36765ff90160d2378f46cb517f24f071f508381d45614",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_3_GEX.h5ad": "b6fb27b679fbe81335cb194df1d6af65c00d8bc3ab49e759ea6b171140deb92b",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_4_CITE.h5ad": "bb0defdcf1cae3ee93f2edd8db38c827a6404fa5540c7909355495ac8bc3b909",
+    "Benchmarking/xenium_pseudovisium/data_protein_gt/h5ad_objects/Xenium_region_4_GEX.h5ad": "8d7077c767470f7f9708cf3b51a0542ef96340223293517ea9ff02b763a50634"
+   },
+   "glob": "*.h5ad"
+  },
+  "sensitivity_canonical_gt": {
+   "dir": "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth",
+   "files": {
+    "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth/Xenium_region_0_prop.csv": "c1b14b664940a74f69f20e2b275977e934827a1e9262f59898e03ebd6139d943",
+    "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth/Xenium_region_1_prop.csv": "2827ba392864e72dec4a5853ad7f31fbbf106609e408470bb4aea66e011b3873",
+    "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth/Xenium_region_2_prop.csv": "0dfb2122a4912fcaca05ac684a833e9328138f3976b5f135ca52b41ae7a98142",
+    "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth/Xenium_region_3_prop.csv": "7689f0618aa51661653e9cb85a6af76bdaf23f606b9fcfa4e4537154e08f9989",
+    "Benchmarking/xenium_benchmarking/ground_truth_singler/ground_truth_6type/ground_truth/Xenium_region_4_prop.csv": "59cabeb2ea1ff0d7da8d78241f8ae6ce76ebc3421ff9e80e73f04ba85281d8de"
+   },
+   "glob": "*.csv"
+  },
+  "sensitivity_scores_all": {
+   "dir": "Benchmarking/xenium_benchmarking/reference_audit/singler_variants",
+   "files": {
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/scores_all.csv": "50efbaa442ebd36917997354511fef0f8a06f981559374f25e0960a5f583f992"
+   },
+   "glob": "scores_all.csv"
+  },
+  "sensitivity_scores_v41p": {
+   "dir": "Benchmarking/xenium_benchmarking/reference_audit/singler_variants_v41p",
+   "files": {
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants_v41p/scores_v41p.csv": "9019c84e040d6c3a57d5afddc211a6a82c05935a67a25f9dafc1c106cd0420df"
+   },
+   "glob": "scores_v41p.csv"
+  },
+  "sensitivity_variant_gt": {
+   "dir": "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt",
+   "files": {
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKmerged/ground_truth/Xenium_region_0_prop.csv": "d87e012deba1f9ab24f6008496bb5ea9b8ae211a67c745e16ef39813c13c25dd",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKmerged/ground_truth/Xenium_region_1_prop.csv": "d0ddc685ef8378c3bc0d02c6f803321a360dd526ddf63d8caea3ae673e7ef3a7",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKmerged/ground_truth/Xenium_region_2_prop.csv": "a9f337796feaa35c38ee7e1c18bc0c712b42fd0c8d7ee64f0a1b58d3534ca1f1",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKmerged/ground_truth/Xenium_region_3_prop.csv": "2d685614ce4dca1ddb093e29138f19329ba82cf1abd830d05070d8d3cdb79fb6",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKmerged/ground_truth/Xenium_region_4_prop.csv": "cf31a4268d6d4061d9d5dd57d1ea7baa31c444a4e4cab82c0a5cf70c3f377338",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKremoved/ground_truth/Xenium_region_0_prop.csv": "8ee85691dfea2284718afd14adcb2642da7ba9c8a6cc5bae14aad388ac42a636",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKremoved/ground_truth/Xenium_region_1_prop.csv": "22238324cf949877433b7a740d701fb020e38c255b39812282cfa182df9f050f",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKremoved/ground_truth/Xenium_region_2_prop.csv": "b833730950e8a361bb61ae5c648c0a41fad53f43a8283163f9f5ceebb06a8e75",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKremoved/ground_truth/Xenium_region_3_prop.csv": "e54bf469e2d4a29dd933e2f4686b46c92a088db36e0cdbd3a594774383d31d42",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/A_NKremoved/ground_truth/Xenium_region_4_prop.csv": "3be8e0b33a219da696544cf2a21935f11f7655e293a179327f25f69a4951f25b",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/B/ground_truth/Xenium_region_0_prop.csv": "bc12a15a699f0a7be4ea08cfb8a5882350f06528f62da582d0c4e9838252ecbf",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/B/ground_truth/Xenium_region_1_prop.csv": "1f618dbca29b9bd5e8263d262c305ecb4c336dc6a8f383383768970a6c7a1bfa",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/B/ground_truth/Xenium_region_2_prop.csv": "c96fd6a851c93dfdcbd0c603c7e6214eb1fe267f11251e018a67919a9646c02f",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/B/ground_truth/Xenium_region_3_prop.csv": "0aa2a4f7d6f6a04bfa43e49c85cfde04f273c0a7d663ff306a614dd1788f86a0",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/B/ground_truth/Xenium_region_4_prop.csv": "7ab6d9f3c4d0f5c9c069737aa8fc66b5d01a4372d8538d3004caf9ea4d0686dc",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/control/ground_truth/Xenium_region_0_prop.csv": "ccbe15df17ce706ac8635676a474e0a358ef1ececd477e8d5379811df2330576",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/control/ground_truth/Xenium_region_1_prop.csv": "e3f53ddc0ac035335e915ebe2603c99d8d9eccb042fed6f09895b172fee2c8df",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/control/ground_truth/Xenium_region_2_prop.csv": "8b97148bf80e34b3ee2c2b9d58fb1097c2a19ef089d867f7c9fdfacf43452d24",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/control/ground_truth/Xenium_region_3_prop.csv": "a5e76c4d6317c210bd403ff3a9f57c20c8a838866e0b8e01da41404a3aa47f2b",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/control/ground_truth/Xenium_region_4_prop.csv": "d4755d7c2db72e339629c87fc7bc7c7e22de7efc823d28b774e0f5cf62e6b508",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/recomputed_canonical/ground_truth/Xenium_region_0_prop.csv": "c1b14b664940a74f69f20e2b275977e934827a1e9262f59898e03ebd6139d943",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/recomputed_canonical/ground_truth/Xenium_region_1_prop.csv": "2827ba392864e72dec4a5853ad7f31fbbf106609e408470bb4aea66e011b3873",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/recomputed_canonical/ground_truth/Xenium_region_2_prop.csv": "0dfb2122a4912fcaca05ac684a833e9328138f3976b5f135ca52b41ae7a98142",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/recomputed_canonical/ground_truth/Xenium_region_3_prop.csv": "7689f0618aa51661653e9cb85a6af76bdaf23f606b9fcfa4e4537154e08f9989",
+    "Benchmarking/xenium_benchmarking/reference_audit/singler_variants/gt/recomputed_canonical/ground_truth/Xenium_region_4_prop.csv": "59cabeb2ea1ff0d7da8d78241f8ae6ce76ebc3421ff9e80e73f04ba85281d8de"
+   },
+   "glob": "*.csv"
+  },
+  "tangram_native_layers": {
+   "dir": "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native",
+   "files": {
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/B cells_layer.csv": "1bb9a54ee382d82b3fc85aa76f40085ccf1ad0ae080f479e884d9bdff9e6cfa2",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/CD4+ T cells_layer.csv": "76b740c17a20e33181029df70d29758be344af9e99be7bcfdeed222a6f796b12",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/CD8+ T cells_layer.csv": "1b337538305c0ec2245a02ddac1086d69622b729b580080868729988362f9d75",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/Endothelial_layer.csv": "42a394fdf3ddc65c1a17a23b6897834d0f60ff987cfd887013fb5853689c45b9",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/Epithelial_layer.csv": "e27389d466846c6c971b383d5a3aff02ddc724393cd3a8c1d44ab9dd81d522e2",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/Fibroblasts_layer.csv": "4a6644b4b39f7a081bf6c622c118107a8e214c4b2eec8260ec2380f968770253",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_0/layers/Macrophages_layer.csv": "0240d3cc20dd35b5885a7ab32c82ca9d45910a2a625fac75f6a010aae1bdd0a2",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/B cells_layer.csv": "5c403555a805827e1315ca8b49bb3bd82732e4baa9855642712c3eea55bc5c1c",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/CD4+ T cells_layer.csv": "4edc1d5f2847ba50961642733273c4ab2ef1a02cd8410b3c220d64fd6226d90d",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/CD8+ T cells_layer.csv": "c75316ec7be164840fac607e2ad917f94cccee9980cad48a0822c58773288cd2",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/Endothelial_layer.csv": "051432889a4e65607f6be7f8f14a74cea6489e37087ba87a779472dc92206002",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/Epithelial_layer.csv": "9e085079bc3c4b28bbb119ccc2147aed0060feccd76788e6117225c77812a19e",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/Fibroblasts_layer.csv": "e745a6b1492e23418a5c10bad11e2e995599617d64abb656b1b74a4db94ab1a2",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_1/layers/Macrophages_layer.csv": "3480d8495347bff830809364091f620c9b44c29371b2ad390d989e0e729da1c3",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/B cells_layer.csv": "ecc8254b6f0f534e2725f41b4a0b0db975ae263d4fc3246b4fa578caac7fdba5",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/CD4+ T cells_layer.csv": "c0fc65bf96d92d4930a407da0891d430636fb4e6e9419bb3067d0007d3992345",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/CD8+ T cells_layer.csv": "b5281e5763fbe9a111a65a6ffcc073870a6955ee077c00f90c088a28b9f3e4e3",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/Endothelial_layer.csv": "7db51d701a9beb28e533d458047db83d1dc1c605f3699031f8bc91930be106a7",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/Epithelial_layer.csv": "75bbdc40e6171e8ec6dea24d7c70702af04bbb72001a4614cedc861987dca9ec",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/Fibroblasts_layer.csv": "8f9b5012b921554de86a5546d120fb5b73e0fb54c6e0dee1992626d76ca2c039",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_2/layers/Macrophages_layer.csv": "a262dba6b0370cdb58cf7b9c40434417f1f0625c84b08a67cde14b352b56bf3e",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/B cells_layer.csv": "7d30ff2676c3de21a42620de8afcc7e3c9e16bbc61712d71af5ab96aefc3f87d",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/CD4+ T cells_layer.csv": "2821b228dbac7b13182763d1c0894eeab196325815bb608bc57d3f6df07ffabd",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/CD8+ T cells_layer.csv": "742a6dac0d8cac9c2e1632b8fbeaecf1134082fa0d9c93471046022d33f56605",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/Endothelial_layer.csv": "22ddb81d1a0ab5c82164d3c2bfc8ae594113fff2bcd2fb526e0f8326e2cd672e",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/Epithelial_layer.csv": "82e004dced17b2a15ac79ab38da2c341b01b5db028f6e77f1c779e917527e966",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/Fibroblasts_layer.csv": "e4e0bf95a5ff5d2596bf0b7972f2dbfc593e3ad31c27418fafd109263950ce12",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_3/layers/Macrophages_layer.csv": "bd4f5d716d4e5057d2c7fc401d1ecf71c9395ee53e73ef223e56e6f9e6751e9b",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/B cells_layer.csv": "994af9325801259ab850c9296b547cfc0f89f4da638148c7332643ccb8ee3f61",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/CD4+ T cells_layer.csv": "1c643766ccd623e2a5008b4dbd1ff1ab44bfcad64684983f9aa8ad9c36c75654",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/CD8+ T cells_layer.csv": "7b133c2e7ab43a67dda1ce07663c66a633e0dcb5e356272cafd618e130e0e52e",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/Endothelial_layer.csv": "ed5c8fc8cb23d15c4dd35c2bd12a2a868a904d0d91b92e16a6f7afc9f6eaace6",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/Epithelial_layer.csv": "8b4a1e99e2e51aa49f26bb8888cd45d6285b47bf8eb4e14fc698b261f6fea65b",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/Fibroblasts_layer.csv": "ae681798aaa56991b006cf1f2959b6de8f5895b528b3ef900ad814eb1dd597c9",
+    "Benchmarking/xenium_benchmarking/Tangram/output_singler_7type_native/Xenium_region_4/layers/Macrophages_layer.csv": "d17ed2d9d7d7047c0a6740187afeced1d376435ba92f5f015a218e24a8d1d091"
+   },
+   "glob": "*_layer.csv"
+  }
+ },
+ "schema": 1
+}

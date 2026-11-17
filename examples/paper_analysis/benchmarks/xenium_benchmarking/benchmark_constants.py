@@ -218,6 +218,22 @@ ACHIEVABLE_6_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = {
     },
 }
 
+# =============================================================================
+# MS_V41 PROFILES (CITEgeist v41p): ACHIEVABLE dicts with B-cell Major = CD20 + CD138
+# =============================================================================
+# One user-approved revision of the marker-share step (with GMM brightness correction).
+# ACHIEVABLE_* above stay unchanged; these are independent copies.
+
+
+def _ms_v41(base: Dict[str, Dict[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
+    out = {ct: {k: list(v) for k, v in info.items()} for ct, info in base.items()}
+    out["B cells"]["Major"] = ["CD20", "CD138"]
+    return out
+
+
+MS_V41_6_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = _ms_v41(ACHIEVABLE_6_CELL_PROFILE_DICT)
+MS_V41_7_CELL_PROFILE_DICT: Dict[str, Dict[str, List[str]]] = _ms_v41(ACHIEVABLE_7_CELL_PROFILE_DICT)
+
 # Markers excluded from coherence scoring (legitimately cross-lineage)
 FUNCTIONAL_MARKERS: Set[str] = {
     "CD45",  # Pan-immune

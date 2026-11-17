@@ -1,0 +1,23 @@
+# FROZEN before any SACE/ORA run (Task A8). Many-to-one map from the 10 breast profile types
+# to 6 lineages, and from library term names to lineages.
+# Library term name is lowercased; for CellMarker ("Cell type:Tissue") the part before the first ':'
+# is used. A term maps to the FIRST lineage (in `lineage_order`) whose regex matches (re.search).
+type_to_lineage:
+  Endothelial: endothelial
+  Fibroblasts: fibroblast
+  B_Cells: B
+  Macrophages: myeloid
+  Monocytes: myeloid
+  Dendritic_Cells: myeloid
+  CD8_T_Cells: T
+  CD4_T_Cells: T
+  Cancer_Luminal: epithelial_cancer
+  Cancer_Basal: epithelial_cancer
+lineage_order: [endothelial, fibroblast, myeloid, T, B, epithelial_cancer]
+lineage_patterns:
+  endothelial: 'endothelial|hemangioblast'
+  fibroblast: 'fibroblast|stromal|mesenchymal|pericyte|smooth muscle|stellate'
+  myeloid: 'macrophage|monocyte|dendritic|kupffer|microglia|myeloid|langerhans|histiocyte|osteoclast'
+  T: '\bt cell|t helper|t regulatory|t cytotoxic|t memory|t follicular|thymocyte|gamma delta|natural killer|\bnkt\b|\bnk cell|\btreg\b'
+  B: '\bb cell|plasma cell|plasmablast|\bb lymphoma'
+  epithelial_cancer: 'epithelial|luminal|basal|mammary|myoepithelial|cancer|tumor|keratinocyte|ductal|urothelial'

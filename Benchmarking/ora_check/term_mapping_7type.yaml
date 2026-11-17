@@ -1,0 +1,18 @@
+# FROZEN 2026-11-01 before any v41/v2 ORA run. Same as term_mapping.yaml except type_to_lineage covers the 7 v41 breast types.
+# lineage_order and lineage_patterns are copied verbatim from term_mapping.yaml.
+type_to_lineage:
+  Cancer_Cells: epithelial_cancer
+  Macrophages: myeloid
+  CD4_T_Cells: T
+  CD8_T_Cells: T
+  B_Cells: B
+  Endothelial: endothelial
+  Fibroblasts: fibroblast
+lineage_order: [endothelial, fibroblast, myeloid, T, B, epithelial_cancer]
+lineage_patterns:
+  endothelial: 'endothelial|hemangioblast'
+  fibroblast: 'fibroblast|stromal|mesenchymal|pericyte|smooth muscle|stellate'
+  myeloid: 'macrophage|monocyte|dendritic|kupffer|microglia|myeloid|langerhans|histiocyte|osteoclast'
+  T: '\bt cell|t helper|t regulatory|t cytotoxic|t memory|t follicular|thymocyte|gamma delta|natural killer|\bnkt\b|\bnk cell|\btreg\b'
+  B: '\bb cell|plasma cell|plasmablast|\bb lymphoma'
+  epithelial_cancer: 'epithelial|luminal|basal|mammary|myoepithelial|cancer|tumor|keratinocyte|ductal|urothelial'

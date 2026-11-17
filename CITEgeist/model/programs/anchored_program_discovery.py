@@ -1280,7 +1280,7 @@ def anchored_spatial_nmf(
         coords: Spatial coordinates (n_spots, 2).
         K: Number of programs to discover.
         lambda_spatial: Spatial smoothness weight (applied via Laplacian smoothing).
-        lambda_sparsity: Gene sparsity weight (sklearn's alpha parameter).
+        lambda_sparsity: Elastic-net penalty on gene loadings (W) only (unscaled; sklearn's n_samples scaling is cancelled via alpha_H = lambda_sparsity / n_rows; no penalty on spot loadings; elastic net with l1_ratio=0.5).
         max_iter: Maximum iterations for NMF.
         random_state: Random seed for reproducibility.
 
@@ -1301,15 +1301,15 @@ def anchored_spatial_nmf(
     # Ensure non-negative (required for NMF)
     X_weighted = np.maximum(X_weighted, 0)
 
-    # Run NMF
     nmf = NMF(
         n_components=K,
         init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
         solver="cd",  # Frobenius norm, coordinate descent
-        loss="frobenius",
-        alpha_W=lambda_sparsity,
+        beta_loss="frobenius",
+        alpha_W=0.0,  # no penalty on spot loadings
+        alpha_H=lambda_sparsity / n_spots,  # unscaled penalty on gene loadings (cancels sklearn n_samples scaling)
         l1_ratio=0.5,  # Balance L1 and L2 for W
     )
 
@@ -1534,7 +1534,7 @@ def discover_anchored_programs(
         protein_adata: AnnData with protein data for validation (optional).
         K_programs: Number of programs to discover per cell type.
         lambda_spatial: Spatial smoothness regularization weight.
-        lambda_sparsity: Gene loading sparsity weight.
+        lambda_sparsity: Elastic-net penalty on gene loadings only (unscaled; no penalty on spot loadings).
         min_proportion_threshold: Minimum cell type proportion to include a spot.
         contrastive_strength: How much background to subtract (0=none, 1=full).
         use_enriched_genes: Pre-filter to genes enriched in anchor spots.
@@ -1799,7 +1799,7 @@ def discover_joint_programs(
         K_programs: Number of programs to discover.
         layer_pattern: Pattern to identify deconvolved layers.
         lambda_spatial: Spatial smoothness regularization (not yet implemented).
-        lambda_sparsity: Sparsity regularization via NMF alpha.
+        lambda_sparsity: Elastic-net penalty on gene loadings only (unscaled; sklearn's n_samples scaling is cancelled via alpha_H = lambda_sparsity / n_rows; no penalty on spot loadings; elastic net with l1_ratio=0.5).
         top_n_genes: Number of top genes to report per program.
         random_state: Random seed.
 
@@ -1838,8 +1838,8 @@ def discover_joint_programs(
         init="nndsvda",
         random_state=random_state,
         max_iter=500,
-        alpha_W=lambda_sparsity,
-        alpha_H=0.0,
+        alpha_W=0.0,  # no penalty on activities
+        alpha_H=lambda_sparsity / X_stacked.shape[0],  # cancels sklearn's n_samples scaling
         l1_ratio=0.5,
     )
 
@@ -2126,7 +2126,7 @@ def contrastive_anchored_nmf(
         coords: Spatial coordinates (n_spots, 2)
         K: Number of programs to discover
         lambda_spatial: Spatial smoothness weight
-        lambda_sparsity: Gene sparsity weight
+        lambda_sparsity: Elastic-net penalty on gene loadings only (unscaled; sklearn's n_samples scaling is cancelled via alpha_H = lambda_sparsity / n_rows; no penalty on spot loadings; elastic net with l1_ratio=0.5)
         contrastive_strength: How much background to subtract (0-1)
         max_iter: Maximum NMF iterations
         random_state: Random seed
@@ -2160,13 +2160,13 @@ def contrastive_anchored_nmf(
 
     X_weighted = np.maximum(X_weighted, 0)
 
-    # Run NMF
     nmf = NMF(
         n_components=K,
         init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
-        alpha_W=lambda_sparsity,
+        alpha_W=0.0,  # no penalty on spot loadings
+        alpha_H=lambda_sparsity / n_spots,  # unscaled penalty on gene loadings (cancels sklearn n_samples scaling)
         l1_ratio=0.5,
     )
 
@@ -2254,7 +2254,7 @@ def discover_programs_from_layers(
         protein_adata: AnnData with protein data for validation (optional).
         K_programs: Number of programs to discover per cell type.
         lambda_spatial: Spatial smoothness regularization weight.
-        lambda_sparsity: Gene loading sparsity weight.
+        lambda_sparsity: Elastic-net penalty on gene loadings only (unscaled; no penalty on spot loadings).
         min_expression_threshold: Minimum total expression to include a spot.
         validate_with_proteins: Whether to validate programs against proteins.
         top_n_genes: Number of top genes to report per program.
@@ -2493,7 +2493,7 @@ def _deconvolved_spatial_nmf(
         coords: Spatial coordinates (n_spots, 2).
         K: Number of programs to discover.
         lambda_spatial: Spatial smoothness weight.
-        lambda_sparsity: Gene sparsity weight.
+        lambda_sparsity: Elastic-net penalty on gene loadings only (unscaled; sklearn's n_samples scaling is cancelled via alpha_H = lambda_sparsity / n_rows; no penalty on spot loadings; elastic net with l1_ratio=0.5).
         max_iter: Maximum NMF iterations.
         random_state: Random seed.
 
@@ -2509,13 +2509,13 @@ def _deconvolved_spatial_nmf(
     # Ensure non-negative
     X_weighted = np.maximum(X_weighted, 0)
 
-    # Run NMF
     nmf = NMF(
         n_components=K,
         init="nndsvda",
         max_iter=max_iter,
         random_state=random_state,
-        alpha_W=lambda_sparsity,
+        alpha_W=0.0,  # no penalty on spot loadings
+        alpha_H=lambda_sparsity / n_spots,  # unscaled penalty on gene loadings (cancels sklearn n_samples scaling)
         l1_ratio=0.5,
     )
 

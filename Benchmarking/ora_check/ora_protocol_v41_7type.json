@@ -1,0 +1,16 @@
+{
+  "_status": "OVERRIDE of ora_protocol.json (deep-merged over it) for the v41/v2 ORA check. FROZEN 2026-11-01, see ora_v2_DECISION_RULE.md. Thresholds, nulls, seeds, variants are NOT overridden.",
+  "marker_gene_removal": {
+    "rule": "gene symbols of ALL antibodies in the REAL profile dictionary (v41 BREAST_PROFILE), '-1' suffix stripped; removed in EVERY variant",
+    "from_dictionary": "v41"
+  },
+  "ora": {
+    "libraries": {
+      "CellMarker_2024": {"file": "libraries/CellMarker_2024_human.gmt", "sha256": "69139edf08479ac437bb436302a918aa5616604dd82508b336ff954fb2a8671a"}
+    },
+    "primary_libraries": ["CellMarker_2024"],
+    "comparison_libraries": ["PanglaoDB_Augmented_2021", "CellMarker_Augmented_2021"],
+    "library_note": "Addendum 1 of ora_v2_DECISION_RULE.md: CellMarker_2024 is primary (passed / readout / null verdict); the two frozen libraries are reported beside it"
+  },
+  "term_mapping": {"file": "term_mapping_7type.yaml", "sha256": "df7dcaf720fe11e6422e6a160c3ec0c52b244129e092966973a8c094ca0d6cb3"}
+}

@@ -1,0 +1,18 @@
+# FROZEN 2026-11-01 (ora_sense_DECISION_RULE.md) before any sense-check number. Xenium RCC 7-type names -> lineage.
+# lineage_order and lineage_patterns copied verbatim from term_mapping_7type.yaml.
+type_to_lineage:
+  Epithelial: epithelial_cancer
+  "B cells": B
+  "CD4+ T cells": T
+  "CD8+ T cells": T
+  Macrophages: myeloid
+  Endothelial: endothelial
+  Fibroblasts: fibroblast
+lineage_order: [endothelial, fibroblast, myeloid, T, B, epithelial_cancer]
+lineage_patterns:
+  endothelial: 'endothelial|hemangioblast'
+  fibroblast: 'fibroblast|stromal|mesenchymal|pericyte|smooth muscle|stellate'
+  myeloid: 'macrophage|monocyte|dendritic|kupffer|microglia|myeloid|langerhans|histiocyte|osteoclast'
+  T: '\bt cell|t helper|t regulatory|t cytotoxic|t memory|t follicular|thymocyte|gamma delta|natural killer|\bnkt\b|\bnk cell|\btreg\b'
+  B: '\bb cell|plasma cell|plasmablast|\bb lymphoma'
+  epithelial_cancer: 'epithelial|luminal|basal|mammary|myoepithelial|cancer|tumor|keratinocyte|ductal|urothelial'

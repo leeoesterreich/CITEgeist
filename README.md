@@ -14,11 +14,11 @@ CITEgeist is a comprehensive computational framework for analyzing spatial multi
 ## Key Features
 
 - Reference-free cell-type deconvolution using same-slide CITE-seq antibody capture — no scRNA-seq reference required
-- GPU-accelerated cell-type proportion estimation via quadratic programming (cuOPT)
+- CPU cell-type proportion estimation (default: SPOTS marker share plus reference-free RNA refinement); GPU quadratic programming (cuOPT) available with `method="qp"`
 - SACE per-cell gene expression deconvolution via single-pass Poisson-multinomial allocation
 - Per-cell type assignment from spot proportions via StarDist nuclei segmentation. The default
-  routes nucleus morphology scores (`morphology/nucleus_scores.py`, shipped) through a Bayesian
-  posterior; count-constrained Hungarian matching remains available via `use_morphology=False`
+  is count-constrained Hungarian matching; the morphology-Bayesian posterior
+  (`morphology/nucleus_scores.py`) is available via `use_morphology=True`
 - Spatial gene program discovery and cross-sample integration (Modules 4–5)
 - Validated on dense tumor microenvironments including breast cancer and RCC clinical samples
 
@@ -46,13 +46,17 @@ The curated analysis code behind the paper's reported numbers — with a map fro
 the figure it produces — is in
 [`examples/paper_analysis`](https://github.com/leeoesterreich/CITEgeist/tree/main/examples/paper_analysis).
 
+## Reproducing the benchmarks
+
+The code behind the paper's benchmark figures and tables is in [`Benchmarking/`](https://github.com/leeoesterreich/CITEgeist/tree/main/Benchmarking). Its [README](https://github.com/leeoesterreich/CITEgeist/blob/main/Benchmarking/README.md) maps each figure and table to its scripts and lists the environment variables, data layout and data sources you need.
+
 ## System Requirements
 
 ### Minimum Requirements
 - Python 3.10
 - 16GB RAM
 - Multi-core processor
-- NVIDIA GPU with 8GB+ VRAM (required for cuOPT QP solver, Module 3)
+- NVIDIA GPU with 8GB+ VRAM (optional; only needed for `method="qp"`, the cuOPT QP solver)
 - Linux, macOS, or Windows 10 with WSL2
 
 ## Quick Installation
@@ -71,11 +75,12 @@ pip install citegeist
 > from CITEgeist import CitegeistModel      # lazy re-export — heavy stack loaded on demand
 > ```
 
-> **GPU requirement:** CITEgeist's QP deconvolution (Module 3) requires an **NVIDIA GPU with
+> **GPU is optional:** the default proportion method (`method="auto"`, which resolves to
+> `rna_refined`) runs on CPU. Only `method="qp"` (the 2.0.0 behaviour) needs an **NVIDIA GPU with
 > CUDA** and the [cuOPT](https://developer.nvidia.com/cuopt-logistics-optimization) library.
 > cuOPT is **not available on PyPI** — install it via NVIDIA RAPIDS or NGC
 > (`pip install cuopt-cu12` from the NVIDIA index, or use a pre-built RAPIDS container).
-> CPU-only environments **cannot run** the cell-type proportion solver.
+> The default needs a `raw_counts` GEX layer and per-spot nuclei counts.
 
 To install from source instead:
 

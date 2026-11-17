@@ -1,0 +1,56 @@
+#!/bin/bash
+#SBATCH --job-name=gen_granular_gt
+#SBATCH --output=slurm_log/gen_granular_gt_%j.out
+#SBATCH --error=slurm_log/gen_granular_gt_%j.err
+#SBATCH --time=04:00:00
+#SBATCH --mem=128G
+#SBATCH --cpus-per-task=8
+#SBATCH --cluster=htc
+#SBATCH --partition=htc
+
+# ============================================================================
+# Generate Granular 10-Cell-Type Ground Truth Dataset
+# ============================================================================
+# Creates pseudo-Visium spots with UNSIMPLIFIED RNA clustering (10 cell types)
+# to provide maximum granularity for benchmarking CITEgeist.
+#
+# Cell types: CD8+ T cells, Macrophages, Mixed Immune, Epithelial,
+#             Myofibroblasts, Stromal, Endothelial, B cells,
+#             Proliferating T, Vascular Stromal
+# ============================================================================
+
+_cg_find() {
+    if [ -n "${CITEGEIST_PATHS_SH:-}" ]; then echo "${CITEGEIST_PATHS_SH}"; return 0; fi
+    local p d
+    p="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../../_paths.sh"
+    if [ -f "$p" ]; then echo "$p"; return 0; fi
+    d="${SLURM_SUBMIT_DIR:-}"
+    while [ -n "$d" ] && [ "$d" != "/" ] && [ "$d" != "." ]; do
+        if [ -f "$d/Benchmarking/_paths.sh" ]; then echo "$d/Benchmarking/_paths.sh"; return 0; fi
+        d="$(dirname "$d")"
+    done
+    echo "cannot find Benchmarking/_paths.sh; set CITEGEIST_PATHS_SH" >&2
+    return 1
+}
+_cg_paths="$(_cg_find)" || exit 1
+source "${_cg_paths}"
+unset -f _cg_find
+unset _cg_paths
+cd ${CITEGEIST_REPO_ROOT}
+
+# Set up environment
+export PATH="${CITEGEIST_ENVS_ROOT:?CITEGEIST_ENVS_ROOT is not set and conda was not found; set it to your conda envs directory}/CITEgeist_env/bin:$PATH"
+PYTHON="$(cg_env_python CITEgeist_env)"
+
+echo "============================================================"
+echo "Generating Granular 10-Cell-Type Ground Truth Dataset"
+echo "============================================================"
+echo "Job ID: $SLURM_JOB_ID"
+echo "Time: $(date)"
+echo "Python: $PYTHON"
+echo ""
+
+$PYTHON Benchmarking/xenium_pseudovisium/src/generate_granular_dataset.py
+
+echo ""
+echo "Completed at: $(date)"

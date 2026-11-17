@@ -19,8 +19,8 @@ sys.path.insert(0, os.path.join(project_root, "CITEgeist", "model"))
 project = "CITEgeist"
 copyright = "2025, Lee/Oesterreich Lab"
 author = "Lee/Oesterreich Lab"
-release = "2.0.1"
-version = "2.0.1"
+release = "3.0.0"
+version = "3.0.0"
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration

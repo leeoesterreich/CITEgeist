@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -353,3 +354,115 @@ def tighten_axes_to_spots(
     y_min, y_max = float(coords_plot[:, 1].min()), float(coords_plot[:, 1].max())
     ax.set_xlim(x_min - pad, x_max + pad)
     ax.set_ylim(y_max + pad, y_min - pad)  # inverted y (image convention)
+
+
+# -- v4 morphology_assignment path resolution --------------------------------
+# The v4 per-cell data is nested per run region:
+#   <repo>/output/morphology_assignment_v4_hungarian/<run_id>/<region>/<SPEC>/
+# Regions (verified on disk): r3, r4, r5.  We search all three (first match
+# wins) rather than hardcoding a specimen -> region map that could drift.
+V4_MORPH_ROOT_NAME = "morphology_assignment_v4_hungarian"
+
+
+_V40_SHA12 = "0344d54f9d3d"  # fallback only when the MANUSCRIPT_PROTOCOL pin file is absent (public checkout)
+
+
+def manuscript_protocol_sha12() -> str:
+    """sha12 of the protocol run the manuscript data/figures are built from: env ``MIDKINE_PROTOCOL_SHA12``, else the
+    one-line ``benchmarks/midkine_remediation/MANUSCRIPT_PROTOCOL`` file (flipped to the new sha12 when the manuscript data
+    is rebuilt from a new run). If neither exists (a public checkout has no benchmarks/ tree) it falls back to the v40
+    sha12 and warns once, so a missing pin in the dev repo is not silent."""
+    import re
+    import warnings
+
+    val = os.environ.get("MIDKINE_PROTOCOL_SHA12")
+    if val is None:
+        f = Path(__file__).resolve().parents[3] / "benchmarks" / "midkine_remediation" / "MANUSCRIPT_PROTOCOL"
+        if f.is_file():
+            val = f.read_text()
+        else:
+            val = _V40_SHA12
+            warnings.warn(f"{f} not found; falling back to the v40 protocol sha12 {val}", stacklevel=2)
+    val = val.strip()
+    if not re.fullmatch(r"[0-9a-f]{12}", val):
+        raise ValueError(f"protocol sha12 must be 12 hex chars, got {val!r}")
+    return val
+
+
+V4_MORPH_REGIONS: tuple[str, ...] = ("r3", "r4", "r5")
+
+
+def _v4_repo_root(repo_root: "str | Path | None") -> Path:
+    """Return *repo_root*, defaulting to the CITEgeist repo root."""
+    if repo_root is None:
+        return Path(__file__).resolve().parents[3]  # .../figures/_shared -> repo root
+    return Path(repo_root)
+
+
+def v4_specimen_dir(specimen: str, repo_root: "str | Path | None" = None) -> Path:
+    """Return the per-specimen v4 morphology_assignment directory.
+
+    Searches ``<repo_root>/output/morphology_assignment_v4_hungarian/<run_id>``
+    across ``{r3,r4,r5}`` and returns the first region containing a
+    subdirectory named *specimen* (e.g. ``"HCC22-088-P3-S2"``).
+
+    Parameters
+    ----------
+    specimen : str
+        Specimen directory name (e.g. ``"HCC22-088-P1-S2"``).
+    repo_root : str or Path, optional
+        Repository root to resolve against.  Defaults to the CITEgeist repo
+        root derived from this module's location.
+
+    Returns
+    -------
+    Path
+        Absolute path to the specimen's v4 directory.
+
+    Raises
+    ------
+    ValueError
+        If *specimen* is not found under any of ``{r3, r4, r5}``.
+    """
+    sha = manuscript_protocol_sha12()
+    if sha not in ("0344d54f9d3d", "ec0cf5b80715"):
+        # v42 layout: output/<family>/<sha12>/<B3 run id>/<specimen> (no r3/r4/r5 regions; run id from v42_run_ids.yaml,
+        # superseded ids refused). Never falls back to the legacy region search.
+        from . import v2_runs
+
+        cand = v2_runs.output_dir("B3") / specimen
+        if not cand.is_dir():
+            raise ValueError(f"Specimen {specimen!r} not found under {cand.parent}")
+        return cand
+    v4_base = _v4_repo_root(repo_root) / "output" / V4_MORPH_ROOT_NAME / sha
+    for region in V4_MORPH_REGIONS:
+        candidate = v4_base / region / specimen
+        if candidate.is_dir():
+            return candidate
+    raise ValueError(
+        f"Specimen {specimen!r} not found under {v4_base} in any region "
+        f"{V4_MORPH_REGIONS} (searched {', '.join(V4_MORPH_REGIONS)})"
+    )
+
+
+def v4_specimen_file(specimen: str, filename: str, repo_root: "str | Path | None" = None) -> Path:
+    """Return the path to a specific file inside a specimen's v4 directory.
+
+    Resolves the specimen's v4 dir via :func:`v4_specimen_dir` and appends
+    *filename* (e.g. ``"<SPEC>_single_cell.h5ad"`` or ``"<SPEC>_nucleus_spot_map.csv"``).
+
+    Parameters
+    ----------
+    specimen : str
+        Specimen directory name.
+    filename : str
+        File name within the specimen's v4 directory.
+    repo_root : str or Path, optional
+        Repository root to resolve against (defaults to the repo root).
+
+    Returns
+    -------
+    Path
+        Absolute path to *filename* inside the specimen's v4 directory.
+    """
+    return v4_specimen_dir(specimen, repo_root) / filename

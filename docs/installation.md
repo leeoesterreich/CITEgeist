@@ -20,7 +20,7 @@ The optional StarDist nucleus segmentation used by single-cell assignment (`star
 ### Prerequisites
 
 - Conda or Mamba
-- NVIDIA GPU (required for Module 3 cuOPT QP solver)
+- NVIDIA GPU (optional; only for `method="qp"`, the cuOPT QP solver)
 
 ### Environment Setup
 
@@ -38,8 +38,9 @@ pip install -e .
 
 CITEgeist is designed for HPC clusters using SLURM. Key requirements:
 
-- **GPU nodes required for Module 3 (QP deconvolution).** The cuOPT solver
-  fails silently on CPU nodes. Submit with `--gres=gpu:1`.
+- **GPU nodes are needed only for `method="qp"`.** The default proportion method
+  (`auto`, resolving to `rna_refined`) runs on CPU. The cuOPT solver fails silently on
+  CPU nodes, so submit `method="qp"` jobs with `--gres=gpu:1`.
 - Module 3b (StarDist segmentation) requires `HDF5_USE_FILE_LOCKING=FALSE`
   for array jobs on NFS.
 

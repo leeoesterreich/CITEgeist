@@ -1,0 +1,1235 @@
+{
+  "protocol_id": "A12_midkine_remediation_v9",
+  "status": "DRAFT",
+  "drafted": "2026-10-14 (revised 2026-10-22; revision 9)",
+  "frozen_sha256": null,
+  "freeze_rule": "Integrity stamp: status FROZEN and frozen_sha256 (sha256 of the file with that field null) are the fields the loader reads; producers recompute the hash and abort on mismatch, so every output names the exact protocol text it used. There is no separate review or sign-off step. Legacy files, identifiers, input inventories, --dry-run preflights and synthetic tests may be used at any time; the A01-A07 sweep runner and the positive-control COMMOT rerun are built and tested (8ee65b0a, 8a6cbeec).",
+  "open_questions_pending_user": [
+    {
+      "id": "genotype_citable_record",
+      "status": "OPEN USER ITEM - NON-BLOCKING FOR COMPUTATION",
+      "question": "Is there a citable sequencing/ddPCR record for 'P4-S2 ESR1-D538G, all other specimens WT'? It belongs in Methods.",
+      "interim": "specimens.genotype cites the user statement of 2026-10-14. No computation, gate, label or claim-tree input reads the genotype record; only the manuscript Methods text waits on it."
+    }
+  ],
+  "inputs": {
+    "proportions_dir": "output/module3_rna_refined_7type_{run_timestamp}/v2b1",
+    "proportions_note": "v2 (2026-11-01): the proportions every stage reads are RNA compartments (frozen RNA refinement: multinomial, c 0.1, 3 passes, anchor threshold 0, 2000 variable genes), an RNA-mass fraction exported as a cell fraction, refined from a protein start p0 with the rebuilt nuclei counts, for ALL p0 spots. Each stage gets the run's directory as MODULE3_DIR; the rule is the module3 layout {specimen}_cell_prop_finetuned_results.csv plus a .stamp.json sidecar (scripts/v42_stamp.py).",
+    "protein_start_p0": "the closed-form marker share (SPOTS estimator) over the same dictionary, computed fresh in the run (Benchmarking/midkine_remediation/src/v2_inputs.py p0); never read from an earlier run's folder",
+    "synthetic_lattice_dir": "output/module3_marker_share_7type",
+    "synthetic_lattice_note": "HISTORICAL and used only by the synthetic G6/G7 gate series (spatial lattice of the earlier stored proportions); no reported v2 result reads it",
+    "proportions_pattern": "{specimen}_cell_prop_finetuned_results.csv",
+    "types": [
+      "Cancer_Cells",
+      "Macrophages",
+      "CD4_T_Cells",
+      "CD8_T_Cells",
+      "B_Cells",
+      "Endothelial",
+      "Fibroblasts"
+    ],
+    "dictionary_version": "v41",
+    "dictionary_note": "v41 breast hand dictionary (CITEgeist/examples/breast_dictionary.py BREAST_PROFILE): the v40 7 types with PAX5-1 added to B_Cells Major. A Neutrophils type (CEACAM8-1) was tried and dropped (CEACAM8-1 raw UMIs do not exceed the matched isotype in 0/12 specimens; evidence: results/<protocol_sha12>/neutrophil_check.json). The protein start p0 is the marker share over this dictionary; the proportions used downstream are its RNA refinement (inputs.proportions_note), not cuOPT QP.",
+    "nuclei_counts_pattern": "output/nuclei_rebuilt_7type_{run_timestamp}/v2b2/{specimen}/{specimen}_nuclei_counts_fullres_patchwise.csv",
+    "nuclei_counts_note": "v2 (2026-11-01): the nuclei are REBUILT for every p0 spot (stage B2; production per-spot-patch StarDist, compute_spot_nuclei_counts_patchwise) into a new, stamped, non-symlink artifact. Barcodes are unique and equal to the specimen's full p0 spot set before the refit. No stage reads output/morphology_assignment_v3. Counts feed n_cells_est and the refit; a spot may have zero nuclei and is kept as zero.",
+    "proportions_stored_as_is": true,
+    "proportion_facts_checked_2026_10_22": {
+      "_source": "counted directly from the 12 marker-share csv files in output/module3_marker_share_7type on 2026-10-22 (module3 job 12010686, code 1c5ad4f7); the 2026-10-14 v40 QP facts (0 exact zeros, row sums 0.901-0.915) no longer apply",
+      "exact_zero_entries_all_12_files": 729,
+      "entries_all_12_files": 232687,
+      "row_sum_all_rows_range": [
+        1.0,
+        1.0
+      ],
+      "row_sum_tolerance": 1e-12,
+      "consequence": "marker-share rows sum to 1 (to float precision), so renormalisation by row sum is the identity; exact zeros exist, so proportion == 0 is a real (but non-operative) exclusion and min-proportion thresholds remain the operative rules"
+    },
+    "v3_hash_snapshot": "HISTORICAL (v40/v41 only): Benchmarking/midkine_remediation/v3_manifest.sha256. Not read by any v2 stage.",
+    "nuclei_rule": "see compartments.nuclei_eff (monotone floor); raw StarDist counts from the stamped B2 artifact (inputs.nuclei_counts_pattern), read-only"
+  },
+  "specimens": {
+    "ordered": [
+      "HCC22-088-P1-S1",
+      "HCC22-088-P1-S2",
+      "HCC22-088-P2-S1",
+      "HCC22-088-P2-S2",
+      "HCC22-088-P3-S1_A",
+      "HCC22-088-P3-S2",
+      "HCC22-088-P4-S1",
+      "HCC22-088-P4-S2_1i_rep",
+      "HCC22-088-P5-S1",
+      "HCC22-088-P5-S2_F_rep",
+      "HCC22-088-P6-S1",
+      "HCC22-088-P6-S2_D"
+    ],
+    "n_expected": 12,
+    "pairs_biopsy_surgery": [
+      [
+        "HCC22-088-P1-S1",
+        "HCC22-088-P1-S2"
+      ],
+      [
+        "HCC22-088-P2-S1",
+        "HCC22-088-P2-S2"
+      ],
+      [
+        "HCC22-088-P3-S1_A",
+        "HCC22-088-P3-S2"
+      ],
+      [
+        "HCC22-088-P4-S1",
+        "HCC22-088-P4-S2_1i_rep"
+      ],
+      [
+        "HCC22-088-P5-S1",
+        "HCC22-088-P5-S2_F_rep"
+      ],
+      [
+        "HCC22-088-P6-S1",
+        "HCC22-088-P6-S2_D"
+      ]
+    ],
+    "pairs_note": "All six clinical pairs are frozen here from naming metadata; the five-pair list in trajectory_deltas.csv (outcome-bearing) is NOT inherited. A pair enters an analysis only if both members are estimable.",
+    "P4_S1_rule": "P4-S1 is always in the specimen set (ESR1-WT, patient-matched control for P4-S2). Reported whatever its values, or typed not_estimable under the gate; never excluded for non-significance. Aggregates are over ALL estimable specimens.",
+    "hurdle_specimens_primary": [
+      "HCC22-088-P4-S2_1i_rep"
+    ],
+    "expected_n_spots_qp_file": {
+      "HCC22-088-P1-S1": 674,
+      "HCC22-088-P1-S2": 4990,
+      "HCC22-088-P2-S1": 2050,
+      "HCC22-088-P2-S2": 4989,
+      "HCC22-088-P3-S1_A": 420,
+      "HCC22-088-P3-S2": 4827,
+      "HCC22-088-P4-S1": 648,
+      "HCC22-088-P4-S2_1i_rep": 3931,
+      "HCC22-088-P5-S1": 1141,
+      "HCC22-088-P5-S2_F_rep": 4449,
+      "HCC22-088-P6-S1": 300,
+      "HCC22-088-P6-S2_D": 4822
+    },
+    "expected_n_cells_v3_h5ad": {
+      "HCC22-088-P1-S1": 1037,
+      "HCC22-088-P1-S2": 88689,
+      "HCC22-088-P2-S1": 2090,
+      "HCC22-088-P2-S2": 41580,
+      "HCC22-088-P3-S1_A": 1104,
+      "HCC22-088-P3-S2": 53221,
+      "HCC22-088-P4-S1": 2077,
+      "HCC22-088-P4-S2_1i_rep": 35039,
+      "HCC22-088-P5-S1": 6486,
+      "HCC22-088-P5-S2_F_rep": 16887,
+      "HCC22-088-P6-S1": 1161,
+      "HCC22-088-P6-S2_D": 15447
+    },
+    "expected_cancer_compartments_stored_prop": {
+      "_source": "counted directly from the 12 marker-share csv files (output/module3_marker_share_7type) on 2026-10-22, independent of any builder; the builder may drop spots absent from the GEX object, so the gate allows [0.99*expected, expected]",
+      "ge_0.05": {
+        "HCC22-088-P1-S1": 672,
+        "HCC22-088-P1-S2": 4969,
+        "HCC22-088-P2-S1": 1957,
+        "HCC22-088-P2-S2": 4725,
+        "HCC22-088-P3-S1_A": 409,
+        "HCC22-088-P3-S2": 3829,
+        "HCC22-088-P4-S1": 518,
+        "HCC22-088-P4-S2_1i_rep": 3751,
+        "HCC22-088-P5-S1": 1076,
+        "HCC22-088-P5-S2_F_rep": 4412,
+        "HCC22-088-P6-S1": 300,
+        "HCC22-088-P6-S2_D": 4740
+      },
+      "ge_0.10": {
+        "HCC22-088-P1-S1": 629,
+        "HCC22-088-P1-S2": 4885,
+        "HCC22-088-P2-S1": 1306,
+        "HCC22-088-P2-S2": 3196,
+        "HCC22-088-P3-S1_A": 335,
+        "HCC22-088-P3-S2": 1509,
+        "HCC22-088-P4-S1": 274,
+        "HCC22-088-P4-S2_1i_rep": 2915,
+        "HCC22-088-P5-S1": 936,
+        "HCC22-088-P5-S2_F_rep": 4011,
+        "HCC22-088-P6-S1": 294,
+        "HCC22-088-P6-S2_D": 3666
+      },
+      "ge_0.20": {
+        "HCC22-088-P1-S1": 110,
+        "HCC22-088-P1-S2": 4023,
+        "HCC22-088-P2-S1": 135,
+        "HCC22-088-P2-S2": 586,
+        "HCC22-088-P3-S1_A": 122,
+        "HCC22-088-P3-S2": 37,
+        "HCC22-088-P4-S1": 84,
+        "HCC22-088-P4-S2_1i_rep": 781,
+        "HCC22-088-P5-S1": 457,
+        "HCC22-088-P5-S2_F_rep": 1380,
+        "HCC22-088-P6-S1": 96,
+        "HCC22-088-P6-S2_D": 191
+      }
+    },
+    "genotype": {
+      "HCC22-088-P4-S2_1i_rep": "ESR1_D538G",
+      "HCC22-088-P1-S1": "ESR1_WT",
+      "HCC22-088-P1-S2": "ESR1_WT",
+      "HCC22-088-P2-S1": "ESR1_WT",
+      "HCC22-088-P2-S2": "ESR1_WT",
+      "HCC22-088-P3-S1_A": "ESR1_WT",
+      "HCC22-088-P3-S2": "ESR1_WT",
+      "HCC22-088-P4-S1": "ESR1_WT",
+      "HCC22-088-P5-S1": "ESR1_WT",
+      "HCC22-088-P5-S2_F_rep": "ESR1_WT",
+      "HCC22-088-P6-S1": "ESR1_WT",
+      "HCC22-088-P6-S2_D": "ESR1_WT"
+    },
+    "genotype_source": "user statement 2026-10-14 (not verified from data in this repository; citable record is an open item)",
+    "sample_type_convention": {
+      "S1": "pre-treatment biopsy",
+      "S2": "post-endocrine-therapy surgery"
+    },
+    "sample_type_status": "CONFIRMED for all 6 patients; source: GEO GSE289326 sample records ('treatment: pre-treament' vs 'post primary endocrine therapy'), A12.2",
+    "hurdle_specimens_all": [
+      "HCC22-088-P1-S1",
+      "HCC22-088-P1-S2",
+      "HCC22-088-P2-S1",
+      "HCC22-088-P2-S2",
+      "HCC22-088-P3-S1_A",
+      "HCC22-088-P3-S2",
+      "HCC22-088-P4-S1",
+      "HCC22-088-P4-S2_1i_rep",
+      "HCC22-088-P5-S1",
+      "HCC22-088-P5-S2_F_rep",
+      "HCC22-088-P6-S1",
+      "HCC22-088-P6-S2_D"
+    ],
+    "surgical_wt_specimens": [
+      "HCC22-088-P1-S2",
+      "HCC22-088-P2-S2",
+      "HCC22-088-P3-S2",
+      "HCC22-088-P5-S2_F_rep",
+      "HCC22-088-P6-S2_D"
+    ],
+    "below_gate_specimens": {
+      "HCC22-088-P3-S2": "fullres H&E 1.1922 um/px",
+      "HCC22-088-P4-S2_1i_rep": "fullres H&E 1.1922 um/px",
+      "gate": "<= 1.0 um/px (_validate_he_resolution)",
+      "source": "Benchmarking/midkine_remediation/preflight_2026-10-14.json (commit 2ede20a5)",
+      "other_specimens": "pass"
+    },
+    "specimen_ids_note": "P4-S2_1i_rep and P5-S2_F_rep are the specimen ids (not the plain dirs)"
+  },
+  "rebuild": {
+    "script": "Benchmarking/midkine_remediation/src/rebuild_single_cell.py",
+    "why_not_example": "examples/scripts/run_single_cell_assignment.py accepts only sample-P* names, has a placeholder data root, and --stages 5 reads nucleus_spot_mapping.csv from the empty new dir",
+    "cli": "python -u rebuild_single_cell.py --specimen {specimen} --data-root {data_root} --module3-dir {module3_dir} --nuclei-dir {nuclei_dir} --out-root output/morphology_assignment_v4_hungarian/{protocol_sha12}/{run_id} --run-id {run_id} [--dry-run]",
+    "specimen_map": "explicit dict specimen -> (visium outs dir under data root, proportion csv) covering all 12; asserted complete",
+    "call": "model.run_sace_allocation(output_mode='single_cell', resolution_mode='fullres', use_morphology=False, integer_allocation=False)",
+    "no_redundant_first_assignment": true,
+    "preflight": "--dry-run for all 12 against empty output dirs: args parse, inputs exist and readable, map complete, output writable and empty, fullres H&E exists and its scale passes the <=1.0 um/px gate (_validate_he_resolution); no StarDist/SACE work",
+    "output_rules": "refuse non-empty target; write to temp dir then atomic rename; promote only a validated manifest; never write morphology_assignment_v3",
+    "compute": "GPU via gpu-race-submit.sh (script has --gres=gpu:1, no --partition/--cluster; reference $GPU_RACE_NAMESPACE in a log line); first specimen is a timing probe; largest specimen >= 64G",
+    "gates": {
+      "expected_allocation": {
+        "source": "CITEgeist/model/assignment/cell_assignment.py discretize_proportions L55-59 and assign_cells L173-188; round_counts_largest_remainder in cellularity_utils.py",
+        "stage1": "for each spot with N_raw=nuclei_count_raw>0: counts1 = LR(N_raw * p_i, N_raw); LR renormalises its input to sum N, so the row sum (1 for marker-share rows) is irrelevant",
+        "stage2": "n_actual = cells mapped to the spot; if sum(counts1) != n_actual: counts2 = LR(counts1 / max(sum(counts1),1) * n_actual, n_actual) else counts2 = counts1; spots with n_actual==0 are not represented",
+        "check": "independent re-implementation of LR, unit-tested against the library function on random and hand-built tie cases (A12.3); recomputed from nuclei_count_raw, the cell->spot map and the QP csv; exact equality with the new per-spot type counts for every represented spot",
+        "tie_break": "as implemented in cellularity_utils.py (read and mirrored in A12.3; mismatches on tie cases fail the unit test)"
+      },
+      "fraction_tolerance_per_type_specimen": 0.02,
+      "fraction_reference": "mean over spots of stored proportion renormalised over 7 types (identity: marker-share rows already sum to 1), weighted by per-spot cell counts; computed from the QP csv, not from the h5ad",
+      "n_cells_vs_v3_relative_tolerance": 0.02,
+      "n_cells_gate_on_fail": "stop_and_report (never loosen)",
+      "mutation_checks_required": [
+        "drop_last_type_column",
+        "swap_two_type_labels",
+        "scramble_spot_assignment",
+        "skip_stage2_reconciliation_in_checker"
+      ],
+      "independent_n_cells_per_spot": "n_cells_per_spot taken from the segmentation nucleus->spot table (not from the new h5ad); the new per-spot cell counts must equal it"
+    },
+    "persisted_for_gate": [
+      "nuclei_count_raw (per-spot nuclei count fed to stage-1 rounding)",
+      "cell_to_spot map (cell_id, spot_id)"
+    ],
+    "specimens_rebuilt": "10 (all except HCC22-088-P3-S2 and HCC22-088-P4-S2_1i_rep)",
+    "no_rebuild_below_gate": {
+      "specimens": [
+        "HCC22-088-P3-S2",
+        "HCC22-088-P4-S2_1i_rep"
+      ],
+      "decision": "user 2026-10-14: gate kept as is",
+      "typed_status": "not_estimable",
+      "reason": "fullres H&E 1.19 um/px > 1.0 um/px segmentation gate",
+      "applies_to": [
+        "Moran definition A (all-cells)",
+        "per-cell supplementary maps",
+        "any analysis reading a v4 per-cell file"
+      ]
+    }
+  },
+  "layers": {
+    "producer": "run_sace_allocation(output_mode='layers', init_method='marker', integer_allocation=False) on the module3-layout RNA-compartment proportions (inputs.proportions_dir)",
+    "integer_allocation": false,
+    "count_semantics": "all 'counts' below are expected allocated counts (continuous), not integer transcripts",
+    "not_reusable": "Benchmarking/ora_check/results/sace_layers (10-type clinical dictionary)",
+    "conservation_gate": {
+      "statement": "sum over types of allocated counts equals the RAW spot counts per gene and spot; raw layer read independently from the Visium file",
+      "max_relative_error": 0.0001,
+      "assert_raw_counts_layer_used": "SACE must read the raw_counts layer, not the .X fallback"
+    }
+  },
+  "compartments": {
+    "p_construct": 0.05,
+    "empty_rule_note": "Rule 'proportion == 0' removes only the 729 exact zeros of the 232687 marker-share entries (see inputs.proportion_facts_checked_2026_10_22). p_construct is the operative rule. The user's instruction (drop empty) is satisfied as: drop proportion < p_construct.",
+    "p_construct_sensitivity": [
+      0.02,
+      0.1,
+      0.2
+    ],
+    "obs_fields": [
+      "spot_id",
+      "barcode",
+      "cell_type",
+      "qp_prop",
+      "qp_prop_renorm",
+      "n_nuclei_spot",
+      "nuclei_eff",
+      "n_st",
+      "n_st_eff",
+      "nuclei_floor_bound",
+      "n_floor_bound",
+      "total_counts",
+      "spot_umi",
+      "depth_ratio",
+      "rna_per_cell_equiv",
+      "rna_per_cell_equiv_nf",
+      "n_st_nf",
+      "keratin_counts",
+      "k_share",
+      "k_percell_desc",
+      "k_percell_desc_nf"
+    ],
+    "obsm_spatial": "spot coordinates (same units as COMMOT dis_thr)",
+    "eligibility_cancer": {
+      "min_prop": 0.1,
+      "min_expected_allocated_total_counts": 200,
+      "min_counts_sensitivity": [
+        50,
+        500
+      ]
+    },
+    "n_st": "nuclei_eff * qp_prop_renorm",
+    "n_st_eff": "max(n_st, n_floor); n_floor=0.5 (drafter's convention); floor sensitivity {0.25,1.0} runs in ALL 12 specimens",
+    "depth_ratio": "spot_umi / M; M = ONE pooled median of observed raw spot UMI over all spots of all 12 specimens present in both the QP csv and the GEX object (not only cancer-eligible; no outcome data); written once into the stamped inventory",
+    "nuclei_eff": "max(nuclei_spot, f_spec); f_spec = max(1, floor(0.5 * specimen median nuclei per spot over spots with >=1 nucleus)); missing counts as 0; monotone in nuclei_spot",
+    "rna_per_cell_equiv": "sum over all genes except the six keratins and MDK of E_stg / n_st_eff / depth_ratio",
+    "heavy_flags": {
+      "fallback_heavy": "nuclei floor binds for >20% of eligible cancer compartments",
+      "floor_heavy": "n_floor binds for >20% of eligible cancer compartments",
+      "consequence": "specimen primary results descriptive; N_S sensitivity reported prominently",
+      "report": "fraction of spots with nuclei floor binding and fraction of eligible cancer compartments with n_floor binding, per specimen"
+    },
+    "no_spatial_distance_in_R00": "R00 object must have no obsp['spatial_distance'] (asserted)",
+    "row_count_rule": "rows per type == independent recount on the QP csv restricted to barcodes present in the GEX object (the gate); literal QP-file counts in specimens.expected_cancer_compartments_stored_prop are a sanity bracket only: 0.99*literal <= rows <= literal",
+    "below_gate_flag": "below_gate = specimen in specimens.below_gate_specimens (fixed by preflight, not by outcomes)",
+    "label_columns_note": "k_share (counts only, MDK excluded from the denominator) is the ONLY label variable. k_percell_desc and k_percell_desc_nf are DESCRIPTIVE columns (per-cell-equivalent keratin on the N_P / N_P_nf scale); they never define a group. keratin_counts = allocated counts of the six keratins (A07)."
+  },
+  "normalisation": {
+    "model": "E_stg ~ n_st * (per-cell expression of t in s) * c_s (c_s = spot capture/depth)",
+    "primary_N_P": {
+      "formula": "x_stg = log1p( E_stg / n_st_eff / depth_ratio_s )",
+      "question": "does a cancer compartment express/send more MDK per cell-equivalent at common depth (cell state)?",
+      "used_for": [
+        "H1-H4 expression-level quantities",
+        "Moran's I",
+        "COMMOT primary input",
+        "rna_per_cell_equiv covariate (the keratin label is NOT on this scale: it is k_share, counts only)"
+      ]
+    },
+    "secondary_N_A": {
+      "formula": "x_stg = log1p( E_stg / depth_ratio_s )  (= N_P multiplied by n_st_eff before the log)",
+      "question": "how much ligand does the compartment put into the tissue? (secretion scales with cell number)",
+      "used_for": [
+        "COMMOT flow secondary"
+      ]
+    },
+    "sensitivity_N_S": {
+      "formula": "per-compartment normalize_total(1e4) then log1p",
+      "question": "compositional expression (removes cell number, depth and RNA content per cell)"
+    },
+    "claims": "statements about cell state may rest on N_P; statements about flow on N_A; a 'supported' label needs agreement in direction across N_P, N_A and N_S",
+    "depth_reference": "pooled M (see compartments.depth_ratio); makes the cross-specimen N-P MDK values used by H4 comparable. k_share is a ratio of linear counts and does not depend on depth, so the pooled M plays no role in k0 or in the label",
+    "floor_sensitivity_all_specimens": true,
+    "nuclei_free_sensitivity_N_P_nf": {
+      "formula": "n_st_nf = qp_prop_renorm * (specimen median nuclei per spot over spots with >=1 nucleus); x = log1p(E / max(n_st_nf, n_floor) / depth_ratio); rna_per_cell_equiv_nf recomputed on this scale",
+      "specimens": "ALL 12",
+      "run_id": "R11 (COMMOT rerun with N_P_nf input)",
+      "reporting": "every H1 estimate reported side by side for primary and nuclei-free; P4-S2 shown as a headline table",
+      "why": "nuclei for P3-S2 and P4-S2_1i_rep were segmented on fullres H&E at 1.1922 um/px (below the <=1.0 um/px gate); primary results for them depend on below-gate counts",
+      "difference_from_ruling_wording": "uses qp_prop_renorm instead of the stored qp_prop so that it differs from the primary only in the nuclei term (spec 9.12)",
+      "reuses": "R11 uses EXACTLY the R00 eligible compartments and the R00 k_share labels (k_share has no nuclei or depth term, so it cannot change). Only the N-P_nf outcome and the covariate rna_per_cell_equiv_nf are recomputed; spot_umi and qp_prop are unchanged. The nuclei-free label is NOT recomputed."
+    },
+    "limitation_statement": "For P3-S2 and P4-S2_1i_rep the StarDist nuclei counts come from below-gate imagery (1.19 um/px). This is stated in Methods and next to any P4-S2 result."
+  },
+  "commot": {
+    "env": "envs/COMMOT (commot 0.0.3, numpy 1.26.4) is REQUIRED for every COMMOT run (A12.8). CITEgeist_env cannot import commot (numpy 2.1.3 removed np.Inf); the tests shell out to envs/COMMOT",
+    "database": "CellChat, human",
+    "filter_lr_min_cell_pct": 0.01,
+    "heteromeric": true,
+    "pathway_sum": true,
+    "lr_list_policy": "frozen from the primary N_P object per specimen and reused in every sensitivity run",
+    "dis_thr_primary": 500,
+    "dis_thr_unit": "coordinate units; record median nearest-spot pitch per specimen",
+    "dis_thr_sensitivity_in_pitch_units": [
+      1.5,
+      3.0
+    ],
+    "other_params": "package defaults (cot_eps_p=0.1, cot_rho=10, cot_nitermax=1e4, cost_type euc)",
+    "scale_note": "COMMOT divides masses by max(S.sum(), D.sum()) of the run; absolute sender scores are NOT comparable across specimens. Cross-specimen contrasts use scale-free within-specimen effects or expression-level MDK sending.",
+    "pair_mapping_sender_to_obsp": {
+      "s-MDK-NCL": "commot-cellchat-MDK-NCL",
+      "s-MDK-SDC2": "commot-cellchat-MDK-SDC2",
+      "s-MDK-SDC4": "commot-cellchat-MDK-SDC4",
+      "s-MDK-LRP1": "commot-cellchat-MDK-LRP1",
+      "s-MDK-ITGA6_ITGB1": "commot-cellchat-MDK-ITGA6_ITGB1"
+    },
+    "pair_gate": "G5 is a key-mapping check (not a validity check): each pair survived filter_lr_database into the frozen LR list; obsp matrix row sum is nonzero (non-vacuous); obsp row sum equals the sender column within 1e-6; pathway matrix commot-cellchat-MK not used",
+    "optional_endpoint": "s-MK pathway sender (separate, exploratory)",
+    "zero_distance_source_reading": "M<=cutoff inclusive; zero-distance pairs and diagonal inside cutoff; cost_scale=max(M within cutoff)*A; kernel exp(-C/eps)",
+    "decomposition_descriptive": "between-spot SHARE of native flow = row sums over other-spot columns / total (not a between-spot-only flow); autocrine and within-spot parts reported",
+    "true_between_spot_rerun": {
+      "role": "secondary; condition for the wording 'spatial' in decision_rules",
+      "how": "set obsp['spatial_distance'] so same-spot pairs and the diagonal exceed dis_thr (excluded), refit COMMOT with the frozen LR list",
+      "run_id": "R10"
+    },
+    "toy_gate_three_row": "co-located ligand-only row + receptor-only row + positive-mass row one pitch away; expect nonzero within-spot AND between-spot transport and cost_scale>0; failure stops (explicit zero entries lost). A two-row toy at identical coordinates is degenerate (cost_scale=0) and is not used.",
+    "run_matrix": {
+      "design": "one-factor-at-a-time around R00; ALL 12 specimens run R00, R01, R08, R09, R10, R11; P4-S2 additionally runs R02-R07",
+      "runs": {
+        "R00": "primary: N_P, p_construct 0.05, dis_thr 500, n_floor 0.5",
+        "R01": "N_A input",
+        "R02": "N_S input",
+        "R03": "p_construct 0.02",
+        "R04": "p_construct 0.10",
+        "R05": "p_construct 0.20",
+        "R06": "dis_thr 1.5 pitch",
+        "R07": "dis_thr 3 pitch",
+        "R08": "n_floor 0.25 (all 12 specimens)",
+        "R09": "n_floor 1.0 (all 12 specimens)",
+        "R10": "true between-spot rerun",
+        "R11": "nuclei-free N_P_nf input (all 12 specimens); same eligible rows and the same k_share labels as R00; recompute only the N-P_nf outcome and rna_per_cell_equiv_nf"
+      },
+      "analysis_side_variants_no_commot_rerun": {
+        "A01": "counts gate 50",
+        "A02": "counts gate 500",
+        "A03": "k0 0.005 on k_share (absolute rule, group-size gate, no fallback)",
+        "A04": "k0 0.02 on k_share (absolute rule, group-size gate, no fallback)",
+        "A05": "continuous: standardised log1p(k_share) (population SD over the specimen's eligible compartments); effect per 1 SD, point estimates only (no interval); gates evaluated on the primary binary label (descriptive.estimate_continuous)",
+        "A06": "top vs bottom tertile of k_share within specimen (numpy quantile method=linear at 1/3 and 2/3; top = k_share >= q(2/3), bottom = k_share <= q(1/3); middle dropped; degenerate tertiles not_estimable)",
+        "A07": "R_B: six-keratin allocated count (keratin_counts) >= 1"
+      },
+      "R00_asserts": [
+        "no obsp['spatial_distance']",
+        "LR list equals the frozen list"
+      ],
+      "analysis_variant_mechanics": {
+        "common": {
+          "specimens": [
+            "HCC22-088-P4-S2_1i_rep"
+          ],
+          "outcome": "R00 N-P MDK-NCL native COMMOT sender score (no COMMOT rerun; scores exist for every compartment)",
+          "participation": "point estimate only",
+          "claim_tree": false
+        },
+        "A01": {
+          "changes": "eligibility min allocated counts 50",
+          "recompute": [
+            "eligibility",
+            "labels (primary rule incl. its one fallback)",
+            "blocks (make_blocks + median pitch on the new eligible set)",
+            "covariate standardisation (new eligible set)"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "primary rule",
+          "fallback": "primary rule only"
+        },
+        "A02": {
+          "changes": "eligibility min allocated counts 500",
+          "recompute": [
+            "eligibility",
+            "labels (primary rule incl. its one fallback)",
+            "blocks (make_blocks + median pitch on the new eligible set)",
+            "covariate standardisation (new eligible set)"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "primary rule",
+          "fallback": "primary rule only"
+        },
+        "A03": {
+          "changes": "k0 0.005",
+          "recompute": [
+            "labels"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "30 eligible compartments per group",
+          "fallback": "none"
+        },
+        "A04": {
+          "changes": "k0 0.02",
+          "recompute": [
+            "labels"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "30 eligible compartments per group",
+          "fallback": "none"
+        },
+        "A05": {
+          "changes": "continuous standardised log1p(k_share)",
+          "recompute": [
+            "label"
+          ],
+          "magnitude_interval": "none (point estimates only)",
+          "label_gate": "primary binary label",
+          "fallback": "none"
+        },
+        "A06": {
+          "changes": "top vs bottom tertile of k_share, middle dropped",
+          "recompute": [
+            "labels",
+            "analysis subset"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "30 compartments per tertile group on the subset",
+          "fallback": "none",
+          "note": "blocks keep the primary tile assignment (not re-merged on the subset); covariates keep the primary standardisation (never per subset)"
+        },
+        "A07": {
+          "changes": "R_B: six-keratin allocated count >= 1",
+          "recompute": [
+            "labels"
+          ],
+          "magnitude_interval": "nominal 95% production bootstrap",
+          "label_gate": "30 eligible compartments per group",
+          "fallback": "none"
+        }
+      },
+      "analysis_variant_rules": {
+        "A01-A04,A06,A07": "same estimator, gates (30 compartments per group, 10 active senders per group, 10 mixed blocks) and typed failures as the primary run",
+        "unchanged_unless_listed": "eligibility rows, tile assignment and covariate standardisation are those of the primary run"
+      },
+      "analysis_variant_runner": "BUILT AND TESTED (src/sweep.py, commit 8ee65b0a; run_sweep/write_sweep, driven by the A12.9 step); the mechanics above are the specification and a contract test compares the runner with them (see post_freeze_open_items)"
+    },
+    "r10_typed_failure": "R10 with no pair inside dis_thr after excluding same-spot pairs and the diagonal makes commot raise (zero-size reduction); the code (commot_gates.r10_precheck / run_commot_typed) returns a typed not_estimable / failed status instead of crashing",
+    "pair_mapping_note": "each named LR pair has an exact sender column and obsp key (the five MDK pairs are descriptive endpoints only)"
+  },
+  "hurdle": {
+    "unit": "eligible cancer compartment",
+    "questions": {
+      "H1": {
+        "what": "HEADLINE: within HCC22-088-P4-S2_1i_rep only, basal-keratin-high (proxy for ESR1-D538G) vs keratin-low cancer compartments, MDK-NCL, both parts",
+        "purpose": "motivate the wet-lab work; not a proof of mechanism. Descriptive inference only (see inference_status)",
+        "headline_for": [
+          "HCC22-088-P4-S2_1i_rep"
+        ],
+        "others": "the other 11 specimens: context only. Simple descriptive reporting of the same estimates (GMR with nominal interval, OR point estimate, typed failures); no claim tree, no multiplicity procedure, no inference",
+        "wording_guard": "'basal-keratin-high (proxy for ESR1-D538G)' compartments; never 'mutant cells' or 'WT cells'",
+        "estimands": {
+          "magnitude": "geometric-mean ratio GMR (high/low) AMONG ACTIVE SENDERS (compartments with a nonzero MDK-NCL sender score) = exp(group coefficient) of the log-linear model. This is a CONDITIONAL estimand (conditional on being an active sender) and every wording says so. Reported with the NOMINAL 95% block-bootstrap interval and its measured synthetic coverage; the interval is never widened.",
+          "participation": "covariate-adjusted odds ratio of being an active sender; POINT ESTIMATE ONLY, no interval (bootstrap coverage 0.398-0.730 on synthetic nulls, bootstrap SE about 1.8-3.2x too small)"
+        },
+        "required_statements_with_the_headline": [
+          "the GMR is conditional on being an active sender (nonzero sender score)",
+          "the interval is a NOMINAL 95% 6-pitch-tile block bootstrap interval (2000 resamples, seed 20261014); on synthetic nulls its measured coverage was 0.874, 0.896, 0.898 and 0.900 of 500 datasets (historical estimator at 500 resamples; the figures recorded in this protocol), 0.884, 0.900, 0.902, 0.904 of 500 datasets through the production estimator at 2000 resamples (synthetic/g6_fix/prod_coverage/) and 0.868, 0.896, 0.868, 0.874 of 500 datasets through the production estimator on held-out seeds 70000000..70000499 (synthetic/g6_fix/prod_coverage_heldout/); case order autocorrelated, noisy_nst_kshare, depth_confounded, autocorrelated_stress; coverage is about 0.87-0.90 in every series, below the nominal 95%; the bootstrap standard error of the historical estimator was about 1.1-1.3x too small",
+          "the odds ratio is a point estimate; no interval is reported because synthetic coverage was 0.398-0.730 (bootstrap SE about 1.8-3.2x too small)",
+          "no p-value or q-value is reported for the hurdle",
+          "one ESR1-D538G tumour; keratin-high is a phenotype proxy; the other 11 specimens are context only"
+        ]
+      },
+      "H2": {
+        "what": "SUPPLEMENTARY: rank of the P4-S2 GMR among the estimable specimens",
+        "effect": "MAGNITUDE GMR ONLY (one per estimable specimen). No participation / odds-ratio rank. Not ranked on z = coefficient/SE.",
+        "population": "only specimens whose label used the ABSOLUTE rule (k_share >= 0.01) and whose magnitude is estimable are ranked; specimens that used the fallback quantile rule are listed as contextual (not ranked, not counted in k); not_estimable specimens are listed",
+        "direction": "rank 1 = largest GMR",
+        "tie_rule": "competition ranking: equal GMR (within 1e-12) share the lower rank number",
+        "code": "descriptive.rank_gmr",
+        "inference": "none: rank only, no significance",
+        "significant_wording_allowed": false,
+        "stands_out_wording_allowed": false
+      },
+      "H3": {
+        "what": "patient-matched P4-S1 (WT biopsy) and P4-S2 (D538G surgical): DESCRIPTIVE SIDE-BY-SIDE only",
+        "quantity": "for each of the two specimens report its own H1 result (GMR among active senders with the nominal interval, odds-ratio point estimate) in adjacent table rows",
+        "inference": "none. No contrast statistic, ratio of GMRs, interval on a difference or cross-slide test is computed: a contrast of two within-slide effects on different slides has no calibrated interval here, and genotype, biopsy-vs-surgery, slide and batch are confounded",
+        "confounded_with": [
+          "genotype",
+          "biopsy vs surgery",
+          "slide",
+          "batch"
+        ],
+        "significant_wording_allowed": false
+      },
+      "H4": {
+        "what": "P4-S2 rank among specimens (specimen-level contrast on compartment MDK sending); SUPPLEMENTARY, descriptive",
+        "statistics": [
+          "median: median N-P MDK (R00 N-P scale, pooled depth reference M) over the specimen's ELIGIBLE cancer compartments",
+          "fraction_nonzero: fraction of those compartments whose N-P MDK is STRICTLY > 0"
+        ],
+        "algorithm_frozen": {
+          "separate": "each statistic is ranked on its own against each reference set: 2 statistics x 2 reference sets = 4 results; no combined rank, no combined direction",
+          "reference_sets": {
+            "all_wt": "the 11 WT specimens = every specimen except HCC22-088-P4-S2_1i_rep (includes P4-S1)",
+            "surgical_wt": "the 5 specimens of specimens.surgical_wt_specimens"
+          },
+          "reference_median": "numpy.median of the reference specimens' values (the target is never part of its own reference set; a reference specimen without a value is dropped and listed as unranked)",
+          "ranked_population": "the reference specimens with a value plus the target",
+          "deviation": "|value - reference median|",
+          "direction": "above | below | equal, from value - reference median; equal iff |value - reference median| <= 1e-12",
+          "rank": "1 + number of ranked specimens whose deviation exceeds the target's deviation by more than 1e-12 (competition ranking; rank 1 = largest deviation)",
+          "tie_tolerance": 1e-12,
+          "ties": "deviations within the tolerance share the LOWER rank number; the target exactly at the reference median has deviation 0, direction 'equal', and ties only with other zero-deviation specimens (with an odd reference set the median is a reference specimen's own value, so at least one tie); no jitter or secondary key",
+          "no_value": "a specimen with no eligible compartment or non-finite values has no statistic: it is not ranked and is listed; a target without a value has rank null and typed not_estimable",
+          "code": "descriptive.h4_statistics, descriptive.rank_h4, descriptive.h4_all"
+        },
+        "inference": "none: rank only, no p-value, no interval",
+        "COMMOT_absolute_scores": "excluded (not comparable across slides)",
+        "significant_wording_allowed": false
+      }
+    },
+    "estimable": {
+      "min_compartments_per_group": 30,
+      "min_active_senders_per_group_for_magnitude": 10,
+      "on_fail": "typed status not_estimable with reason"
+    },
+    "models": {
+      "covariates": [
+        "log(spot_umi)",
+        "log(rna_per_cell_equiv)",
+        "qp_prop"
+      ],
+      "magnitude": "linear model: log(sender score among actives) ~ group + covariates + block fixed effects",
+      "participation": "logistic regression: active ~ group + covariates (no block fixed effects; separation risk; blocks enter through the bootstrap resampling)",
+      "covariate_note": "log(n_st_eff) removed (A12.3 fix round). With n_st measured with noise, adding log(n_st_eff) to the covariates produces a group-effect bias in the synthetic noisy-n_st null that grows with the noise: mean plain-OLS group t among actives with vs without it, at sigma_n 0.01 / 0.4 / 0.8, is in synthetic/g6_fix/diag_collider_noise_dose.json (with: 0.05 / 0.69 / 0.75; without: -0.14 / -0.15 / -0.15) (script src/diag_collider_noise_dose.py, 300 datasets). A collider-type path (log E_o is recoverable from log(n_st_eff), log(spot_umi) and log(rna_per_cell_equiv), and the keratin share's denominator contains E_o) is consistent with this dose-response, but the exact causal path is NOT demonstrated. Trade-off: on real data n_st (StarDist counts) is noisy, so dropping it avoids the label bias, but the outcome still depends on the true cell number, and the remaining adjustment rests on log(rna_per_cell_equiv) and depth only. Magnitude blocks: 6-pitch tiles",
+      "covariate_domain_rule": "Frozen (replaces any floor): log(spot_umi) and log(rna_per_cell_equiv) require every value finite and strictly > 0; qp_prop must be finite. Otherwise typed not_estimable (covariate_domain). No value is ever floored or replaced.",
+      "standardisation": "the three covariates are standardised ONCE over the specimen's eligible cancer compartments (all rows of the run, population SD ddof=0), never per bootstrap resample, per label shift or per subset. Covariates are the same for R00, R01, R02, R10; R11 swaps rna_per_cell_equiv for rna_per_cell_equiv_nf only.",
+      "log_n_st_eff": "not a covariate; available only by explicit opt-in (include_log_n_st_eff=True) for sensitivity work, never in a protocol run"
+    },
+    "spatial_blocks": {
+      "definition": "square tiles of side 6 spot pitches from coordinates only, assigned before labels/outcomes are touched",
+      "merge_rule": "tiles with <8 eligible compartments merge into the nearest tile",
+      "frozen_in_code_before_labels": true
+    },
+    "inference": {
+      "estimability_gate": {
+        "magnitude": "at least 10 active senders per group",
+        "participation": "at least 30 eligible compartments per group",
+        "min_mixed_label_blocks": 10,
+        "mixed_label_block_definition": "block containing at least one compartment of each group",
+        "on_fail": "not_estimable with a typed reason_code (see hurdle.typed_failures)",
+        "justification": "group sizes and active-sender counts keep the group estimates finite and stable. Fewer than 10 mixed blocks leaves too few blocks in which both groups appear for a block bootstrap to resample. The earlier distinct-permutation requirement (>= 999) is dropped: with >= 10 mixed blocks it is automatically >= 2^10 = 1024 (tests/midkine_remediation/test_hurdle.py), and it was a permutation-test argument only"
+      },
+      "bootstrap": {
+        "method": "block bootstrap (resample 6-pitch tile blocks with replacement); weighted refit of the same model; percentile 95% interval (numpy quantile method=linear at 0.025 and 0.975); magnitude (GMR) only is reported with an interval",
+        "n": 2000,
+        "seed": 20261014,
+        "scope": "real-data run. Participation: no interval is reported (point estimate only)",
+        "measured_synthetic_performance": {
+          "gmr_coverage_range": [
+            0.874,
+            0.9
+          ],
+          "or_coverage_range": [
+            0.398,
+            0.73
+          ],
+          "setting": "HISTORICAL estimator (src/block_bootstrap.py, ridge-regularised singular fits, > 50% finite rule, 500 resamples): 500 synthetic datasets x 500 resamples, 6-pitch tiles, four null cases (synthetic/g6_fix/boot_*_s6.json); target 0.90 for the nominal 95%. These are the user-mandated figures carried in every wording. They are NOT the production estimator; see production_path_rerun",
+          "bootstrap_se_underestimate": "GMR about 1.1-1.3x too small (SD of the point estimate / median bootstrap SE: 1.25 autocorrelated null, 1.12 stress null); odds ratio about 1.8-3.2x too small (1.79 autocorrelated, 3.16 stress); 300 datasets x 500 resamples, seed0 1000, 6-pitch tiles; committed script src/diag_bootstrap_se_ratio.py, output synthetic/g6_fix/diag_bootstrap_se_ratio.json. Measured with the HISTORICAL estimator; not remeasured on the production estimator",
+          "monte_carlo_se_of_each_coverage_figure": "about 0.015",
+          "injected_case": "adds no independent evidence: injection multiplies sender scores by 3 so the log-GMR interval shifts by log 3 and the participation interval is unchanged; boot_inj_*_s6 equals boot_null_autocorrelated_s6",
+          "covariates": "bootstrap runs used the primary covariate set (no log(n_st_eff))",
+          "production_path_rerun": {
+            "what": "the four stored calibration settings rerun through the production descriptive.gmr_interval path (2000 resamples, production seed, production covariates)",
+            "outputs": "synthetic/g6_fix/prod_coverage/prod_<case>_s6.json (src/prod_coverage.py, src/run_prod_coverage.py, slurm/prod_coverage.sbatch; the old boot_*_s6.json files are kept)",
+            "settings": "same lattice, same dataset seeds 1000..1499, same k_share threshold 0.0143791, same 6-pitch tiles, same 500 datasets; 2000 resamples; production bootstrap seed 20261014 for every dataset; min valid fraction 0.95; production covariates (strict-positive domain gate, 3 primary covariates)",
+            "coverage_by_case": {
+              "null_autocorrelated": 0.884,
+              "null_noisy_nst_kshare": 0.9,
+              "null_depth_confounded": 0.902,
+              "null_autocorrelated_stress": 0.904
+            },
+            "stored_by_case": {
+              "null_autocorrelated": 0.874,
+              "null_noisy_nst_kshare": 0.896,
+              "null_depth_confounded": 0.898,
+              "null_autocorrelated_stress": 0.9
+            },
+            "n_not_estimable": 0,
+            "valid_resample_fraction": "1.0 for every one of the 2000 datasets (4 cases x 500), i.e. all 2000 resamples valid each time (minimum 1.0; no dataset below 0.95)",
+            "summary": "coverage 0.884-0.904; within 0.02 of the stored values; 0 not_estimable. Provenance: SLURM array 11956368 (2026-10-15 20:08-20:13); array 11956612 (20:45) gave the same numbers."
+          },
+          "heldout_run": {
+            "what": "the same four cases, the same 500 datasets per case, the same production estimator and settings (2000 resamples, seed 20261014, 0.95 valid fraction), on new dataset seeds",
+            "dataset_seeds": "70000000..70000499 (HELDOUT_SEED0 = 70000000); disjoint from every earlier synthetic seed: lattice datasets 1000..1999 (+7 offsets), injection 5000..5049 (+7), k0 reference draws 900000..900019, G7 seeds below 7000+100000*(n_lattices*9)+1000, shift pools 20261015/20261016, bootstrap seed 20261014 (test_prod_coverage.py enumerates them independently)",
+            "job": "SLURM htc array 11958455 (slurm/prod_coverage_heldout.sbatch), started 2026-10-16T09:58:57, code commit caa42827; synthetic/g6_fix/prod_coverage_heldout/heldout_timing.json",
+            "outputs": "synthetic/g6_fix/prod_coverage_heldout/prod_<case>_s6.json",
+            "coverage_by_case": {
+              "null_autocorrelated": 0.868,
+              "null_noisy_nst_kshare": 0.896,
+              "null_depth_confounded": 0.868,
+              "null_autocorrelated_stress": 0.874
+            },
+            "historical_by_case": {
+              "null_autocorrelated": 0.874,
+              "null_noisy_nst_kshare": 0.896,
+              "null_depth_confounded": 0.898,
+              "null_autocorrelated_stress": 0.9
+            },
+            "n_datasets_per_case": 500,
+            "n_not_estimable": 0,
+            "summary": "coverage of the nominal 95% GMR interval is 0.868-0.896 on the held-out seeds. Across all three series (historical, production path, held-out) coverage is about 0.87-0.90, below the nominal 95%. The interval is reported as nominal, with these numbers beside it, and is never widened."
+          }
+        },
+        "deviation": "see hurdle.pre_freeze_deviations",
+        "min_valid_fraction": 0.95,
+        "min_valid_fraction_justification": "a PRESPECIFIED QC CONVENTION, not a coverage guarantee and not empirically tuned. Each tail of the 95% interval holds 2.5% of the resamples (5% in total); if more than 5% of the 2000 resamples are invalid the retained resamples cannot be treated as the full bootstrap distribution at the tail quantiles. >= 0.95 of 2000 = at least 1900 valid resamples. Invalid resamples may be non-random (they are the resamples that lose a group or a block), so passing the threshold does NOT imply that the nominal level is preserved; the measured coverage (0.874-0.900 historical, 0.884-0.904 production path, in which every resample was valid) is the only evidence about the level. The earlier code used > 0.5, which is not frozen here",
+        "valid_resample": "a resample is valid iff both groups keep positive weight among active senders, the weighted design is full rank (smallest/largest eigenvalue of X'WX > 1e-10) and the group coefficient is finite",
+        "interval_policy": "NOMINAL 95% interval, never widened or inflated. It is reported with its measured synthetic coverage (0.874, 0.896, 0.898, 0.900; all four null cases, from synthetic/g6_fix/boot_*_s6.json) and the valid-resample fraction. Wording never depends on whether the interval excludes 1.",
+        "historical_module": "src/block_bootstrap.py and tests/midkine_remediation/test_block_bootstrap.py are HISTORICAL, synthetic-calibration-only (they produced the 0.874-0.900 record and the SE-underestimate diagnostic). No production module imports block_bootstrap (tested); the production interval is descriptive.gmr_interval"
+      },
+      "superseded_permutation_tests": {
+        "status": "SUPERSEDED (not used in any decision; G6 failed, see inference_status). Code kept for the historical G6 record and the mutation checks",
+        "magnitude": "Freedman-Lane within-block permutation, n 4999, seed 20261014",
+        "participation": "within-block label permutation, score statistic, n 4999, seed 20261014"
+      }
+    },
+    "thinning": {
+      "status": "descriptive only; not used in any decision rule",
+      "min_separation_pitches": 3,
+      "n_draws": 20,
+      "seeds": "20261014..20261033"
+    },
+    "continuity_secondary": [
+      "Fisher exact (unadjusted)",
+      "Mann-Whitney on nonzero (unadjusted)"
+    ],
+    "primary_outcomes": [
+      "H1/P4-S2 MDK-NCL magnitude: GMR among active senders with the nominal block-bootstrap 95% interval (descriptive)",
+      "H1/P4-S2 MDK-NCL participation: odds-ratio point estimate (no interval)"
+    ],
+    "secondary_outcomes": [
+      "other 4 MDK LR pairs, both parts",
+      "N_A and N_S versions",
+      "true between-spot rerun (R10)",
+      "run-matrix variants R03-R09 and analysis variants A01-A07",
+      "H1 in the 11 other specimens (context only; simple descriptive reporting)",
+      "H2 (supplementary rank on the GMR), H3 (descriptive side-by-side), H4",
+      "s-MK pathway endpoint",
+      "exploratory: other CellChat pairs",
+      "descriptive: DEG basal-keratin-high vs low on compartments + Enrichr; ESR1 signature; HPA correlation"
+    ],
+    "multiple_testing": {
+      "procedure": "none. The hurdle is descriptive: no p-values or q-values are computed or reported, so there is no multiplicity adjustment",
+      "headline": "H1 in P4-S2, MDK-NCL, magnitude (GMR + CI) and participation (OR point estimate)",
+      "other_lr_pairs": "the 4 other MDK LR pairs in P4-S2 are listed as secondary descriptive estimates; participation is identical across MDK pairs in prior data, counted as one piece of evidence in text",
+      "wt_specimens": "context / exploratory descriptive, labelled so",
+      "no_claim_from_unadjusted_p": true
+    },
+    "validation_controls": {
+      "synthetic_pre_freeze": {
+        "labels": "spatially CLUSTERED group labels (not random)",
+        "mask_source": "QP proportions and coordinates only (SACE layers do not exist pre-freeze)",
+        "case_null_autocorrelated": "outcomes autocorrelated, independent of labels; used for bootstrap-interval coverage (6-pitch tiles); the permutation type-I numbers are historical (G6 failed)",
+        "case_null_noisy_nst": "n_st measured with noise; MDK depends on true n and depth but is independent of keratin; label defined from the noisy keratin share (k_share); covariates WITHOUT log(n_st_eff)",
+        "plain_permutation_diagnostic": "must be inflated for clustered labels",
+        "hurdle_only_score_injection": "inject fold 3.0 into the keratin-high group's sender scores; the GMR point estimate is recovered within 20% (descriptive; historical result: recovery 1.00 in all four variants). Injection recovery under a permutation q rule is superseded",
+        "g6_fix_round_result": "variants {block 3 or 6 pitches} x {with or without log(n_st_eff)}, moving-block label shifts, k_share label: none passed the pre-declared rule; see hurdle.inference_status and Benchmarking/midkine_remediation/synthetic/g6_fix/*.json. Injection recovery 1.00 and BH false-positive rate 0.04-0.06 in all four variants",
+        "g6_gate_status": "FAILED (A12.3 fix round, 2026-10-15; no variant of the pre-declared rule passed). Consequence: hurdle inference is DESCRIPTIVE ONLY, not a pass",
+        "open_limitation": "The participation type-I of 0.107-0.109 in the autocorrelated stress case is identical in all four variants of the moving-block-shift null (block size cannot matter for participation), so it is a property of the shift null, not of the variant grid. It is UNDIAGNOSED. Untested hypothesis: stress labels and outcomes have a 10-pitch bandwidth but the minimum shift is 6 pitches, so null draws are not independent of the observed field. No new runs. It no longer affects any decision because no permutation test is used"
+      },
+      "real_data_post_freeze": {
+        "status": "descriptive controls; they report context and never gate or alter a claim-tree branch; no hypothesis-test output; code in src/controls.py",
+        "scope": "P4-S2 (HCC22-088-P4-S2_1i_rep) only",
+        "negative_control": {
+          "frozen_inputs": "P4-S2, run R00 (N-P), MDK-NCL magnitude (GMR among active senders), the 3 primary covariates, the frozen blocks, the frozen eligibility and the observed k_share labels",
+          "shift_pool": "4000 ACCEPTED moving-block label shifts (hurdle.shift_pool, seed 20261015; acceptance rules in the function: torus shift >= 6 pitches, >= 50% of compartments land within 1.5 pitches of an observed compartment)",
+          "selection": "999 of the 4000 selected WITHOUT replacement with a separately fixed seed 20261016",
+          "per_shift": "refit the magnitude GMR with the shifted labels (scores, covariates, blocks fixed); a shift that leaves < 10 active senders in a group or is otherwise not estimable is FAILED with its typed reason",
+          "report": "number usable and number failed (with reasons), the usable GMRs, their min, 2.5%, 25%, 50%, 75%, 97.5% and max, beside the observed GMR (table or figure). No percentile of the observed GMR, p-value or threshold is computed or reported.",
+          "overall_status": "ok iff the observed GMR is estimable AND at least 900 of the 999 selected shifts gave a finite usable GMR (controls.MIN_USABLE_SHIFTS = 900); otherwise typed not_estimable (observed_not_estimable or too_few_usable_shifts) and the summary is withheld (the usable GMRs and failure counts are still listed). Justification: 900 of 999 keeps at least 22 shifts in each 2.5% tail of the reported quantiles (0.025 x 900 = 22.5); fewer would put the tails on a handful of points. The same finite checks as the runner apply to every shift (a non-finite or non-positive GMR is a failed shift). The control never gates a claim-tree branch"
+        },
+        "positive_control_commot": {
+          "injection": "multiply the LINEAR allocated MDK counts (SACE layer) by 3.0 for the cancer compartments in the ORIGINALLY defined eligible keratin-high group (spot ids fixed from the baseline R00 labels); labels, eligibility and the LR list are NOT recomputed (k_share excludes MDK, so membership could not change anyway)",
+          "rerun": "rerun COMMOT in envs/COMMOT on the injected object with the frozen LR list and the same dis_thr, then the same estimator on the same eligible rows and labels",
+          "report": "baseline GMR, injected GMR and delta log(GMR) = log(injected) - log(baseline); typed not_estimable if either run is. The response is reported, not required to equal 3.0.",
+          "code": "controls.inject_mdk_layers, controls.injection_report",
+          "status": "BUILT AND TESTED (src/positive_control.py, commit 8a6cbeec; toy run plus real-COMMOT toy test; real-data entry in the A12.9 step); descriptive, never a gate (see post_freeze_open_items)"
+        },
+        "controls_in_claim_tree": false
+      },
+      "mutation_checks_required": [
+        "shuffle_group_labels_between_spatial_halves",
+        "swap_nonzero_filter",
+        "drop_depth_covariates",
+        "break_block_assignment",
+        "reintroduce_log_n_st_eff_covariate",
+        "kshare_includes_mdk_in_denominator",
+        "fallback_trigger_uses_active_senders",
+        "interval_valid_fraction_zero",
+        "participation_separation_reported_as_ok",
+        "claim_tree_estimable_misfiled",
+        "contract_label_threshold_drift"
+      ],
+      "mutation_checks_note": "drop_log_n_st_eff_covariate (rev 4) mutated a covariate that is no longer primary; replaced by reintroduce_log_n_st_eff_covariate (tests/midkine_remediation/run_mutations.py), which restores the covariate and must turn test_hurdle red"
+    },
+    "inference_status": "DESCRIPTIVE ONLY (protocol revision 6, 2026-10-15). G6 FAILED: no variant of the pre-declared rule (commit 5c262bd8) met it. USER DECISION 2026-10-15: the hurdle motivates the wet-lab work and does not prove mechanism. HEADLINE = H1 within P4-S2, MDK-NCL. Reported: GMR AMONG ACTIVE SENDERS (conditional estimand) with the NOMINAL block-bootstrap 95% interval (2000 resamples) plus its measured synthetic coverage (0.874, 0.896, 0.898, 0.900) and the bootstrap-SE underestimate (about 1.1-1.3x); the participation odds ratio as a POINT ESTIMATE ONLY (coverage 0.398-0.730; SE underestimate about 1.8-3.2x). The other 11 specimens are context. H2 is a supplementary rank on the GMR only. No hurdle hypothesis-test output, BH family or p-based branch exists in this protocol. Wording: 'basal-keratin-high (proxy for ESR1-D538G)'.",
+    "pre_freeze_deviations": [
+      {
+        "date": "2026-10-15",
+        "what": "Synthetic bootstrap coverage runs (synthetic/g6_fix/boot_*.json, task array 11949147-era sbatch g6_bootstrap.sbatch) used 500 resamples x 500 datasets, with each dataset's own seed (seed0 1000 + index) as the block-bootstrap seed, set through the unrecorded sbatch env vars BOOT_N/BOOT_B. The pre-declared rule (g6_fix_round_selection_rule.md) specified 2000 resamples and seed 20261014. The real-data run uses 2000 resamples and seed 20261014.",
+        "why": "runtime. Direction of the effect: 500-resample percentile endpoints are noisier and on average slightly too narrow, so coverage at 2000 resamples would be 0 to about 1.5 points higher; it cannot rescue the odds-ratio coverage (0.398-0.730). Going forward run_bootstrap.py writes its settings (including BOOT_N, BOOT_B, BOOT_OUT, SLURM ids) into the output json, and the sbatch echoes them to the log. Reproduction of the stored numbers at HEAD 792d5d4e was confirmed by the reviewer; the output stamps say _code_commit 5c262bd8 with _code_dirty true because the code was uncommitted at run time",
+        "resolution": "Coverage was measured again with the production estimator at 2000 resamples (series production_path_rerun and heldout_run): 0.884-0.904 and 0.868-0.896. The binding figures are unchanged and coverage is reported for every series (about 0.87-0.90, below the nominal 95%); see measured_synthetic_performance"
+      },
+      {
+        "date": "2026-10-15",
+        "what": "USER OVERRIDE of the pre-declared rule in g6_fix_round_selection_rule.md (line 25, 'If no variant passes' paragraph): the rule says that if bootstrap coverage fails the 0.90 target, 'report that the intervals are not trustworthy'. The measured nominal GMR coverage was 0.874, 0.896, 0.898 and 0.900 (the 0.90 target is missed in three of four null cases). The user decided to RETAIN the nominal 95% GMR interval in the headline anyway, reported WITH these four coverage numbers and the valid-resample fraction, never widened, and never used as a wording escalator.",
+        "why": "the interval is a descriptive indicator of precision for a wet-lab-motivating comparison; hiding it would remove information, and the measured coverage is stated beside it so a reader can discount it. The participation interval is NOT retained (coverage 0.398-0.730).",
+        "decided_by": "user, 2026-10-15"
+      }
+    ],
+    "continuity_secondary_note": "continuity checks are reported as descriptive statistics; they are not inputs of the claim tree and carry no p-value-based claim",
+    "typed_failures": {
+      "codes": [
+        "group_size",
+        "active_senders",
+        "mixed_blocks",
+        "covariate_domain",
+        "nonfinite_input",
+        "collinear",
+        "separation",
+        "nonconvergence",
+        "nonfinite_estimate",
+        "bootstrap_valid_fraction",
+        "point_estimate_not_estimable",
+        "commot_run_failed"
+      ],
+      "definitions": {
+        "group_size": "fewer than 30 eligible compartments in a group (participation, label stage), or fewer than 60 eligible compartments in the specimen: this EARLY gate (descriptive.MIN_ELIGIBLE = 2 x 30) is evaluated before the pitch, the blocks or any quantile are computed, so an empty or tiny specimen returns a typed result and never raises",
+        "active_senders": "fewer than 10 active senders in a group (magnitude)",
+        "mixed_blocks": "fewer than 10 blocks containing both groups",
+        "covariate_domain": "a log-covariate is not finite and strictly positive, or qp_prop is not finite",
+        "nonfinite_input": "the sender score has non-finite or negative entries",
+        "collinear": "the design is rank deficient (magnitude: least-squares rank < columns; participation: matrix rank < columns or a singular information matrix)",
+        "separation": "participation only: max |logistic coefficient| > 15 on the standardised scale, or fitted probabilities within 1e-8 of 0 or 1 (complete or quasi-complete separation); no odds ratio is reported",
+        "nonconvergence": "participation only: IRLS (60 iterations, step tolerance 1e-9) did not converge and no separation signal",
+        "nonfinite_estimate": "the estimate, its exponential (the GMR or odds ratio), or an interval endpoint is not finite. The ACTUAL exponentiated value is tested: a large finite coefficient whose exponential overflows is not_estimable, never ok with an infinite GMR",
+        "bootstrap_valid_fraction": "fewer than 0.95 of the 2000 resamples are valid; the INTERVAL is not_estimable, the point estimate is unaffected",
+        "point_estimate_not_estimable": "the interval was not attempted because the magnitude point estimate is not estimable",
+        "commot_run_failed": "a COMMOT run (R00/R01/R02/R10/R11) failed or was not estimable and was passed to the runner as a typed result; every part of that run is not_estimable"
+      },
+      "no_nan_with_status_ok": "a result with status ok holds only finite numbers and a value (or interval endpoints); descriptive.assert_no_nan_ok is applied to every runner output (fail closed)",
+      "claim_tree_mapping": "a not_estimable part gives est = false; a not_estimable or opposite-sign R01/R02 makes c false; a not_estimable R11 makes f false; a not_estimable R10 gives d = not_estimable",
+      "code": "descriptive.py",
+      "control_codes": {
+        "observed_not_estimable": "negative control: the observed GMR is not estimable",
+        "too_few_usable_shifts": "negative control: fewer usable shifts than the frozen minimum"
+      }
+    },
+    "runner": {
+      "production_entry": "descriptive.run_h1_specimen(specimen, obs, xy, scores): NO tunable argument",
+      "frozen_settings": {
+        "bootstrap_n": 2000,
+        "bootstrap_seed": 20261014,
+        "min_valid_fraction": 0.95,
+        "level": 0.95,
+        "interval_runs": [
+          "R00"
+        ],
+        "tile_side_pitches": 6.0,
+        "block_min_n": 8,
+        "pitch": "median nearest-neighbour distance of the eligible compartments' coordinates",
+        "min_per_group": 30,
+        "min_active_per_group": 10,
+        "min_mixed_blocks": 10,
+        "covariates": [
+          "log_spot_umi",
+          "log_rna_per_cell_equiv",
+          "qp_prop"
+        ]
+      },
+      "required_runs": {
+        "headline_HCC22-088-P4-S2_1i_rep": [
+          "R00",
+          "R01",
+          "R02",
+          "R10",
+          "R11"
+        ],
+        "other_specimens": [
+          "R00"
+        ],
+        "rule": "a missing required run raises MissingRunError (never claim_tree = null); a failed COMMOT run is passed as a typed result and becomes reason_code commot_run_failed"
+      },
+      "test_only": "descriptive._run_h1_for_tests may change bootstrap n, seed, pitch and interval runs; its provenance records the settings actually used (production: false) and write_h1 refuses it",
+      "write": "descriptive.write_h1: protocol_io.load_protocol (status FROZEN, hash verified) -> protocol_id equals the code's -> recorded settings equal this protocol's frozen values AND the code constants -> protocol_io.check_output_target (namespace <protocol_sha12>/<run_id>, empty target) -> protocol sha256 added with protocol_io.with_protocol_hash and stamped with the provenance stamp -> protocol_io.atomic_write_json",
+      "code": "descriptive.py"
+    }
+  },
+  "morans": {
+    "primary_definition": "C",
+    "primary_definition_status": "USER DECISION 2026-10-14",
+    "definitions": {
+      "C": "PRIMARY: eligible cancer compartments, one per spot, spot coordinates, KNN k=6 among eligible compartments",
+      "A": "SECONDARY: all nuclei, per-cell, v4 Hungarian h5ad, KNN k=6; labelled 'all cells'; typed not_estimable for HCC22-088-P3-S2 and HCC22-088-P4-S2_1i_rep (fullres H&E 1.19 um/px > 1.0 um/px segmentation gate)"
+    },
+    "statistic": "bivariate Moran's I; x = MDK (zero-inflated), y = mean z-scored secretory genes (continuous); both on N_P scale; KNN k=6 row-standardised W; rank-transformed version as robustness",
+    "secretory_genes": [
+      "HSP90B1",
+      "HSPA5",
+      "CALR",
+      "CANX",
+      "PDIA4",
+      "PDIA6",
+      "SEC23A",
+      "SEC61B",
+      "ATF6",
+      "MAN1A1",
+      "XBP1"
+    ],
+    "weights": "KNN k=6, row-standardised",
+    "seed": 42,
+    "estimable_if": {
+      "min_eligible_compartments": 30,
+      "min_mdk_nonzero": 10
+    },
+    "aggregate": {
+      "mean_over": "all estimable specimens",
+      "also": [
+        "median",
+        "IQR",
+        "n_estimable",
+        "per-specimen table with typed status"
+      ],
+      "never_conditioned_on_significance": true
+    },
+    "continuity_secondary": [
+      "definition A on v4 h5ads",
+      "superseded v3 recompute (0.266 over 12; 0.2896 over the 11 significant), for the Corrections note only"
+    ],
+    "comparators": {
+      "methods": [
+        "cell2location",
+        "tangram"
+      ],
+      "source": "output/competitor_gex",
+      "primary_shared_object": {
+        "barcodes": "intersection of the three methods' spots and the CITEgeist-eligible set",
+        "coordinates": "shared",
+        "gene_set": "genes present in all three outputs",
+        "eligibility_set": "CITEgeist-defined (qp_prop>=0.10 and expected allocated counts>=200), applied to all methods",
+        "graph": "one shared KNN k=6 graph on the shared eligible compartments"
+      },
+      "method_specific_transforms_disclosed": {
+        "cell2location": "mu (model-expected counts) / depth_ratio, then log1p",
+        "tangram": "as supplied (log-normalised reference expression projected through the mapping)",
+        "citegeist": "N_P"
+      },
+      "rank_transformed_I": "reported alongside, removes transform differences",
+      "method_native_sets": "descriptive only (own spots, own abundance>=0.10, own graph; P4-S2 has 3931 CITEgeist marker-share spots vs 4991 competitor spots)",
+      "cancer_label_mapping": "FILLED (A12.3, reference metadata only). Cell2location and Tangram were both trained on the same Wu ER+ reference (output/competitor_gex/reference/wu_erpos_reference.h5ad, obs 'cell_type', 9 labels: B-cells, Cancer Epithelial, Endothelial, Fibroblasts, Macrophages, Normal Epithelial, Perivascular, Plasma cells, T cells). The comparator cancer compartment is 'Cancer Epithelial' + 'Normal Epithelial', merged into one Cancer_Cells layer by summing the two per-label layers (cell2location: c2l_gex_layers.h5ad layers 'means_per_cluster_mu_fg_<label>'; Tangram: gex_layers.h5ad layers '<label>'). The other 7 labels are not used. Reason: the CITEgeist 7-type dictionary has one epithelial type (Cancer_Cells) and no separate normal-epithelium type, so the epithelial signal it calls Cancer_Cells is split over both Wu epithelial labels in the comparators. Sensitivity reported alongside, not a decision input: 'Cancer Epithelial' alone.",
+      "inference": {
+        "unit": "patient (6)",
+        "difference": "d_p = mean over the patient's estimable specimens of (I_CITEgeist - I_comparator)",
+        "test": "exact patient-clustered sign-flip, two-sided; smallest attainable p = 2/64 = 0.03125",
+        "multiplicity": "Holm over 2 comparators",
+        "attainable_significant_at_0.05": false,
+        "consequence": "wording must be descriptive ('higher in k of 6 patients')",
+        "per_patient_composition_report": "list, per patient, which specimens contributed to d_p and each specimen's I"
+      }
+    },
+    "trajectory": {
+      "pairs": "specimens.pairs_biopsy_surgery (all six; S1 pre-treatment biopsy, S2 post-endocrine-therapy surgery, GSE289326)",
+      "pair_rule": "pair enters if both members estimable",
+      "statistic": "delta I = surgery - biopsy per pair",
+      "tests": [
+        "exact sign test",
+        "one-sided Wilcoxon"
+      ],
+      "smallest_one_sided_p_if_all_positive": "1/2^n_pairs (n=6: 0.0156; n=5: 0.0312)"
+    },
+    "dropped": "B (cancer-subset per-cell): arbitrary sub-spot positions, pseudoreplicated, not estimable where cancer is rare",
+    "null": {
+      "primary": "Moran spectral randomization (Wagner & Dray 2015)",
+      "spectrum_from": "W_sym = (W + W^T)/2, doubly-centred; statistic still uses row-standardised KNN W",
+      "surrogated_field": "y (continuous secretory field); x (zero-inflated MDK) held fixed",
+      "n_surrogates": 999,
+      "seed": 42,
+      "why_not_free_permutation": "free permutation destroys the field's spatial autocorrelation: tests spatial randomness, not independence of two structured fields",
+      "pre_freeze_gate": {
+        "data": "independent SAR/CAR fields, rho in [0.5,0.8,0.95], on the real P4-S2 and P1-S2 lattices and eligibility-shaped masked subsets (masks from QP proportions and coordinates only)",
+        "include_zero_inflated_x": "point mass at 0 for 50-80% of units with spatially structured intensity, paired with continuous y",
+        "n_pairs_per_setting": 1000,
+        "max_type_I_at_alpha_0.05": 0.07,
+        "naive_permutation_diagnostic": "must show inflation at high rho (mutation check that the gate can fail)"
+      },
+      "large_n_fallback": "FILLED (A12.3). No approximate eigensolver is used. Definition C: exact dense eigendecomposition of the doubly-centred W_sym; largest eligible set is 4976 compartments (P1-S2, p>=0.05); measured at n=4990 (P1-S2 lattice, 16 cores): eigh 2.3 s, peak RSS 1.1 GB. Validated ceiling n<=6000, enforced in code (larger -> typed not_estimable, reason 'exceeds validated eigendecomposition size'). Gate G7 result: 54 settings (2 specimen lattices x 3 masks x rho 0.5/0.8/0.95 x x-field continuous / zero-inflated 50% / zero-inflated 80%), 1000 pairs each, 999 surrogates: MSR type-I max 0.065 (limit 0.07; rank-transformed max 0.075); naive permutation mean 0.23/0.48/0.67 at rho 0.5/0.8/0.95. Definition A (25k-88k cells): the spot-level construction of definition_A_null is the large-n method; validated on synthetic cell-level data (83658 cells, 4990 spots, P1-S2 lattice, 500 pairs per setting, 999 surrogates; 59 min and 0.8 GB peak RSS for 12 settings): type-I max 0.064 when within-spot deviations do not depend on the spot field (additive), 0.058 when they scale with it (multiplicative stress); naive cell permutation >= 0.51 in every setting. Stated limit: the gate fields are SAR on the analysis graph; for Gaussian-kernel smooth fields the MSR type-I rises to 0.29 (bandwidth 10 pitches; see synthetic/g7_definition_c_gauss.json).",
+      "definition_A_null": {
+        "construction": "spot-level spectral surrogates of the spot-mean secretory value on the spot graph (<= ~5000 spots); each cell's value = its within-spot deviation + the surrogate spot mean",
+        "why": "eigendecomposition on a 25k-88k cell graph is infeasible; cells in a spot share expression within type",
+        "validation": "synthetic cell-level data in G7 before freeze"
+      }
+    },
+    "implementation_check": "Moran_BV statistic matches a manual implementation to 1e-6 on a synthetic lattice; lattice toy (x=y smooth gradient) gives I>0.5",
+    "significance": "BH q<0.05 across the 12 specimens; typed status per specimen",
+    "estimable_status_literal": "G8: n_estimable + n_not_estimable == 12",
+    "definition_C_nuclei_note": "C carries the nuclei limitation where it uses N_P; N_P_nf version reported alongside for all specimens"
+  },
+  "nmf": {
+    "trace_required_before_freeze": [],
+    "regeneration_path": "ONE path, frozen at revision 8: rerun Module 4 (CITEgeist/model/programs/anchored_program_discovery.py, discover_programs_from_layers) on the SACE layers regenerated from code for the module3_marker_share_7type proportions (plan A12.6 output). There is no second path: legacy program tables (output/<s>_module4_programs.csv, output/module4_unified, module4_discovery, module4_nb) are never read to produce any reported count. Do NOT run before the freeze.",
+    "regeneration": "tracked, stamped producer (A12.11) that runs the frozen path in regeneration_path with the frozen settings in frozen_module4; coherence rule at compartment level; select Cancer_Cells and ASSERT a non-empty selection; remove the manual constants nmf_total_programs, n_programs_spatially_coherent, pct_programs_spatially_coherent and allowlist entries",
+    "frozen_module4": {
+      "input_source": {
+        "layers": "output/sace_layers_module3_7type/<protocol_sha12>/<run_id>/<specimen>/ written by plan A12.6 (run_sace_allocation(output_mode='layers', init_method='marker', integer_allocation=False), CITEgeist/model/citegeist_model.py:2026; CITEgeist/model/gex/sace_gex.py:305); each cell type's (spots x genes) slice becomes adata.layers['<Type>_genes_pass1'] (layer_pattern default, anchored_program_discovery.py:2220); no earlier SACE run and no per-cell h5ad is read",
+        "proportions": "<MODULE3_DIR>/<specimen>_cell_prop_finetuned_results.csv (inputs.proportions_dir; the same file A12.6 used); a missing file is the typed failure proportions_missing, never a fallback to the global file",
+        "specimens": "exactly the 12 specimens of .commands/submit-module3-marker-share.sh: HCC22-088-P1-S1, P1-S2, P2-S1, P2-S2, P3-S1_A, P3-S2, P4-S1, P4-S2_1i_rep, P5-S1, P5-S2_F_rep, P6-S1, P6-S2_D",
+        "cell_types": "the seven types (v41 dictionary): Cancer_Cells, Macrophages, CD4_T_Cells, CD8_T_Cells, B_Cells, Endothelial, Fibroblasts"
+      },
+      "entry_point": "discover_programs_from_layers (anchored_program_discovery.py:2217) called once per specimen with cell_type_proportions=<the proportions above>, profile_discovery_result=None, protein_adata=None and every other argument at its code default",
+      "program_dictionary_and_params": {
+        "K_programs": "5 (anchored_program_discovery.py:2224)",
+        "lambda_spatial": "0.0 (:2225)",
+        "lambda_sparsity": "0.01 (:2226)",
+        "min_expression_threshold": "0.0 (:2227)",
+        "top_n_genes": "50 (:2229)",
+        "detect_subpopulations": "True, n_subpopulations 3 (:2230-2231; not used by any count)",
+        "random_state": "42 (:2232)",
+        "nmf": "sklearn NMF init='nndsvda', max_iter 200, alpha_W = lambda_sparsity, l1_ratio 0.5, random_state 42, on X * sqrt(proportion + 1e-10) (_deconvolved_spatial_nmf, :2473-2530)",
+        "moran": "kNN k=8 row-normalised binary weights, 199 permutations, two-sided p = (count(|I_perm| >= |I|) + 1) / 200 (_compute_spatial_moran_i :1194-1252; called at :2394)",
+        "permutation_seed": "the Moran permutations use the global numpy RNG (np.random.permutation, :1247), so the producer calls np.random.seed(42) immediately before each specimen's discover_programs_from_layers call; without it the p-values are not reproducible"
+      },
+      "duplicate_policy": "one program table per (specimen, cell type); the 12 specimens above are the complete set and no specimen is counted twice (the non-representative P4-S2 and P5-S2 runs are never included); programs with identical top-gene sets are NOT merged (counted as emitted: K_programs per eligible type)",
+      "scoring_path": "program counts and coherence come only from the SpatialProgram.spatial_moran_i / spatial_moran_pvalue of the Module 4 result, computed on the active rows of each type's layer (layer row total > min_expression_threshold, i.e. the (spot, type) compartments with mass); spatial_program_scoring.py is not a source of any count",
+      "coherence_rule": "a program is coherent iff Moran I > 0.15 (spatial_moran_i) AND p < 0.01 (spatial_moran_pvalue). With 199 permutations the smallest attainable p is 0.005 and p < 0.01 therefore means no permuted |I| reached |I_obs| (1 of 200 ranks); the rule is attainable and consistent, so it is kept unchanged from the manual-constant description",
+      "reported_counts": "(a) all programs of all eligible types over the 12 specimens: total, coherent, percent coherent (replaces the three manual constants; the scope of the old constants is not recoverable); (b) the same three numbers for Cancer_Cells only, and per specimen. Each sentence in the text names which one it quotes",
+      "cancer_cells_selection": "cancer compartments are selected by the exact 7-type name 'Cancer_Cells' (never Cancer_Basal / Cancer_Luminal / Epithelial); the producer ASSERTS results_by_anchor contains Cancer_Cells with n_spots_used >= 20 for every specimen that is not typed not_estimable, and that the Cancer_Cells table is non-empty (assertion failure aborts, never a warning)",
+      "typed_failures": {
+        "layers_missing": "the specimen's A12.6 layer output is absent or its conservation gate failed",
+        "proportions_missing": "the finetuned proportion file is absent",
+        "layer_type_mismatch": "the layer types differ from the proportion columns",
+        "type_skipped_lt20_active": "a (specimen, type) has fewer than 20 active rows (the code skips it, :2335); recorded, excluded from every total",
+        "cancer_cells_absent": "Cancer_Cells missing or skipped for a specimen: that specimen is not_estimable for table (b) and the failure is listed",
+        "nmf_failed_random_fallback": "the logger message 'NMF failed' is emitted (the code then substitutes RANDOM matrices, :2526); the type's programs are discarded and recorded",
+        "moran_not_computed": "fewer than 10 active rows or zero variance (the code returns I=0, p=1; :1215): the program is counted as emitted but typed not coherent-estimable and listed",
+        "nonfinite_program": "any non-finite W, H, I or p"
+      }
+    },
+    "coherence_rule": {
+      "moran_I_min": 0.15,
+      "p_max": 0.01,
+      "status": "frozen at revision 8 (see frozen_module4.coherence_rule); carried from the manual-constant description (I>0.15, p<0.01 on spatial_moran_i / spatial_moran_pvalue); legacy files use it to give 137/303"
+    },
+    "trace_status": "DONE (A12.2, docs/superpowers/handoffs/2026-10-14-a12-nmf-trace.md)",
+    "trace_result": {
+      "constants_490_231_47": "NOT REPRODUCIBLE",
+      "legacy_files_give": {
+        "all_12_files": {
+          "programs": 303,
+          "coherent": 137
+        },
+        "deduped_excluding_non_rep_P4_S2": {
+          "programs": 267,
+          "coherent": 105
+        }
+      },
+      "nmf_input": "SACE spot-type layers with a 10-type clinical dictionary (anchored_program_discovery.py stack_deconvolved_layers); did not read per-cell h5ads",
+      "program_counts_depend_on_v3_h5ads": false
+    }
+  },
+  "decision_rules": {
+    "hurdle_branches_for_H1_per_part": {
+      "regime": "DESCRIPTIVE (protocol rev 6). No hypothesis-test output, no interval property and no control is an input. Applied per part: magnitude (GMR among active senders) and participation (odds-ratio point estimate).",
+      "scope": {
+        "specimen": "HCC22-088-P4-S2_1i_rep",
+        "why": "the input c (agreement across N-P, N-A and N-S: runs R02 exist only for P4-S2) and the below-gate nuclei condition are defined only there; P4-S2 is below the segmentation gate (preflight), so the nuclei-free agreement f is always required",
+        "other_specimens": "the other 11 specimens get simple descriptive reporting (GMR with nominal interval, OR point estimate, typed failures) and NO claim tree; code raises ScopeError if the tree is asked about them"
+      },
+      "inputs": {
+        "est": "estimability gates pass for the part (group sizes, active senders, >= 10 mixed-label blocks, typed failures none)",
+        "s": "estimate > 1 under R00 (GMR or OR: keratin-high higher)",
+        "c": "estimate > 1 under all of N_P (R00), N_A (R01) and N_S (R02); a not_estimable run makes c false",
+        "d": "true between-spot rerun R10: agree (estimable, estimate > 1) | disagree (estimable, estimate <= 1) | not_estimable",
+        "f": "nuclei-free run R11 estimable with estimate > 1 (not_estimable makes f false)",
+        "robust": "c and f (P4-S2 is below the segmentation gate, fixed by preflight)"
+      },
+      "estimand_by_part": {
+        "magnitude": "geometric-mean ratio (high/low) of the MDK-NCL sender score among active senders (nonzero score); conditional on being an active sender",
+        "participation": "covariate-adjusted odds ratio (high/low) of being an active sender"
+      },
+      "conditions_disjoint_and_exhaustive": [
+        {
+          "id": "not_estimable",
+          "condition": "not est",
+          "allowed_claim": "could not be estimated for {estimand} (state group sizes and the typed reason_code); remove the claim"
+        },
+        {
+          "id": "not_higher",
+          "condition": "est and not s",
+          "allowed_claim": "the point estimate was not above 1 for {estimand} (report the estimate, and the nominal interval with its measured coverage for the magnitude); no supportive wording"
+        },
+        {
+          "id": "direction_not_robust",
+          "condition": "est and s and not robust",
+          "allowed_claim": "positive point estimate for {estimand}, but the sign is not stable across normalisation or segmentation; no claim of higher signalling",
+          "reason_rule": "'segmentation-dependent' when c holds and f fails; otherwise 'not robust to normalisation'"
+        },
+        {
+          "id": "positive_between_spot_agrees",
+          "condition": "est and s and robust and d==agree",
+          "allowed_claim": "higher in the native COMMOT analysis for {estimand}, and the between-spot-only rerun agreed in direction (point estimate above 1); descriptive; interval (magnitude) is nominal with its measured coverage stated"
+        },
+        {
+          "id": "positive_native_only",
+          "condition": "est and s and robust and d!=agree",
+          "allowed_claim": "higher in the native COMMOT analysis for {estimand}; the between-spot-only rerun did not agree or was not estimable; no claim of signalling between spots; descriptive"
+        }
+      ],
+      "exhaustiveness_test": "enumerate every combination of (est, s, c, d in 3 values, f) = 48; each of the 5 conditions is evaluated independently (no first-match ordering) and exactly one must be true; independent hand counts (not_estimable 24, not_higher 12, direction_not_robust 9, positive_between_spot_agrees 1, positive_native_only 2); mutation-tested (weaken one condition, overlap two, drop f from a positive branch, create a gap, misfile est)",
+      "strongest_pair_phrase": "allowed only in the two positive_* branches if MDK-NCL has the largest GMR among the 5 pairs; wording 'largest point estimate of the 5 pairs', never a significance claim",
+      "wording_rules": "every claim sentence states the conditional estimand; no sentence depends on whether the interval excludes 1; the interval is always called nominal and is followed by its measured synthetic coverage (0.874, 0.896, 0.898, 0.900; production path 0.884, 0.900, 0.902, 0.904; production path on held-out seeds 0.868, 0.896, 0.868, 0.874); the not_higher branch says only that the point estimate was not above 1",
+      "headline_requirement": "the headline wording requires the nuclei-free sensitivity (R11) to agree in sign (f); otherwise direction_not_robust, reason segmentation-dependent"
+    },
+    "H2_H4": {
+      "wording": "rank only: 'P4-S2 had the r-th largest GMR of k estimable specimens using the absolute label rule' (H2, supplementary, GMR only); H4: 'P4-S2 had the r-th largest absolute deviation of n specimens from the reference median (above/below/equal the reference median); rank only', stated separately for each of the two statistics and each of the two reference sets; no 'significant', no 'stands out', no p-value",
+      "must_state": "one ESR1-D538G tumour"
+    },
+    "H3": {
+      "wording": "descriptive side-by-side of the two specimens' own H1 results; no contrast statistic; confounded with specimen type, slide and batch; no causal wording and no 'differed' / 'did not differ' verdict"
+    },
+    "morans_primary": {
+      "text_wording": "definition C -> 'within the cancer layer (one observation per spot)'; definition A -> 'across all cells'; 'cancer cell layer' forbidden unless C",
+      "consistent_colocalisation": "allowed if >= 2/3 of estimable specimens have I>0 with BH q<0.05 under spectral randomization; otherwise 'k of n specimens'",
+      "number_in_text": "mean and median over all estimable specimens with n_estimable"
+    },
+    "morans_comparators": {
+      "wording": "descriptive: 'higher/lower in k of 6 patients'; 'significant' is not attainable (see morans.comparators.inference)"
+    },
+    "trajectory": {
+      "increase_claim": "allowed only if the one-sided exact Wilcoxon p<0.05; otherwise 'k of n pairs increased' with deltas"
+    },
+    "nmf": {
+      "counts": "regenerated counts only; if 490/231 cannot be reproduced, the Corrections note says so"
+    }
+  },
+  "gates_fail_closed": {
+    "principle": "expected values come from independent sources (QP csv, literal tables, toy constructions), never from the object being checked; every gate asserts non-emptiness and is mutation-verified (delete the last element; break the matcher)",
+    "typed_status": "every gate and outcome returns {status: ok|not_estimable|failed, reason}; a legitimate not_estimable is not a failure; a missing or NaN value without a status fails the run",
+    "list": [
+      "G1 rebuild gates (two-stage expected allocation, fractions, n_cells)",
+      "G2 layer conservation vs RAW counts + raw_counts layer asserted",
+      "G3 compartment row counts == independent QP-csv recount on QP\u2229GEX barcodes; literal bracket 0.99*L <= rows <= L",
+      "G4 COMMOT three-row toy",
+      "G5 LR-pair key-mapping check (survived filter, nonzero row sum, row sum == sender column)",
+      "G6 hurdle synthetic gates (clustered labels; autocorrelated null; noisy-n_st null; injection): FAILED 2026-10-15 -> hurdle is DESCRIPTIVE ONLY (bootstrap CIs with the measured coverage; no p-values); the real-data controls (src/controls.py) are descriptive and non-gating",
+      "G7 Moran: implementation agreement, MSR type-I incl. zero-inflated x, definition-A null validation",
+      "G8 n_estimable + n_not_estimable == 12 (literal); aggregate n equals n_estimable",
+      "G9 stamps carry the protocol sha256; producers abort on hash mismatch",
+      "G10 claim-tree exhaustiveness (48 combinations, P4-S2 headline scope, exactly one condition true)",
+      "G11 output namespace: refuse non-empty target, atomic write, v3 hashes unchanged; R00 has no obsp['spatial_distance']",
+      "G12 cross-document contract (tests/midkine_remediation/test_protocol_contract.py): label formula, thresholds, sensitivities, covariates, run matrix, claim-tree scope and control seeds agree between this JSON, spec section 9 and the code constants; mutation-verified"
+    ]
+  },
+  "reporting": {
+    "all_preregistered_outcomes_reported": true,
+    "deviations_field": "deviations (list of {date, what, why}); empty list must be written explicitly",
+    "results_dir": "Benchmarking/midkine_remediation/results/{protocol_sha12}/{run_id}",
+    "earlier_results_to_list_beside_new": [
+      "spot-level MDK-SDC4 3.4x (deprecated)",
+      "per-cell MDK-SDC4 1.24 FDR 0.566",
+      "per-cell MDK-NCL magnitude 2.08x",
+      "Moran's 0.254 (not reproducible), 0.2896 over 11 significant, 0.266 over 12"
+    ],
+    "figure_staging": "new figure files are staged under new names before replacing existing assets",
+    "single_mutant_tumour_statement": "one ESR1-D538G tumour; H2/H4 are ranks of effect size with no p-value"
+  },
+  "revision": "9 (2026-11-01 v2 inputs: the proportions are the RNA compartments of the frozen RNA refinement and the nuclei are rebuilt for all p0 spots; no statistical parameter, threshold or analysis changed. 2026-10-22: v41 Piece C. Proportions are marker-share over the 7-type v41 breast dictionary (v40 plus PAX5-1 in B_Cells Major; Neutrophils dropped) in output/module3_marker_share_7type; rows sum to 1; cancer-compartment brackets and zero counts recounted; min_qp_prop renamed min_prop). Revision 8 (2026-10-16): held-out production-path coverage series added, ONE NMF path, A12.9 reports every coverage series.",
+  "pre_freeze_checklist": [
+    "A12.1 DONE (commit 2ede20a5): entry point, preflight; P3-S2 and P4-S2_1i_rep fail the H&E gate (user decision: no rebuild, typed not_estimable)",
+    "A12.2 DONE: NMF trace (irreproducible), S1/S2 sample types confirmed (GSE289326), v3 hash snapshot; comparator cancer-label mapping filled; pooled depth reference M=368711 (median raw spot UMI over 32146 spots) and per-specimen f_spec written to Benchmarking/midkine_remediation/inventory_M_fspec.json",
+    "A12.3 synthetic tests pass and are mutation-verified: hash loader, COMMOT three-row toy, Moran null (zero-inflated x, definition A), two-stage allocation checker, typed statuses, 48-combination descriptive claim tree (P4-S2 scope, rev 6). EXCEPTION: G6 (hurdle permutation gates) FAILED -> hurdle descriptive fallback (block-bootstrap intervals with measured coverage); not a pass",
+    "Rev 6 (A12.3d) DONE: k_share label, count-only fallback, typed failures, nominal interval, controls and descriptive runner built and tested on toy data; cross-document contract test added",
+    "Rev 7 (A12.3e) DONE: production-path coverage series, fail-closed production runner, H4 algorithm and A01-A07 mechanics, typed overflow / tiny-specimen / negative-control status, k_share full gene set",
+    "Rev 8 (A12.3f) DONE: held-out coverage series, ONE NMF path with its settings, concern fixes and contract tests",
+    "A01-A07 sweep runner and positive-control COMMOT rerun BUILT AND TESTED (8ee65b0a, 8a6cbeec; A12.3g); no TO_FILL_PRE_FREEZE strings remain"
+  ],
+  "user_decisions_2026_10_14": {
+    "moran_primary": "C compartment-level; A all-cells per-cell on v4 is secondary",
+    "cutoffs": "p_construct>=0.05; cancer eligibility qp_prop>=0.10 and expected allocated counts>=200; others are sensitivity",
+    "genotype": "P4-S2 ESR1-D538G mutant; all other specimens ESR1-WT (includes P4-S1)",
+    "hurdle_scope": "all 12 specimens estimated; H1 within-tumour (headline P4-S2 only), H2 supplementary rank on effect size, H3 P4-S1 vs P4-S2, H4 specimen-level genotype contrast (rank only). Revised by the 2026-10-15 user decision (descriptive only)",
+    "normalisation": "primary per-cell-equivalent depth-corrected log1p; secondary abundance-weighted for COMMOT flows; per-compartment normalize_total as sensitivity"
+  },
+  "genotype_groups": {
+    "specimen_level": "see specimens.genotype",
+    "compartment_groups": "basal_keratin_high / basal_keratin_low (phenotype groups). Wording: 'basal-keratin-high (proxy for ESR1-D538G)'. Never 'mutant cells' or 'WT cells'.",
+    "genes": [
+      "KRT5",
+      "KRT6A",
+      "KRT6B",
+      "KRT14",
+      "KRT16",
+      "KRT17"
+    ],
+    "high_threshold_k0": 0.01,
+    "k0_justification": "Convention fixed without real data: keratin-high if k_share >= 0.01, i.e. the six basal keratins make up at least 1% of the compartment's partitioned counts. A share is free of n_st (removes the shared denominator that let n_st noise leak into the label), and 0.01 is a round fraction not tuned on any outcome. Honest note: 0.01 is NOT independent of the synthetic generator. It equals the generator's baseline keratin share (E_k mean 2 vs E_o mean 200, 2/202 = 0.0099), and the sensitivity grid (0.005, 0.02) was chosen around it. It is therefore a pre-set convention, not evidence about real keratin biology, and its prevalence on real data is unknown. The synthetic G6 gate used its own generator-specific threshold (0.0143791, pooled 0.70 quantile of the generator's k_share, seeds 900000-900019) only to give 30% prevalence; it does not transfer to real data.",
+    "sensitivity": {
+      "k0": [
+        0.005,
+        0.02
+      ],
+      "continuous": "standardised log1p(k_share), effect per 1 SD (A05)",
+      "tertile_contrast": "top vs bottom tertile of k_share within specimen (A06; numpy quantile method=linear)",
+      "R_B_expected_count_ge_1": "six-keratin allocated count >= 1 (A07)"
+    },
+    "allowed_claim_P4_S2_within_tumour": "basal-keratin-high (proxy for ESR1-D538G) compartments within one ESR1-D538G tumour",
+    "descriptive_validation": "ESR1-signature score (examples/media-3.xlsx) compared between groups on compartments",
+    "k0_fallback": {
+      "primary": "absolute threshold k_share >= 0.01",
+      "trigger": "ONLY if either group (high or low) has fewer than 30 eligible compartments at k0 = 0.01 in that specimen. The decision uses the compartment counts and k_share alone, is taken before COMMOT runs and before any outcome exists. The active-sender count is NOT a trigger.",
+      "fallback": "within-specimen threshold = numpy.quantile(k_share over the specimen's eligible cancer compartments, 0.70, method='linear'); high = k_share >= that quantile (ties go to HIGH). Applied once.",
+      "after_selection": "once a threshold is chosen, the active-sender gate (>= 10 per group, magnitude) and the mixed-block gate (>= 10 mixed blocks) are applied as ordinary typed gates with NO further fallback and no other threshold",
+      "reporting": "state per specimen which rule was used (absolute_k0_0.01 or fallback_quantile_0.70); if either group is still < 30 under the fallback the specimen is not_estimable (group_size)",
+      "algorithm_frozen": {
+        "numpy_quantile_method": "linear",
+        "q": 0.7,
+        "tie_rule": "k_share >= quantile is high",
+        "code": "compartments.select_label",
+        "sensitivity_labels": "A03/A04 use the absolute rule with the group-size gate and no fallback; A05-A07 as listed under sensitivity"
+      },
+      "outcome_blind": true
+    },
+    "label_variable": "k_share = sum over the six genes (KRT5, KRT6A, KRT6B, KRT14, KRT16, KRT17) of E_stg / ( sum over all genes of E_stg MINUS E_st,MDK ): the compartment's keratin share of its own allocated counts EXCLUDING the tested outcome MDK. Linear counts only: neither n_st nor depth_ratio enters it, and MDK (the outcome) cannot set its own label; a fold-3 MDK injection therefore cannot change membership. Implemented in src/compartments.py (obs column k_share). The per-cell-equivalent form E/n_st_eff/depth_ratio is a descriptive column only (k_percell_desc).",
+    "label_rule": "keratin-high iff k_share >= k0 (the boundary value is HIGH)",
+    "synthetic_generator_note": "src/synthetic_g6.py builds the same label: k_share = E_k / max(E_o + E_k, 1) with E_o = the non-keratin, non-MDK counts, so the synthetic label excludes MDK as well (verified; mutation kshare_label_depends_on_n_st).",
+    "historical_label_k_st": "HISTORICAL (withdrawn): revisions 1-5 of the spec used the per-cell label k_st = sum E/n_st_eff/depth_ratio >= 1.0 (sensitivities 0.25, 2.0). It is HISTORICAL: it let the nuclei estimate and depth enter the label and was replaced by k_share in revision 5; revision 6 removes the remaining k_st uses."
+  },
+  "user_decisions_2026_10_15": {
+    "hurdle_purpose": "motivate the wet-lab work, not prove mechanism",
+    "headline": "H1 within P4-S2 (HCC22-088-P4-S2_1i_rep) only, MDK-NCL, basal-keratin-high (proxy for ESR1-D538G) vs low",
+    "report": "GMR + block-bootstrap 95% CI (2000 resamples) with measured synthetic coverage 0.874-0.900 and SE underestimate about 1.1-1.3x; participation OR point estimate only",
+    "others": "11 other specimens context / exploratory descriptive; H2 rank supplementary, on GMR, rank only",
+    "r11": "nuclei-free sensitivity must agree in sign for the headline (below-gate imagery)",
+    "rev6": "magnitude interval retained as nominal 95% (user override of the selection rule, see hurdle.pre_freeze_deviations); no widened interval; wording never depends on whether it excludes 1; OR point estimate only; H2 ranks the GMR only; other 11 specimens context only",
+    "rev7": "user decisions unchanged: descriptive only; headline H1 in P4-S2 MDK-NCL; k_share >= 0.01 excluding MDK; GMR among active senders with a NOMINAL 95% interval and measured coverage (never widened; no wording hinges on excluding 1; user override recorded); OR point estimate only; other specimens context; H2 GMR only"
+  },
+  "post_freeze_open_items": [
+    {
+      "id": "positive_control_commot_rerun",
+      "what": "implement the COMMOT rerun on the MDK-injected object (hurdle.validation_controls.real_data_post_freeze.positive_control_commot)",
+      "must_be_tested_before_opening": "toy test of the layer injection, the COMMOT rerun wrapper (typed failure on a crash) and injection_report; a mutation that breaks the injection group or fold; the result is not opened until these pass"
+    },
+    {
+      "id": "a01_a07_sweep_runner",
+      "what": "implement the A01-A07 sensitivity runner (plan A12.9) to the mechanics in commot.run_matrix.analysis_variant_mechanics",
+      "must_be_tested_before_opening": "toy tests per variant for: recomputed vs inherited eligibility, labels, blocks and standardisation; interval vs point-only; the 30-per-group gates and no fallback; a contract test comparing its settings with analysis_variant_mechanics; mutations that break each variant's subset or recompute rule; results are not opened until these pass"
+    }
+  ]
+}

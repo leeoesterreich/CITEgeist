@@ -8,10 +8,11 @@ which carries the same workflow in full with troubleshooting notes.
 
 .. warning::
 
-   Modules 3 and 3-post require an **NVIDIA GPU**. The proportion solver uses
-   cuOPT, which is not on PyPI and is not in ``CITEgeist_env.yml``; nucleus
-   segmentation uses StarDist (``pip install citegeist[imaging]``). There is no CPU
-   fallback for the proportion solver. See :doc:`installation`.
+   The default proportion method (``method="auto"``, resolving to ``"rna_refined"``)
+   runs on CPU. The optional ``method="qp"`` solver uses cuOPT, which needs an **NVIDIA
+   GPU**, is not on PyPI and is not in ``CITEgeist_env.yml`` (no CPU fallback for QP);
+   nucleus segmentation uses StarDist (``pip install citegeist[imaging]``). See
+   :doc:`installation`.
 
 Data Preparation
 ----------------
@@ -38,7 +39,7 @@ Workflow Overview
 1. **Profile discovery** (Modules 1–2, optional) — find spatially informative
    antibody markers and group them into candidate profiles.
 2. **Preprocessing** — split the AnnData and normalize both modalities.
-3. **Spot-level proportions** (Module 3) — cuOPT QP against the antibody profiles.
+3. **Spot-level proportions** (Module 3) — marker share plus RNA refinement (default, CPU), or cuOPT QP with ``method="qp"``.
 4. **Single-cell assignment and GEX** (Modules 3-post / 3-gex) — StarDist nuclei,
    per-nucleus type assignment, and SACE allocation of spot counts to cells.
 
@@ -175,10 +176,10 @@ counts to the nuclei assigned within that spot.
 
 ``output_mode="single_cell"`` orchestrates StarDist segmentation, per-nucleus
 assignment, and SACE projection behind an H&E resolution gate (≤ 1.0 µm/px). It
-defaults to ``use_morphology=True``, which scores nucleus morphology
-(``CITEgeist.model.morphology.nucleus_scores``) and assigns each nucleus by the
-Bayesian posterior. Pass ``use_morphology=False`` for count-constrained Hungarian
-assignment, which reproduces the QP spot proportions exactly.
+defaults to ``use_morphology=False``, which gives count-constrained Hungarian
+assignment (it reproduces the spot proportions). Pass ``use_morphology=True`` to score nucleus
+morphology (``CITEgeist.model.morphology.nucleus_scores``) and assign each nucleus by the
+Bayesian posterior.
 
 ``output_mode="layers"`` (the default) returns spot-level per-type expression
 compartments and needs no nuclei or H&E image:

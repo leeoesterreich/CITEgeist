@@ -1,0 +1,55 @@
+{
+  "B cells": {
+    "Major": [
+      "CD20"
+    ],
+    "Minor": [
+      "CD45RA"
+    ]
+  },
+  "CD4+ T cells": {
+    "Major": [
+      "CD3E",
+      "CD4"
+    ],
+    "Minor": [
+      "CD45RO"
+    ]
+  },
+  "CD8+ T cells": {
+    "Major": [
+      "CD3E",
+      "CD8A"
+    ],
+    "Minor": [
+      "GranzymeB"
+    ]
+  },
+  "Macrophages": {
+    "Major": [
+      "CD68",
+      "CD163"
+    ],
+    "Minor": [
+      "CD16"
+    ]
+  },
+  "Endothelial": {
+    "Major": [
+      "CD31"
+    ],
+    "Minor": []
+  },
+  "Epithelial": {
+    "Major": [
+      "PanCK"
+    ],
+    "Minor": []
+  },
+  "Fibroblasts": {
+    "Major": [
+      "alphaSMA"
+    ],
+    "Minor": []
+  }
+}

@@ -6,6 +6,7 @@ spatial transcriptomics data using CITE-seq profiles.
 """
 
 # Standard library imports
+import inspect
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -19,6 +20,8 @@ try:
     import pyarrow.parquet as pq
 except ImportError:  # pragma: no cover - exercised only in reduced environments
     pq = None
+
+from .alignment import align_to, densify, positions_of
 
 # Local imports
 # Production-path imports (cuOPT backend)
@@ -78,10 +81,60 @@ def _require_pyarrow(feature_name: str) -> None:
         )
 
 
+_UNSET = object()  # sentinel: brightness_method not given (legacy brightness_correction semantics)
+
+
+def _resolve_brightness_method(brightness_method, brightness_correction) -> str:
+    """Map (brightness_method, brightness_correction) to a method name; ValueError on conflict/unknown.
+
+    3.0.0 contract (the brightness drop): `brightness_method` is the modern argument and takes
+    precedence over the legacy `brightness_correction` alias. `brightness_method=None`/"plain" means
+    marker share with no brightness correction (the default); "gmm" is the legacy GMM brightness
+    estimator; an RNA method name needs raw GEX.
+
+    Precedence / error rule (documented, single source of truth):
+      * `brightness_method` not given (_UNSET) -> the legacy alias determines the method:
+          `brightness_correction=True`  -> "gmm"   (DeprecationWarning; deprecated alias)
+          `brightness_correction=False` -> "plain" (the default; no warning)
+      * `brightness_method` given (modern) wins over legacy `brightness_correction`:
+          None                    -> "plain"  (modern None wins; legacy True is not silently honoured)
+          "gmm"                   -> "gmm"
+          a known RNA method name -> that method
+      * Conflict error: legacy `brightness_correction=True` with an explicit, non-None
+          `brightness_method` that is not "gmm" is a genuine contradiction -> ValueError.
+      * Invalid type/name (neither None nor in METHODS) -> ValueError.
+    """
+    from .deconvolution.brightness_estimators import METHODS  # pylint: disable=import-outside-toplevel
+
+    if brightness_correction:
+        import warnings  # pylint: disable=import-outside-toplevel
+
+        warnings.warn(
+            "brightness_correction is deprecated (the brightness drop); "
+            "set brightness_method instead (e.g. brightness_method='gmm' or None/plain).",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+
+    if brightness_method is _UNSET:
+        return "gmm" if brightness_correction else "plain"
+    if brightness_method is None:
+        return "plain"  # modern None (plain) takes precedence over the legacy brightness_correction alias
+    if not isinstance(brightness_method, str) or brightness_method not in METHODS:
+        raise ValueError(f"unknown brightness_method {brightness_method!r}; expected None or one of {METHODS}")
+    if brightness_correction and brightness_method != "gmm":
+        raise ValueError(
+            f"brightness_method={brightness_method!r} contradicts brightness_correction=True (which means 'gmm')"
+        )
+    return brightness_method
+
+
 class CitegeistModel:
     """Orchestrates the CITEgeist pipeline for one sample.
 
-    Typical sequence: ``split_adata()`` -> ``run_cell_proportion_model()`` (M3 cuOPT QP)
+    Typical sequence: ``split_adata()`` -> ``run_cell_proportion_model()`` (M3 proportion
+    estimation: RNA refinement by default, which needs per-spot ``nuclei_counts``; plain marker share via
+    ``method="marker_share"``, cuOPT QP via ``method="qp"``)
     -> ``run_sace_allocation()`` (M3-gex SACE). See module docstrings for details.
 
     Attributes:
@@ -149,6 +202,8 @@ class CitegeistModel:
         setup_logging(self.output_folder, self.sample_name)
 
         self.results = {}
+        self._gex_prefilter = None  # unfiltered GEX, kept only by filter_gex(keep_unfiltered=True)
+        self._gex_filtered = False
         self.cell_profile_dict = None
         self.preprocessed_gex = False
         self.preprocessed_antibody = False
@@ -285,7 +340,7 @@ class CitegeistModel:
     # Preprocessing Functions
     # -----------------------------------------
 
-    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.0, min_counts=10):
+    def filter_gex(self, nonzero_percentage=0.01, mean_expression_threshold=1.0, min_counts=10, keep_unfiltered=False):
         """
         Filter genes in the gene expression AnnData object based on user-defined criteria.
 
@@ -296,6 +351,8 @@ class CitegeistModel:
         Args:
             nonzero_percentage (float): Minimum percentage of spots where a gene must have a count > 0 (default: 1%)
             mean_expression_threshold (float): Minimum mean expression value in nonzero spots
+            keep_unfiltered (bool): keep a reference to the unfiltered GEX (raw counts for RNA brightness
+                methods). Off by default (holds the full-gene matrix in memory). A repeat call keeps the first.
         """
         if self.gene_expression_adata is None:
             raise ValueError("Gene expression data has not been split. Run `split_adata` first.")
@@ -326,6 +383,10 @@ class CitegeistModel:
         # Combine filters
         col_filter = count_filter & mean_filter
 
+        # Opt-in: keep the first unfiltered object (raw GEX for RNA brightness); a repeat call never replaces it.
+        if keep_unfiltered and self._gex_prefilter is None and not self._gex_filtered:
+            self._gex_prefilter = self.gene_expression_adata
+        self._gex_filtered = True
         # Apply the filter and subset the AnnData object
         filtered_gene_count = np.sum(col_filter)
         initial_gene_count = self.gene_expression_adata.shape[1]
@@ -694,7 +755,12 @@ class CitegeistModel:
         threshold_method="auto",
         use_negative_gates=False,
         # Method selection
-        method="qp",  # "qp" (cuOPT, default) or "per_type_beta"
+        method="auto",  # "auto" (default; = "rna_refined"), "rna_refined", "marker_share", "qp" (cuOPT), or "per_type_beta"
+        # Marker-share params (ignored when method != "marker_share")
+        brightness_correction=False,
+        brightness_method=_UNSET,  # None/"plain", "gmm", or an RNA method (see brightness_estimators.METHODS)
+        rna_panel=None,  # RNA estimation panel for RNA brightness methods
+        allow_plain_fallback=False,  # RNA method without raw GEX: warn and use plain instead of ValueError
         # Per-type beta params (ignored when method != "per_type_beta")
         sigma_scale=1.0,
         # NB-specific params (ignored when method="qp")
@@ -705,6 +771,11 @@ class CitegeistModel:
         nb_gpu_adam_steps=200,
         # Morphology prior (refinement)
         morphology_device="cpu",
+        # Optional hierarchical split (method="rna_refined" only): RNA estimates the parent, protein splits it
+        subtype_groups=None,  # e.g. {"T": ("CD4pos_T_cells", "CD8pos_T_cells")}; None = off (default)
+        subtype_markers=None,  # e.g. {"CD4pos_T_cells": ["CD4"], "CD8pos_T_cells": ["CD8A"]}
+        subtype_scale=None,  # None = raw-count split (default); "cd3e_anchor" = CD3E-anchored split (Amendment B)
+        anchor_marker=None,  # CD3E antibody name (required with subtype_scale="cd3e_anchor")
     ):
         """
         Orchestrates the cell proportion optimization workflow.
@@ -724,8 +795,34 @@ class CitegeistModel:
             lambda_coverage (float): Exponent for marker-count asymmetric loss scaling. Default: 1.0
 
         Args (production-relevant; see signature for the full set):
-            method: proportion solver variant ("qp" — per-marker cuOPT QP — is production;
-                also "per_type_beta").
+            subtype_groups, subtype_markers: opt-in hierarchical split for method="rna_refined" (see
+                ``run_rna_refinement``); RNA estimates the parent share and the raw antibody counts in
+                ``antibody_capture_adata.layers["raw_counts"]`` split it between the two children. Off by default.
+            subtype_scale, anchor_marker: opt-in CD3E-anchored split for method="rna_refined" (needs
+                subtype_groups). Experimental and not adopted: the anchor split failed its validation
+                (see ``docs/superpowers/handoffs/2026-11-01-proportion-engine-v2-decision.md``).
+            method: proportion estimation method. "auto" (default) resolves to "rna_refined" (frozen v2:
+                multinomial, c=0.1, n_passes=3, anchor_thr=0) and raises, with instructions, when it cannot run:
+                no GEX ``raw_counts`` layer, no per-spot nuclei counts (pass ``nuclei_counts=`` or set
+                ``gene_expression_adata.obs["n_nuclei"]``), or cell-resolution gating. It never falls back to
+                marker share; request ``method="marker_share"`` explicitly for that. The result is an
+                "RNA compartment" estimate; the estimator used is recorded in ``results["phase1_method"]``.
+                "marker_share" (CPU only) takes the share of each cell type's Major
+                marker channels in the cosine-normalized antibody vector. "rna_refined" refines the
+                marker-share proportions with raw spot RNA counts and per-spot nuclei counts
+                (reference-free; needs ``nuclei_counts=`` as a barcode-indexed pd.Series, or
+                ``gene_expression_adata.obs["n_nuclei"]``). "qp" is the per-marker cuOPT QP (needs a
+                GPU); also "per_type_beta".
+            brightness_correction: legacy alias (deprecated, 3.0.0 brightness drop); marker_share
+                only. True -> "gmm" (DeprecationWarning), False -> no correction. Use
+                brightness_method instead.
+            brightness_method: marker_share only. Modern argument (3.0.0); unset keeps the legacy
+                plain default. None/"plain" (default) = marker share with no brightness correction;
+                "gmm" = legacy GMM brightness estimator; or an RNA method name (needs raw GEX and
+                rna_panel; ValueError if raw GEX is unavailable unless allow_plain_fallback=True).
+                Takes precedence over the legacy brightness_correction alias when both are given;
+                an explicit non-"gmm" brightness_method with brightness_correction=True raises
+                ValueError. Diagnostics go to results["marker_brightness_diagnostics"].
             fusion_mode: detection-mask fusion mode ("union" default).
             use_gex_detection / gex_detection_k / gex_detection_min_corr: GEX-informed detection fusion.
             use_detection_gating / detection_gate_ub: GMM detection gating controls.
@@ -742,13 +839,63 @@ class CitegeistModel:
             proportions (rows = spot barcodes, columns = cell types); the finetuned frame is also
             stored on the model (``self.results["cell_prop"]``) for downstream SACE allocation.
             Other dispatch paths (cell-resolution gating) return their own
-            result type instead.
+            result type instead. Note: with ``resolution="cell"`` and ``use_gating=None``
+            the gating classifier runs instead of marker share (pass ``use_gating=False``
+            to get marker share at cell resolution). With marker share, QP-only arguments
+            (``lambda_laplacian``, ``radius``, nuclei options, detection gating, ...) are
+            ignored; one warning lists any passed with non-default values.
         """
+
+        # --- Method dispatch ---
+        resolved_brightness = _resolve_brightness_method(brightness_method, brightness_correction)
+        if method not in ("auto", "rna_refined", "marker_share", "qp", "per_type_beta"):
+            raise ValueError(
+                f"Unknown method '{method}'. Use 'auto', 'rna_refined', 'marker_share', 'qp' or 'per_type_beta'."
+            )
+
+        if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
+            raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
+
+        if self.cell_profile_dict is None:
+            raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
+
+        # Cell resolution dispatches to gating-based classification unless use_gating=False
+        if use_gating is None:
+            use_gating = self.resolution == "cell"
+
+        if method == "rna_refined" and use_gating:
+            raise ValueError("method='rna_refined' is not available with cell-resolution gating (use_gating=True).")
+        if method == "auto":
+            # Default Phase 1 is frozen RNA refinement (v2). No silent fallback to marker share: a missing
+            # requirement raises with instructions (the explicit path then raises the nuclei/raw-layer errors).
+            if use_gating:
+                raise ValueError(
+                    "method='auto' resolves to 'rna_refined', which is not available with cell-resolution gating "
+                    "(use_gating=True). Pass use_gating=False, or request method='marker_share' explicitly."
+                )
+            if self._raw_gex_source() is None:
+                raise ValueError(
+                    "method='auto' resolves to 'rna_refined', which needs a GEX AnnData with a 'raw_counts' layer "
+                    "(run preprocess_gex, or filter_gex(keep_unfiltered=True)). To run without raw GEX counts, "
+                    "request method='marker_share' explicitly."
+                )
+            method = "rna_refined"
+            logging.info("method='auto' resolved to %r", method)
+        if (
+            subtype_groups is not None or subtype_markers is not None or subtype_scale is not None
+            or anchor_marker is not None
+        ) and method != "rna_refined":  # fmt: skip
+            raise ValueError(
+                f"subtype_groups / subtype_markers / subtype_scale / anchor_marker apply only to method='rna_refined' (resolved method: {method!r})."
+            )
+
+        # Marker share needs no spatial terms, radius or QP settings (CPU only).
+        marker_share_active = method == "marker_share" and not use_gating
 
         # --- Detection gating guard ---
         # GMM detection gating is critical for accurate proportions (r=0.766 vs 0.36 without).
         # Disabling it is almost always a mistake in benchmarks and production.
-        if not use_detection_gating:
+        if not use_detection_gating and not marker_share_active:
             import warnings  # pylint: disable=import-outside-toplevel
 
             warnings.warn(
@@ -759,11 +906,33 @@ class CitegeistModel:
                 stacklevel=2,
             )
 
-        # --- Method dispatch ---
-        if method not in ("qp", "per_type_beta"):
-            raise ValueError(f"Unknown method '{method}'. Use 'qp' or 'per_type_beta'.")
+        # --- RNA-refined path (CPU): marker share p0, then reference-free RNA refinement ---
+        if method == "rna_refined":
+            return self._run_rna_refined(
+                nuclei_counts,
+                brightness_method=resolved_brightness,
+                rna_panel=rna_panel,
+                allow_plain_fallback=allow_plain_fallback,
+                subtype_groups=subtype_groups,
+                subtype_markers=subtype_markers,
+                subtype_scale=subtype_scale,
+                anchor_marker=anchor_marker,
+            )
+
+        # --- Marker-share path (CPU, no cuOPT) ---
+        if marker_share_active:
+            self._warn_qp_only_args_ignored(locals())
+            out = self._run_marker_share(
+                brightness_correction,
+                brightness_method=resolved_brightness,
+                rna_panel=rna_panel,
+                allow_plain_fallback=allow_plain_fallback,
+            )
+            self.results["phase1_method"] = "marker_share"  # set only after a successful run
+            return out
 
         # --- QP path (cuOPT backend) ---
+        self.results["phase1_method"] = method  # provenance: the Phase 1 estimator actually used
 
         # Use resolution preset for laplacian_k if caller used default
         if laplacian_k == 8 and self.resolution == "cell":
@@ -781,12 +950,6 @@ class CitegeistModel:
             radius = compute_optimal_radius(source_adata)
             logging.info("Auto-detected radius: %s (3 rings)", radius)
 
-        if self.adata is None and (self.gene_expression_adata is None or self.antibody_capture_adata is None):
-            raise ValueError("No valid data loaded. Ensure `adata` or split datasets are loaded properly.")
-
-        if self.cell_profile_dict is None:
-            raise ValueError("Cell profile dictionary has not been loaded. Run `load_cell_profile_dict` first.")
-
         # Extract spatial coordinates for Laplacian smoothing
         coords = None
         if lambda_laplacian > 0:
@@ -800,8 +963,6 @@ class CitegeistModel:
                 lambda_laplacian = 0
 
         # Dispatch to gating-based classification for cell resolution
-        if use_gating is None:
-            use_gating = self.resolution == "cell"
         if use_gating:
             logging.info("Cell resolution: dispatching to gating-based classification")
             return self._run_cell_classification(
@@ -1005,7 +1166,7 @@ class CitegeistModel:
             for i in range(marker_level_data.shape[0]):
                 if detection_mask_bool[i].sum() < 2:
                     detection_mask_bool[i] = True
-            self.results["detection_mask_bool"] = detection_mask_bool
+            self._set_detection_mask(detection_mask_bool)
             logging.info(
                 "Persisted detection_mask_bool: %d spots, %d types, %.1f%% gated",
                 marker_level_data.shape[0],
@@ -1052,6 +1213,7 @@ class CitegeistModel:
 
             gex_X = self.gene_expression_adata.X
             gex_X = gex_X.toarray() if hasattr(gex_X, "toarray") else np.asarray(gex_X)
+            gex_X = gex_X[self._gex_rows_in_antibody_order()]  # pair rows with the antibody spots by barcode
             gene_names_list = list(self.gene_expression_adata.var_names)
 
             ab_names_stripped = [_strip_suffix(n) for n in var_names]
@@ -1102,7 +1264,7 @@ class CitegeistModel:
 
             # Update detection_mask_bool to reflect fusion
             detection_mask_bool = fused_detected
-            self.results["detection_mask_bool"] = detection_mask_bool
+            self._set_detection_mask(detection_mask_bool)
 
             n_gated_fused = (sparsity_mask < 1.0).sum()
             logging.info(
@@ -1501,6 +1663,252 @@ class CitegeistModel:
 
         return global_cell_type_proportions_df, finetuned_cell_type_proportions_df
 
+    def _warn_qp_only_args_ignored(self, local_vars):
+        """Log one warning naming QP-only arguments passed with non-default values."""
+        sig = inspect.signature(self.run_cell_proportion_model).parameters
+        qp_only = (
+            "lambda_laplacian",
+            "laplacian_k",
+            "lambda_reg",
+            "alpha",
+            "radius",
+            "use_nuclei_prior",
+            "nuclei_counts",
+            "use_detection_gating",
+            "use_gex_detection",
+            "sparsity_mask",
+            "marker_weight_dict",
+            "lambda_confusion",
+            "use_cellularity_laplacian",
+            "refine_sparsity",
+            "use_entropy_weights",
+        )
+        changed = []
+        for name in qp_only:
+            default = sig[name].default
+            value = local_vars[name]
+            same = (value is default) or (
+                not hasattr(value, "__len__") and not isinstance(value, (np.ndarray, pd.Series)) and value == default
+            )
+            if not same:
+                changed.append(name)
+        if changed:
+            logging.warning(
+                "method='marker_share' ignores QP-only arguments: %s. Use method='qp' to apply them.",
+                ", ".join(changed),
+            )
+
+    def _raw_gex_for_brightness(self, spot_names):
+        """Raw-count GEX (all genes, rows = ``spot_names`` in order) or None if the model holds none.
+
+        Uses the pre-``filter_gex`` object when ``filter_gex`` ran (so genes it dropped stay available), else
+        the current GEX object; prefers its ``raw_counts`` layer over ``.X``. A current GEX object without a
+        ``raw_counts`` layer is treated as unavailable (its ``.X`` may be normalized).
+        """
+        import anndata as ad  # pylint: disable=import-outside-toplevel
+        from scipy import sparse  # pylint: disable=import-outside-toplevel
+
+        src = self._gex_prefilter
+        if src is None:
+            if self._gex_filtered:
+                return None  # filtered without keep_unfiltered: full-gene counts are gone
+            src = self.gene_expression_adata
+            if src is None or "raw_counts" not in src.layers:
+                return None
+        raw = src.layers["raw_counts"] if "raw_counts" in src.layers else src.X
+        if "raw_counts" not in src.layers:
+            vals = raw.data if sparse.issparse(raw) else np.asarray(raw)
+            if not np.all(np.mod(vals, 1) == 0):
+                import warnings  # pylint: disable=import-outside-toplevel
+
+                warnings.warn(
+                    "GEX for RNA brightness has no raw_counts layer and .X is not integer-valued; "
+                    "RNA scores will come from normalised values.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+        names = list(src.obs_names)
+        spot_names = list(spot_names)
+        if len(set(names)) != len(names) or len(set(spot_names)) != len(spot_names):
+            raise ValueError("duplicate spot names in GEX or antibody data; cannot align raw GEX")
+        pos = {n: i for i, n in enumerate(names)}
+        missing = [n for n in spot_names if n not in pos]
+        if missing:
+            raise ValueError(f"{len(missing)} antibody spots absent from raw GEX obs_names (e.g. {missing[:3]})")
+        rows = [pos[n] for n in spot_names]
+        mat = raw[rows]
+        mat = mat.toarray() if sparse.issparse(mat) else np.asarray(mat)
+        out = ad.AnnData(
+            X=np.asarray(mat, dtype=float),
+            obs=pd.DataFrame(index=spot_names),
+            var=pd.DataFrame(index=list(src.var_names)),
+        )
+        return out
+
+    def _raw_gex_source(self):
+        """GEX AnnData carrying a ``raw_counts`` layer (pre-``filter_gex`` object if kept), else None."""
+        if self._gex_prefilter is not None:
+            return self._gex_prefilter  # raw 10x counts live in .X; _run_rna_refined builds the raw_counts layer
+        src = self.gene_expression_adata
+        if src is None or "raw_counts" not in src.layers:
+            return None
+        return src
+
+    def _raw_antibody_counts(self, columns):
+        """Raw antibody counts for ``columns`` as a barcode-indexed DataFrame (``raw_counts`` layer, never normalized .X)."""
+        ab = self.antibody_capture_adata
+        if ab is None:
+            raise ValueError("hierarchical split needs antibody_capture_adata")
+        raw = ab.layers["raw_counts"] if "raw_counts" in ab.layers else ab.X
+        names = list(ab.var_names)
+        keep = [c for c in dict.fromkeys(columns) if c in names]  # absent ones are reported by the refinement
+        mat = raw[:, [names.index(c) for c in keep]]
+        mat = mat.toarray() if hasattr(mat, "toarray") else np.asarray(mat)
+        return pd.DataFrame(np.asarray(mat, dtype=float), index=list(ab.obs_names), columns=keep)
+
+    def _run_rna_refined(
+        self,
+        nuclei_counts,
+        brightness_method=None,
+        rna_panel=None,
+        allow_plain_fallback=False,
+        subtype_groups=None,
+        subtype_markers=None,
+        subtype_scale=None,
+        anchor_marker=None,
+    ):
+        """Marker-share p0, then reference-free RNA refinement; stores results and writes the CSVs."""
+        from .deconvolution.rna_refinement_adata import run_rna_refinement  # pylint: disable=import-outside-toplevel
+
+        gex = self._raw_gex_source()
+        if gex is None:
+            raise ValueError("method='rna_refined' needs a GEX AnnData with a 'raw_counts' layer (run preprocess_gex).")
+        if nuclei_counts is not None:
+            if not isinstance(nuclei_counts, pd.Series):
+                raise ValueError(
+                    "method='rna_refined' needs nuclei_counts as a barcode-indexed pd.Series, "
+                    f"got {type(nuclei_counts).__name__}; pass a Series so counts align by barcode."
+                )
+            nuclei = nuclei_counts
+        elif "n_nuclei" in gex.obs.columns:
+            nuclei = gex.obs["n_nuclei"]
+        else:
+            raise ValueError(
+                "method='rna_refined' needs per-spot nuclei counts: pass nuclei_counts= (barcode-indexed "
+                "pd.Series) or set gene_expression_adata.obs['n_nuclei']."
+            )
+
+        p0, _ = self._run_marker_share(
+            False,
+            brightness_method=brightness_method,
+            rna_panel=rna_panel,
+            allow_plain_fallback=allow_plain_fallback,
+        )
+        hier_kwargs = {}
+        if subtype_groups is not None:
+            if not isinstance(subtype_markers, dict):
+                raise ValueError("subtype_groups needs subtype_markers (marker names per child type)")
+            hier_kwargs = dict(
+                subtype_groups=subtype_groups,
+                subtype_markers=subtype_markers,
+                protein_counts=self._raw_antibody_counts(
+                    [m for ms in subtype_markers.values() for m in ms] + ([anchor_marker] if anchor_marker else [])
+                ),
+            )
+            if subtype_scale is not None or anchor_marker is not None:
+                hier_kwargs.update(subtype_scale=subtype_scale, anchor_marker=anchor_marker)
+        elif subtype_markers is not None:
+            raise ValueError("subtype_markers were given without subtype_groups")
+        elif subtype_scale is not None or anchor_marker is not None:
+            raise ValueError("subtype_scale / anchor_marker were given without subtype_groups")
+        if self._gex_prefilter is not None:
+            # filter_gex(keep_unfiltered=True): refine on the full-gene raw counts, rows = the refined spots
+            gex = self._raw_gex_for_brightness(list(p0.index))
+            gex.layers["raw_counts"] = gex.X.copy()
+        p, info = run_rna_refinement(gex, p0, nuclei, **hier_kwargs)
+        for suffix in ("global", "finetuned"):
+            p.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_{suffix}_results.csv"))
+        self.results["cell_prop_base"] = p0.copy()
+        self.results["cell_prop"] = p
+        self.results["rna_refinement"] = info
+        self.results["phase1_method"] = "rna_refined"  # provenance, set only after validation and a successful fit
+        return p, p.copy()
+
+    def _run_marker_share(
+        self,
+        brightness_correction: bool = False,
+        brightness_method: str = None,
+        rna_panel=None,
+        allow_plain_fallback: bool = False,
+    ):
+        """Marker-share proportion estimation; stores results and writes the CSVs."""
+        from scipy import sparse  # pylint: disable=import-outside-toplevel
+
+        from .deconvolution.marker_share import (  # pylint: disable=import-outside-toplevel
+            estimate_marker_brightness_with_diagnostics,
+            marker_share_proportions,
+        )
+
+        adata = self.antibody_capture_adata
+        # preprocess_antibody() replaces .X with winsorized+CLR values; marker share needs raw counts.
+        raw = adata.layers["raw_counts"] if "raw_counts" in adata.layers else adata.X
+        X = raw.toarray() if sparse.issparse(raw) else np.asarray(raw)
+        var_names = list(adata.var_names)
+
+        if brightness_method is None:  # direct callers: legacy semantics
+            brightness_method = "gmm" if brightness_correction else "plain"
+
+        brightness = None
+        brightness_diag = None
+        if brightness_method not in ("plain", "gmm"):
+            from .deconvolution.brightness_estimators import (  # pylint: disable=import-outside-toplevel
+                estimate_brightness,
+            )
+
+            spot_names = list(adata.obs_names)
+            gex = self._raw_gex_for_brightness(spot_names)
+            if gex is None and not allow_plain_fallback:
+                raise ValueError(
+                    f"brightness_method={brightness_method!r} needs raw GEX counts, which this model does not hold; "
+                    "if filter_gex was used, call filter_gex(keep_unfiltered=True); "
+                    "or pass allow_plain_fallback=True to use plain brightness"
+                )
+            res = estimate_brightness(
+                brightness_method,
+                X,
+                var_names,
+                self.cell_profile_dict,
+                gex,
+                rna_panel,
+                panel_set=None,
+                spot_names=spot_names,
+                allow_plain_fallback=allow_plain_fallback,
+            )
+            brightness, brightness_diag = res.applied_b, res.diag
+        elif brightness_method == "gmm":
+            majors: List[str] = []
+            for entry in self.cell_profile_dict.values():
+                markers = entry["Major"] if isinstance(entry, dict) else entry
+                majors.extend(m for m in markers if m not in majors)
+            brightness, brightness_diag = estimate_marker_brightness_with_diagnostics(X, var_names, majors)
+
+        df, n_zero = marker_share_proportions(X, var_names, self.cell_profile_dict, brightness=brightness)
+        df.index = adata.obs_names
+        df = df.sort_index()
+        if n_zero:
+            logging.info("Marker share: %d spots with all-zero marker channels set to uniform.", n_zero)
+
+        df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_global_results.csv"))
+        df.to_csv(os.path.join(self.output_folder, f"{self.sample_name}_cell_prop_finetuned_results.csv"))
+
+        self.results["cell_prop"] = df
+        if "cell_prop_base" not in self.results:
+            self.results["cell_prop_base"] = df.copy()
+        self.results["marker_brightness"] = brightness
+        self.results["marker_brightness_diagnostics"] = brightness_diag
+        self.results["n_all_zero_marker_spots"] = n_zero
+        return df, df.copy()
+
     def discretize_proportions(
         self,
         proportions_df: pd.DataFrame,
@@ -1524,10 +1932,10 @@ class CitegeistModel:
             Guaranteed: sum of counts per spot == nuclei_count for that spot.
 
         Example:
-            >>> # Run continuous model first
-            >>> global_props, finetuned_props = model.run_cell_proportion_model()
             >>> # Get nuclei counts from StarDist segmentation
             >>> nuclei_counts = pd.Series({'spot_1': 10, 'spot_2': 8, ...})
+            >>> # Run continuous model first (default RNA refinement needs the nuclei counts)
+            >>> global_props, finetuned_props = model.run_cell_proportion_model(nuclei_counts=nuclei_counts)
             >>> # Discretize
             >>> cell_counts = model.discretize_proportions(finetuned_props, nuclei_counts)
 
@@ -1668,7 +2076,7 @@ class CitegeistModel:
             strong_signals = np.mean(prior_info["global_prior"][t] > 0.5)
             logging.info("\n%s:", cell_type)
             logging.info(" - Mean confidence score: %s", mean_conf)
-            logging.info(" - % Strong signals: %s%", 100 * strong_signals)
+            logging.info(" - %% Strong signals: %s%%", 100 * strong_signals)
 
             # Expression pattern summary
             mean_exp = np.mean(prior_info["expression_patterns"]["mean_expression"][t])
@@ -1895,12 +2303,29 @@ class CitegeistModel:
             raise ValueError("Cell profile dict has not been loaded. Run 'load_cell_profile_dict' first.")
         assert_neighborhood_size(self.gene_expression_adata, self.cell_profile_dict, radius=radius, num_spots=5)
 
+    def _set_detection_mask(self, mask) -> None:
+        """Store the detection mask together with the spot order of its rows (antibody order)."""
+        self.results["detection_mask_bool"] = mask
+        self.results["detection_mask_meta"] = {
+            "mask": mask,
+            "index": pd.Index(self.antibody_capture_adata.obs_names),
+        }
+
+    def _gex_rows_in_antibody_order(self) -> np.ndarray:
+        """Row positions of the GEX object that line it up, by barcode, with the antibody object."""
+        return positions_of(
+            self.gene_expression_adata.obs_names,
+            self.antibody_capture_adata.obs_names,
+            what="gene expression vs antibody spots",
+        )
+
     def assign_cells(
         self,
         nuclei_counts: "pd.Series",
         cell_to_spot: np.ndarray,
         *,
         cell_ids: np.ndarray = None,
+        cell_prop: "pd.DataFrame" = None,
         random_state: int = 42,
         assignment_method: str = "hungarian",
         detection_mask: np.ndarray = None,
@@ -1920,6 +2345,8 @@ class CitegeistModel:
             cell_to_spot: (C,) int array mapping each cell to a spot index
                 (positional into self.results["cell_prop"]).
             cell_ids: (C,) cell/nucleus identifiers. Defaults to integer indices.
+            cell_prop: Optional proportions whose row order matches cell_to_spot
+                (defaults to self.results["cell_prop"]).
             random_state: Seed for deterministic no-morphology assignment.
             assignment_method: "hungarian" or "bayesian". Default "hungarian".
             detection_mask: (I, T) boolean mask required for bayesian assignment.
@@ -1937,7 +2364,11 @@ class CitegeistModel:
                 "run_cell_proportion_model() must be called before assign_cells(). " "No 'cell_prop' found in results."
             )
 
-        # Auto-populate for Bayesian assignment
+        orig_prop = self.results["cell_prop"]
+        target_prop = orig_prop if cell_prop is None else cell_prop
+
+        # Auto-populate for Bayesian assignment. These are stored in the original
+        # cell_prop row/column order; align them to the order of target_prop.
         if assignment_method == "bayesian":
             if detection_mask is None:
                 detection_mask = self.results.get("detection_mask_bool")
@@ -1946,15 +2377,37 @@ class CitegeistModel:
                         "No detection mask available. Run run_cell_proportion_model() "
                         "with use_detection_gating=True first."
                     )
+                # The mask run_cell_proportion_model stores is in antibody spot order (recorded when it
+                # was written). Any other mask (e.g. injected by the user) is taken to be in cell_prop order.
+                meta = self.results.get("detection_mask_meta")
+                if meta is not None and meta["mask"] is self.results.get("detection_mask_bool"):
+                    mask_index = meta["index"]
+                else:
+                    mask_index = orig_prop.index
+                detection_mask = align_to(
+                    target_prop.index,
+                    pd.DataFrame(np.asarray(detection_mask), index=mask_index, columns=orig_prop.columns),
+                    what="detection_mask",
+                    columns=target_prop.columns,
+                ).values
             if proportion_prior is None:
                 base = self.results.get("cell_prop_base", self.results.get("cell_prop"))
                 if base is not None:
-                    proportion_prior = base.values if hasattr(base, "values") else base
+                    if not hasattr(base, "index"):
+                        base = pd.DataFrame(np.asarray(base), index=orig_prop.index, columns=orig_prop.columns)
+                    proportion_prior = align_to(
+                        target_prop.index, base, what="proportion_prior", columns=target_prop.columns
+                    ).values
 
         existing_int = self.results.get("cell_counts_integer", None)
+        if existing_int is not None:
+            # Stored in antibody spot order; the assigner reads cell_to_spot as a position into it.
+            existing_int = align_to(
+                target_prop.index, existing_int, what="cell_counts_integer", columns=target_prop.columns
+            )
 
         result = _assign_cells(
-            cell_prop=self.results["cell_prop"],
+            cell_prop=target_prop,
             nuclei_counts=nuclei_counts,
             cell_to_spot=cell_to_spot,
             cell_ids=cell_ids,
@@ -2034,7 +2487,7 @@ class CitegeistModel:
         modality: str = "he",
         assignment_method: str = "hungarian",
         stardist_kwargs: dict = None,
-        use_morphology: bool = True,
+        use_morphology: bool = False,
         morphology_weight: float = 0.5,
     ):
         """Run SACE per-cell GEX allocation.
@@ -2050,11 +2503,13 @@ class CitegeistModel:
             assignment_method: "hungarian" (default) or "bayesian" (single_cell only,
                 requires morph_scores_precomputed via assign_cells).
             stardist_kwargs: Extra args for StarDist (single_cell only).
-            use_morphology: compute non-DL morphology scores and assign with the
-                Bayesian posterior (the benchmarked winner: 0.434 pooled vs 0.336
-                Hungarian on Xenium RCC); default True. If morphology scoring
-                fails, falls back to count-constrained Hungarian. Set False for
-                byte-identical, proportion-consistent Hungarian assignment.
+            use_morphology: if False (default, since 2026-10-25), assign cells
+                with count-constrained, proportion-consistent Hungarian. If True,
+                compute non-DL morphology scores and assign with the Bayesian
+                posterior; if morphology scoring fails, falls back to Hungarian.
+                On the joint RNA+protein Xenium GT, morphology-Bayesian scored
+                30.6% vs 33.5% for Hungarian (random 28.4%); its earlier 0.434 vs
+                0.336 win held only on the SingleR GT.
             morphology_weight: Hungarian morphology nudge in [0,1], forwarded to
                 assign_cells; ignored by bayesian.
 
@@ -2099,16 +2554,26 @@ class CitegeistModel:
                 ab_sub = ab_adata[ab_mask]
                 ab_sub = ab_sub[adata.obs_names]
                 ab_raw = ab_sub.layers.get("raw_counts", ab_sub.X)
-                ab_data = np.asarray(ab_raw)
+                ab_data = densify(ab_raw)
                 logging.info(
                     "Aligned antibody data: %d spots × %d markers",
                     ab_data.shape[0],
                     ab_data.shape[1],
                 )
 
+        # SACE is positional: proportions must be in GEX spot order (and in the
+        # profile dict's type order when one defines the type list).
+        profile_dict = getattr(self, "cell_profile_dict", None)
+        cell_prop = align_to(
+            adata.obs_names,
+            self.results["cell_prop"],
+            what="cell_prop",
+            columns=list(profile_dict) if profile_dict else None,
+        )
+
         spot_type_gex, E_x, internals, diagnostics = run_sace_layers(
             spot_counts=raw_X,
-            proportions=self.results["cell_prop"],
+            proportions=cell_prop,
             spot_coords=adata.obsm["spatial"],
             gene_names=list(adata.var_names),
             spotwise_profiles_init=self.results.get("gene_expression_pass1"),
@@ -2209,8 +2674,8 @@ class CitegeistModel:
             morph_scores_precomputed = compute_morphology_scores_safe(
                 labeled_mask=seg_result.masks,
                 nuclei_spot_map=cell_to_spot,
-                spot_proportions=self.results["cell_prop"].values,
-                cell_type_names=list(self.results["cell_prop"].columns),
+                spot_proportions=cell_prop.values,
+                cell_type_names=list(cell_prop.columns),
                 nucleus_ids=nsm["nucleus_id"].values.astype(int),
             )
             if morph_scores_precomputed is not None:
@@ -2225,6 +2690,7 @@ class CitegeistModel:
             nuclei_counts=nuclei_counts,
             cell_to_spot=cell_to_spot,
             cell_ids=cell_ids,
+            cell_prop=cell_prop,
             assignment_method=sc_method,
             morph_scores_precomputed=morph_scores_precomputed,
             morphology_weight=morphology_weight,
@@ -2321,11 +2787,12 @@ class CitegeistModel:
         if functional_marker_table is None:
             functional_marker_table = DEFAULT_FUNCTIONAL_TABLE
 
-        proportions = self.results["cell_prop"]
+        # Counts below are in antibody spot order; put the (sorted) proportions in the same order.
+        ab_adata = self.antibody_capture_adata
+        proportions = align_to(ab_adata.obs_names, self.results["cell_prop"], what="cell_prop")
         cell_types = list(proportions.columns)
 
         # Find functional markers present in the antibody panel
-        ab_adata = self.antibody_capture_adata
         panel_markers = list(ab_adata.var_names)
 
         # Try direct match first, then try stripping -1 suffix
@@ -2403,7 +2870,7 @@ class CitegeistModel:
         intensity_df.index = proportions.index
 
         # Spatial statistics
-        spot_coords = self.gene_expression_adata.obsm["spatial"]
+        spot_coords = np.asarray(self.gene_expression_adata.obsm["spatial"])[self._gex_rows_in_antibody_order()]
         active_pairs = [
             (ct, m)
             for t_idx, ct in enumerate(cell_types)
@@ -2616,7 +3083,7 @@ class CitegeistModel:
 
         raw_layer = ab_sub.layers.get("raw_counts", ab_sub.X)
         raw = raw_layer[:, col_idx] if hasattr(raw_layer, "__getitem__") else raw_layer
-        spot_protein = np.asarray(raw, dtype=np.float64)
+        spot_protein = densify(raw)
 
         # --- 4. Adapt cell_spot_map columns ---
         csm = cell_spot_map.copy()
@@ -2651,9 +3118,15 @@ class CitegeistModel:
             logging.info("SACE protein: warm-starting from functional_lambda")
 
         # --- 6. Call run_sace() ---
+        # spot_protein, spot_idx and coords are in GEX order; align proportions.
         _, cell_adata, diagnostics = run_sace(
             spot_counts=spot_protein,
-            proportions=self.results["cell_prop"],
+            proportions=align_to(
+                self.gene_expression_adata.obs_names,
+                self.results["cell_prop"],
+                what="cell_prop",
+                columns=list(self.cell_profile_dict),
+            ),
             cell_assignments=cell_assignments,
             cell_spot_map=csm,
             spot_coords=self.gene_expression_adata.obsm["spatial"],

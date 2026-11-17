@@ -1,0 +1,6 @@
+{
+  "value": "full_training_5783",
+  "answer_verbatim": "Gene set: go with the 5,783 full-size genes for training (your recommendation). That keeps C2L's normal recipe and still gives exactly 180 at inference, which isolates the gene-filter-at-inference effect from cell-type mix \u2014 matching the fixed-gene intent.",
+  "timestamp": "2026-10-25",
+  "recorded_by": "controller"
+}

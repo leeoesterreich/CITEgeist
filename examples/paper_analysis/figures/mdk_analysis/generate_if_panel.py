@@ -14,25 +14,21 @@ ch2=AF647 (Magenta/MDK).
 from __future__ import annotations
 
 import sys
+import warnings
 from pathlib import Path
 
 import numpy as np
 import tifffile
 from matplotlib import pyplot as plt
+from PIL import Image
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 from _shared.generate_utils import PanelContext, load_panel_sizes, panel_argparser
 
-DATA_ROOT = Path(
-    "/path/to/imaging_data"
-    "/A.V. Lee Lab's files - Alex Chang/1. Projects/CITEgeist_wetlab"
-    "/HW120 T47D MCF7 ESR1mut E2 Depravation MDK IF"
-    "/HW120 Midkine Experimental MCF7 T47D ESR1m IF"
-)
+DATA_ROOT = Path("/path/to/imaging_data")  # folder holding the raw IF z-stacks ("MCF7 WT 5 Day", "MCF7 D538G 5 Day")
 # FOV choice rationale (2026-05-18 visual review against all 6 WT and 5 D538G
-# 60x z-stacks; contact sheets in handoff note
-# vault://CITEgeist/handoffs/2026-05-18-fov-review-fig4f.md):
+# 60x z-stacks; contact sheets kept with the project notes):
 # - WT z-stack 1: cleanest E-cadherin membrane outlines, low/sparse MDK
 #   consistent with WT baseline. Stacks 2/3 denser but blurrier E-cad; 4 sparse;
 #   5 defocused; 6 tissue edge.
@@ -43,6 +39,14 @@ WT_TIFF = DATA_ROOT / "MCF7 WT 5 Day" / "60x z stack 1.tif"
 D538G_TIFF = DATA_ROOT / "MCF7 D538G 5 Day" / "60x z stack 1.tif"
 
 PANELS_DIR = SCRIPT_DIR / "panels"
+
+# Final RGB composites (8-bit PNG, 445x445) recovered byte-for-byte from the
+# embedded <image> elements of the 2026-06-13 panel_C.svg, used only when the
+# raw z-stacks above are unavailable (the raw imaging data is not shipped). See
+# if_cache/README.md.
+CACHE_DIR = SCRIPT_DIR / "if_cache"
+WT_CACHE = CACHE_DIR / "wt_maxproj.png"
+D538G_CACHE = CACHE_DIR / "d538g_maxproj.png"
 
 CH_HOECHST = 0
 CH_AF555 = 1  # E-cadherin
@@ -91,6 +95,25 @@ def make_composite(mip: np.ndarray) -> np.ndarray:
     return np.stack([r, g, b], axis=-1)
 
 
+def load_composite(tiff_path: Path, cache_path: Path) -> np.ndarray:
+    """Return the final RGB composite: from the raw TIFF, else from the PNG cache.
+
+    The cache already holds the finished composite (contrast stretch and channel
+    colouring applied), so it is used as-is and never re-processed.
+    """
+    if tiff_path.exists():
+        print(f"  Reading {tiff_path.parent.name} z-stack...")
+        return make_composite(max_project(tiff_path))
+    if not cache_path.exists():
+        raise FileNotFoundError(f"Neither raw z-stack ({tiff_path}) nor cached composite ({cache_path}) exists")
+    warnings.warn(
+        f"Raw z-stack {tiff_path} missing; using cached composite {cache_path}",
+        stacklevel=2,
+    )
+    with Image.open(cache_path) as im:
+        return np.asarray(im.convert("RGB"))
+
+
 def add_scale_bar(ax, pixel_um: float, bar_um: float, color="white"):
     """Add scale bar to bottom-right of axis. Label uses Nature's >=10pt minimum.
 
@@ -122,16 +145,8 @@ def draw_panel_F(ax):
 
     Note: the function name is historical; this renders Figure 4 panel **E**.
     """
-    print("  Reading WT z-stack...")
-    mip_wt = max_project(WT_TIFF)
-    print(f"    Shape: {mip_wt.shape}")
-
-    print("  Reading D538G z-stack...")
-    mip_d538g = max_project(D538G_TIFF)
-    print(f"    Shape: {mip_d538g.shape}")
-
-    rgb_wt = make_composite(mip_wt)
-    rgb_d538g = make_composite(mip_d538g)
+    rgb_wt = load_composite(WT_TIFF, WT_CACHE)
+    rgb_d538g = load_composite(D538G_TIFF, D538G_CACHE)
 
     # Split the single axis into two side-by-side images
     fig = ax.get_figure()

@@ -1,0 +1,107 @@
+{
+  "frozen_at_commit": "see git log: chore: freeze v40 protein stress-test protocol (pre-results)",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "axes": {
+    "thinning": [
+      1.0,
+      0.5,
+      0.25,
+      0.1
+    ],
+    "dropout": [
+      0.1,
+      0.25,
+      0.5
+    ],
+    "noise": [
+      0.5,
+      1.0,
+      2.0,
+      4.0
+    ],
+    "ablation": "perturb.ablation_panels + perturb.leave_one_type_out (deterministic, seedless)",
+    "type_removal": "perturb.type_removal_series (deterministic, seedless)"
+  },
+  "background_estimator": "per-marker mean of spots at or below that marker's median raw count",
+  "background_check": "results/background_stats.tsv: all CITE counts integral; background == 0 for 7/35 (xenium6), 7/45 (xenium7), 15/180 (sim) marker-unit entries, so the estimator is kept unchanged",
+  "sentinels": {
+    "baseline": [
+      {
+        "axis": "baseline"
+      }
+    ],
+    "moderate": [
+      {
+        "axis": "thinning",
+        "level": 0.25
+      },
+      {
+        "axis": "dropout",
+        "level": 0.25
+      },
+      {
+        "axis": "noise",
+        "level": 1.0
+      },
+      {
+        "axis": "ablation",
+        "panel": "one_per_type"
+      }
+    ],
+    "severe": [
+      {
+        "axis": "thinning",
+        "level": 0.1
+      },
+      {
+        "axis": "dropout",
+        "level": 0.5
+      },
+      {
+        "axis": "noise",
+        "level": 4.0
+      },
+      {
+        "axis": "type_removal",
+        "panel": {
+          "xenium6": "minus_B cells+Endothelial+Epithelial+Fibroblasts+Macrophages",
+          "xenium7": "minus_B cells+CD4+ T cells+CD8+ T cells+Endothelial+Epithelial+Fibroblasts",
+          "sim": "minus_B-cells+CAFs+Cancer Epithelial+Endothelial+Myeloid+Normal Epithelial+PVL+Plasmablasts"
+        }
+      }
+    ],
+    "zero": [
+      {
+        "axis": "ablation",
+        "panel": "zero"
+      }
+    ]
+  },
+  "sentinel_rules": "Sentinels are axis-specific conditions tagged with a `sentinel` field. Stochastic sentinel conditions run at all 3 seeds. SACE runs only on sentinel-tagged conditions, and only for Xenium 7-type and sim (never Xenium 6-type). Aggregation key = (sentinel, axis). Per unit: 1 baseline + moderate (3 stochastic axes x 3 seeds + 1 ablation = 10) + severe (10) + zero (1) = 22 SACE conditions. The severe type_removal panel is resolved per profile (last non-zero entry of type_removal_series).",
+  "primary": {
+    "xenium_n_types": 6,
+    "metric": "pearson_r"
+  },
+  "units": {
+    "xenium": [
+      0,
+      1,
+      2,
+      3,
+      4
+    ],
+    "sim": [
+      "high_seg:0..4",
+      "mixed:0..4"
+    ]
+  },
+  "tolerances": {
+    "xenium_prop_pearson_abs": 0.01,
+    "xenium_sace_flat_r_abs": 0.02,
+    "sim_prop_corr_abs": 0.02
+  }
+}

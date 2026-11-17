@@ -8,7 +8,7 @@ This guide walks through the complete CITEgeist pipeline on real Visium CITE-seq
 |-------|-------------|
 | SpaceRanger output | Directory with `filtered_feature_bc_matrix.h5` and `spatial/` folder |
 | H&E image | `spatial/tissue_fullres_image.tif` (or CytAssist/hires fallback) |
-| GPU node | Required for Module 3 (cuOPT QP solver) and StarDist segmentation |
+| GPU node | Only for `method="qp"` (cuOPT QP solver) and StarDist segmentation; the default proportion method runs on CPU |
 
 No external scRNA-seq reference is needed — CITEgeist builds cell-type profiles directly from the same-slide CITE-seq antibody panel.
 
@@ -25,14 +25,14 @@ SpaceRanger output
           │ cell_profile_dict (JSON)
           ▼
 ┌─────────────────────┐
-│ Module 3:           │  GPU-accelerated QP deconvolution →
+│ Module 3:           │  marker share + RNA refinement (CPU; QP optional) →
 │ Proportions         │  spot-level cell-type proportions
 └─────────┬───────────┘
           │ proportions CSV
           ▼
 ┌─────────────────────┐
 │ Module 3-post:      │  StarDist nuclei segmentation →
-│ Cell Assignment     │  morphology-Bayesian assignment → SACE per-cell GEX
+│ Cell Assignment     │  Hungarian assignment → SACE per-cell GEX
 └─────────┬───────────┘
           │
           ▼
@@ -175,10 +175,10 @@ cell_profile_dict = {
 
 ## Step 2: Spot-Level Proportions (Module 3)
 
-This step estimates cell-type proportions per spot using GPU-accelerated quadratic programming.
+This step estimates cell-type proportions per spot. This example uses the optional cuOPT quadratic programming solver (`method="qp"`, the 2.0.0 behaviour). The 3.0.0 default, `method="auto"` (resolves to `rna_refined`), runs on CPU but needs a `raw_counts` GEX layer and per-spot nuclei counts (`nuclei_counts=` or `obs["n_nuclei"]`).
 
 ```python
-"""run_proportions.py — Module 3 QP on a single sample. Requires GPU node."""
+"""run_proportions.py — Module 3 QP on a single sample (method="qp"). Requires GPU node."""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -236,7 +236,7 @@ model.preprocess_antibody()
 # Load cell-type profiles
 model.load_cell_profile_dict(CELL_PROFILE_DICT)
 
-# Run cell-type proportions (cuOPT QP, requires GPU)
+# Run cell-type proportions (cuOPT QP, requires GPU; the default method="auto" runs on CPU)
 model.run_cell_proportion_model(
     method="qp",
     use_detection_gating=True,
@@ -340,6 +340,13 @@ model.preprocess_gex()
 model.preprocess_antibody()
 model.load_cell_profile_dict(CELL_PROFILE_DICT)
 
+# Keep only the spots that have proportions. Stage 1 may have dropped spots that
+# this re-initialised model still holds, and the SACE steps need the same spots.
+common = prop_df.index.intersection(model.gene_expression_adata.obs_names)
+prop_df = prop_df.loc[common]
+model.gene_expression_adata = model.gene_expression_adata[common].copy()
+model.antibody_capture_adata = model.antibody_capture_adata[common].copy()
+
 # Inject pre-computed proportions
 model.results["cell_prop"] = prop_df
 
@@ -369,9 +376,9 @@ assignments_df = model.assign_cells(
 # SACE per-cell GEX allocation. output_mode="single_cell" auto-orchestrates
 # StarDist + assignment + SACE projection behind an H&E resolution gate
 # (requires <=1.0 um/px), so the assign_cells call above is illustrative.
-# It defaults to use_morphology=True, which computes morphology scores and
-# routes assignment through the Bayesian posterior; pass use_morphology=False
-# for count-constrained (proportion-consistent) Hungarian assignment.
+# It defaults to use_morphology=False (count-constrained, proportion-consistent
+# Hungarian assignment); pass use_morphology=True to compute morphology scores
+# and route assignment through the Bayesian posterior.
 spot_type_gex, cell_adata, _ = model.run_sace_allocation(
     output_mode="single_cell",
 )
@@ -438,9 +445,9 @@ python ../examples/scripts/run_single_cell_assignment.py --sample sample_P1_S1 \
 | Parameter | Default | When to Change |
 |-----------|---------|----------------|
 | `min_counts` | 100 | Lower to 25 for surgical/low-depth samples |
-| `method` | `"qp"` | Only option for production (cuOPT) |
+| `method` | `"auto"` | `auto` resolves to `rna_refined` (CPU; needs `raw_counts` and per-spot nuclei). Use `"qp"` for the 2.0.0 cuOPT solver (GPU), or `"marker_share"` for plain marker share |
 | `use_gex_detection` | `True` | Disable if antibody panel is very sparse |
-| `use_morphology` (SACE, `single_cell`) | `True` | Default routes assignment through the morphology-Bayesian posterior. Set `False` for count-constrained Hungarian, which reproduces the QP spot proportions exactly |
+| `use_morphology` (SACE, `single_cell`) | `False` | Default is count-constrained Hungarian, which reproduces the spot proportions. Set `True` to route assignment through the morphology-Bayesian posterior |
 | `max_iter` (SACE) | `1` | Do not increase — EM overfits beyond iteration 1 |
 
 ---

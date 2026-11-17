@@ -1,0 +1,47 @@
+#!/bin/bash
+# GPU_RACE_READONLY_OK=1
+#SBATCH --job-name=sace_iter_xen
+#SBATCH --array=0-19
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --gres=gpu:1
+#SBATCH --output=%x_%A_%a.out
+
+_cg_find() {
+    if [ -n "${CITEGEIST_PATHS_SH:-}" ]; then echo "${CITEGEIST_PATHS_SH}"; return 0; fi
+    local p d
+    p="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)/../../../_paths.sh"
+    if [ -f "$p" ]; then echo "$p"; return 0; fi
+    d="${SLURM_SUBMIT_DIR:-}"
+    while [ -n "$d" ] && [ "$d" != "/" ] && [ "$d" != "." ]; do
+        if [ -f "$d/Benchmarking/_paths.sh" ]; then echo "$d/Benchmarking/_paths.sh"; return 0; fi
+        d="$(dirname "$d")"
+    done
+    echo "cannot find Benchmarking/_paths.sh; set CITEGEIST_PATHS_SH" >&2
+    return 1
+}
+_cg_paths="$(_cg_find)" || exit 1
+source "${_cg_paths}"
+unset -f _cg_find
+unset _cg_paths
+REPO_ROOT="${CITEGEIST_REPO_ROOT}"
+CONDA_ENV="${CITEGEIST_ENVS_ROOT:?CITEGEIST_ENVS_ROOT is not set and conda was not found; set it to your conda envs directory}/CITEgeist_env"
+
+# 4 iter values × 5 regions
+ITERS=(1 5 10 20)
+ITER_IDX=$(( SLURM_ARRAY_TASK_ID / 5 ))
+REGION=$(( SLURM_ARRAY_TASK_ID % 5 ))
+
+MAX_ITER=${ITERS[$ITER_IDX]}
+
+OUTPUT_DIR="${REPO_ROOT}/Benchmarking/xenium_benchmarking/CITEgeist/results_sace_iter_sweep/i${MAX_ITER}"
+
+source activate "${CONDA_ENV}" 2>/dev/null || conda activate "${CONDA_ENV}"
+cd "${REPO_ROOT}/CITEgeist"
+
+python -u ../Benchmarking/xenium_benchmarking/CITEgeist/src/benchmark_sace_xenium.py \
+    --region "$REGION" \
+    --max_iter "$MAX_ITER" \
+    --init_method marker \
+    --output_dir "$OUTPUT_DIR"

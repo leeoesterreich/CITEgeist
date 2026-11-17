@@ -1,0 +1,71 @@
+{
+  "_status": "FROZEN before any SACE or ORA run (Task A8). Do not edit after results exist.",
+  "frozen_date": "2026-10-14",
+  "specimens": ["HCC22-088-P1-S1","HCC22-088-P1-S2","HCC22-088-P2-S1","HCC22-088-P2-S2","HCC22-088-P3-S1_A","HCC22-088-P3-S2","HCC22-088-P4-S1","HCC22-088-P4-S2_1i_rep","HCC22-088-P5-S1","HCC22-088-P5-S2_F_rep","HCC22-088-P6-S1","HCC22-088-P6-S2_D"],
+  "data_root": "GSE289326/processed_files",
+  "clinical_config": {
+    "source": "examples/scripts/run_cuopt_qp_patient.py (PROFILE_DICT major markers only, 10 types)",
+    "min_counts": {"S1": 100, "S2": 25},
+    "qp": {"method": "qp", "lambda_reg": 1.0, "lambda_laplacian": 0.03, "use_detection_gating": true, "detection_gate_ub": 0.01},
+    "sace": "run_sace_layers on raw_counts layer; spotwise_profiles_init=None; antibody_data = raw antibody counts aligned to GEX spots"
+  },
+  "marker_gene_removal": {
+    "rule": "gene symbols of ALL antibodies in the REAL profile dictionary, '-1' suffix stripped; removed from the candidate list in EVERY variant (including scrambled_dict)",
+    "genes": ["ACTA2","CD14","CD163","CD19","CD3E","CD4","CD68","CD8A","EPCAM","HLA-DRA","ITGAX","KRT5","PECAM1","SDC1"]
+  },
+  "specificity": {
+    "layer_definition": "per-type per-gene mean over spots of SACE allocation E_x[:, t, g] (conserved: sums over types to the mean raw count)",
+    "expressed_gene": "sum over types of layer means >= min_mean (specimen-level mean raw count per spot)",
+    "min_mean": 0.1,
+    "score": "log2((mean_t + pseudocount) / (mean of the other types' layer means + pseudocount))",
+    "pseudocount": 0.001,
+    "top_n": 100,
+    "tie_break": "gene symbol ascending",
+    "ora_background": "all expressed genes of the specimen (same min_mean rule), uppercase symbols"
+  },
+  "min_layer_abundance": {
+    "rule": "a (specimen, type) pair is evaluable only if mean QP proportion of that type over spots >= threshold, using the REAL QP proportions for every variant",
+    "threshold": 0.02
+  },
+  "ora": {
+    "tool": "gseapy.enrich (offline hypergeometric ORA, local GMT, explicit background); NOT Enrichr server combined score",
+    "libraries": {
+      "PanglaoDB_Augmented_2021": {"file": "libraries/PanglaoDB_Augmented_2021.gmt", "sha256": "6dcd4b787f6f69a88f269c15e734055736a14821219bdf1742b0dc29db0ad5ed"},
+      "CellMarker_Augmented_2021": {"file": "libraries/CellMarker_Augmented_2021.gmt", "sha256": "a6c74c71c762f08e108bb57649b99568e4aeeb14a980aad1a508891eb5e5420c"}
+    },
+    "library_download": "gseapy 1.1.5 get_library(organism=Human, min_size=0, max_size=2000), written to GMT sorted by term, description column 'na'",
+    "adj_p_threshold": 0.05
+  },
+  "pass_rule": {
+    "rule": "lineage",
+    "definition": "a (specimen, type, library) PASSES if at least one of the top-k significant terms (adjusted P < adj_p_threshold, ranked by adjusted P ascending, ties by term name) maps (term_mapping.yaml) to the lineage of the type",
+    "top_k": 5,
+    "type_level_pass": "a (specimen, type) PASSES if it passes in at least one of the two libraries (per-library rates also reported)",
+    "pass_rate": "evaluable (specimen,type) pairs that pass / evaluable pairs, pooled over specimens, per variant; also per type and per specimen"
+  },
+  "term_mapping": {"file": "term_mapping.yaml", "sha256": "5ce9d630c19dc3227c4342a42c37cc6499b8af2c6c0da7cf984245aff42e6269"},
+  "variants": {
+    "real_marker": "QP props, init_method=marker, real dictionary",
+    "real_prop": "QP props, init_method=prop",
+    "spot_permuted_marker": "QP props with rows permuted by a Sattolo cyclic permutation (no fixed points, row multiset preserved, spatial alignment broken); init_method=marker, real dictionary, real coords",
+    "uniform_marker": "every spot has proportion 1/T for every type; init_method=marker, real dictionary",
+    "scrambled_marker": "real QP props; dictionary marker lists cyclically assigned to other type names via a Sattolo permutation of type names; init_method=marker",
+    "spot_permuted_prop": "as spot_permuted_marker but init_method=prop",
+    "uniform_prop": "as uniform_marker but init_method=prop"
+  },
+  "seeds": {"base": 20261014, "per_specimen": "base + index of specimen in the list above", "applies_to": ["spot_permuted_marker", "spot_permuted_prop", "scrambled_marker"]},
+  "null_check": {
+    "arms": {
+      "marker_arm": {"real": "real_marker", "nulls": ["spot_permuted_marker", "uniform_marker", "scrambled_marker"]},
+      "prop_arm": {"real": "real_prop", "nulls": ["spot_permuted_prop", "uniform_prop"]}
+    },
+    "margin": 0.30,
+    "min_real_pass_rate": 0.50,
+    "arm_supported_iff": "real pass rate >= min_real_pass_rate AND for EVERY null in the arm: null pass rate <= real pass rate - margin",
+    "verdicts": {
+      "SUPPORTED": "both arms supported: claim 'check distinguishes a correct deconvolution from a badly wrong one' may be made",
+      "PROP_ARM_ONLY": "prop arm supported, marker arm not: only 'proportion-weighted profiles carry lineage-specific signal beyond spatially shuffled/uniform proportions' may be said; no general correct-vs-wrong claim",
+      "NOT_SUPPORTED": "otherwise: the correct-vs-wrong claim is DROPPED and only what holds is reported"
+    }
+  }
+}

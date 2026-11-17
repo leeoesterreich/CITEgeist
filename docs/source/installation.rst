@@ -20,10 +20,12 @@ CITEgeist requires **Python 3.10 or higher** and the following dependencies:
 * `esda <https://pysal.org/esda/>`_
 * `libpysal <https://pysal.org/libpysal/>`_
 
-GPU Requirement (cuOPT)
------------------------
+GPU (cuOPT, optional)
+---------------------
 
-CITEgeist's cell-type proportion solver (Module 3) uses **quadratic programming (QP)** via the
+The default proportion method (``method="auto"``, which resolves to ``"rna_refined"``) runs
+on CPU and needs no GPU. The optional **quadratic programming (QP)** solver
+(``method="qp"``, the 2.0.0 behaviour) uses the
 `cuOPT <https://developer.nvidia.com/cuopt-logistics-optimization>`_ library, which requires:
 
 * An **NVIDIA GPU** with CUDA support (8 GB+ VRAM recommended)
@@ -33,9 +35,9 @@ Install cuOPT via the NVIDIA package index or a pre-built RAPIDS/NGC container::
 
    pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com
 
-There is **no CPU fallback** for the proportion solver. CPU-only environments cannot run
-Module 3.  All other modules (GEX deconvolution, program discovery, integration) work
-without a GPU.
+There is **no CPU fallback** for the QP solver itself. CPU-only environments use the
+default ``rna_refined`` method (or ``method="marker_share"``).  All other modules (GEX
+deconvolution, program discovery, integration) work without a GPU.
 
 Installation
 ------------

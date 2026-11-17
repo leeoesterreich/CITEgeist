@@ -1,0 +1,1135 @@
+term	lineage	types
+1-Cell Stage Cell (Blastomere) Embryo Human		
+4-Cell Stage Cell (Blastomere) Embryo Human		
+8-Cell Stage Cell (Blastomere) Embryo Human		
+AXL+ SIGLEC6+ Dendritic Cell Undefined Human	myeloid	Macrophages
+AXL+SIGLEC6+ Dendritic Cell Blood Human	myeloid	Macrophages
+Acinar Cell Pancreas Human		
+Acinar Cell Pancreatic Islet Human		
+Activated CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Activated CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Activated CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Activated Langerhans Cell Skin Human	myeloid	Macrophages
+Activated Memory B Cell Blood Human	B	B_Cells
+Activated T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Activated T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Activated Tissue Resident Memory CD8+ T Cell Airway Human	T	CD4_T_Cells,CD8_T_Cells
+Adenocarcinoma Stem-Like Cell Lung Human		
+Adipocyte Progenitor Cell Adipose Tissue Human		
+Adipose-derived Stem Cell Abdominal Adipose Tissue Human		
+Adipose-derived Stem Cell Adipose Tissue Human		
+Adipose-derived Stem Cell Subcutaneous Adipose Tissue Human		
+Adipose-derived Stromal Cell Adipose Tissue Human	fibroblast	Fibroblasts
+Alpha Cell Pancreas Human		
+Alpha Cell Pancreatic Islet Human		
+Alveolar Cell Type 2 Lung Human		
+Alveolar Macrophage Lung Human	myeloid	Macrophages
+Alveolar Type II (ATII) Cell Lung Human		
+Antibody-secreting Cell Peripheral Blood Human		
+Antibody-secreting Cell Undefined Human		
+Antigen-presenting Cell Kidney Human		
+Astrocyte Brain Human		
+Astrocyte Cerebrospinal Fluid Human		
+Astrocyte Cortex Human		
+Astrocyte Embryonic Prefrontal Cortex Human		
+Astrocyte Entorhinal Cortex Human		
+Astrocyte Heart Human		
+Astrocyte Middle Temporal Gyrus Human		
+Astrocyte Superior Frontal Gyrus Human		
+B Cell Blood Human	B	B_Cells
+B Cell Bone Marrow Human	B	B_Cells
+B Cell Brain Human	B	B_Cells
+B Cell Breast Human	B	B_Cells
+B Cell Colon Human	B	B_Cells
+B Cell Colorectum Human	B	B_Cells
+B Cell Esophagus Human	B	B_Cells
+B Cell Intestine Human	B	B_Cells
+B Cell Kidney Human	B	B_Cells
+B Cell Liver Human	B	B_Cells
+B Cell Lung Human	B	B_Cells
+B Cell Lymph Human	B	B_Cells
+B Cell Lymph Node Human	B	B_Cells
+B Cell Lymphoid Tissue Human	B	B_Cells
+B Cell Pancreas Human	B	B_Cells
+B Cell Peripheral Blood Human	B	B_Cells
+B Cell Skin Human	B	B_Cells
+B Cell Soft Tissue Human	B	B_Cells
+B Cell Spleen Human	B	B_Cells
+B Cell Stomach Human	B	B_Cells
+B Cell Tonsil Human	B	B_Cells
+B Cell Undefined Human	B	B_Cells
+Basal Cell Airway Epithelium Human	epithelial_cancer	Cancer_Cells
+Basal Cell Bladder Human	epithelial_cancer	Cancer_Cells
+Basal Cell Breast Human	epithelial_cancer	Cancer_Cells
+Basal Cell Lung Human	epithelial_cancer	Cancer_Cells
+Basal Cell Prostate Human	epithelial_cancer	Cancer_Cells
+Basal Cell Skin Human	epithelial_cancer	Cancer_Cells
+Basal Progenitor Cell Breast Human	epithelial_cancer	Cancer_Cells
+Basophil Blood Human		
+Basophil Peripheral Blood Human		
+Basophil Undefined Human		
+Beta Cell Blood Human		
+Beta Cell Liver Human		
+Beta Cell Pancreas Human		
+Beta Cell Pancreatic Islet Human		
+Beta Cell Undefined Human		
+Bipolar Cell Retina Human		
+Blood Cell Bile Duct Human		
+Bone Marrow Stem Cell Bone Marrow Human		
+Brush Cell (Tuft Cell) Airway Epithelium Human		
+Brush Cell (Tuft Cell) Lung Human		
+CAR-T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CCR7+ Dendritic Cell Undefined Human	myeloid	Macrophages
+CD14+ Monocyte Peripheral Blood Human	myeloid	Macrophages
+CD141+CLEC9A+ Dendritic Cell Blood Human	myeloid	Macrophages
+CD16+ Dendritic Cell Peripheral Blood Human	myeloid	Macrophages
+CD16+ Monocyte Blood Human	myeloid	Macrophages
+CD16+ Monocyte Peripheral Blood Human	myeloid	Macrophages
+CD1C+ A Dendritic Cell Blood Human	myeloid	Macrophages
+CD1C+ B Dendritic Cell Blood Human	myeloid	Macrophages
+CD1C-CD141- Dendritic Cell Blood Human	myeloid	Macrophages
+CD4 T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ Central Memory Like T (Tcm-like) Cell Peripheral Blood Human		
+CD4+ Cytotoxic T1 Cell Peripheral Blood Human		
+CD4+ Cytotoxic T2 Cell Peripheral Blood Human		
+CD4+ Recently Activated Effector Memory Or Effector T Cell (CTL) Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Lymphoid Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+CD4+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+CD4-CD28+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD4-CD28- T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD40LG+ T Helper Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+CD56dim Natural Killer Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD8 T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+CD8 T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ Mucosal-Associated Invariant T cell(CD8+ MAIT) Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ Recently Activated Effector Memory Or Effector T Cell (CTL) Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Bone Marrow Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Epithelium Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Lymph Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Lymphoid Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Nasal Polyp Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+CD8+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+CLEC10A+ Dendritic Cell Spleen Human	myeloid	Macrophages
+Cancer Cell Blood Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Bone Marrow Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Brain Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Breast Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Esophagus Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Lung Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Lymph Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Lymph Node Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Nerve Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Ovary Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Pancreas Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Peripheral Blood Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Prostate Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Skin Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Stomach Human	epithelial_cancer	Cancer_Cells
+Cancer Cell Undefined Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Bladder Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Blood Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Bone Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Brain Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Breast Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Colon Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Colorectum Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Intestine Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Liver Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Lung Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Lymph Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Ovary Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Pancreas Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Prostate Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Soft Tissue Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Stomach Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Thyroid Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Undefined Human	epithelial_cancer	Cancer_Cells
+Cancer Stem Cell Uterus Human	epithelial_cancer	Cancer_Cells
+Cancer-associated Fibroblast Breast Human	fibroblast	Fibroblasts
+Cancer-associated Fibroblast Colorectum Human	fibroblast	Fibroblasts
+Cancer-associated Fibroblast Liver Human	fibroblast	Fibroblasts
+Cancer-associated Fibroblast Skin Human	fibroblast	Fibroblasts
+Cardiac Progenitor Cell Heart Human		
+Cardiomyocyte Embryo Human		
+Cardiomyocyte Embryonic Heart Human		
+Cardiomyocyte Heart Human		
+Cardiomyocyte Heart Muscle Human		
+Cardiosphere-derived Cell Heart Human		
+Cardiovascular Progenitor Cell Heart Human		
+Cartilage Progenitor Cell Cartilage Human		
+Central Memory CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory CD4+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory CD4+ T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory CD8+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory CD8+ T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Central Memory T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Chief Cell Stomach Human		
+Cholangiocyte Bile Duct Human		
+Cholangiocyte Liver Human		
+Chromaffin Cell Adrenal Gland Human		
+Ciliated Cell Airway Epithelium Human		
+Ciliated Cell Lung Human		
+Ciliated Epithelial Cell Esophagus Human	epithelial_cancer	Cancer_Cells
+Circulating Fetal Cell Blood Human		
+Classical Monocyte Peripheral Blood Human	myeloid	Macrophages
+Claudin-low Cell Bladder Human		
+Club Cell (Clara Cell) Airway Epithelium Human		
+Club Cell (Clara Cell) Lung Human		
+Collecting Duct And Ureteric Bud Cell Fetal Kidney Human		
+Common Myeloid Progenitor Cell Undefined Human	myeloid	Macrophages
+Cone Cell Retina Human		
+Cone Photoreceptor Cell Retina Human		
+Conventional Dendritic Cell 1(cDC1) Skin Human	myeloid	Macrophages
+Conventional Dendritic Cell 1(cDC1) Undefined Human	myeloid	Macrophages
+Conventional Dendritic Cell 2(cDC2) Liver Human	myeloid	Macrophages
+Conventional Dendritic Cell 2(cDC2) Skin Human	myeloid	Macrophages
+Conventional Dendritic Cell 2(cDC2) Spleen Human	myeloid	Macrophages
+Conventional Dendritic Cell 2a(cDC2a) Brain Human	myeloid	Macrophages
+Conventional Dendritic Cell 2b(cDC2b) Brain Human	myeloid	Macrophages
+Conventional Dendritic Cell Undefined Human	myeloid	Macrophages
+Conventional T(Tconv) Cell Peripheral Blood Human		
+Corticotroph Tumor Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Cranial Neural Crest Cell Skin Human		
+Cytotoxic CD4+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic CD8+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic Cell Pancreas Human		
+Cytotoxic Cell Stomach Human		
+Cytotoxic Double-Positive T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic Lymphocyte Brain Human		
+Cytotoxic Lymphocyte Soft Tissue Human		
+Cytotoxic T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic T Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic T Cell Colorectum Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Cytotoxic T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+DCLK1+ Progenitor Cell Large Intestine Human		
+Deep Layer Neuron Cortex Human		
+Definitive Endoderm Cell Endoderm Human		
+Definitive Endoderm Cell Undefined Human		
+Delta Cell Liver Human		
+Delta Cell Pancreas Human		
+Dendritic Cell 2A Undefined Human	myeloid	Macrophages
+Dendritic Cell Blood Human	myeloid	Macrophages
+Dendritic Cell Bone Marrow Human	myeloid	Macrophages
+Dendritic Cell Brain Human	myeloid	Macrophages
+Dendritic Cell Breast Human	myeloid	Macrophages
+Dendritic Cell Colorectum Human	myeloid	Macrophages
+Dendritic Cell Decidua Human	myeloid	Macrophages
+Dendritic Cell Epithelium Human	myeloid	Macrophages
+Dendritic Cell Intestine Human	myeloid	Macrophages
+Dendritic Cell Kidney Human	myeloid	Macrophages
+Dendritic Cell Lineage Bone Marrow Human	myeloid	Macrophages
+Dendritic Cell Lineage Peripheral Blood Human	myeloid	Macrophages
+Dendritic Cell Liver Human	myeloid	Macrophages
+Dendritic Cell Lung Human	myeloid	Macrophages
+Dendritic Cell Peripheral Blood Human	myeloid	Macrophages
+Dendritic Cell Progenitor Bone Marrow Human	myeloid	Macrophages
+Dendritic Cell Skin Human	myeloid	Macrophages
+Dendritic Cell Spleen Human	myeloid	Macrophages
+Dendritic Cell Stomach Human	myeloid	Macrophages
+Dendritic Cell Tonsil Human	myeloid	Macrophages
+Dendritic Cell Undefined Human	myeloid	Macrophages
+Dental Pulp Stem Cell Dental Pulp Human		
+Dental Pulp Stem Cell Premolar Human		
+Dermal Cell Skin Human		
+Developing Nephron Fetal Kidney Human		
+Distal Tubular Cell Kidney Human		
+Dividing T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Dopamine Neuron Skin Human		
+Ductal Cell Pancreas Human	epithelial_cancer	Cancer_Cells
+Dysfunctional T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+Effector CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector CD8 T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector CD8+ Memory T (Tem) Cell Peripheral Blood Human		
+Effector CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Chondrocyte Articular Cartilage Human		
+Effector Memory CD4+ T Cell Airway Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory CD4+ T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory CD8+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Intestine Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Effector Memory T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Effector T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Effector T(Teff) Cell Blood Human		
+Embryonic Stem Cell Embryo Human		
+Embryonic Stem Cell Embryoid Body Human		
+Embryonic Stem Cell Germ Human		
+Embryonic Stem Cell Undefined Human		
+Endocardial Cell Heart Human		
+Endocrine Cell Pancreas Human		
+Endocrine Cell Undefined Human		
+Endometrial Stem Cell Endometrium Human		
+Endothelial Cell Adipose Tissue Human	endothelial	Endothelial
+Endothelial Cell Artery Human	endothelial	Endothelial
+Endothelial Cell Bladder Human	endothelial	Endothelial
+Endothelial Cell Blood Human	endothelial	Endothelial
+Endothelial Cell Blood Vessel Human	endothelial	Endothelial
+Endothelial Cell Bone Marrow Human	endothelial	Endothelial
+Endothelial Cell Brain Human	endothelial	Endothelial
+Endothelial Cell Breast Human	endothelial	Endothelial
+Endothelial Cell Bronchial Vessel Human	endothelial	Endothelial
+Endothelial Cell Capillary Human	endothelial	Endothelial
+Endothelial Cell Colon Human	endothelial	Endothelial
+Endothelial Cell Cornea Human	endothelial	Endothelial
+Endothelial Cell Corneal Endothelium Human	endothelial	Endothelial
+Endothelial Cell Embryo Human	endothelial	Endothelial
+Endothelial Cell Epithelium Human	endothelial	Endothelial
+Endothelial Cell Esophagus Human	endothelial	Endothelial
+Endothelial Cell Eye Human	endothelial	Endothelial
+Endothelial Cell Fetal Gonad Human	endothelial	Endothelial
+Endothelial Cell Fetal Kidney Human	endothelial	Endothelial
+Endothelial Cell Heart Human	endothelial	Endothelial
+Endothelial Cell Intestine Human	endothelial	Endothelial
+Endothelial Cell Kidney Human	endothelial	Endothelial
+Endothelial Cell Liver Human	endothelial	Endothelial
+Endothelial Cell Lung Human	endothelial	Endothelial
+Endothelial Cell Lymphatic Vessel Human	endothelial	Endothelial
+Endothelial Cell Muscle Human	endothelial	Endothelial
+Endothelial Cell Ovary Human	endothelial	Endothelial
+Endothelial Cell Pancreas Human	endothelial	Endothelial
+Endothelial Cell Peripheral Blood Human	endothelial	Endothelial
+Endothelial Cell Skin Human	endothelial	Endothelial
+Endothelial Cell Soft Tissue Human	endothelial	Endothelial
+Endothelial Cell Spleen Human	endothelial	Endothelial
+Endothelial Cell Stomach Human	endothelial	Endothelial
+Endothelial Cell Testis Human	endothelial	Endothelial
+Endothelial Cell Thyroid Human	endothelial	Endothelial
+Endothelial Cell Undefined Human	endothelial	Endothelial
+Endothelial Cell Vein Human	endothelial	Endothelial
+Endothelial Progenitor Cell Blood Vessel Human	endothelial	Endothelial
+Endothelial Progenitor Cell Bone Marrow Human	endothelial	Endothelial
+Endothelial Stem Cell Blood Vessel Human	endothelial	Endothelial
+Enterocyte Colorectum Human		
+Enterocyte Large Intestine Human		
+Enterocyte Progenitor Cell Small Intestine Human		
+Enteroendocrine Cell Ileum Human		
+Enteroendocrine Cell Small Intestine Human		
+Enteroendocrine Cell Stomach Human		
+Eosinophil Blood Human		
+Eosinophil Peripheral Blood Human		
+Eosinophil Stomach Human		
+Eosinophil Undefined Human		
+Epiblast Cell Embryo Human		
+Epicardial Cell Heart Human		
+Epidermal Cell Skin Human		
+Epidermal Stem Cell Skin Human		
+Epithelial Cell Adipose Tissue Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Airway Epithelium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Biliary Tract Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Bladder Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Blood Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Breast Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Bronchial Vessel Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Bronchiole Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Colon Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Colorectum Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Endometrium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Epidermis Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Epithelium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Esophagus Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Intestine Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Liver Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Lung Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Microvascular Endothelium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Nasal Epithelium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Ovarian Cortex Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Ovary Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Pancreas Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Pancreatic Islet Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Prostate Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Retinal Pigment Epithelium Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Skin Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Stomach Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Thymus Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Thyroid Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Transformed Artery Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Undefined Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Uterus Human	epithelial_cancer	Cancer_Cells
+Epithelial Cell Vein Human	epithelial_cancer	Cancer_Cells
+Epithelial-mesenchymal Cell Bladder Human	fibroblast	Fibroblasts
+Erythroid Lineage Cell Spleen Human		
+Exausted T(Tex) Cell Skin Human		
+Exausted T(Tex) Cell Undefined Human		
+Excitatory Neuron Brain Human		
+Excitatory Neuron Hippocampus Human		
+Exhausted CD4+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted CD8+ T Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted CD8+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted CD8+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Exhausted T(Tex) Cell Colorectum Human		
+Exhausted T(Tex) Cell Intestine Human		
+Exhausted T(Tex) Cell Liver Human		
+Exhausted T(Tex) Cell Oral Cavity Human		
+Exhausted T(Tex) Cell Peripheral Blood Human		
+Exhausted T(Tex) Cell Skin Human		
+Exhausted T(Tex) Cell Undefined Human		
+Extravillous Trophoblast Placenta Human		
+FGFR1HighNME5- Epithelial Cell Esophagus Human	epithelial_cancer	Cancer_Cells
+FGFR1LowNME5- Epithelial Cell Esophagus Human	epithelial_cancer	Cancer_Cells
+FOXN4+ Cell Lung Human		
+Fat Cell (Adipocyte) Adipose Tissue Human		
+Fibroblast Bile Duct Human	fibroblast	Fibroblasts
+Fibroblast Bladder Human	fibroblast	Fibroblasts
+Fibroblast Blood Human	fibroblast	Fibroblasts
+Fibroblast Brain Human	fibroblast	Fibroblasts
+Fibroblast Breast Human	fibroblast	Fibroblasts
+Fibroblast Colon Human	fibroblast	Fibroblasts
+Fibroblast Epithelium Human	fibroblast	Fibroblasts
+Fibroblast Esophagus Human	fibroblast	Fibroblasts
+Fibroblast Heart Human	fibroblast	Fibroblasts
+Fibroblast Kidney Human	fibroblast	Fibroblasts
+Fibroblast Lung Human	fibroblast	Fibroblasts
+Fibroblast Muscle Human	fibroblast	Fibroblasts
+Fibroblast Ovarian Cortex Human	fibroblast	Fibroblasts
+Fibroblast Ovary Human	fibroblast	Fibroblasts
+Fibroblast Pancreas Human	fibroblast	Fibroblasts
+Fibroblast Prostate Human	fibroblast	Fibroblasts
+Fibroblast Skin Human	fibroblast	Fibroblasts
+Fibroblast Spleen Human	fibroblast	Fibroblasts
+Fibroblast Stomach Human	fibroblast	Fibroblasts
+Fibroblast Synovium Human	fibroblast	Fibroblasts
+Fibroblast Thymus Human	fibroblast	Fibroblasts
+Fibroblast Undefined Human	fibroblast	Fibroblasts
+Fibroblast Vocal Fold Human	fibroblast	Fibroblasts
+Fibrocartilage Chondrocyte Articular Cartilage Human		
+Finally Highly Effector (TEMRA) Memory T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Follicular B Cell Lung Human	B	B_Cells
+Follicular B Cell Spleen Human	B	B_Cells
+Follicular B Cell Undefined Human	B	B_Cells
+Follicular Helper (Tfh) T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Foxp3+ Regulatory T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+GZMB+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+GZMK+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Gamma Delta T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Ganglion Cell Retina Human		
+Germ Cell Embryo Human		
+Germ Cell Ovary Human		
+Germ Cell Testis Human		
+Germ Cell Undefined Human		
+Germinal Center B Cell Lung Human	B	B_Cells
+Germinal Center B Cell Nasopharynx Human	B	B_Cells
+Germinal Center B Cell Undefined Human	B	B_Cells
+Glial Cell Brain Human		
+Glial Cell Colon Human		
+Glial Cell Epithelium Human		
+Glial Cell Undefined Human		
+Globose Basal Cell Olfactory Neuroepithelium Human	epithelial_cancer	Cancer_Cells
+Goblet Cell Airway Epithelium Human		
+Goblet Cell Colon Human		
+Goblet Cell Epithelium Human		
+Goblet Cell Large Intestine Human		
+Goblet Cell Small Intestine Human		
+Goblet Progenitor Cell Large Intestine Human		
+Gonadal Endothelial Cell Fetal Gonad Human	endothelial	Endothelial
+Gonadal Mitotic Phase Fetal Germ Cell Fetal Gonad Human		
+Granulocyte Peripheral Blood Human		
+Granulocyte Undefined Human		
+Granulocyte-monocyte Progenitor Umbilical Cord Blood Human	myeloid	Macrophages
+Granulosa Cell Fetal Gonad Human		
+Hemangioblast Germ Human	endothelial	Endothelial
+Hematopoietic Cell Bone Marrow Human		
+Hematopoietic Cell Fetal Liver Human		
+Hematopoietic Cell Transformed Artery Human		
+Hematopoietic Precursor Cell Fetal Liver Human		
+Hematopoietic Progenitor Cell Bone Marrow Human		
+Hematopoietic Stem Cell Blood Human		
+Hematopoietic Stem Cell Bone Marrow Human		
+Hematopoietic Stem Cell Embryo Human		
+Hematopoietic Stem Cell Germ Human		
+Hematopoietic Stem Cell Spleen Human		
+Hematopoietic Stem Cell Undefined Human		
+Hepatic Cell Liver Human		
+Hepatic Progenitor Cell Liver Human		
+Hepatic Stellate Cell Liver Human	fibroblast	Fibroblasts
+Hepatocyte Fetal Liver Human		
+Hepatocyte Liver Human		
+Homeostatic Chondrocyte Articular Cartilage Human		
+Homeostatic Microglial Cell Brain Human	myeloid	Macrophages
+Hypertrophic Chondrocyte Articular Cartilage Human		
+IL7R T Helper Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Idiopathic Pulmonary Fibrosis Cell Lung Human		
+Idiopathic Pulmonary Fibrosis Myofibroblast Undefined Human	fibroblast	Fibroblasts
+Immature B Cell Peripheral Blood Human	B	B_Cells
+Immature Dendritic Cell Stomach Human	myeloid	Macrophages
+Immature Myeloid Cell Peripheral Blood Human	myeloid	Macrophages
+Immune Cell Breast Human		
+Immune Cell Bronchus Human		
+Immune Cell Fetal Kidney Human		
+Immune Cell Kidney Human		
+Immune Cell Lung Human		
+Immune Cell Ovary Human		
+Immune Cell Undefined Human		
+Induced Pluripotent Stem Cell Undefined Human		
+Inhibitory Neuron Brain Human		
+Inhibitory Neuron Entorhinal Cortex Human		
+Inhibitory Neuron Hippocampus Human		
+Inhibitory Neuron Superior Frontal Gyrus Human		
+Innate Lymphoid Cell Intestine Human		
+Innate Lymphoid Cell Spleen Human		
+Innate Lymphoid Cell Tonsil Human		
+Innate Lymphoid Cell Undefined Human		
+Intermediate Monocyte Cell Peripheral Blood Human	myeloid	Macrophages
+Intermediate Monocyte Peripheral Blood Human	myeloid	Macrophages
+Interneuron Brain Human		
+Interneuron Cortex Human		
+Interneuron Embryonic Prefrontal Cortex Human		
+Interstitial Cell Fetal Kidney Human		
+Interstitial Progenitor Cell Fetal Kidney Human		
+Intestinal Cell Epithelium Human		
+Intestinal Stem Cell Colon Epithelium Human		
+Intestinal Stem Cell Small Intestine Human		
+Ionocyte Cell Lung Human		
+KLRF+ Natural Killer Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Keratinocyte Skin Human	epithelial_cancer	Cancer_Cells
+Kupffer Cell Liver Human	myeloid	Macrophages
+LGR5+ Stem Cell Large Intestine Human		
+Lake Et al.Science.Ex1 Brain Human		
+Lake Et al.Science.Ex2 Brain Human		
+Lake Et al.Science.Ex4 Brain Human		
+Lake Et al.Science.Ex5 Brain Human		
+Lake Et al.Science.Ex6 Brain Human		
+Lake Et al.Science.Ex8 Brain Human		
+Lake Et al.Science.In3 Brain Human		
+Lake Et al.Science.In4 Brain Human		
+Lake Et al.Science.In5 Brain Human		
+Lake Et al.Science.In7 Brain Human		
+Leukemic Stem Cell Blood Human		
+Leukocyte Blood Human		
+Leukocyte Undefined Human		
+Leydig Cell Fetal Gonad Human		
+Leydig Cell Testis Human		
+Leydig Precursor Cell Fetal Gonad Human		
+Limbal Stem Cell Cornea Human		
+Liver Bud Hepatic Cell Liver Human		
+Luminal Cell Bladder Human	epithelial_cancer	Cancer_Cells
+Luminal Epithelial Cell Breast Human	epithelial_cancer	Cancer_Cells
+Luminal Progenitor Cell Breast Human	epithelial_cancer	Cancer_Cells
+Lung Epithelial Cell Lung Human	epithelial_cancer	Cancer_Cells
+Lymph Node Cell Lymph Node Human		
+Lymphangioleiomyomatosis cell(LAMcore) Lung Human		
+Lymphocyte Bile Duct Human		
+Lymphocyte Blood Human		
+Lymphocyte Bone Marrow Human		
+Lymphocyte Brain Human		
+Lymphocyte Lung Human		
+Lymphocyte Lymph Node Human		
+Lymphocyte Undefined Human		
+Lymphoid Cell Undefined Human		
+Lymphoid-primed Multipotent Progenitor cell(LMPP) Bone Marrow Human		
+Lymphoid-primed Multipotent Progenitor cell(LMPP) Umbilical Cord Blood Human		
+M1 Macrophage Brain Human	myeloid	Macrophages
+M1 Macrophage Lung Human	myeloid	Macrophages
+M1 Macrophage Peripheral Blood Human	myeloid	Macrophages
+M1 Macrophage Skin Human	myeloid	Macrophages
+M1 Macrophage Stomach Human	myeloid	Macrophages
+M1 Macrophage Undefined Human	myeloid	Macrophages
+M1 Microglial Cell Frontal Cortex Human	myeloid	Macrophages
+M2 Macrophage Bladder Human	myeloid	Macrophages
+M2 Macrophage Bone Marrow Human	myeloid	Macrophages
+M2 Macrophage Brain Human	myeloid	Macrophages
+M2 Macrophage Breast Human	myeloid	Macrophages
+M2 Macrophage Kidney Human	myeloid	Macrophages
+M2 Macrophage Lung Human	myeloid	Macrophages
+M2 Macrophage Peripheral Blood Human	myeloid	Macrophages
+M2 Macrophage Skin Human	myeloid	Macrophages
+M2 Macrophage Stomach Human	myeloid	Macrophages
+M2 Macrophage Undefined Human	myeloid	Macrophages
+MKI67+ Progenitor Cell Large Intestine Human		
+MKI67+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Macrophage Adipose Tissue Human	myeloid	Macrophages
+Macrophage Adrenal Gland Human	myeloid	Macrophages
+Macrophage Blood Human	myeloid	Macrophages
+Macrophage Bone Marrow Human	myeloid	Macrophages
+Macrophage Brain Human	myeloid	Macrophages
+Macrophage Breast Human	myeloid	Macrophages
+Macrophage Colon Epithelium Human	myeloid	Macrophages
+Macrophage Colorectum Human	myeloid	Macrophages
+Macrophage Decidua Human	myeloid	Macrophages
+Macrophage Epithelium Human	myeloid	Macrophages
+Macrophage Intestine Human	myeloid	Macrophages
+Macrophage Kidney Human	myeloid	Macrophages
+Macrophage Liver Human	myeloid	Macrophages
+Macrophage Lung Human	myeloid	Macrophages
+Macrophage Nasal Polyp Human	myeloid	Macrophages
+Macrophage Nasopharynx Human	myeloid	Macrophages
+Macrophage Ovary Human	myeloid	Macrophages
+Macrophage Pancreas Human	myeloid	Macrophages
+Macrophage Peripheral Blood Human	myeloid	Macrophages
+Macrophage Placenta Human	myeloid	Macrophages
+Macrophage Prostate Human	myeloid	Macrophages
+Macrophage Rectum Human	myeloid	Macrophages
+Macrophage Skin Human	myeloid	Macrophages
+Macrophage Spleen Human	myeloid	Macrophages
+Macrophage Stomach Human	myeloid	Macrophages
+Macrophage Synovium Human	myeloid	Macrophages
+Macrophage Testis Human	myeloid	Macrophages
+Macrophage Undefined Human	myeloid	Macrophages
+Marginal Zone B Cell Spleen Human	B	B_Cells
+Marginal Zone B Cell Undefined Human	B	B_Cells
+Mast Cell Decidua Human		
+Mast Cell Kidney Human		
+Mast Cell Lung Human		
+Mast Cell Nasal Polyp Human		
+Mast Cell Polyp Human		
+Mast Cell Stomach Human		
+Mast Cell Undefined Human		
+Mature Dendritic Cell Liver Human	myeloid	Macrophages
+Megakaryocyte Blood Human		
+Megakaryocyte Erythroid Cell Undefined Human		
+Megakaryocyte Fetal Kidney Human		
+Megakaryocyte Peripheral Blood Human		
+Megakaryocyte Spleen Human		
+Megakaryocyte Undefined Human		
+Meiotic Prophase Fetal Germ Cell Fetal Gonad Human		
+Melanocyte Skin Human		
+Melanocyte Undefined Human		
+Memory B Cell Blood Human	B	B_Cells
+Memory B Cell Peripheral Blood Human	B	B_Cells
+Memory B Cell Precursor Undefined Human	B	B_Cells
+Memory B Cell Undefined Human	B	B_Cells
+Memory CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory CD8+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Memory Stem Cell(Tscm) Undefined Human		
+Memory T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Memory T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Merkel Cell Skin Human		
+Mesangial Cell Fetal Kidney Human		
+Mesangial Cell Kidney Human		
+Mesenchymal Cell Adrenal Gland Human	fibroblast	Fibroblasts
+Mesenchymal Cell Brain Human	fibroblast	Fibroblasts
+Mesenchymal Cell Breast Human	fibroblast	Fibroblasts
+Mesenchymal Cell Colon Human	fibroblast	Fibroblasts
+Mesenchymal Cell Kidney Human	fibroblast	Fibroblasts
+Mesenchymal Cell Liver Human	fibroblast	Fibroblasts
+Mesenchymal Cell Lung Human	fibroblast	Fibroblasts
+Mesenchymal Cell Ovary Human	fibroblast	Fibroblasts
+Mesenchymal Cell Pancreas Human	fibroblast	Fibroblasts
+Mesenchymal Cell Pancreatic Islet Human	fibroblast	Fibroblasts
+Mesenchymal Cell Transformed Artery Human	fibroblast	Fibroblasts
+Mesenchymal Glioblastoma Cell Brain Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Adipose Tissue Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Bone Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Bone Marrow Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Cartilage Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Dental Pulp Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Endometrium Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Fat Pad Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Gingiva Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Ligament Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Liver Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Lung Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Meniscus Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Muscle Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Periodontal Ligament Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Placenta Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Skeletal Muscle Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Synovium Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Tendon Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Tooth Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Umbilical Cord Human	fibroblast	Fibroblasts
+Mesenchymal Stem Cell Undefined Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Adipose Tissue Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Bone Marrow Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Brain Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Lymph Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Nasal Concha Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Tonsil Human	fibroblast	Fibroblasts
+Mesenchymal Stromal Cell Undefined Human	fibroblast	Fibroblasts
+Mesoderm Cell Germ Human		
+Mesothelial Cell Epithelium Human		
+Microglial Cell Bone Marrow Human	myeloid	Macrophages
+Microglial Cell Brain Human	myeloid	Macrophages
+Microglial Cell Embryonic Prefrontal Cortex Human	myeloid	Macrophages
+Microglial Cell Entorhinal Cortex Human	myeloid	Macrophages
+Microglial Cell Retina Human	myeloid	Macrophages
+Microglial Cell Superior Frontal Gyrus Human	myeloid	Macrophages
+Microglial Cell Undefined Human	myeloid	Macrophages
+Mid Radical Glial Cell Brain Human		
+Migration Phase Fetal Germ Cell Fetal Gonad Human		
+Migratory Langerhans Cell Skin Human	myeloid	Macrophages
+Mitotic Arrest Phase Fetal Germ Cell Fetal Gonad Human		
+Mitotic Fetal Germ Cell Fetal Gonad Human		
+Monocyte Blood Human	myeloid	Macrophages
+Monocyte Bone Marrow Human	myeloid	Macrophages
+Monocyte Brain Human	myeloid	Macrophages
+Monocyte Breast Human	myeloid	Macrophages
+Monocyte Decidua Human	myeloid	Macrophages
+Monocyte Derived Dendritic Cell Peripheral Blood Human	myeloid	Macrophages
+Monocyte Fetal Kidney Human	myeloid	Macrophages
+Monocyte Heart Human	myeloid	Macrophages
+Monocyte Kidney Human	myeloid	Macrophages
+Monocyte Liver Human	myeloid	Macrophages
+Monocyte Lung Human	myeloid	Macrophages
+Monocyte Nasopharynx Human	myeloid	Macrophages
+Monocyte Pancreas Human	myeloid	Macrophages
+Monocyte Peripheral Blood Human	myeloid	Macrophages
+Monocyte Rectum Human	myeloid	Macrophages
+Monocyte Skin Human	myeloid	Macrophages
+Monocyte Soft Tissue Human	myeloid	Macrophages
+Monocyte Spleen Human	myeloid	Macrophages
+Monocyte Undefined Human	myeloid	Macrophages
+Monocyte-derived Dendritic Cell Undefined Human	myeloid	Macrophages
+Monocyte-derived Macrophage Pancreas Human	myeloid	Macrophages
+Mononuclear Phagocyte Sputum Human		
+Morula Cell (Blastomere) Embryo Human		
+Motor Neuron Brain Human		
+Mucosa-associated Invariant T (MAIT) Cell Peripheral Blood Human		
+Mucosa-associated Invariant T (MAIT) Cell Undefined Human		
+Mucosal-associated Invariant T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Multilymphoid Progenitor Cell Umbilical Cord Blood Human		
+Multipotent Mesenchymal Stroma Cell Bone Marrow Human	fibroblast	Fibroblasts
+Multipotent Progenitor Cell Stomach Human		
+Multipotent Progenitor Cell Undefined Human		
+Multipotent Retinal Progenitor Cell Retina Human		
+Mural Cell Brain Human		
+Myeloblast Germ Human		
+Myeloid Cell Bile Duct Human	myeloid	Macrophages
+Myeloid Cell Blood Human	myeloid	Macrophages
+Myeloid Cell Bone Marrow Human	myeloid	Macrophages
+Myeloid Cell Brain Human	myeloid	Macrophages
+Myeloid Cell Breast Human	myeloid	Macrophages
+Myeloid Cell Colon Human	myeloid	Macrophages
+Myeloid Cell Esophagus Human	myeloid	Macrophages
+Myeloid Cell Intestine Human	myeloid	Macrophages
+Myeloid Cell Lung Human	myeloid	Macrophages
+Myeloid Cell Nasal Polyp Human	myeloid	Macrophages
+Myeloid Cell Nasopharynx Human	myeloid	Macrophages
+Myeloid Cell Pancreas Human	myeloid	Macrophages
+Myeloid Cell Peripheral Blood Human	myeloid	Macrophages
+Myeloid Cell Skin Human	myeloid	Macrophages
+Myeloid Cell Stomach Human	myeloid	Macrophages
+Myeloid Cell Undefined Human	myeloid	Macrophages
+Myeloid Conventional Dendritic Cell Bone Marrow Human	myeloid	Macrophages
+Myeloid Dendritic Cell Blood Human	myeloid	Macrophages
+Myeloid Dendritic Cell Intestine Human	myeloid	Macrophages
+Myeloid Dendritic Cell Lung Human	myeloid	Macrophages
+Myeloid Dendritic Cell Peripheral Blood Human	myeloid	Macrophages
+Myeloid Dendritic Cell Skin Human	myeloid	Macrophages
+Myeloid Dendritic Cell Stomach Human	myeloid	Macrophages
+Myeloid Derived Suppressor Cell (MDSC) Liver Human	myeloid	Macrophages
+Myeloid-derived Suppressor Cell Peripheral Blood Human	myeloid	Macrophages
+Myoblast Muscle Human		
+Myoblast Skeletal Muscle Human		
+Myoblast Undefined Human		
+Myocyte Undefined Human		
+Myoepithelial Cell Breast Human	epithelial_cancer	Cancer_Cells
+Myofibroblast Breast Human	fibroblast	Fibroblasts
+Myofibroblast Dermis Human	fibroblast	Fibroblasts
+Myofibroblast Epithelium Human	fibroblast	Fibroblasts
+Myofibroblast Esophagus Human	fibroblast	Fibroblasts
+Myofibroblast Lung Human	fibroblast	Fibroblasts
+Myofibroblast Skin Human	fibroblast	Fibroblasts
+Myofibroblast Stomach Human	fibroblast	Fibroblasts
+Myofibroblast Undefined Human	fibroblast	Fibroblasts
+Myofibroblastic Cancer Associated Fibroblast (myCAF) Pancreas Human	fibroblast	Fibroblasts
+Naive B Cell Blood Human	B	B_Cells
+Naive B Cell Liver Human	B	B_Cells
+Naive B Cell Peripheral Blood Human	B	B_Cells
+Naive B Cell Spleen Human	B	B_Cells
+Naive B Cell Undefined Human	B	B_Cells
+Naive CD4 T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4 T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4 T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD4+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8 T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Bone Marrow Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive CD8+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Naive Human Pluripotent Stem Cell Undefined Human		
+Naive IL7R+ T Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Naive T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Naive T(Th0) Cell Blood Human		
+Naive T(Th0) Cell Colorectum Human		
+Naive T(Th0) Cell Peripheral Blood Human		
+Natural Killer CD56 Bright Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer CD56 Dim Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Adipose Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Bone Marrow Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Decidua Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Lymph Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Nasal Polyp Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Nasopharynx Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Ovary Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Peritoneal Fluid Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Scalp Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Soft Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Testis Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T (NKT) Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T (NKT) Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T(NKT) Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T(NKT) Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T(NKT) Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Killer T(NKT) Cell Venous Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Natural Regulatory T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Nephron Epithelial Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Nephron Progenitor Cell Embryonic Kidney Human		
+Nephron Progenitor Cell Fetal Kidney Human		
+Nephron Progenitor Cell Kidney Human		
+Neural Crest Cell Undefined Human		
+Neural Progenitor Cell Brain Human		
+Neural Progenitor Cell Embryonic Prefrontal Cortex Human		
+Neural Stem Cell Brain Human		
+Neural Stem Cell Embryo Human		
+Neural Stem Cell Undefined Human		
+Neural Tube Cell Germ Human		
+Neuroendocrine Cell Bladder Human		
+Neuroendocrine Cell Lung Human		
+Neurogenic Retinal Progenitor Cell Retina Human		
+Neuron Brain Human		
+Neuron Cerebral Organoid Human		
+Neuron Cerebrospinal Fluid Human		
+Neuron Cortex Human		
+Neuron Embryonic Prefrontal Cortex Human		
+Neuron Epithelium Human		
+Neuron Kidney Human		
+Neuron Pluripotent Stem Cell Human		
+Neuron Retina Human		
+Neuron Undefined Human		
+Neutrophil Blood Human		
+Neutrophil Bone Marrow Human		
+Neutrophil Brain Human		
+Neutrophil Kidney Human		
+Neutrophil Liver Human		
+Neutrophil Lung Human		
+Neutrophil Nasal Polyp Human		
+Neutrophil Peripheral Blood Human		
+Neutrophil Plasma Human		
+Neutrophil Soft Tissue Human		
+Neutrophil Stomach Human		
+Neutrophil Undefined Human		
+Non PT Tubular Cell Kidney Human		
+Non-classical Monocyte Peripheral Blood Human	myeloid	Macrophages
+Non-neuron Brain Human		
+Normal Cell Kidney Human		
+Nucleus Pulposus Cell Bone Marrow Human		
+Nucleus Pulposus Cell Nucleus Pulposus Human		
+Oligodendrocyte Brain Human		
+Oligodendrocyte Cortex Human		
+Oligodendrocyte Precursor Cell Brain Human		
+Oligodendrocyte Progenitor Cell Brain Human		
+Oligodendrocyte Progenitor Cell Embryonic Prefrontal Cortex Human		
+Oocyte Embryo Human		
+Oogenesis Phase Fetal Germ Cell Fetal Gonad Human		
+Osteoblast Bone Human		
+Osteoclast Bone Human	myeloid	Macrophages
+Osteocyte Bone Human		
+Ovarian Cell Ovary Human		
+Oviduct-derived Stem Cell Oviduct Human		
+P53-like Cell Bladder Human		
+PROCR+ Progenitor Cell Small Intestine Human		
+Paget Cell Skin Human		
+Pan-endothelial Cell Lung Human	endothelial	Endothelial
+Pan-trophectoderm Cell Embryo Human		
+Pancreatic Endoderm Cell Undefined Human		
+Pancreatic Polypeptide Cell Pancreas Human		
+Paneth Cell Large Intestine Human		
+Panneuron Undefined Human		
+Panvascular Cell Lung Human		
+Papillary Fibroblast Skin Human	fibroblast	Fibroblasts
+Parietal Progenitor Cell Stomach Human		
+Pelvic Epithelial Cell Kidney Human	epithelial_cancer	Cancer_Cells
+Pericyte Adipose Tissue Human	fibroblast	Fibroblasts
+Pericyte Brain Human	fibroblast	Fibroblasts
+Pericyte Breast Human	fibroblast	Fibroblasts
+Pericyte Epithelium Human	fibroblast	Fibroblasts
+Pericyte Kidney Human	fibroblast	Fibroblasts
+Pericyte Skin Human	fibroblast	Fibroblasts
+Pericyte Stomach Human	fibroblast	Fibroblasts
+Pericyte Synovium Human	fibroblast	Fibroblasts
+Pericyte Undefined Human	fibroblast	Fibroblasts
+Perivascular Cell Breast Human		
+Pit Cell Stomach Human		
+Pit Progenitor Cell Stomach Human		
+Plasma Cell Blood Human	B	B_Cells
+Plasma Cell Bone Marrow Human	B	B_Cells
+Plasma Cell Breast Human	B	B_Cells
+Plasma Cell Kidney Human	B	B_Cells
+Plasma Cell Lung Human	B	B_Cells
+Plasma Cell Nasopharynx Human	B	B_Cells
+Plasma Cell Peripheral Blood Human	B	B_Cells
+Plasma Cell Skin Human	B	B_Cells
+Plasma Cell Spleen Human	B	B_Cells
+Plasma Cell Stomach Human	B	B_Cells
+Plasma Cell Undefined Human	B	B_Cells
+Plasmablast Blood Human	B	B_Cells
+Plasmablast Peripheral Blood Human	B	B_Cells
+Plasmacytoid Dendritic Cell Blood Human	myeloid	Macrophages
+Plasmacytoid Dendritic Cell Bone Marrow Human	myeloid	Macrophages
+Plasmacytoid Dendritic Cell Undefined Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Blood Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Bone Marrow Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Liver Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Lung Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Nasopharynx Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Peripheral Blood Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Spleen Human	myeloid	Macrophages
+Plasmacytoid Dendritic cell(pDC) Undefined Human	myeloid	Macrophages
+Platelet Blood Human		
+Platelet Peripheral Blood Human		
+Platelet Undefined Human		
+Pluripotent Stem Cell Skeletal Muscle Human		
+Pluripotent Stem Cell Undefined Human		
+Podocyte Kidney Human		
+Polymorphonuclear Myeloid-Derived suppressor(PMN-MDSC) Cell Peripheral Blood Human	myeloid	Macrophages
+Pre-conventional Dendritic Cell Bone Marrow Human	myeloid	Macrophages
+Pre-dendritic cell(pre-DC) Brain Human	myeloid	Macrophages
+Prehypertrophic Chondrocyte Articular Cartilage Human		
+Pretubular Aggregate Cell Fetal Kidney Human		
+Primitive Endoderm Cell Embryo Human		
+Primitive Vesicle Cell Fetal Kidney Human		
+Primordial Germ Cell Undefined Human		
+Progenitor Cell Adrenal Gland Human		
+Progenitor Cell Blood Human		
+Progenitor Cell Bone Marrow Human		
+Progenitor Cell Brain Human		
+Progenitor Cell Colon Human		
+Progenitor Cell Epithelium Human		
+Progenitor Cell Kidney Human		
+Progenitor Cell Liver Human		
+Progenitor Cell Pancreas Human		
+Progenitor Cell Peripheral Blood Human		
+Progenitor Cell Pluripotent Stem Cell Human		
+Progenitor Cell Prostate Human		
+Progenitor Cell Undefined Human		
+Progenitor Cell Ventricular Zone Human		
+Proliferative Chondrocyte Articular Cartilage Human		
+Prospermatogonia Testis Human		
+Proximal Tubular Cell Kidney Human		
+Purkinje Cell Undefined Human		
+Pyramidal Cell Undefined Human		
+Quiescent T Stem Cell Skin Human		
+Radial Glial Cell Brain Human		
+Radial Glial Cell Undefined Human		
+Red Blood Cell (Erythrocyte) Blood Human		
+Red Blood Cell (Erythrocyte) Bone Marrow Human		
+Red Blood Cell (Erythrocyte) Lung Human		
+Red Blood Cell (Erythrocyte) Undefined Human		
+Regulatory CD4+ T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T (Treg) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Bile Duct Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Bladder Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Colorectum Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Esophagus Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Intestine Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Large Intestine Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Lymph Node Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Thymus Human	T	CD4_T_Cells,CD8_T_Cells
+Regulatory T(Treg) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+Renal Vesicle And Comma-Shaped Body Cell Fetal Kidney Human		
+Reticular Fibroblast Skin Human	fibroblast	Fibroblasts
+Retinal Pigment Epithelial Cell Eye Human	epithelial_cancer	Cancer_Cells
+Retinoid Acid Signaling-Responsive Fetal Germ Cell Fetal Gonad Human		
+Rod Cell Retina Human		
+SLC16A7+ Cell Lung Human		
+Schwann Cell Skin Human		
+Secretory Cell Airway Epithelium Human		
+Secretory Cell Lung Human		
+Secretory Progenitor Cell Esophagus Human		
+Secretory Progenitor Cell Large Intestine Human		
+Secretory Progenitor Cell Small Intestine Human		
+Sensory Neuron Pluripotent Stem Cell Human		
+Sertoli Cell Fetal Gonad Human		
+Sertoli Cell Testis Human		
+Sinusoidal Endothelial Cell Liver Human	endothelial	Endothelial
+Smooth Muscle Cell Blood Vessel Human	fibroblast	Fibroblasts
+Smooth Muscle Cell Heart Human	fibroblast	Fibroblasts
+Smooth Muscle Cell Kidney Human	fibroblast	Fibroblasts
+Smooth Muscle Cell Lung Human	fibroblast	Fibroblasts
+Smooth Muscle Cell Ovary Human	fibroblast	Fibroblasts
+Smooth Muscle Cell Skin Human	fibroblast	Fibroblasts
+Somatic Cell Testis Human		
+Specialist Antigen Presenting Cell Undefined Human		
+Spermatogenic Cell Testis Human		
+Spermatogonial Cell Testis Human		
+Spermatogonial Stem Cell Testis Human		
+Spermatogonium Testis Human		
+Squamous-differentiation Cell Bladder Human		
+Stellate Cell Pancreas Human	fibroblast	Fibroblasts
+Stem Cell Adipose Tissue Human		
+Stem Cell Amniotic Fluid Human		
+Stem Cell Bladder Human		
+Stem Cell Blood Human		
+Stem Cell Blood Vessel Human		
+Stem Cell Bone Human		
+Stem Cell Bone Marrow Human		
+Stem Cell Brain Human		
+Stem Cell Breast Human		
+Stem Cell Cartilage Human		
+Stem Cell Colon Human		
+Stem Cell Dental Pulp Human		
+Stem Cell Embryo Human		
+Stem Cell Embryonic Heart Human		
+Stem Cell Endometrium Human		
+Stem Cell Eye Human		
+Stem Cell Intestine Human		
+Stem Cell Kidney Human		
+Stem Cell Liver Human		
+Stem Cell Lung Human		
+Stem Cell Muscle Human		
+Stem Cell Ovary Human		
+Stem Cell Periodontal Ligament Human		
+Stem Cell Prostate Human		
+Stem Cell Skin Human		
+Stem Cell Stomach Human		
+Stem Cell Undefined Human		
+Stromal Cell Blood Vessel Human	fibroblast	Fibroblasts
+Stromal Cell Bone Marrow Human	fibroblast	Fibroblasts
+Stromal Cell Colon Human	fibroblast	Fibroblasts
+Stromal Cell Kidney Human	fibroblast	Fibroblasts
+Stromal Cell Lung Human	fibroblast	Fibroblasts
+Stromal Cell Ovary Human	fibroblast	Fibroblasts
+Stromal Cell Undefined Human	fibroblast	Fibroblasts
+Subpallium Cell Subpallium Human		
+Suppressive Monocyte Peripheral Blood Human	myeloid	Macrophages
+Suppressive Regulatory T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+Sympathoadrenal Cell Adrenal Gland Human		
+Syncytiotrophoblast Placenta Human		
+T Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Bone Marrow Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Brain Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Breast Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Cardiac Atrium Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Colon Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Colorectum Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Decidua Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Epithelium Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Intestine Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Lymph Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Lymph Node Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Lymphoid Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Ovary Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Pancreas Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Rectum Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Soft Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Testis Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Thymus Human	T	CD4_T_Cells,CD8_T_Cells
+T Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Lymph Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Lymphoid Tissue Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Spleen Human	T	CD4_T_Cells,CD8_T_Cells
+T Follicular helper(Tfh) Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 1(Th1) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 1(Th1) Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 17(Th17) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 17(Th17) Cell Intestine Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 2(Th2) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 2(Th2) Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 2(Th2) Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper 2(Th2) Cell Uterine Cervix Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper Cell Kidney Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper Cell Liver Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper1 (Th1) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper17 (Th17) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper2 (Th2) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T Helper9 (Th9) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+T helper(Th) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+T helper(Th) Cell Lymph Human	T	CD4_T_Cells,CD8_T_Cells
+T helper(Th) Cell Skin Human	T	CD4_T_Cells,CD8_T_Cells
+T helper(Th) Cell Stomach Human	T	CD4_T_Cells,CD8_T_Cells
+Thymic Epithelial Cell (TEC) Thymus Human	epithelial_cancer	Cancer_Cells
+Thymus Seeding Progenitor (TSP) Thymus Human		
+Tissue Resident Memory T(TRM) Cell Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Tissue Resident Memory T(TRM) Cell Ectocervix Human	T	CD4_T_Cells,CD8_T_Cells
+Tissue Resident Memory T(TRM) Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Tissue Resident Memory T(TRM) Cell Undefined Human	T	CD4_T_Cells,CD8_T_Cells
+TolDC-induced Regulatory T Cell Peripheral Blood Human	T	CD4_T_Cells,CD8_T_Cells
+Tonsil Cell Tonsil Human		
+Trophectoderm Cell Embryo Human		
+Trophectoderm Cell Placenta Human		
+Trophoblast Cell Placenta Human		
+Tuft Progenitor Cell Small Intestine Human		
+Tumor Associated Macrophage (TAM) Brain Human	myeloid	Macrophages
+Tumor Associated Macrophage (TAM) Breast Human	myeloid	Macrophages
+Tumor Associated Macrophage (TAM) Liver Human	myeloid	Macrophages
+Tumor-infiltrating Regulatory T Cell Lung Human	T	CD4_T_Cells,CD8_T_Cells
+Type 3 Dendritic Cell (DC3) Undefined Human	myeloid	Macrophages
+Ureteric Bud Cell Fetal Kidney Human		
+Urine-derived Stem Cell Urine Human		
+Urothelium Cell Kidney Human		
+Vascular Cell Lung Human		
+Vascular Endothelial Cell Eye Human	endothelial	Endothelial
+hMSC-treated B Cell Bone Marrow Human	B	B_Cells
+lmmLeydig Cell Testis Human		

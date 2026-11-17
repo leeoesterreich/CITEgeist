@@ -35,6 +35,7 @@ class MarkerInterest:
     passed_kurtosis: bool  # True if kurtosis > threshold
     passed_gmm: bool  # True if in high-SNR GMM component
     passed_morans: bool  # True if Moran's I significant
+    n_components: Optional[int] = None  # BIC-selected GMM components (only set when auto_components=True)
 
 
 @dataclass
@@ -178,6 +179,47 @@ def _fit_gmm_per_marker(
             signal_fractions[m] = 0.0
 
     return snr_values, signal_fractions, signal_masks
+
+
+def _fit_gmm_per_marker_auto(
+    X: NDArray[np.floating],
+    seed: int,
+) -> Tuple[NDArray[np.floating], NDArray[np.floating], NDArray[np.bool_], NDArray[np.int_]]:
+    """Negative-binomial mixture variant of ``_fit_gmm_per_marker`` (raw counts, 1-2 components by BIC).
+
+    Size factors come from the full matrix X. A marker with one component has no
+    positive population: SNR 0, no signal spots. Otherwise SNR =
+    (mu_high - mu_low) / sd_low at the median size factor, with sd_low the NB
+    standard deviation sqrt(m + m^2 / theta) of the low component, and the signal
+    mask is the high component (posterior > 0.5).
+
+    Returns:
+        (snr_values, signal_fractions, signal_masks, n_components).
+    """
+    from CITEgeist.model.discovery.nb_mixture import (  # pylint: disable=import-outside-toplevel
+        fit_nb_mixture,
+        size_factors_from_counts,
+    )
+
+    n_spots, n_markers = X.shape
+    snr_values = np.zeros(n_markers)
+    signal_fractions = np.zeros(n_markers)
+    signal_masks = np.zeros((n_spots, n_markers), dtype=bool)
+    n_components = np.ones(n_markers, dtype=int)
+    counts = np.clip(X, 0, None)
+    sf = size_factors_from_counts(counts)
+    med = float(np.median(sf))
+    for m in range(n_markers):
+        fit = fit_nb_mixture(counts[:, m], sf, seed=seed)
+        n_components[m] = fit.n_components
+        if fit.n_components < 2 or not fit.positive_mask.any():
+            continue
+        m_lo, m_hi = fit.means[0] * med, fit.means[1] * med
+        sd_lo = max(float(np.sqrt(m_lo + m_lo**2 / fit.dispersions[0])), 1e-6)
+        snr_values[m] = (m_hi - m_lo) / sd_lo
+        signal_fractions[m] = float(fit.positive_mask.mean())
+        signal_masks[:, m] = fit.positive_mask
+    return snr_values, signal_fractions, signal_masks, n_components
 
 
 def _spatial_smooth(
@@ -506,6 +548,7 @@ def identify_interesting_markers(
     morans_n_perm: int = 199,
     seed: int = 1234,
     verbose: bool = True,
+    auto_components: bool = False,
 ) -> MarkerInterestResult:
     """
     Identify markers with interesting signal magnitude variation.
@@ -537,6 +580,13 @@ def identify_interesting_markers(
         morans_n_perm: Number of permutations for Moran's I null (default: 199).
         seed: Random seed for reproducibility (default: 1234).
         verbose: Log progress information (default: True).
+        auto_components: If True, X must be raw counts and each marker is fitted
+            with a 1- or 2-component negative-binomial mixture (``fit_nb_mixture``,
+            size factors from X, BIC choice) instead of the forced 2-component
+            Gaussian GMM. A marker passes the GMM gate only if it has 2 components
+            and SNR >= gmm_snr_threshold;
+            ``MarkerInterest.n_components`` is recorded. Default False keeps
+            the original behavior unchanged.
 
     Returns:
         MarkerInterestResult with ranked list of markers and interest scores.
@@ -580,7 +630,11 @@ def identify_interesting_markers(
     # Step 3: Fit GMM per marker for signal/noise separation
     if verbose:
         logging.info("Fitting GMM to separate signal/noise per marker...")
-    snr_values, signal_fractions, signal_masks = _fit_gmm_per_marker(X, seed)
+    if auto_components:
+        snr_values, signal_fractions, signal_masks, n_comp_values = _fit_gmm_per_marker_auto(X, seed)
+    else:
+        snr_values, signal_fractions, signal_masks = _fit_gmm_per_marker(X, seed)
+        n_comp_values = None
 
     # Step 4: Spatial smoothing before Moran's I
     if verbose:
@@ -627,6 +681,8 @@ def identify_interesting_markers(
         # Apply gates (using adaptive GMM classifications)
         passed_kurt = bool(kurtosis_passed_array[m])
         passed_gmm = snr >= gmm_snr_threshold
+        if n_comp_values is not None:
+            passed_gmm = bool(passed_gmm and n_comp_values[m] >= 2)
         passed_morans = bool(morans_passed_array[m])
 
         # Compute combined score
@@ -644,6 +700,7 @@ def identify_interesting_markers(
                 passed_kurtosis=passed_kurt,
                 passed_gmm=passed_gmm,
                 passed_morans=passed_morans,
+                n_components=int(n_comp_values[m]) if n_comp_values is not None else None,
             )
         )
 

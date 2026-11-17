@@ -1,0 +1,183 @@
+term	level	frozen_lineage	corrected_lineage	reason	source
+Acinar Cell Pancreas Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Acinar Cell Pancreatic Islet Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Adenocarcinoma Stem-Like Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Alveolar Cell Type 2 Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Alveolar Type II (ATII) Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Antibody-secreting Cell Peripheral Blood Human	2		B	audit candidate group 'Antibody-secreting cell'	mapping_audit.tsv candidate_group
+Antibody-secreting Cell Undefined Human	2		B	audit candidate group 'Antibody-secreting cell'	mapping_audit.tsv candidate_group
+Antigen-presenting Cell Kidney Human	2		myeloid	audit candidate group 'Mononuclear phagocyte / antigen-presenting cell'	mapping_audit.tsv candidate_group
+Basophil Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Basophil Peripheral Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Basophil Undefined Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Brush Cell (Tuft Cell) Airway Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Brush Cell (Tuft Cell) Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+CD4+ Central Memory Like T (Tcm-like) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+CD4+ Cytotoxic T1 Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+CD4+ Cytotoxic T2 Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+CD56dim Natural Killer Cell Peripheral Blood Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Cancer Cell Blood Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Cell Bone Marrow Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Cell Lymph Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Cell Lymph Node Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Cell Peripheral Blood Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Stem Cell Blood Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Cancer Stem Cell Lymph Human	1	epithelial_cancer		audit: leukaemia / lymphoma, not epithelial cancer: unmapped	audit.md section 3, mapped wrongly
+Chief Cell Stomach Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Cholangiocyte Bile Duct Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Cholangiocyte Liver Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Ciliated Cell Airway Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Ciliated Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Claudin-low Cell Bladder Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Club Cell (Clara Cell) Airway Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Club Cell (Clara Cell) Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Conventional T(Tconv) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Distal Tubular Cell Kidney Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Effector CD8+ Memory T (Tem) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Effector T(Teff) Cell Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Enterocyte Colorectum Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Enterocyte Large Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Enterocyte Progenitor Cell Small Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Enteroendocrine Cell Ileum Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Enteroendocrine Cell Small Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Enteroendocrine Cell Stomach Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Eosinophil Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Eosinophil Peripheral Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Eosinophil Stomach Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Eosinophil Undefined Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Epidermal Cell Skin Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Epidermal Stem Cell Skin Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Epithelial-mesenchymal Cell Bladder Human	1	fibroblast	epithelial_cancer	audit WRONG: 'mesenchymal' tested before 'epithelial' (name-order issue); an EMT cell is epithelial-derived	audit.md section 3, mapped wrongly
+Exhausted T(Tex) Cell Colorectum Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Intestine Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Liver Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Oral Cavity Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Skin Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Exhausted T(Tex) Cell Undefined Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Goblet Cell Airway Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Goblet Cell Colon Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Goblet Cell Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Goblet Cell Large Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Goblet Cell Small Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Goblet Progenitor Cell Large Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Granulocyte Peripheral Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Granulocyte Undefined Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Hepatocyte Fetal Liver Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Hepatocyte Liver Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Ionocyte Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+KLRF+ Natural Killer Cell Bile Duct Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Mast Cell Decidua Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Kidney Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Lung Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Nasal Polyp Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Polyp Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Stomach Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Mast Cell Undefined Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Memory Stem Cell(Tscm) Undefined Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Mesenchymal Glioblastoma Cell Brain Human	1	fibroblast		audit WRONG: a brain tumour state, not a fibroblast and not a breast epithelial cancer cell: unmapped	audit.md section 3, mapped wrongly
+Mesenchymal Stem Cell Adipose Tissue Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Bone Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Bone Marrow Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Cartilage Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Dental Pulp Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Endometrium Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Fat Pad Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Gingiva Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Ligament Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Liver Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Lung Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Meniscus Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Muscle Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Periodontal Ligament Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Placenta Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Skeletal Muscle Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Synovium Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Tendon Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Tooth Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Umbilical Cord Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stem Cell Undefined Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Adipose Tissue Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Bone Marrow Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Brain Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Lymph Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Nasal Concha Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Tonsil Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesenchymal Stromal Cell Undefined Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Mesothelial Cell Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Mononuclear Phagocyte Sputum Human	2		myeloid	audit candidate group 'Mononuclear phagocyte / antigen-presenting cell'	mapping_audit.tsv candidate_group
+Mucosa-associated Invariant T (MAIT) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Mucosa-associated Invariant T (MAIT) Cell Undefined Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Multipotent Mesenchymal Stroma Cell Bone Marrow Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Naive T(Th0) Cell Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Naive T(Th0) Cell Colorectum Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Naive T(Th0) Cell Peripheral Blood Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Natural Killer CD56 Bright Cell Stomach Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer CD56 Dim Cell Stomach Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Adipose Tissue Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Blood Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Bone Marrow Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Brain Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Breast Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Decidua Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Kidney Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Liver Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Lung Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Lymph Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Nasal Polyp Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Nasopharynx Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Ovary Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Peripheral Blood Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Peritoneal Fluid Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Scalp Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Skin Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Soft Tissue Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Spleen Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Stomach Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Testis Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Natural Killer Cell Undefined Human	2	T		audit: NK cells are innate lymphoid, not T cells (author-flagged); NKT terms stay T	audit.md section 3 and mapping_audit groups
+Neuroendocrine Cell Bladder Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Neuroendocrine Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Neutrophil Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Bone Marrow Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Brain Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Kidney Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Liver Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Lung Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Nasal Polyp Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Peripheral Blood Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Plasma Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Soft Tissue Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Stomach Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Neutrophil Undefined Human	2		myeloid	audit candidate group 'Mast cell / neutrophil / basophil / eosinophil / granulocyte'	mapping_audit.tsv candidate_group
+Non PT Tubular Cell Kidney Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Paget Cell Skin Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Paneth Cell Large Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Pericyte Adipose Tissue Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Brain Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Breast Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Epithelium Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Kidney Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Skin Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Stomach Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Synovium Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pericyte Undefined Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Pit Cell Stomach Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Pit Progenitor Cell Stomach Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Proximal Tubular Cell Kidney Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Quiescent T Stem Cell Skin Human	2		T	audit: T-spelled name missed by the T pattern	mapping_audit.tsv candidate_group
+Secretory Cell Airway Epithelium Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Secretory Cell Lung Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Secretory Progenitor Cell Esophagus Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Secretory Progenitor Cell Large Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Secretory Progenitor Cell Small Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Smooth Muscle Cell Blood Vessel Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Smooth Muscle Cell Heart Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Smooth Muscle Cell Kidney Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Smooth Muscle Cell Lung Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Smooth Muscle Cell Ovary Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Smooth Muscle Cell Skin Human	3	fibroblast		audit: arguable, stromal/mural not fibroblast: sensitivity level only	audit.md section 3, mapped arguably
+Specialist Antigen Presenting Cell Undefined Human	2		myeloid	audit candidate group 'Mononuclear phagocyte / antigen-presenting cell'	mapping_audit.tsv candidate_group
+Squamous-differentiation Cell Bladder Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Tuft Progenitor Cell Small Intestine Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group
+Urothelium Cell Kidney Human	2		epithelial_cancer	audit candidate group 'Epithelial-like (goblet, club, acinar, alveolar, adenocarcinoma, ...)'	mapping_audit.tsv candidate_group

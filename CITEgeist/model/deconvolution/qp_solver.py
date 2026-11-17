@@ -198,7 +198,7 @@ def compute_global_prior(
     logging.info("Prior computation statistics:")
     logging.info(" - Mean confidence score: %s", np.mean(confidence_scores))
     logging.info(" - Mean prior strength: %s", np.mean(global_prior))
-    logging.info(" - % Strong signals (>0.5): %s%", 100 * np.mean(global_prior > 0.5))
+    logging.info(" - %% Strong signals (>0.5): %s%%", 100 * np.mean(global_prior > 0.5))
 
     return {
         "global_prior": global_prior,
@@ -523,12 +523,14 @@ def validate_cell_proportions(
     logging.info("✓ Cell type validation passed (proportions + redundancy)")
     if "Unknown" in cell_type_names:
         unknown_idx = cell_type_names.index("Unknown")
-        logging.info("  - Unknown: %s% (threshold < %s%)", mean_proportions[unknown_idx] * 100, unknown_threshold * 100)
+        logging.info(
+            "  - Unknown: %s%% (threshold < %s%%)", mean_proportions[unknown_idx] * 100, unknown_threshold * 100
+        )
 
     # Log cell type proportions
     for celltype, mean_prop in zip(cell_type_names, mean_proportions):
         if celltype != "Unknown":
-            logging.info("  - %s: %s%", celltype, mean_prop * 100)
+            logging.info("  - %s: %s%%", celltype, mean_prop * 100)
 
 
 def estimate_true_expression_cell(

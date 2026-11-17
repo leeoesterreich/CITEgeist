@@ -72,6 +72,14 @@ jobs:
     needs: [format-check, lint]
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # lineage, stamp and stage tests read git history and the v41-final tag
+          # PRs: test the head commit, which is what a fast-forward merge puts on dev; the synthetic merge commit's
+          # first parent is the old base, which breaks tests that read HEAD~1
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Local dev branch for git-history tests
+        run: git show-ref --verify --quiet refs/heads/dev || git branch dev HEAD
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v6
@@ -94,29 +102,7 @@ jobs:
           pip install -e .
 
       - name: Run tests
-        run: |
-          # pytest imports every collected module before marker filtering, so a
-          # module-scope import of a package outside the dependency closure
-          # aborts the run with RC 2. tests/ci_collect_skip.txt lists any such
-          # paths; it is optional, and paths in it that do not exist are
-          # skipped, so this works unchanged on a tree that has none of them.
-          IGNORES=""
-          if [ -f tests/ci_collect_skip.txt ]; then
-            while read -r line; do
-              case "$line" in ''|'#'*) continue ;; esac
-              [ -e "$line" ] && IGNORES="$IGNORES --ignore=$line"
-            done < tests/ci_collect_skip.txt
-          fi
-          echo "collection ignores:${IGNORES:- (none)}"
-          pytest tests/ \
-            -m "unit and not slow and not requires_data and not requires_cuopt" \
-            $IGNORES \
-            --cov=CITEgeist/model \
-            --cov-report=xml \
-            --cov-report=term-missing \
-            --cov-fail-under=15 \
-            --tb=short \
-            -v
+        run: bash scripts/ci_test.sh
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6

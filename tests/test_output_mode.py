@@ -13,7 +13,7 @@ def _make_mock_model():
     N, T, G = 10, 3, 20
     np.random.seed(99)
     props = np.random.dirichlet([1] * T, N)
-    prop_df = pd.DataFrame(props, columns=["A", "B", "C"])
+    prop_df = pd.DataFrame(props, columns=["A", "B", "C"], index=[f"spot_{i}" for i in range(N)])
     model.results = {"cell_prop": prop_df}
 
     gex_adata = MagicMock()
@@ -83,11 +83,12 @@ class TestOutputModeLayers:
             )
 
 
-def test_use_morphology_defaults_to_true():
-    """SACE single-cell defaults to morphology-informed Bayesian assignment."""
+def test_use_morphology_defaults_to_false():
+    """SACE single-cell defaults to count-constrained Hungarian (since 2026-10-25)."""
     import inspect
 
     from CITEgeist.model.citegeist_model import CitegeistModel
 
     sig = inspect.signature(CitegeistModel.run_sace_allocation)
-    assert sig.parameters["use_morphology"].default is True
+    assert sig.parameters["use_morphology"].default is False
+    assert sig.parameters["assignment_method"].default == "hungarian"

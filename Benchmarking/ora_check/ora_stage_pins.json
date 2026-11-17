@@ -1,0 +1,25 @@
+{
+ "_note": "Hash pins of the two inputs of the ORA stages B19/B20 that are not stamped v2 outputs. (1) gene_universe: the committed list ora_stage_gene_universe.json (B19). (2) g4_reference: the plain marker-share table of the earlier arm (path relative to the namespace root), read ONLY by gate G4 (the stamped p0 must equal it exactly); a precondition, never an input of a number and never in the stamp's input_sha256.",
+ "gene_universe": {
+  "file": "Benchmarking/ora_check/ora_stage_gene_universe.json",
+  "sha256": "394281f4b7fdd22d8f94abae8feb38b8e5fe28b5a0d4273f0d5668e3a901b607"
+ },
+ "g4_reference": {
+  "dir": "output/module3_marker_share_7type",
+  "file_pattern": "{sample}_cell_prop_global_results.csv",
+  "sha256": {
+   "HCC22-088-P1-S1": "54345f01f24831884f9c70d95ccd67de055a703242b6fd3165dcf60c770a281b",
+   "HCC22-088-P1-S2": "459a1db3915c3d0654a532a8f87f55d404f7f3217140433f418fd1145d2bb2cc",
+   "HCC22-088-P2-S1": "7d2541e56d86503e2d31fa337d95460353b3fb21b6bb3eb2b1b95b8b0ccef6a6",
+   "HCC22-088-P2-S2": "c057ae9b50b85316b6b03a30c4e648315dde1cb4c096d788796d31a8cc0e5e19",
+   "HCC22-088-P3-S1_A": "9252cf97a18bda8bf170553e2fc95ddbffb4ca4678f514a425100dff4ba39305",
+   "HCC22-088-P3-S2": "8a15d8219a93a7fca6d47e973560e35232992703d5cd864a55f23d52977b4ba7",
+   "HCC22-088-P4-S1": "db67badd3c519badc40ba82566cf749eeca57c04a0d0455f417df00dfd44f2d5",
+   "HCC22-088-P4-S2_1i_rep": "44c2df2c8a928d334b22c1c237532dcb228afc493b3a0ef3481be5f689e4ba06",
+   "HCC22-088-P5-S1": "637fc369331e789c87675de8d2642a5f15dcdea299c8cd061fb25b2f03f89edb",
+   "HCC22-088-P5-S2_F_rep": "f1e145672fcfb7b1178a111b2dea2069191f6a905c56ae677a33373a2b885f75",
+   "HCC22-088-P6-S1": "a78cb4832d078a27a091c7d8c2ceca12cabb97b29c90393539c0351c42d7ce8e",
+   "HCC22-088-P6-S2_D": "ff4098a355b1220a2f461b0c6f7e79bf63a1cc19385d42fb78e4e03b91e71bf2"
+  }
+ }
+}

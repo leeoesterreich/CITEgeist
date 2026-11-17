@@ -12,6 +12,20 @@ Panels:
   F — Gene-set matched accuracy: CITEgeist vs C2L on own gene set and on
         Cell2Location's 180 training genes
 
+v41 (env FIG_LABELSET=v41; joint RNA+protein "rnaprot" GT). CITEgeist = plain marker share (P138 arm) + SACE; no
+SPOTS row, no QP, no brightness correction. Emitted panels (letters per save_panels):
+  A — per-type mean r +- per-type s.e.m. (5 regions), 6- and 7-type. CITEgeist from
+        evaluation/results_rnaprot_p138/method_comparison_singler_{6,7}type/SPOTS_P138_{6,7}type_results.json;
+        competitors from evaluation/results_rnaprot/method_comparison_singler_{6,7}type/*.json. Gated against
+        the props_{6,7}type.json summary.
+  B — per-type r heatmap (6-type), same sources as A.
+  C/D — per-type GEX flat r / RMSE, rows CG_GEX_KEY (SACE on plain marker share: CITEgeist_p138_SACE, or
+        CITEgeist_SACE under MS_DATA_V41_SACE_ARM=olddict; same arm as the text), Cell2Location, Tangram of
+        evaluation/rnaprot/xenium_gex_comparison_7type_summary.csv (sigma lines: evaluation/rnaprot/gt_gex_sigma.json).
+  E — matched genes: evaluation/rnaprot/matched_gene_r.json (methods.<CG_GEX_KEY>.matched_pooled_r vs
+        c2l_matched_pooled_r).
+  F — pie maps; CITEgeist = the P138 6-type prediction file the strict evaluator scored (_inputs.pred_files).
+
 Usage:
     python generate.py                  # all panels + composite
     python generate.py --panels-only    # panels only, skip composite
@@ -25,10 +39,10 @@ Data pipeline — run upstream scripts before regenerating:
 
   Panel E (GEX comparison CSV):
     benchmarks/xenium_benchmarking/evaluation/src/compare_xenium_gex_methods.py
-    → results/gex_rerun_v8/xenium_gex_comparison_7type_summary.csv
+    → evaluation/xenium_gex_comparison_7type_summary.csv
 
   Panel D (proportion outputs per method):
-    CITEgeist  → CITEgeist/output_qp_singler_6type/
+    CITEgeist  → protein_sensitivity/results/baseline_preds (run_dirs from CITEgeist_6type_results.json)
     C2L        → Cell2Location/output_singler_6type/
     RCTD       → RCTD/output_singler_6type/
     Tangram    → Tangram/output_singler_6type/
@@ -43,6 +57,7 @@ Data pipeline — run upstream scripts before regenerating:
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -66,29 +81,79 @@ from _shared.generate_utils import PanelContext, load_panel_sizes, panel_argpars
 from _shared.spatial_utils import compute_spot_radius, draw_pie_spots
 from _shared.style import CELL_TYPE_COLORS, METHOD_COLORS, METHOD_DISPLAY, PALETTE, apply_style
 
+sys.path.insert(0, str(PROJECT / "benchmarks" / "xenium_benchmarking"))
+import benchmark_paths as bp  # noqa: E402
+
 apply_style()
 plt.rcParams.update({"svg.fonttype": "none"})
 
 # ── Data paths ────────────────────────────────────────────────────────────────
-EVAL_DIR = PROJECT / "benchmarks" / "xenium_benchmarking" / "evaluation" / "results"
+# Env FIG_LABELSET: unset/"" = v40 sources (byte-identical paths); "march" = v41 March-label reruns;
+# "v41" = the joint RNA+protein GT ("rnaprot"), strict per-type mean r +- per-type s.e.m. CITEgeist = plain marker
+# share (the P138 arm: ms_v41 dictionary, no brightness correction) + SACE on plain marker share. One CITEgeist row.
+# "v41" reads the fixed rnaprot benchmark layout below.
+FIG_LABELSET = os.environ.get("FIG_LABELSET", "")
+if FIG_LABELSET not in ("", "march", "v41"):
+    raise ValueError(f"FIG_LABELSET must be '', 'march' or 'v41', got {FIG_LABELSET!r}")
+_V42 = FIG_LABELSET == "v42"
+_V41 = FIG_LABELSET in (
+    "v41",
+    "v42",
+)  # the strict rnaprot-GT structure shared by v41 and v42 (v42 reads different, stamped files)
+BP_LABELSET = "rnaprot" if _V41 else FIG_LABELSET  # benchmark_paths labelset
+_XEN_EVAL = PROJECT / "benchmarks" / "xenium_benchmarking" / "evaluation"
+_LP: Dict[str, Path] = {}
+if _V41:
+    # v41 GEX tables: the rnaprot_v41 rescore carries the CITEgeist_p138_SACE rows next to the competitor rows.
+    _LP = {
+        "gex_comparison": _XEN_EVAL / "rnaprot_v41" / "xenium_gex_comparison_7type_summary.csv",
+        "matched_gene_r": _XEN_EVAL / "rnaprot_v41" / "matched_gene_r.json",
+    }
+# v41/v42 source locations (the builder's keys when present, else the fixed rnaprot layout)
+V41_RESULTS_DIR = Path(_LP.get("xenium_results_dir", _XEN_EVAL / "results_rnaprot"))
+V41_GEX_DIR = Path(_LP.get("xenium_gex_dir", _XEN_EVAL / "rnaprot"))
+# v42 has no P138 arm. Competitors (and the GT) are the reused v40/v41 predictions, scored once in results_rnaprot
+# (named in the reuse allowlist of v42_lineage_manifest.yaml); CITEgeist is the v2 result in xenium_results_dir.
+V41_COMPETITOR_DIR = _XEN_EVAL / "results_rnaprot" if _V42 else V41_RESULTS_DIR
+V41_P138_DIR = Path(_LP.get("spots_p138_dir") or _XEN_EVAL / "results_rnaprot_p138")
+V41_MATCHED_GENE_R = Path(_LP.get("matched_gene_r") or V41_GEX_DIR / "matched_gene_r.json")
+
+
+def v41_citegeist_result_file(g: int) -> Path:
+    """CITEgeist proportion result scored by the strict rnaprot evaluator.
+
+    v41: the P138 arm (plain marker share). v42: the frozen v2 result (RNA-refined proportions) in `xenium_results_dir`.
+    """
+    if _V42:
+        return V41_RESULTS_DIR / f"method_comparison_singler_{g}type" / f"CITEgeist_{g}type_results.json"
+    return V41_P138_DIR / f"method_comparison_singler_{g}type" / f"SPOTS_P138_{g}type_results.json"
+
+
+EVAL_DIR = bp.eval_results_dir(BP_LABELSET)
 DIR_6TYPE = EVAL_DIR / "method_comparison_singler_6type"
 DIR_7TYPE = EVAL_DIR / "method_comparison_singler_7type"
 
 BENCH_XENIUM = PROJECT / "benchmarks" / "xenium_benchmarking"
-GT_6TYPE_DIR = BENCH_XENIUM / "ground_truth_singler" / "ground_truth_6type" / "ground_truth"
-GT_7TYPE_DIR = BENCH_XENIUM / "ground_truth_singler" / "ground_truth_7type" / "ground_truth"
-CG_QP_DIR = BENCH_XENIUM / "CITEgeist" / "output_qp_singler_7type"
-C2L_DIR = BENCH_XENIUM / "Cell2Location" / "output_singler_6type"
-RCTD_DIR = BENCH_XENIUM / "RCTD" / "output_singler_6type"
-TANGRAM_DIR = BENCH_XENIUM / "Tangram" / "output_singler_6type"
-SEURAT_DIR = BENCH_XENIUM / "Seurat" / "output_singler_6type"
+GT_6TYPE_DIR = bp.gt_dir(6, BP_LABELSET) / "ground_truth"
+GT_7TYPE_DIR = bp.gt_dir(7, BP_LABELSET) / "ground_truth"
+C2L_DIR = bp.pred_dir("Cell2Location", 6, BP_LABELSET)
+RCTD_DIR = bp.pred_dir("RCTD", 6, BP_LABELSET)
+TANGRAM_DIR = bp.pred_dir("Tangram", 6, BP_LABELSET)
+SEURAT_DIR = bp.pred_dir("Seurat", 6, BP_LABELSET)
 MORPH_DIR = BENCH_XENIUM / "scResolve" / "images" / "morphology"
-GEX_RERUN_CSV = EVAL_DIR / "gex_rerun_v8" / "xenium_gex_comparison_7type_summary.csv"
+# Canonical GEX summary.
+# (results/gex_rerun_v8/ is superseded: its Tangram rows predate the native-projection rerun.)
+GEX_RERUN_CSV = (
+    Path(_LP["gex_comparison"])
+    if _V41 and "gex_comparison" in _LP
+    else bp.gex_eval_dir(BP_LABELSET) / "xenium_gex_comparison_7type_summary.csv"
+)  # v41: the rnaprot_v41 table (rnaprot_v41 rescore with the CITEgeist_p138_SACE row)
 
 # Paths for Panel F gene-coverage computation
-GEX_CG_LAYERS_DIR = BENCH_XENIUM / "CITEgeist" / "results_sace_singler_7type"
-GEX_C2L_LAYERS_DIR = BENCH_XENIUM / "Cell2Location" / "output_singler_7type"
-GEX_GT_LAYERS_DIR = BENCH_XENIUM / "ground_truth_singler" / "ground_truth_7type" / "ground_truth_gex"
+# Layer dirs are read only by the v40 restricted-r path (_compute_cg_restricted_r); v41 reads matched_gene_r.json.
+GEX_CG_LAYERS_DIR = bp.citegeist_sace_dir(BP_LABELSET)
+GEX_C2L_LAYERS_DIR = bp.pred_dir("Cell2Location", 7, BP_LABELSET)
+GEX_GT_LAYERS_DIR = bp.gt_gex_dir(BP_LABELSET)
 
 PANELS_DIR = SCRIPT_DIR / "panels"
 COMPOSITE_DIR = SCRIPT_DIR / "composite"
@@ -115,6 +180,15 @@ METHOD_FILES_7TYPE: Dict[str, str] = {
 }
 
 METHOD_ORDER = ["CITEgeist", "Cell2Location", "RCTD", "Tangram", "Seurat", "CARD"]
+# v41: roster key in the strict-evaluator outputs / props_{6,7}type.json (no SPOTS row in v41)
+V41_DATA_KEY = {
+    "CITEgeist": "CITEgeist",
+    "Cell2Location": "C2L",
+    "RCTD": "RCTD",
+    "Tangram": "Tangram",
+    "Seurat": "Seurat",
+    "CARD": "CARD",
+}
 
 # Cell types shown in spatial maps (6-type benchmark labels, in row order)
 SPATIAL_CELL_TYPES = ["Epithelial", "Macrophages", "T cells"]
@@ -133,8 +207,20 @@ def _ct_cmap(cell_type: str) -> mcolors.LinearSegmentedColormap:
 
 
 # GEX panel: CSV method names → display
+# CITEgeist row in the GEX summary CSV. v40: CITEgeist_SACE. v41: SACE on plain marker share, the SACE arm the text
+# reports: CITEgeist_p138_SACE (SACE on the P138 arm). Never v41p / SPOTS.
+def _v41_cg_gex_key() -> str:
+    """The v41 SACE arm reported in the paper (SACE on plain marker share, P138)."""
+    return "CITEgeist_p138_SACE"
+
+
+CG_GEX_KEY = _v41_cg_gex_key() if _V41 else "CITEgeist_SACE"
+if _V42 and CG_GEX_KEY != "CITEgeist_v2_SACE":
+    raise ValueError(f"v42 CITEgeist GEX row must be the frozen v2 SACE arm CITEgeist_v2_SACE, got {CG_GEX_KEY!r}")
+if CG_GEX_KEY not in ("CITEgeist_SACE", "CITEgeist_p138_SACE", "CITEgeist_v2_SACE"):
+    raise ValueError(f"v41/v42 CITEgeist GEX row must be a known SACE arm, got {CG_GEX_KEY!r}")
 GEX_METHOD_MAP = {
-    "CITEgeist_SACE": ("CITEgeist", METHOD_COLORS["CITEgeist"]),
+    CG_GEX_KEY: ("CITEgeist", METHOD_COLORS["CITEgeist"]),
     "Cell2Location": ("Cell2Location", METHOD_COLORS["Cell2Location"]),
     "Tangram": ("Tangram", METHOD_COLORS["Tangram"]),
 }
@@ -186,6 +272,87 @@ def load_method_results(
             "region_r": region_r,
         }
     return results
+
+
+N_XENIUM_REGIONS = 5
+
+
+def _v41_result_files(g: int) -> Dict[str, Path]:
+    """Strict-evaluator result file per roster method (CITEgeist = the P138 plain marker-share arm)."""
+    d = V41_COMPETITOR_DIR / f"method_comparison_singler_{g}type"
+    return {
+        "CITEgeist": v41_citegeist_result_file(g),
+        "Cell2Location": d / f"Cell2Location_{g}type_results.json",
+        "RCTD": d / f"RCTD_{g}type_results.json",
+        "Tangram": d / f"Tangram_{g}type_results.json",
+        "Seurat": d / f"Seurat_{g}type_results.json",
+        "CARD": d / "CARD_results.json",
+    }
+
+
+def per_type_summary(d: Dict, where: str, n_regions: int = N_XENIUM_REGIONS) -> Dict:
+    """Per-type mean r +- per-type s.e.m. from one strict-evaluator result dict (pure; no I/O).
+
+    overall_mean = summary.per_type_mean_r (mean over cell types of the per-type Pearson r on the shared spot masks);
+    overall_std = across-region SD (ddof=0) of the per-region mean over types; sem = overall_std / sqrt(n_regions)
+    (= the manuscript-data per_type_sem). per_type = per-type mean r over regions. Raises when the region count is
+    wrong or the region means do not average to the evaluator's per_type_mean_r (same gate as the data build).
+    """
+    summary, regions = d["summary"], d["regions"]
+    if len(regions) != n_regions:
+        raise ValueError(f"{where}: expected {n_regions} regions, got {len(regions)}")
+    region_means = [sum(r[f"{t}_pearson_r"] for t in r["cell_types"]) / len(r["cell_types"]) for r in regions]
+    ptm = float(summary["per_type_mean_r"])
+    if abs(float(np.mean(region_means)) - ptm) > 1e-6:
+        raise ValueError(f"{where}: region means do not average to the evaluator's per_type_mean_r")
+    sd = float(np.std(region_means))
+    per_type = {ct: float(summary[f"{ct}_mean_r"]) for ct in regions[0]["cell_types"] if f"{ct}_mean_r" in summary}
+    return {
+        "overall_mean": ptm,
+        "overall_std": sd,
+        "sem": sd / np.sqrt(n_regions),
+        "per_type": per_type,
+        "region_r": region_means,
+    }
+
+
+def load_method_results_v41(g: int) -> Dict[str, Dict]:
+    """Strict per-type mean r +- per-type s.e.m. per method (same dict shape as load_method_results, plus 'sem')."""
+    results: Dict[str, Dict] = {}
+    for label, path in _v41_result_files(g).items():
+        with open(path) as fh:
+            d = json.load(fh)
+        results[label] = per_type_summary(d, f"{path.name} ({g}-type)")
+    return results
+
+
+def check_against_data(results: Dict[str, Dict], data: Dict, g: int) -> None:
+    """Plotted (per_type_r, per_type_std, per_type_sem) per method must equal the props_{g}type.json rows (pure)."""
+    assert "SPOTS" not in data, f"props_{g}type.json still carries a SPOTS row (v41: CITEgeist = plain marker share)"
+    expected = set(V41_DATA_KEY.values())
+    assert expected <= set(data), f"props_{g}type.json missing {expected - set(data)}"
+    assert results, "no plotted methods"
+    assert set(results) == set(V41_DATA_KEY), f"plotted methods {sorted(results)} != roster {sorted(V41_DATA_KEY)}"
+    for label, res in results.items():
+        row = data[V41_DATA_KEY[label]]
+        got = (round(res["overall_mean"], 3), round(res["overall_std"], 4), round(res["sem"], 3))
+        want = (row["per_type_r"], row["per_type_std"], row["per_type_sem"])
+        assert got == want, f"{g}-type {label}: plotted (r, std, sem) {got} != props_{g}type.json {want}"
+
+
+def assert_matches_manuscript_data(results: Dict[str, Dict], g: int) -> None:
+    """Data-freshness gate against the text-data summary: maintainer-only, not shipped (no-op)."""
+
+
+def scored_pred_file(result: Dict, region: int) -> Path:
+    """The one prediction file a strict-evaluator result JSON scored for Xenium_region_<region> (pure)."""
+    pred_files = [Path(e["path"]) for e in result["_inputs"]["pred_files"]]
+    sample = f"Xenium_region_{region}"
+    # the evaluator reads either <dir>/<sample>/<file> or a top-level <dir>/<sample>_<suffix>.csv
+    hits = [q for q in pred_files if sample in q.parts[:-1] or q.name.startswith(sample + "_")]
+    if len(hits) != 1:
+        raise ValueError(f"expected one scored prediction file for region {region}, got {hits}")
+    return hits[0]
 
 
 def _normalise_col(name: str) -> str:
@@ -273,8 +440,27 @@ def load_spatial_data(
                 return _align_prop_cols(df, gt_cols)
         return None
 
+    def _load_cg_canonical() -> Optional[pd.DataFrame]:
+        """CITEgeist 6-type predictions from the exact run dir the canonical 6-type results JSON was scored on."""
+        if _V41:  # strict evaluator records the exact prediction files it scored (P138 = plain marker share)
+            res_json = v41_citegeist_result_file(6)
+            if not res_json.exists():
+                return None
+            with open(res_json) as fh:
+                p = scored_pred_file(json.load(fh), region)
+        else:
+            res_json = DIR_6TYPE / "CITEgeist_6type_results.json"
+            if not res_json.exists():
+                return None
+            with open(res_json) as fh:
+                run_dirs = json.load(fh)["_inputs"]["run_dirs"]
+            p = PROJECT / run_dirs[str(region)] / "predictions" / "baseline.csv.gz"
+        if not p.exists():
+            return None
+        return _align_prop_cols(pd.read_csv(p, index_col=0), gt_cols)
+
     method_props: Dict[str, Optional[pd.DataFrame]] = {
-        "CITEgeist": _load_prop_merge_tcells(CG_QP_DIR, sample),
+        "CITEgeist": _load_cg_canonical(),
         "Cell2Location": _load_prop(C2L_DIR, sample),
         "RCTD": _load_prop(RCTD_DIR, sample),
         "Tangram": _load_prop_merge_tcells(TANGRAM_DIR, sample),
@@ -367,15 +553,18 @@ def draw_panel_A(
     """Combined 6-type (solid) + 7-type (hatched) bar chart on a single axis."""
     methods = [m for m in METHOD_ORDER if m in results_6 or m in results_7]
     bar_w = 0.35
-    x = np.arange(len(methods))
+    x = np.arange(len(methods), dtype=float)
     ekw = dict(ecolor="#444", elinewidth=0.8, capsize=3, capthick=0.8)
+
+    def _sem(res: Dict) -> float:
+        # v41: per-type s.e.m. across regions (stored by per_type_summary); v40: pooled-r std / sqrt(5)
+        return res["sem"] if "sem" in res else res["overall_std"] / np.sqrt(5)
 
     for i, method in enumerate(methods):
         col = _method_color(method)
-
         if method in results_6:
             mean6 = results_6[method]["overall_mean"]
-            sem6 = results_6[method]["overall_std"] / np.sqrt(5)
+            sem6 = _sem(results_6[method])
             bar6 = ax.bar(x[i] - bar_w / 2, mean6, bar_w, color=col, alpha=0.92, yerr=sem6, error_kw=ekw, zorder=3)
             if method == "CITEgeist":
                 bar6[0].set_edgecolor("black")
@@ -383,7 +572,7 @@ def draw_panel_A(
 
         if method in results_7:
             mean7 = results_7[method]["overall_mean"]
-            sem7 = results_7[method]["overall_std"] / np.sqrt(5)
+            sem7 = _sem(results_7[method])
             bar7 = ax.bar(
                 x[i] + bar_w / 2, mean7, bar_w, color=col, alpha=0.45, hatch="///", yerr=sem7, error_kw=ekw, zorder=3
             )
@@ -393,9 +582,16 @@ def draw_panel_A(
 
     ax.set_xticks(x)
     ax.set_xticklabels([METHOD_DISPLAY.get(m, m) for m in methods], rotation=35, ha="right")
-    ax.set_ylabel("Pearson r", labelpad=12)
-    ax.set_ylim(0, 1.02)
-    ax.set_title("Xenium Benchmark\n(SingleR GT)", pad=6)
+    ax.set_ylabel("Per-type mean r" if _V41 else "Pearson r", labelpad=12)
+    if _V41:
+        ax.set_yticks([0, 0.5, 1.0])
+    # Lower limit follows the data so negative r (e.g. CARD, Tangram 7-type on March labels) stays visible.
+    _lows = [res[m]["overall_mean"] - _sem(res[m]) for res in (results_6, results_7) for m in methods if m in res]
+    _ymin = min(0.0, min(_lows) - 0.04)
+    ax.set_ylim(_ymin, 1.02)
+    if _ymin < 0:
+        ax.axhline(0, color="#444", linewidth=0.8, zorder=2)
+    ax.set_title("Xenium Benchmark\n(joint RNA+protein GT)" if _V41 else "Xenium Benchmark\n(SingleR GT)", pad=6)
     ax.yaxis.grid(True, linestyle=":", linewidth=0.5, alpha=0.6, zorder=0)
     ax.set_axisbelow(True)
 
@@ -686,7 +882,7 @@ def draw_panel_E(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
     """
     Grouped bar chart: per-type flat Pearson r for CITEgeist SACE vs Cell2Location.
 
-    Data from gex_rerun_v8 (7-type SingleR GT, common gene set).
+    Data from xenium_gex_comparison_7type_summary.csv (7-type SingleR GT, common gene set).
     """
     if gex_df is None:
         ax.text(
@@ -733,7 +929,7 @@ def draw_panel_E(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
         ax.errorbar(x + offsets[i], vals, yerr=errs, fmt="none", color="black", capsize=2.5, linewidth=0.8, zorder=4)
 
         # Highlight CITEgeist bars
-        if method == "CITEgeist_SACE":
+        if method == CG_GEX_KEY:
             for bar in bars:
                 bar.set_edgecolor("black")
                 bar.set_linewidth(0.8)
@@ -860,7 +1056,7 @@ def draw_panel_gex_rmse(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
             zorder=4,
         )
 
-        if method == "CITEgeist_SACE":
+        if method == CG_GEX_KEY:
             for bar in bars:
                 bar.set_edgecolor("black")
                 bar.set_linewidth(0.8)
@@ -887,7 +1083,15 @@ def draw_panel_gex_rmse(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
     # ── σ reference lines (Xenium RCC 7-type GT, log1p scale, precomputed)
     SIGMA_MEAN = 0.351
     SIGMA_P90 = 0.763
+    if _V41:  # v41 GT: per-gene sigma recomputed on the rnaprot GT (compute_xenium_gene_sigma.py)
+        with open(Path(_LP.get("gt_gex_sigma", V41_GEX_DIR / "gt_gex_sigma.json"))) as _fh:
+            _sg = json.load(_fh)
+        assert _sg["labelset"] == "rnaprot", _sg["labelset"]
+        SIGMA_MEAN, SIGMA_P90 = round(_sg["mean"], 3), round(_sg["p90"], 3)
     xmin, xmax = x.min() - 0.45, x.max() + 0.45
+    _bars_xmax = xmax
+    if _V41:  # v41: σ labels sit in a right-hand gutter so they never overlap the bars (mean σ=0.28 crosses B/CD4 bars)
+        xmax = _bars_xmax + 1.35
     ax.hlines(
         SIGMA_MEAN,
         xmin,
@@ -915,9 +1119,9 @@ def draw_panel_gex_rmse(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
     # this is the compromise: text reads cleanly, bars are not occluded).
     _label_bbox = dict(facecolor="white", alpha=0.5, edgecolor="none", pad=1.0)
     ax.text(
-        xmin + 0.05,
+        (_bars_xmax + 0.04) if _V41 else (xmin + 0.05),
         SIGMA_MEAN + 0.014,
-        f"mean σ = {SIGMA_MEAN:.2f}",
+        f"mean σ\n= {SIGMA_MEAN:.2f}" if _V41 else f"mean σ = {SIGMA_MEAN:.2f}",
         ha="left",
         va="bottom",
         color="#444444",
@@ -926,9 +1130,9 @@ def draw_panel_gex_rmse(ax: plt.Axes, gex_df: Optional[pd.DataFrame]) -> None:
         zorder=6,
     )
     ax.text(
-        xmin + 0.05,
+        (_bars_xmax + 0.04) if _V41 else (xmin + 0.05),
         SIGMA_P90 + 0.014,
-        f"p90 σ = {SIGMA_P90:.2f}",
+        f"p90 σ\n= {SIGMA_P90:.2f}" if _V41 else f"p90 σ = {SIGMA_P90:.2f}",
         ha="left",
         va="bottom",
         color="#444444",
@@ -1053,6 +1257,21 @@ def _compute_cg_restricted_r() -> float:
     return float(r)
 
 
+def matched_citegeist_r(mg: Dict, method: str) -> float:
+    """Pooled matched-gene r of one SACE arm from matched_gene_r.json (pure).
+
+    Reads methods.<method>.matched_pooled_r; older files without a methods block carry CITEgeist_SACE only as
+    citegeist_matched_r (its like-for-like partner is c2l_matched_pooled_r).
+    """
+    if method in mg.get("methods", {}):
+        return float(mg["methods"][method]["matched_pooled_r"])
+    if method == "CITEgeist_SACE" and mg.get("like_for_like_partner") == {
+        "citegeist_matched_r": "c2l_matched_pooled_r"
+    }:
+        return float(mg["citegeist_matched_r"])
+    raise KeyError(f"matched_gene_r.json has no entry for {method!r} (rerun matched_gene_r.py with that SACE arm)")
+
+
 def draw_panel_F(ax: plt.Axes) -> None:
     """
     Panel F: CITEgeist vs Cell2Location flat_r on own gene set vs same 180-gene set.
@@ -1066,19 +1285,45 @@ def draw_panel_F(ax: plt.Axes) -> None:
 
     # Values from CSV (auto-updated when compare_xenium_gex_methods.py is re-run)
     gex_summary = load_gex_all_summary()
-    cg_full_r = gex_summary["CITEgeist_SACE"]["flat_r"]
+    cg_full_r = gex_summary[CG_GEX_KEY]["flat_r"]
     c2l_full_r = gex_summary["Cell2Location"]["flat_r"]
-    cg_n = gex_summary["CITEgeist_SACE"]["n_genes"]
+    cg_n = gex_summary[CG_GEX_KEY]["n_genes"]
     c2l_n = gex_summary["Cell2Location"]["n_genes"]
 
-    # Restricted r: live-computed from layer CSVs (not in GEX_RERUN_CSV)
-    cg_restr_r = _compute_cg_restricted_r()
+    if _V41:
+        # Same-gene-set values are the pooled, like-for-like pair from matched_gene_r.json (same genes, same blocks,
+        # same pooled metric). "Own genes" bars are the per-block flat r of the GEX summary for both methods.
+        # CITEgeist = the plain marker-share SACE arm CG_GEX_KEY (same entry the text reads).
+        if _V42:
+            # v42: the matched-gene bars are the PER-BLOCK flat r on C2L's gene set (fair scorer, matched/), exactly the
+            # numbers the text reads (matched_genes_* of the gex_comparison summary). Both bar
+            # pairs now use one metric (per-block flat r), not the pooled r of v41.
+            with open(Path("/path/to/manuscript_data/gex_comparison.json")) as fh:
+                gj = json.load(fh)
+            cg_restr_r = float(gj["matched_genes_CITEgeist_flat_r"])
+            c2l_restr_r = float(gj["matched_genes_C2L_flat_r"])
+            c2l_n = int(gj["c2l_output_genes"])
+            assert abs(gj["CITEgeist"]["flat_r"] - cg_full_r) < 6e-4, (gj["CITEgeist"]["flat_r"], cg_full_r)
+            assert abs(gj["C2L"]["flat_r"] - c2l_full_r) < 6e-4, (gj["C2L"]["flat_r"], c2l_full_r)
+        else:
+            with open(V41_MATCHED_GENE_R) as fh:
+                mg = json.load(fh)
+            cg_restr_r = matched_citegeist_r(mg, CG_GEX_KEY)
+            c2l_restr_r = float(mg["c2l_matched_pooled_r"])
+            c2l_n = int(mg["n_c2l_genes"])
+            assert abs(mg["c2l_flat_r"] - c2l_full_r) < 1e-3, (mg["c2l_flat_r"], c2l_full_r)
+    else:
+        # Restricted r: live-computed from layer CSVs (not in GEX_RERUN_CSV)
+        cg_restr_r = _compute_cg_restricted_r()
+        c2l_restr_r = c2l_full_r
 
-    x = np.array([0.0, 2.5])
-    width = 0.32
+    # Bars must be at least as wide as their 7 pt value labels, otherwise each
+    # label spills sideways onto the neighbouring (taller) bar and its label.
+    x = np.array([0.0, 2.4])
+    width = 0.8
 
     cg_vals = [cg_full_r, cg_restr_r]
-    c2l_vals = [c2l_full_r, c2l_full_r]
+    c2l_vals = [c2l_full_r, c2l_restr_r]
 
     ax.bar(
         x - width / 2,
@@ -1096,14 +1341,14 @@ def draw_panel_F(ax: plt.Axes) -> None:
     # region (~0.92) well above the bar tops (~0.73) so it doesn't compete
     # with any other annotation for vertical space.
     y_top = 0.92
-    delta = cg_restr_r - c2l_full_r
+    delta = cg_restr_r - c2l_restr_r
     ax.annotate(
         "",
-        xy=(2.5 - width / 2, y_top),
-        xytext=(2.5 + width / 2, y_top),
+        xy=(x[1] - width / 2, y_top),
+        xytext=(x[1] + width / 2, y_top),
         arrowprops=dict(arrowstyle="<->", color="black", lw=1.0),
     )
-    ax.text(2.5, y_top + 0.018, f"Δ = +{delta:.3f}", ha="center", va="bottom", fontweight="bold", fontsize=8)
+    ax.text(x[1], y_top + 0.04, f"Δ = {delta:+.3f}", ha="center", va="bottom", fontweight="bold", fontsize=8)
 
     for xpos, cg_v, c2l_v in zip(x, cg_vals, c2l_vals):
         ax.text(
@@ -1138,6 +1383,7 @@ def draw_panel_F(ax: plt.Axes) -> None:
     ax.set_title("Matched genes", pad=4, fontsize=10)
     # Headroom for bar-top value labels and the bracket annotation.
     ax.set_ylim(0, 1.15)
+    ax.set_xlim(-0.8, x[1] + 0.8)
     # External-bottom legend (below x-tick labels).
     ax.legend(
         loc="upper center",
@@ -1219,17 +1465,25 @@ def main() -> None:
     panel_sizes = load_panel_sizes(args)
 
     print("Loading 6-type benchmark results …")
-    results_6 = load_method_results(DIR_6TYPE, METHOD_FILES_6TYPE)
+    results_6 = load_method_results_v41(6) if _V41 else load_method_results(DIR_6TYPE, METHOD_FILES_6TYPE)
     print(f"  {len(results_6)} methods: {list(results_6)}")
 
     print("Loading 7-type benchmark results …")
-    results_7 = load_method_results(DIR_7TYPE, METHOD_FILES_7TYPE)
+    results_7 = load_method_results_v41(7) if _V41 else load_method_results(DIR_7TYPE, METHOD_FILES_7TYPE)
     print(f"  {len(results_7)} methods: {list(results_7)}")
+    if _V41:
+        print(
+            f"  CITEgeist ({'frozen v2, RNA-refined' if _V42 else 'plain marker share, P138'}): {v41_citegeist_result_file(6).parent.parent}"
+        )
+        assert_matches_manuscript_data(results_6, 6)
+        assert_matches_manuscript_data(results_7, 7)
 
     print("Loading GEX rerun data …")
     gex_df = load_gex_rerun_data()
     if gex_df is not None:
         print(f"  Methods: {sorted(gex_df['method'].unique())}")
+        if _V41:
+            assert CG_GEX_KEY in set(gex_df["method"]), f"{CG_GEX_KEY} missing from {GEX_RERUN_CSV}"
     else:
         print(f"  Not found at {GEX_RERUN_CSV}; panel E will be empty.")
 

@@ -1,0 +1,286 @@
+{
+  "name": "v40 settings sensitivity ROUND 2 (extension of settings_protocol.json) -- rev 5, FROZEN",
+  "status": "FROZEN (rev 5): reference hashes re-verified at freeze; authorized_implementation_commits set to the exact tested SHA; run from a detached worktree at that commit. The freeze commit is whichever commit adds this file; its md5 is recorded in every run_meta.",
+  "frozen_at_commit": "n/a: a file cannot contain the SHA of the commit that first adds it; the freeze commit is whichever commit adds settings_protocol_v2.json, and its md5 is recorded in every run_meta",
+  "disclosure": {
+    "written_after_round1_results": true,
+    "statement": "This protocol was written AFTER the round-1 results (settings_protocol.json; results commit 2a79b27f, fix round 673dfdbe) were seen. It is a post hoc scope extension, not a blind pre-registration. No level was chosen, kept or dropped using a round-1 r value. Levels come from the April 2026 grid (gridsearch/generate_grid.py:11-17), code-supported values, or the sensitivity steps described under gex_detection_k / gex_detection_min_corr.",
+    "limitations_first_class": [
+      "GEX-side GMM is NOT tested: detect_cell_types_gex has its own hardcoded 2-component GMM and adaptive threshold (CITEgeist/model/deconvolution/detection_refinement.py:111-125, 168-192) and is called whenever GEX detection is on (citegeist_model.py:1067-1084). Protein-side GMM variants and k / min_corr do not cover it. Do NOT write 'all detection settings'.",
+      "7-type profile dictionary contents are untested",
+      "all SACE settings are untested (max_iter / EM loop, embedded QP settings, cells_per_spot, init_method, bandwidth)",
+      "filter_gex min_counts, preprocess_gex target_sum, antibody winsorization 5/95 are untested",
+      "simulation, GeoMx and clinical Visium settings; random seeds are untested",
+      "nuclei_prior_lambda is NOT tested (dropped, see dropped_settings)",
+      "the 5 regions come from one Xenium experiment; they are not independent tissue replicates"
+    ]
+  },
+  "dropped_settings": {
+    "nuclei_prior_lambda": "Dropped entirely (controller ruling, Codex review). The published call passes nuclei_counts (cellularity spot weights, citegeist_model.py:818-832). nuclei_prior_lambda is read only inside `if use_nuclei_prior:` (citegeist_model.py:838-857), a deprecated path (DeprecationWarning at :841-846). Turning it on also adds an abundance target, changes row_sum_bounds to (0.25, 2.5) (:851) and adds a penalty term (qp_solver.py:1493-1499), so it is not a lambda test of the published model. April also used max-normalized StarDist targets without nuclei_counts (gridsearch/run_props_gridsearch.py:54-61, 148-160), so a baseline-anchored version would not reproduce April either."
+  },
+  "extends": {
+    "file": "settings_protocol.json",
+    "md5_at_draft": "67f528ea030f8ac04ce3e28b7a658050",
+    "note": "Round-1 file not modified. Same baseline, regions, panels, metric, robustness rule, tie-break."
+  },
+  "dataset": "xenium",
+  "regions": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "n_types": {
+    "primary": 6,
+    "secondary": 7
+  },
+  "metric": "pearson_r (overall per-region proportion Pearson r vs SingleR GT; rmse/mae/jsd recorded)",
+  "baseline": {
+    "description": "Identical to round 1: baseline.run_xenium_qp published call = filter_gex(min_counts=25), preprocess_gex(target_sum=10000), preprocess_antibody, load_cell_profile_dict(profile), run_cell_proportion_model(lambda_laplacian=0.0, nuclei_counts=<label-derived>); every other kwarg at its production default. Uses protein-gated cell labels for nuclei counts (not label-free).",
+    "baseline_equals_gate_tolerance": 0.0001,
+    "gate_reference": "results/gate (A11). The R2 baseline is re-run and must equal the A11 gate within 1e-4 per region and panel BEFORE any delta is read."
+  },
+  "robustness_rule": {
+    "frozen": true,
+    "statement": "A level is robust iff |mean over regions of (r_level - r_baseline)| <= 0.02 AND no region has |r_level - r_baseline| > 0.05",
+    "mean_abs_threshold": 0.02,
+    "region_abs_threshold": 0.05,
+    "status_values": {
+      "ok": "estimable; gets a robust yes/no",
+      "inert": "detection-mask hash (fused mask) equals the baseline hash in EVERY region of that panel: the level did not change the solver input. No robust yes/no; excluded from all headline denominators; reported with its effective thresholds.",
+      "not_estimable": "any region failed/missing, or the diagnostics needed to establish inertness are missing. No robust yes/no; reported with the failure status."
+    },
+    "headline_rule": "Headline 'robust X of Y' counts only PRODUCTION-family levels with status ok. Benchmark-only detection variants are reported in their own section and never enter X or Y. The allowed phrase is 'robust to one-at-a-time perturbation of N QP-stage Xenium settings' where N counts production-family estimable settings."
+  },
+  "settings": {
+    "fusion_mode": {
+      "family": "production",
+      "default": "union",
+      "default_source": "CITEgeist/model/citegeist_model.py:673 (forwarded :1083)",
+      "levels_non_baseline": [
+        "intersection",
+        "adaptive"
+      ],
+      "level_evidence": "all modes supported by fuse_detection_masks (detection_refinement.py:224-252); anything else raises.",
+      "override": "direct run_cell_proportion_model kwarg fusion_mode (settings_conditions.qp_overrides)."
+    },
+    "gex_detection_k": {
+      "family": "production",
+      "default": 10,
+      "default_source": "CITEgeist/model/citegeist_model.py:671 (forwarded :1072)",
+      "levels_non_baseline": [
+        5,
+        20
+      ],
+      "level_evidence": "post-R1, pre-execution sensitivity steps (half / double the default); not documented as r-optimized and not from a pre-R1 artifact.",
+      "override": "direct kwarg gex_detection_k. Diagnostics log per-type candidate-gene counts and the all-True fallback types (fewer than 3 candidates means no GEX gate for that type, detection_refinement.py:147-162)."
+    },
+    "gex_detection_min_corr": {
+      "family": "production",
+      "default": 0.15,
+      "default_source": "CITEgeist/model/citegeist_model.py:672 (forwarded :1073)",
+      "levels_non_baseline": [
+        0.05,
+        0.3
+      ],
+      "level_evidence": "post-R1, pre-execution sensitivity steps (permissive / strict bracket in the valid [0,1] range, H clipped at detection_refinement.py:100-101); not documented as r-optimized.",
+      "override": "direct kwarg gex_detection_min_corr; same candidate-count / fallback diagnostics."
+    },
+    "gmm_n_components": {
+      "family": "benchmark_only_detection",
+      "default": 2,
+      "default_source": "CITEgeist/model/deconvolution/detection.py:122 (hardcoded; not a run_cell_proportion_model kwarg)",
+      "levels_non_baseline": [
+        3,
+        4
+      ],
+      "level_evidence": "provenance audit row 'Detection gating (GMM 2-comp)': commit 6feea54b tested multi-component GMM ('2-comp optimal').",
+      "semantics_K_gt_2": "Only the single highest-mean component (argmax of summed component means, detection.py:134-136) is treated as signal; all other components, including intermediate-high ones, count as absent. This is an implementation variant of the detector, not a natural extension of background-vs-signal gating.",
+      "override": "BENCHMARK-ONLY: GaussianMixture in the detection module is replaced for ONE condition by a factory that REPLACES the n_components keyword (settings_conditions.make_gmm_factory); restored on exit. Production source is not edited."
+    },
+    "gmm_base_threshold": {
+      "family": "benchmark_only_detection",
+      "default": 0.5,
+      "default_source": "CITEgeist/model/citegeist_model.py:989-995 (threshold=0.5 passed by keyword)",
+      "levels_non_baseline": [
+        0.3,
+        0.7
+      ],
+      "level_evidence": "symmetric steps of 0.2 around 0.5 inside the valid posterior range (0,1); no pre-R1 artifact; not documented as r-optimized.",
+      "known_property": "With adaptive_threshold=True the base is used only when the signal weight is in [0.5, 0.7); other weights give fixed 0.3 / 0.4 / 0.6 (detection.py:46-59). Often inert by construction; inert status is determined from the mask hash, not assumed.",
+      "override": "BENCHMARK-ONLY: detection.detect_cell_types replaced for ONE condition by a wrapper that REPLACES the existing threshold= keyword (settings_conditions.make_detect_wrapper). NOT functools.partial (production already passes threshold=0.5; a partial would be silently overridden by the call-time keyword)."
+    },
+    "gmm_adaptive_threshold": {
+      "family": "benchmark_only_detection",
+      "default": "on",
+      "default_source": "CITEgeist/model/citegeist_model.py:994 (adaptive_threshold=True)",
+      "levels_non_baseline": [
+        "off"
+      ],
+      "level_evidence": "code-supported kwarg of detect_cell_types (detection.py:67); 'off' makes the posterior threshold a fixed 0.5.",
+      "override": "same wrapper, REPLACES adaptive_threshold= with False."
+    }
+  },
+  "joint_block": {
+    "purpose": "Primary answer to 'did tuning on test regions inflate r': the April grid tuned alpha, lambda_reg, lambda_laplacian and detection_gate_ub JOINTLY (gridsearch/run_props_gridsearch.py:148-160), so a one-at-a-time check cannot answer it. Full factorial over the April levels of these four active production parameters, then leave-one-region-out over combinations.",
+    "levels": {
+      "alpha": [
+        0.0,
+        0.3,
+        0.5,
+        0.7,
+        1.0
+      ],
+      "lambda_reg": [
+        0.1,
+        0.5,
+        1,
+        2,
+        5
+      ],
+      "lambda_laplacian": [
+        0.0,
+        0.01,
+        0.03,
+        0.1,
+        0.3
+      ],
+      "detection_gate_ub": [
+        0.005,
+        0.01,
+        0.02,
+        0.05
+      ]
+    },
+    "level_source": "April grid: Benchmarking/xenium_benchmarking/CITEgeist/gridsearch/generate_grid.py:11-17. ALL April levels of all four axes are included, including detection_gate_ub 0.05.",
+    "baseline_cell": {
+      "alpha": 0.5,
+      "lambda_reg": 1,
+      "lambda_laplacian": 0.0,
+      "detection_gate_ub": 0.01
+    },
+    "baseline_cell_verification": "Production alpha default 0.5 (citegeist_model.py:640, kwarg `alpha`, qp_solver.py:1474-1475), lambda_reg 1 (:639), published lambda_laplacian 0.0 (baseline.py run_xenium_qp), detection_gate_ub 0.01 (:668). All four are levels of their axis, so the baseline is exactly one cell of the grid. The cell is not re-run: the baseline condition stands in for it.",
+    "n_combos": 500,
+    "n_combos_note": "5 x 5 x 5 x 4 = 500 including the baseline cell, so 499 non-baseline combos are run. The baseline level of each axis is kept so the baseline is a grid cell.",
+    "override": "direct run_cell_proportion_model kwargs alpha (NOT alpha_elastic, which exists only on the per_type_beta path, citegeist_model.py:1190), lambda_reg, lambda_laplacian, detection_gate_ub (settings_conditions.resolve, axis 'joint').",
+    "oat_slices": "OAT levels of the four joint axes (other three at baseline) are READ from the joint block, not run separately. Round-1 levels are rerun inside round 2 as joint cells (lambda_reg 0.5/2, lambda_laplacian 0.01/0.03/0.1, detection_gate_ub 0.005/0.02/0.05). These 8 duplicated levels x 5 regions x 2 panels = 80 comparisons must ALL be present, status ok, finite and equal to round 1 within 1e-4, or the gate fails. No R1/R2 pooling; the OAT-range LORO uses R2 rows only (post-R1 secondary analysis of the union of OAT ranges).",
+    "loro": "For each panel and held-out region h: choose the combo with the highest mean r over the other four regions (baseline combo is a candidate; ties within 1e-12 go to the baseline; a combo failed/missing in any training region is ineligible). Report held-out r of the chosen combo, held-out r of the baseline, and gain = chosen - baseline, per region and as the mean over regions.",
+    "decision_rule": {
+      "preregistered": true,
+      "statement": "Within the preregistered 4-axis joint block (alpha, lambda_reg, lambda_laplacian, detection_gate_ub), the R1.4 concern 'tuning on test regions inflated r' is ADDRESSED for a panel iff mean held-out gain over baseline <= 0.02 AND no region's held-out gain > 0.05; otherwise it is NOT ADDRESSED.",
+      "mean_gain_max": 0.02,
+      "region_gain_max": 0.05,
+      "justification": "Same thresholds as the round-1 robustness rule (mean 0.02, region 0.05), applied one-sided to the held-out GAIN because the question is inflation. Chosen from the round-1 rule, not from any result. Unchanged by the addition of the fourth axis.",
+      "primary_panel": "6-type; machine-readable fields primary_panel=6 and primary_decision. The 7-type verdict is secondary (secondary_decision_7type).",
+      "descriptive_only": "in_sample_best_descriptive: the combo with the best mean r over all 5 regions and its gain over baseline (the optimism an in-sample April selection could have had). Not part of the rule."
+    },
+    "caveats": [
+      "LORO regions come from one Xenium experiment, not independent tissue replicates",
+      "nuclei_prior_lambda, which April also tuned, is dropped (see dropped_settings)",
+      "detection settings (fusion_mode, k, min_corr, protein GMM) are tested one-at-a-time only, not jointly with the QP axes"
+    ],
+    "detection_gate_ub_choice": {
+      "production": 0.01,
+      "production_source": "CITEgeist/model/citegeist_model.py:668 (detection_gate_ub=0.01)",
+      "april_levels": [
+        0.005,
+        0.01,
+        0.02,
+        0.05
+      ],
+      "joint_levels": [
+        0.005,
+        0.01,
+        0.02,
+        0.05
+      ],
+      "rule": "all four April levels. Controller ruling: the joint test looks for inflation, so leaving out the level that was best one-at-a-time in round 1 (0.05) would weaken the test exactly where a reviewer would look."
+    },
+    "scope_statement": "The verdict covers the April joint-tuning concern for the four active production parameters alpha, lambda_reg, lambda_laplacian and detection_gate_ub, at all April grid levels of those four axes. It does not cover nuclei_prior_lambda (dropped), the detection settings of this protocol jointly with the QP axes, the GEX-side GMM, the 7-type dictionary, SACE or preprocessing. The 5 regions come from one Xenium experiment."
+  },
+  "expected_conditions": {
+    "baseline_per_region_per_ntype": 1,
+    "oat_detection_per_region_per_ntype": 11,
+    "joint_non_baseline_per_region_per_ntype": 499,
+    "total_per_region_per_ntype": 511,
+    "total_rows_both_panels": 5110,
+    "derivation": "OAT detection = fusion_mode 2 + gex_detection_k 2 + gex_detection_min_corr 2 + gmm_n_components 2 + gmm_base_threshold 2 + gmm_adaptive_threshold 1 = 11; joint = 5*5*5*4 - 1 = 499; plus 1 baseline = 511. Tests assert these literals independently of this file's level lists."
+  },
+  "diagnostics_per_condition": {
+    "files": "<unit out dir>/diagnostics/<condition_id>.json (run_sensitivity save_diag)",
+    "fields": [
+      "mask_hash_protein",
+      "mask_hash_gex",
+      "mask_hash_fused",
+      "effective_thresholds (signal weight, base, effective) for every adaptive-threshold call",
+      "gex_candidate_counts per type",
+      "gex_allTrue_fallback_types (< 3 candidates)",
+      "fused_detection_rate_per_type"
+    ],
+    "inert_rule": "level is inert iff mask_hash_fused equals the baseline's in every region of the panel"
+  },
+  "loro_oat": "Per-setting OAT LORO as in round 1 (loro.select) may additionally be reported for the production-family levels; benchmark-only detection variants are labelled as such.",
+  "gpu_cost_estimate": {
+    "cells": 5110,
+    "round1_reference": "round 1: 150 cells, 10 array tasks (jobs 4388144, 4388172), task elapsed 3:59-11:20 min per 15 cells incl. data load = 0.27-0.76 min per cell, mean about 0.4 min (sacct)",
+    "estimate_gpu_hours": "about 34.1 (5110 x 0.4 min); range 23.0 to 64.8",
+    "estimate_wall": "10 array tasks x 511 cells: about 138-388 min per task (typical about 204 min = 3.4 h); about 3.4 h wall if all start together (worst case about 6.5 h). Per-task worst case 6.5 h is well inside the 24 h SBATCH limit, so the array size stays at 10.",
+    "note": "no SACE; LORO and aggregation run on htc."
+  },
+  "gates_before_reading_deltas": [
+    "report output dir must be new or empty; a non-empty dir is refused so a gate failure never sits next to stale summaries",
+    "fail-closed: if ANY gate fails, only settings_v2_gate_failure.json is written; no delta, LORO, headline or verdict is computed",
+    "reference inputs: A11 gate files and the R1 metrics file are loaded by the paths and sha256 in reference_files; exactly one A11 baseline row per panel-region; any hash mismatch fails",
+    "run provenance: protocol md5, authorized commit, conditions hash, no conflicting duplicate candidates",
+    "row count == 511 x 5 x 2 = 5110 and the condition-id set equals the set derived from this protocol, per region and panel",
+    "exact reference key sets, status ok and finite on both sides: R2 baseline r per region equals the A11 gate within 1e-4 (both panels)",
+    "all 80 R1 duplicate comparisons present, ok, finite and equal to round 1 within 1e-4",
+    "per-override tests, patch-scope tests, real-wiring test and baseline-kwargs equivalence pass"
+  ],
+  "r1_duplicates": {
+    "levels": {
+      "lambda_reg": [
+        0.5,
+        2
+      ],
+      "lambda_laplacian": [
+        0.01,
+        0.03,
+        0.1
+      ],
+      "detection_gate_ub": [
+        0.005,
+        0.02,
+        0.05
+      ]
+    },
+    "expected_comparisons": 80,
+    "derivation": "8 round-1 levels that reappear as joint cells (2 + 3 + 3) x 5 regions x 2 panels = 80 (literal; the gate requires all 80)"
+  },
+  "authorized_implementation_commits": ["072ef3f3e7165690679f9a6cf618680da0fefe58"],
+  "authorized_implementation_commits_note": "FILL AT FREEZE with the exact 40-lowercase-hex SHA(s) the runs may come from. Compared by equality; short prefixes, empty strings or anything else make the gate fail. Empty list = every run is rejected (fail-closed). Runs record repository HEAD, so run from a detached worktree AT the authorized commit with the frozen protocol copied in.",
+  "run_selection": "Never by mtime. Every selected unit must carry run_meta settings_protocol_v2_md5 == md5 of the frozen file, an authorized git_hash, and conditions_sha256 == sha256 of json.dumps(build_list_v2()). Several complete candidates for one unit are accepted only if their metrics.csv are byte-identical.",
+  "headline_wording": "robust X of Y estimable production-setting levels (levels, not settings); inert and not-estimable levels and benchmark-only variants are listed separately",
+  "reference_files": {
+    "note": "Exact reference inputs, pinned by sha256 and loaded by path (no directory scan, no mtime). Hashes computed on the draft date; the freeze operator must re-verify them before freezing.",
+    "a11_gate": {
+      "files": {
+        "Benchmarking/protein_sensitivity/results/gate/xenium_6_0_race_20261014-065106-xTPZ44_a100/metrics.csv": "6790aa90705ccdbe75e7b2232dd766a35491a46407e3f4de3e39f7e968411acf",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_6_1_race_20261014-065106-xTPZ44_a100/metrics.csv": "2c02101b6d75e5ad34a7b68aacca8936c2db66f80a5f1e546f530301c4aaf636",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_6_2_race_20261014-065106-xTPZ44_a100/metrics.csv": "2d8c36a1597f75fd9ba80e5b8d02d07200458c1d8d8b03187ec8d6697005fb85",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_6_3_race_20261014-065106-xTPZ44_a100/metrics.csv": "250fbc832477b738b4da6cfc5579a3cfc75967f7710c715a616970779162c6cc",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_6_4_race_20261014-065106-xTPZ44_a100/metrics.csv": "bd0991fe0a59a841bfae5ada9bda9dca1186396f3024f3fd842b44d0dc66df9e",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_7_0_race_20261014-065139-Iukk8i_a100/metrics.csv": "fab3166e44e4ade2507bdceaed54ae6e89c4931dfdf05e478303cf1f216fa368",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_7_1_race_20261014-065139-Iukk8i_a100/metrics.csv": "7fe728d44b8eed0948dfbd802ba3596cd3c7084c822341e035759d7102f3cccc",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_7_2_race_20261014-065139-Iukk8i_a100/metrics.csv": "75e95e6cf3e5cc3bc3edb7a3bc01f1c89ba4f9df8e85bf020ee11eadc3eb916b",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_7_3_race_20261014-065139-Iukk8i_a100/metrics.csv": "fec34c1c4787a160ebfe19185c9b54777298289fa33b62fc21e7592e1710745b",
+        "Benchmarking/protein_sensitivity/results/gate/xenium_7_4_race_20261014-065139-Iukk8i_a100/metrics.csv": "db58c8ac4c3f5920159dc47a370489331df43b91e376b9b01ce9d682278fbde2"
+      }
+    },
+    "r1_metrics": {
+      "path": "Benchmarking/protein_sensitivity/results/settings_metrics.csv",
+      "sha256": "fb3c3453fca7ef4434e681addb4e5d12aaee38f8f4c95f4ecde0b6f056799460"
+    }
+  }
+}

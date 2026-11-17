@@ -1,0 +1,7677 @@
+{
+ "retrieved": "2026-11-03T08:12:56-05:00",
+ "decoupler": "1.9.2",
+ "omnipath": "1.0.12",
+ "calls": [
+  "dc.get_collectri(organism='human', split_complexes=False)",
+  "dc.get_dorothea(organism='human', levels=['A','B','C'])"
+ ],
+ "collectri_edges": 40634,
+ "dorothea_edges": 32286,
+ "collectri_esr1": [
+  {
+   "source": "ESR1",
+   "target": "AATF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCB10",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCB11",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCC2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCC3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCG2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ABL1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ACE2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ACHE",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ACKR3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ACP3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ACSBG1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ADA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ADCYAP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ADIPOQ",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ADORA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AFMID",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGO1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGO2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGO3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGO4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AGTR2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AHR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AICDA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "AIP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AKT1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AKT2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ALDH18A1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ALK",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "AMH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AMY2A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKRD30A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ANP32A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "APAF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "APOA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "APOD",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "APP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "APRT",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AQP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AR",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "AREG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGDIA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ARID5B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ATAD3B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP2A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP7A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AURKA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "AVP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BAK1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BARD1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BAX",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAS3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL2L1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL9",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BDNF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BGLAP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BIRC3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BIRC5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BLM",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BMI1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "BMP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BMP6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BMPR2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "BPIFA4P",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BRCA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BRCA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BRF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BSG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "BTG2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "C3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CA12",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CAD",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CALCA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CALM1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CAPN2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CARM1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CASP12",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CASP8AP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CAV1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CAV2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CBFB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCAR2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCL11",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCL2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCL5",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCL7",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCN1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCN2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCN5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCNA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCND1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCND2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCNE1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCNG2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CCT6B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CD24",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CD44",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CD86",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDC25A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDC42",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH17",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDK4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN1A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN1B",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN1C",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN2A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN2B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN2C",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CEACAM3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CEBPB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CFLAR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CHAT",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CISH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CKB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CLASRP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CLCA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CLDN4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CLIP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "COL2A1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "COMT",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CRABP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CREBZF",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CRH",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CRHBP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CRYAB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CSN2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CTLA4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CTNNB1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CTSD",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCL1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCL12",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCL8",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCR4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP11A1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP17A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP19A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP1A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP1B1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP27A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP2A6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP2B6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP2C19",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP2C9",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP3A4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP7B1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DACH1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DBH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DBI",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DCT",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DDIT3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "DDX17",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DHCR24",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DLC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DNAAF4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "DNMT1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "E2F1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ECM1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EDN1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "EDN3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EDNRA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EGF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EGFR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EGLN2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EGR1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EHMT2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "EIF5B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ELP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EMP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EP300",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EPHA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EPHB2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EPHB4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EPHX1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "EPPIN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ERBB2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ERBB4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ESR2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ESRRA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ETV4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "F12",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "F5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FAS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FASLG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FASN",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FBLN1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FBLN2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FCER1G",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FCGR2A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FCGR3A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FGF2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FGF7",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FGF8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FGFR3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FHL1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FHL2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FKBPL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FLII",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FLT1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOLR1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOSB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOSL1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXC1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXM1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXO1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "FSHB",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "G6PC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GAD2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GAL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GALNS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GAPDH",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GAS6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GAST",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GCH1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GCLC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GH1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GHRHR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GJA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GJB2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GJD2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GLB1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GNB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GNRH1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GNRHR",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GPER1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GPS2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GRB14",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GREB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GRIA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GRIK1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GRIN2D",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GSG1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GSN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GSTK1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GSTP1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "GTF2B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "GZMB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "H2AZ1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HADHB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HBB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HDLBP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HES1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "HEXIM1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "HLA-DQB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HMGB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HMGN1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXA1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXA10",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXC10",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXC13",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXC6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HPGDS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HPSE",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HRAS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSD11B2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSD17B3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSD17B8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSD3B1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSP90AA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSP90B1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSP90B2P",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HSPB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "HTRA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IBSP",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ICAM1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IFI16",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IFNG",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGF1R",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGFBP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGFBP3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGFBP4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IGKV2D-24",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL1A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL1B",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL37",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IL6",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "IMP3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "INHBA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "INS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "INSR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "IRS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGB3BP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGB7",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITK",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITPA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITPR1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ITPRID2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "JAK2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "JUN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "JUNB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "JUP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KAT2A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KAT2B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNK5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNMB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNN3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KDM4B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KDR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KIF18A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KISS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KLK3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KLRC3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRAS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT13",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT14",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT15",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT19",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT9",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LAMA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LCN2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "LCP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LDLR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LEP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LGALS8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LHB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LIPC",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "LITAF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LMO4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LPL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "LTBP1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "LTF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MACROD1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAOB",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAP2K2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAP2K5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAP3K14",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAPK1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAPK12",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MAPK8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MDM2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ME3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MECP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MED1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MED25",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MEMO1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MFGE8",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "MGARP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MGP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MICB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MME",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP13",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP26",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP9",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MPPED2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MRPL41",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MSX2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MT-ATP6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MTA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MTA3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MTO1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MUC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MYB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MYC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MYH11",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "MYOD1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF15",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOA3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOR1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NEK6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NELFB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NELL2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NEUROD1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NEUROG2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NFATC4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NFE2L2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NFIB",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NFKB1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NFYA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NHERF2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NID2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NME1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NONO",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOS2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOS3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOTCH2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOTCH2NLA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NOTCH4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NPAS4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NPY",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NQO1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NR0B2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NR1H3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NR3C1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NR4A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "NR5A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NRF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NRIP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "NSMF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ODC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ODF2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "OPN1LW",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "OTUB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "OXT",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "OXTR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PADI4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PBX1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PCK1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PECR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PELP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PENK",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PGR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PHB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PHLDA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PI3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PIAS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PIAS3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PIK3R1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PKIB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PLAC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PLIN1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PMAIP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "POFUT1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "POLR2F",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "POMC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "POR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARG",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARGC1A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARGC1B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PPM1D",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRDX3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKACA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKCA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKCD",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKDC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKG1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRLR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRMT1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRMT2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PROS1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRSS23",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PRUNE1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PSEN2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PSMB8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PSMD4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTCRA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTGDS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTGES",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTGFR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTGS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTGS2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTMA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTPN6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTPRG",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTPRO",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTRH2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PTTG1IP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "PWP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RAB31",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RAC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RAD21",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RARA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RARB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RBL2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RELB",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "RELN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RET",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RETN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RGN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RHO",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RHOA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RLIM",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RLN2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RNF115",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RORA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RPRM",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "RPS6KB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RUNX2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "RYK",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "S100G",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "S1PR1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SAFB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SALL1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SAP30",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCARB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN10A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN11A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN1A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN5A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN8A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SCN9A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SEC61B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SERINC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINB5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINB9",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINE1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SGCB",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SGK3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SHBG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SIAH2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SIK2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SIN3A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SIRT1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SKIL",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SKP2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC10A4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC1A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC22A5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC2A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC2A4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC34A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC38A2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC5A5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SLCO1B1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SMARCA4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SMURF2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SNAI1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SNAI2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SNCA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "SNURF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SOCS3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SPARC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SPATA2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SPI1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SPP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SRA1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SRC",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SREBF1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "ST8SIA1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "STAR",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "STAT5A",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "STC2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "STIM1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "STK11",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "STS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "STX18",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SULT2A1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SUMO1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "SYP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TAC3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TAP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TAT",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TBXA2R",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TDG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TDO2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TEK",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TERT",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TEX11",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TFAP2A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TFAP2C",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TFF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TFPI2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TG",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TGFA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TGFB3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "THBS2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "THOP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "THRA",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TIMM17A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TIMMDC1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TIMP4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TKT",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TLE1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TLR2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TLR9",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TMPRSS2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNF",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNFRSF11A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNFRSF11B",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNFRSF13C",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNFSF11",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TNIP1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TP53",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TPH2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRAPPC2L",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRH",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM16",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM21",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM25",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM63",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRPS1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TRPV6",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TSC2",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TSC22D3",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TSHB",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "TSPYL5",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TXN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "TYMS",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "U2AF1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "UBE2D2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "UBE2I",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "UCN",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "UGT1A1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "UGT1A4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "UGT2B15",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "VCP",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "VDR",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "VEGFA",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "VEGFC",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "VIM",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "WBP2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "WIF1",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "WNK4",
+   "weight": -1
+  },
+  {
+   "source": "ESR1",
+   "target": "WNT5A",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "WT1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "XCL2",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "YEATS4",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "YWHAQ",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ZEB1",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ZFHX3",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ZMYND8",
+   "weight": 1
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNF398",
+   "weight": 1
+  }
+ ],
+ "dorothea_esr1": [
+  {
+   "source": "ESR1",
+   "target": "GSN",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FBLN2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "EDN3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CLDN4",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEACAM3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CD86",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CAPN2",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL9",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "LGALS8",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NOTCH2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NOTCH2NLA",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF15",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF4",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MB",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARID5B",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "POFUT1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NID2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEC61B",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NEK6",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCT6B",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM16",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPATA2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TYMS",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRH",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPARC",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "POR",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NBPF1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "YWHAQ",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MICB",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "JUNB",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCL12",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTNNB1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHAT",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEBPB",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "BLM",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "UGT2B15",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT13",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "BTG2",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SRC",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NQO1",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "GREB1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADORA1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "AKT2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NRF1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KAT2B",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "RUNX2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXO1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ESRRA",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CD24",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "AR",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLAC1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYB",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "RET",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZFHX3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP2C19",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT15",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PMAIP1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PBX1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXP1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOSL1",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "GADD45G",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PSG1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NOL3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CRYZ",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ERG",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "EBAG9",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "REN",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "AXIN2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARD",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC8A1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT37",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT18",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "B4GALNT2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP2B2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP2B1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANGPTL4",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC8A2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC8A3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "WNT7A",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP2B4",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGB1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SMARCA2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PTPRG",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGA2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "IGFBP4",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZMYND8",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TNIP1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NFIB",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXC1",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TNFRSF11B",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CAV2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPARG",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP1B1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP1A1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "F12",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NR5A2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SOCS3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SP1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "JUN",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYC",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "E2F1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINB9",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "C3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "EGFR",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOA3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TP53",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MDM2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CAD",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "RARA",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "STAT5A",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PTMA",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOS",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCND1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TFAP2C",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN1A",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CXCL8",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MACROD1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINE1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TFF1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TSC22D3",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CRHBP",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TAC3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PELP1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "APOA1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT19",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "AKT1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NOS3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCG2",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "BMP6",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "HOXA10",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "HSPB1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTSD",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MTA3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "AVP",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TGFA",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCN5",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDKN1B",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "MMP13",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "EGF",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRL",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SP3",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "PGR",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "KDR",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "TERT",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CRH",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOA1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "IGF1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CAV1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "FBLN1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "LTF",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP19A1",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "OXT",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "GRIN2D",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH1",
+   "weight": -1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "VEGFA",
+   "weight": 1.0,
+   "confidence": "A"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC22A23",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SRGAP3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTBP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCR",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BMPER",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CXXC5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BHLHE40",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTPS2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTNND2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPSB1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DIS3L2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DIP2C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ASCC2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARSG",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ASAP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP10",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP24",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP26",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DOCK1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DNAJC5B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARFGEF2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ST7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DLG2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "STARD13",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "STARD10",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARID1B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGEF10L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "WWC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATXN7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATXN7L1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP8B1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ATP8B4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AUTS2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BANK1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DAB2IP",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KDM4B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DAAM1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAS4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DAPK1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CASZ1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHST15",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SORBS2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCDC12",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLCO2A1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHN2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CBR3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CLMN",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CALML5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHST8",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CLASP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PTK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDHR3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SMOX",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCR7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH18",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SMYD3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SND1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCDC57",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCDC85C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCDC88C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEP112",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEMIP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CPT1A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPINK4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPRED2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CRISPLD2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEMA3C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CACNG4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CACNA1D",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC38A1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CNBD1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPECC1L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "COL14A1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPATS2L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "COL5A1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAD1L1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LYPD6B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LYZL1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CUEDC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MALRD1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAML3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRP1B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PTPRJ",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PXDN",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LPP",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ECE1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRRFIP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKCH",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKAG2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRICKLE2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CUX1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MED13L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MICAL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HDAC4",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MIDEAS",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SH3BP5",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MARCHF10",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MCF2L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MCF2L2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RASA3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAPKAP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KIAA1217",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RASEF",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAPGEF1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAPGEF4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KIAA0232",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNH7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RBPMS",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KALRN",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KAT6B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KAZN",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNK1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RBM47",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SOX9",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KCTD3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAST4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RBM20",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNQ5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAP1GAP",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LHFPL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAB30",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LLGL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LMBR1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LMCD1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KSR1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAI1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LDLRAD4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PAK4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAD51B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAD23B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LARGE1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PITPNM2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PKP4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PIP4K2A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PIEZO2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KCNMA1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLEC",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EGLN3",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NIBAN2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NKAIN1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HK1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NRCAM",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NPAS3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLCB1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PARD6B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PDLIM5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PALLD",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PDE4D",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PHACTR1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GRHL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PGS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "OSBPL9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "OFCC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "P3H2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PACS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PFDN4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRIG1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MSI2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TEAD1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPFIBP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MTSS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TP63",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MTUS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPP2R2C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MLPH",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NDST1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NDUFAF6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NEDD4L",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NFATC2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NEDD9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYEOV",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYO1B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYO18A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYLK",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NCAM2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLXNA4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MECOM",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NAV2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PMEPA1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NAALADL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NACA2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HIVEP3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYOF",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEMA4B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FARP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAT1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EYA2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SFI1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAM174B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEPTIN9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EEIG1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXK1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FRMD3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP35",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FSIP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "IGF1R",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SDK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "INPP4B",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FGD5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FNDC3B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FLNB",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EFNA5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SHROOM3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EHF",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EEFSEC",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SIL1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RXRA",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RUNX1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SMAD3",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ELAPOR1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DPP9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DSCAM",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DOCK4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DOK5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DOK7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SIPA1L2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SIPA1L1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DST",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "DTNA",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SIPA1L3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ETV6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EVL",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SHANK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EMP2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "EPS15L1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HS6ST1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RIPOR3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "IFT122",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HIPK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RHOBTB3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RERE",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "IQSEC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGB5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGB6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RERG",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RGS3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RGS9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SCNN1B",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "IPPK",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "INPP5A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GLI3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GMDS",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FGFR2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SASH1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GABBR2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GALNT10",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ACSS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GSE1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ROBO1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HDAC11",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RREB1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNF217",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VWA3B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCC3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NCOR2",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ME3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VMP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VAV2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VGLL4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VPS13D",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRPS1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "WNK2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "RAB31",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "XXYLT1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FHL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BRIP1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "XYLT1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TTC7A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TTC6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TTC39A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ERBB4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "USP10",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "USP31",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "UST",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "MPPED2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "UNC5A",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "UMODL1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNRF1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZPLD1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCL3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITPR1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PKIB",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "NRP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADAM12",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BMP7",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRSS23",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZMIZ1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRLR",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZBTB7C",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXN1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRPC6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZBTB40",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNF462",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TLE1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP24A1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC6A6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SCARB1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAS3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "STK11",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAR3",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNF385B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TENM4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "THADA",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "THSD4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TBX4",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TBCD",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRP5",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMEM120B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TLE3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TJP3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TIAM1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TLN2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMCC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FOXA1",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "HMCN1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AKAP6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AKAP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AMOTL1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SUMO1P1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SULT2B1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SULF2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AGAP1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYBU",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AFF3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AFF1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SVIL",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AP1B1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRKCE",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKRD11",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKFN1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANK3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "AMZ1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANO6",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKS1B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TANC1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABHD2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABLIM1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABLIM2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "A4GALT",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TBC1D1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYPL1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADAMTS9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYT12",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "GHR",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYNJ2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADAMTS16",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TACC2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYTL2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ACTN1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYT8",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TPD52L1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TPRG1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TNS3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TOM1L2",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPDEF",
+   "weight": -0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIO",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TSPAN14",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TSNARE1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRAPPC9",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT8",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "PREX1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM37",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "VAV3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "FTO",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADRB1",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMEM229B",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMEM164",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "CACNA1I",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMPRSS3",
+   "weight": 0.5,
+   "confidence": "B"
+  },
+  {
+   "source": "ESR1",
+   "target": "SOX6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NRIP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CSK",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ASB2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP23",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARHGAP22",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ARID1A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "B3GALNT1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "AKNA",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "AMOTL2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKRD2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ANKRD13C",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "B4GALNT3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "C5AR2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TTMP",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CARD10",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CARD8",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CBLN4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CACNG1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CACNA2D1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CAMTA1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "BLK",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "BCAR1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "C17orf67",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "BPIFB1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCB9",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ABCA2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADAMTSL2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADAMTSL5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ACTL7B",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ACIN1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ACTL10",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "EXD3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ETFBKMT",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DNAH1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DNAJA4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DLG5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DGKE",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DKK3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DHRS9",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DOCK2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "E2F2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DPP3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FYN",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FRMD5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GIGYF1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FMN1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SMARCA4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MEIS1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PDZK1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAM83E",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAAH",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAAP100",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FDXR",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FBLIM1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CBY2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHD1L",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHPT1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEP164",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CFAP46",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CHRNA4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CEP128",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CD300LB",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCDC40",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CCNP",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDK18",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CELF5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDHR2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CDH26",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CTBP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ADA",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CST3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CUL7",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP46A1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "COL21A1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CLUH",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CPQ",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CORO2B",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PTTG1IP",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GAS6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CLIP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GAD2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "DNAAF4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FLT1",
+   "weight": -0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ODF2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "FAM135B",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SRI",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SSUH2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPIRE2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SNTG1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPATA7",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPATA21",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SPECC1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SNX9",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC9A8",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TIPIN",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TINAGL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TFCP2L1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMEM186",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMEM132D",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CASP7",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TCIRG1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TACC1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TAS1R3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TANK",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RPS6KL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RRBP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEC24D",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SEPTIN6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SCNN1A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CD79A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SCYL3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RPL37A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RENBP",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RFNG",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RGL2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ISG20",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RNPEPL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SDC3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RPL18A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC29A1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC28A3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC35B2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC6A17",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC7A10",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC43A2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC39A4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SH3BGR",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SH3PXD2A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SETD2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SERPINB6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SLC13A3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZNF81",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TJP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZDHHC18",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "HSPG2",
+   "weight": -0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZBTB38",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZAP70",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ZFYVE28",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PML",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRIM17",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRMT61A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TRPM1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LBH",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TNNC1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TMPRSS13",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "TPD52L2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYOG",
+   "weight": -0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "WDR25",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "WDR45B",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "VPS4A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "UGT8",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SYNE1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MCTP2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MICOS10",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MICALL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRRC43",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRRC20",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRP6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LRFN4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAL2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MANEAL",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LZTS2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LY6E",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MAEA",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "CYP4F3",
+   "weight": -0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYT1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NISCH",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NIPAL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NNMT",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NEFH",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NFASC",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MYO15A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MTRES1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "MTERF2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "HPCAL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "HOOK2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "IFT22",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GRB2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GPATCH2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "HCN2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SUSD3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "GZF1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "INSRR",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "KRT86",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LAMC2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "KLHL30",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LIN28A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LATS2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LDB1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LETMD1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LDLRAP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "LDB3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "ITGA6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "IQCD",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "IRX4",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "JUND",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLAAT3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PIP5KL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PKD2L2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLEKHG6",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "SNX5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PLEKHG5",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PDCD6IP",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PCYT2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PDLIM2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RANBP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "RALGDS",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPM1M",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "POU2F3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PPP2R3A",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PROP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PRICKLE1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PAPLN",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NSUN3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "OVGP1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "OTUD6B",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "OR4D11",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NPR3",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PALM2AKAP2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "P4HA2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PAM",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "NPEPL1",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  },
+  {
+   "source": "ESR1",
+   "target": "PACSIN2",
+   "weight": 0.3333333333333333,
+   "confidence": "C"
+  }
+ ]
+}

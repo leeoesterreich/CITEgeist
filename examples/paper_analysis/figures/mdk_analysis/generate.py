@@ -4,7 +4,7 @@ Midkine (MDK) Figure — CITEgeist Patterns v21.
 
 Panels (8 flat, A-H):
   A — Spatial grid (MDK map + proportion maps side-by-side)
-  B — COMMOT MDK-NCL interaction boxplot
+  B — COMMOT MDK-NCL compartment-level hurdle forest (A12.9)
   C — Bivariate Moran's I forest (12 specimens)
   D — ELISA MDK secretion (MCF7 vs T47D)
   E — IF micrographs (MCF7 only, top 44% crop)
@@ -18,16 +18,17 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 import matplotlib
+import matplotlib.ticker
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
 from matplotlib.image import imread
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -35,7 +36,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT = Path("/path/to/CITEgeist_analysis")
 sys.path.insert(0, str(SCRIPT_DIR.parent))
 from _shared.generate_utils import PanelContext, load_panel_sizes, panel_argparser, place_annotation, place_legend
+from _shared.spatial_utils import manuscript_protocol_sha12
 from _shared.style import apply_style
+from _shared import v2_runs
 
 apply_style()
 plt.rcParams.update({"svg.fonttype": "none"})
@@ -47,22 +50,32 @@ MDK_FIGS = PROJECT / "mdk_analysis" / "outputs" / "figures"
 MDK_IF = PROJECT / "mdk_analysis" / "outputs" / "if_analysis"
 
 PANEL_PATHS: dict[str, Path] = {
-    "A_grid": MDK_IF / "panel_A_grid.png",
+    # v42: written by generate_panel_A_rasters.py from the stamped B5 compartments (never the old if_analysis/panel_A_grid.png)
+    "A_grid": SCRIPT_DIR / "outputs" / "panel_A_grid_v42.png",
     "F": PANELS_DIR / "panel_F.jpg",
 }
 
 # CSV data sources for vector panels
-HURDLE_CSV = PROJECT / "mdk_analysis/outputs/commot_p4s2/hurdle_results_summary.csv"
-HURDLE_JSON = PROJECT / "mdk_analysis/outputs/commot_p4s2/hurdle_results.json"
+HURDLE_RESULTS_JSON = Path("/path/to/midkine_data/hurdle_results.json")
 MORANS_CSV = PROJECT / "mdk_analysis/outputs/if_analysis/bivariate_morans_results.csv"
-ELISA_CSV = PROJECT / "mdk_analysis/outputs/if_analysis/elisa_data.csv"
-CHIPSEQ_CSV = PROJECT / "mdk_analysis/_archive/mdk_saturation_pipeline/outputs/tables/er_chipseq_all_conditions.csv"
-TRAJECTORY_CSV = PROJECT / "mdk_analysis/outputs/spatial/trajectory_deltas.csv"
+# Fig 6D: recomputed from the raw plate 2 readings by scripts/elisa_table.py (4PL standard curve, blank-subtracted, per ug/uL cell protein, Welch).
+# (scripts/elisa_table.py in the authoring tree; not shipped)
+ELISA_SCRIPTS = Path("/path/to/elisa_scripts")
+ELISA_CSV = Path("/path/to/midkine_data/elisa_plate2_wells.csv")
+ELISA_YLABEL = "MDK (ng/mL per \u03bcg/\u03bcL cell protein)"
+# Produced by build_er_chipseq_table.py (max MACS peak score within hg38 TSS +/- 10 kb, capped at 3100).
+CHIPSEQ_CSV = SCRIPT_DIR / "er_chipseq" / "er_chipseq_peak_scores.csv"
 
 # Competitor-GEX comparison (promoted from supplementary biology_validation → Fig 5 C/D)
-COMPETITOR_DIR = PROJECT / "output" / "competitor_gex" / "comparison"
-MORANS_COMPARE_CSV = COMPETITOR_DIR / "morans_comparison.csv"
-FAILURE_CSV = COMPETITOR_DIR / "failure_mode_summary.csv"
+# Def C (A12) MDK bivariate Moran's I sources. The def C mean (0.0606) SUPERSEDES
+# the retired 0.254 from bivariate_morans_results.csv (A12.10/A12.14).
+# Do NOT revert to the legacy CSV.
+MORANS_DEF_C_JSON = Path("/path/to/midkine_data/morans_results.json")
+# v42: stage B9 (run id from v42_run_ids.yaml; the v40 leaf name m1 does not exist under the v2 protocol).
+MORANS_COMPARATORS_DEF_C_JSON = v2_runs.results_dir("B9") / "morans_results.json"
+# Fig 5D source: stamped A12 pr2 program-recovery registry (all three methods, one rule).
+PROGRAM_RECOVERY_JSON = v2_runs.results_dir("B11") / "program_recovery.json"
+TISSUE_JSON = Path("/path/to/midkine_data/tissue.json")
 METHOD_DISPLAY_CMP = {"cell2location": "Cell2Loc.", "tangram": "Tangram"}
 METHOD_COLORS_CMP = {"CITEgeist": "#c51b8a", "cell2location": "#2171b5", "tangram": "#fe9929"}
 PROGRAM_COLORS_CMP = {"full": "#4CAF50", "partial": "#FF9800", "absent": "#F44336"}
@@ -157,115 +170,207 @@ def _show_img(ax: plt.Axes, path: Path) -> None:
 
 
 def draw_panel_A(ax: plt.Axes) -> None:
-    """Spatial deconvolution overview: 2x4 grid of Cancer Luminal proportion
-    (row 1) and MDK expression (row 2) across 4 patient samples.
-    """
+    """MDK expression (row 1) and secretory score (row 2) of the eligible cancer compartments, v2 (B5), three specimens."""
+    if not PANEL_PATHS["A_grid"].exists():  # no placeholder: a missing raster must stop the build, not ship a grey box
+        raise FileNotFoundError(f"{PANEL_PATHS['A_grid']}: run generate_panel_A_rasters.py first")
     _show_img(ax, PANEL_PATHS["A_grid"])
 
 
-def draw_panel_B(ax: plt.Axes) -> None:
-    """COMMOT hurdle model (P4, single patient): two significant axes.
+HURDLE_KEY = "a12_compartment_hurdle"
+# (sensitivity run id, display label) in top-to-bottom order; R00 is the primary analysis.
+HURDLE_FOREST_RUNS = [
+    ("R00", "Primary"),
+    ("R10", "Between-spot only"),
+    ("R01", "Depth-only norm."),
+    ("R02", "Total-count norm."),
+    ("R11", "Nuclei-free"),
+]
+HURDLE_OR_RUNS = ("R00", "R11")
 
-    Left  = overall signaling participation (pooled across pathways),
-            OR=4.01, p=8.7e-11 (Fisher's exact).
-    Right = MDK sender magnitude among active senders (NCL 2.08x, SDC2 2.01x;
-            Mann-Whitney FDR<0.05).
-    The n.s. MDK-NCL *participation* bar was removed: it made the panel read
-    as null even though the finding (a ~2x magnitude increase) is significant.
-    MDK-NCL participation (39% vs 36%, p=0.47) is reported in the caption.
-    """
+
+def load_hurdle_a12(path: Path | None = None) -> dict:
+    """Return the ``a12_compartment_hurdle`` block of hurdle_results.json."""
     import json
 
-    # Load data
-    hurdle_df = pd.read_csv(HURDLE_CSV)
-    with open(HURDLE_JSON, encoding="utf-8") as f:
-        hurdle_json = json.load(f)
+    with open(path or HURDLE_RESULTS_JSON, encoding="utf-8") as f:
+        data = json.load(f)
+    if HURDLE_KEY not in data:
+        raise KeyError(f"{HURDLE_KEY!r} missing from hurdle results JSON")
+    return data[HURDLE_KEY]
 
-    # --- Set up two subplots ---
+
+def _require(d: dict, key: str, where: str):
+    if not isinstance(d, dict) or key not in d or d[key] is None:
+        raise KeyError(f"hurdle results: missing {where}[{key!r}]")
+    return d[key]
+
+
+def hurdle_panel_rows(a12: dict) -> list[dict]:
+    """Forest-plot rows for Figure 5B, top to bottom (pure function; raises on any missing key).
+
+    Each row: ``key, label, kind`` ('primary' | 'sensitivity' | 'control'), ``gmr``,
+    ``lo``/``hi`` (nominal 95% interval; primary only, else None), and
+    ``part_or`` (participation OR; R00 and R11 only, else None).
+    The last row is the 3x-MDK positive control (``injected_gmr``).
+    """
+    head = _require(a12, "headline", "a12")
+    sens = _require(a12, "sensitivity_gmr", "a12")
+    sens_or = _require(a12, "sensitivity_participation_or", "a12")
+    rows = []
+    for run, label in HURDLE_FOREST_RUNS:
+        row = {
+            "key": run,
+            "label": label,
+            "kind": "primary" if run == "R00" else "sensitivity",
+            "gmr": float(_require(sens, run, "sensitivity_gmr")),
+            "lo": None,
+            "hi": None,
+            "part_or": float(_require(sens_or, run, "sensitivity_participation_or")) if run in HURDLE_OR_RUNS else None,
+        }
+        if run == "R00":
+            row["lo"] = float(_require(head, "ci_lo", "headline"))
+            row["hi"] = float(_require(head, "ci_hi", "headline"))
+        rows.append(row)
+    pc = _require(a12, "positive_control", "a12")
+    if pc.get("status") != "ok":
+        raise ValueError(f"hurdle results: positive_control status is {pc.get('status')!r}, not 'ok'")
+    fold = float(_require(pc, "fold_applied", "positive_control"))
+    rows.append(
+        {
+            "key": "PC",
+            "label": f"Positive control\n({fold:g}× MDK)",
+            "kind": "control",
+            "gmr": float(_require(pc, "injected_gmr", "positive_control")),
+            "lo": None,
+            "hi": None,
+            "part_or": None,
+        }
+    )
+    return rows
+
+
+def hurdle_null_band(a12: dict):
+    """Shifted-label null 95% band (q025, q975) of the primary GMR; None when the negative control is not_estimable."""
+    nc = _require(a12, "negative_control", "a12")
+    if nc.get("status") == "not_estimable":
+        return None
+    s = _require(nc, "summary", "negative_control")
+    return float(_require(s, "q025", "negative_control.summary")), float(
+        _require(s, "q975", "negative_control.summary")
+    )
+
+
+def draw_panel_B(ax: plt.Axes) -> None:
+    """COMMOT MDK-NCL compartment-level hurdle (A12.9), P4-S2.
+
+    Left (main) axis: forest plot of the magnitude geometric-mean ratio (GMR,
+    D538G-proxy-high / low) among active senders on a log axis, dashed line at 1.
+    Primary analysis (R00) carries its nominal 95% block-bootstrap interval; the
+    four sensitivity runs (between-spot only, depth-only, total-count, nuclei-free)
+    are points. A gray band marks the 2.5-97.5% range of the shifted-label null;
+    the open diamond is the injected 3x-MDK positive control.
+    Right axis (shares the row positions): participation odds ratio for the
+    primary and nuclei-free runs, dashed line at 1.
+    No p-values or significance marks. Data: hurdle_results.json
+    (``a12_compartment_hurdle``).
+    """
+    a12 = load_hurdle_a12()
+    rows = hurdle_panel_rows(a12)
+    band = hurdle_null_band(a12)
+    head = a12["headline"]
+    ink = "#333333"
+
+    ctx = getattr(PanelContext, "_active", None)
+    fonts = getattr(ctx, "_fonts", None) or {}
+    ann_pt = fonts.get("annotation_pt", 9)
+
     fig = ax.get_figure()
-    pos = ax.get_position()
     ax.set_visible(False)
+    y_pos = [0, 1, 2, 3, 4, 5.6]
+    ax_m = fig.add_axes([0.40, 0.25, 0.34, 0.54])
+    ax_p = fig.add_axes([0.83, 0.25, 0.16, 0.54], sharey=ax_m)
 
-    # Reserve a bottom strip for the shared legend so it does not overlap bars.
-    ax_left = fig.add_axes([pos.x0, pos.y0 + pos.height * 0.18, pos.width * 0.45, pos.height * 0.70])
-    ax_right = fig.add_axes(
-        [pos.x0 + pos.width * 0.55, pos.y0 + pos.height * 0.18, pos.width * 0.45, pos.height * 0.70]
+    if band is not None:
+        ax_m.axvspan(band[0], band[1], color="#E3E3E3", zorder=0, linewidth=0)
+    ax_m.axvline(1.0, color="gray", linestyle="--", linewidth=1.0, zorder=1)
+    for y, r in zip(y_pos, rows):
+        if r["kind"] == "control":
+            ax_m.plot(
+                r["gmr"],
+                y,
+                marker="D",
+                markersize=6,
+                markerfacecolor="white",
+                markeredgecolor=ink,
+                markeredgewidth=1.2,
+                linestyle="none",
+                zorder=3,
+            )
+            continue
+        if r["lo"] is not None:
+            ax_m.plot([r["lo"], r["hi"]], [y, y], color=ink, linewidth=1.4, solid_capstyle="butt", zorder=2)
+        ax_m.plot(
+            r["gmr"],
+            y,
+            marker="o",
+            markersize=6 if r["kind"] == "primary" else 5,
+            color=ink,
+            linestyle="none",
+            zorder=3,
+        )
+    ax_m.set_xscale("log")
+    ax_m.set_xlim(0.5, 4.0)
+    ax_m.set_xticks([0.5, 1, 2, 4])
+    ax_m.set_xticklabels(["0.5", "1", "2", "4"])
+    ax_m.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
+    ax_m.set_yticks(y_pos)
+    ax_m.set_yticklabels([r["label"] for r in rows])
+    ax_m.set_ylim(6.2, -0.6)
+    ax_m.set_xlabel("Sender GMR\n(high/low)", labelpad=3)
+    ax_m.spines["top"].set_visible(False)
+    ax_m.spines["right"].set_visible(False)
+    if band is not None:
+        ax_m.text(
+            band[0],
+            1.02,
+            "Shifted-label 95%",
+            transform=ax_m.get_xaxis_transform(),
+            ha="left",
+            va="bottom",
+            fontsize=ann_pt,
+            color="#666666",
+        )
+    fig.text(
+        0.40,
+        0.985,
+        f"P4-S2, MDK-NCL\nn = {head['n_active_high']} vs {head['n_active_low']} active senders",
+        ha="left",
+        va="top",
+        fontsize=ann_pt,
     )
 
-    color_mut = "#E07B39"  # D538G-high (orange)
-    color_wt = "#5B8DBE"  # D538G-low (blue)
-
-    # --- Left: overall (pooled) signaling participation -----------------
-    # Only the pooled "total" participation is shown: it is the significant
-    # participation result. MDK is significant in magnitude, not engagement
-    # frequency, so its effect is shown on the right instead.
-    total_mut = hurdle_json["total_sender_participation"]["mut_active_pct"]
-    total_wt = hurdle_json["total_sender_participation"]["wt_active_pct"]
-    total_p = hurdle_json["total_sender_participation"]["fisher_p"]
-    total_or = hurdle_json["total_sender_participation"]["fisher_OR"]
-
-    bar_w = 0.4
-    ax_left.bar([-bar_w / 2 - 0.02], [total_mut], width=bar_w, color=color_mut, label="D538G-high")
-    ax_left.bar([bar_w / 2 + 0.02], [total_wt], width=bar_w, color=color_wt, label="D538G-low")
-
-    ax_left.set_xticks([0])
-    ax_left.set_xticklabels(["All pathways"])
-    ax_left.set_xlim(-0.7, 0.7)
-    ax_left.set_ylabel("Sender participation (%)", labelpad=8)
-    ax_left.set_ylim(0, 118)
-    ax_left.set_title("Overall signaling")
-    # Legend placed below the left sub-axes so the bars stay visible.
-    ax_left.legend(
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.30),
-        ncol=1,
-        frameon=False,
-    )
-    ax_left.spines["top"].set_visible(False)
-    ax_left.spines["right"].set_visible(False)
-
-    # Significance annotation for the pooled participation comparison.
-    def _annot_sig(ax_t, x_pos, y_top, p_val):
-        stars = "***" if p_val < 0.001 else ("**" if p_val < 0.01 else ("*" if p_val < 0.05 else "ns"))
-        ax_t.text(x_pos, y_top + 2, stars, ha="center", va="bottom", fontweight="bold" if stars != "ns" else "normal")
-
-    y_top = max(total_mut, total_wt)
-    _annot_sig(ax_left, 0, y_top, total_p)
-    ax_left.text(0, y_top + 11, f"OR = {total_or:.1f}", ha="center", va="bottom")
-
-    # --- Right: MDK sender magnitude among active senders ----------------
-    mdk_rows = hurdle_df[hurdle_df["pathway"].str.startswith("s-MDK-")].copy()
-    # Exclude ITGA6_ITGB1 (no active senders)
-    mdk_rows = mdk_rows[~mdk_rows["pathway"].str.contains("ITGA6_ITGB1")]
-    mdk_rows = mdk_rows.dropna(subset=["sender_fc_nonzero"])
-
-    receptors = [p.replace("s-MDK-", "") for p in mdk_rows["pathway"]]
-    fc_vals = mdk_rows["sender_fc_nonzero"].values
-    fdr_vals = mdk_rows["mw_fdr_nonzero"].values
-
-    colors = ["#d62728" if fdr < 0.05 else "#999999" for fdr in fdr_vals]
-    y_pos = np.arange(len(receptors))
-
-    ax_right.barh(y_pos, fc_vals, color=colors, height=0.6, alpha=0.85)
-    ax_right.axvline(1.0, color="gray", linestyle="--", linewidth=1.2)
-    ax_right.set_yticks(y_pos)
-    ax_right.set_yticklabels(receptors)
-    ax_right.set_xlabel("Fold change (D538G/WT)", labelpad=8)
-    ax_right.set_title("MDK sender strength")
-    ax_right.spines["top"].set_visible(False)
-    ax_right.spines["right"].set_visible(False)
-
-    # Annotate fold-change with FDR significance stars (Mann-Whitney on
-    # nonzero senders). Significant bars are red, n.s. grey.
-    def _stars(fdr):
-        return "***" if fdr < 0.001 else ("**" if fdr < 0.01 else ("*" if fdr < 0.05 else ""))
-
-    for i, (fc, fdr) in enumerate(zip(fc_vals, fdr_vals)):
-        star = _stars(fdr)
-        label = f"{fc:.2f}x {star}".rstrip() if star else f"{fc:.2f}x (ns)"
-        ax_right.text(fc + 0.05, i, label, va="center", ha="left")
-    if len(fc_vals):
-        ax_right.set_xlim(0, max(fc_vals) * 1.40)
+    for y, r in zip(y_pos, rows):
+        if r["part_or"] is not None:
+            ax_p.plot(
+                r["part_or"],
+                y,
+                marker="o",
+                markersize=6 if r["kind"] == "primary" else 5,
+                color=ink,
+                linestyle="none",
+                zorder=3,
+            )
+    ax_p.axvline(1.0, color="gray", linestyle="--", linewidth=1.0, zorder=1)
+    ax_p.set_xscale("log")
+    ax_p.set_xlim(0.4, 2.5)
+    ax_p.set_xticks([0.5, 1, 2])
+    ax_p.set_xticklabels(["0.5", "1", "2"])
+    ax_p.xaxis.set_minor_locator(matplotlib.ticker.NullLocator())
+    ax_p.tick_params(axis="y", left=False, labelleft=False)
+    ax_p.set_xlabel("Particip.\nOR", labelpad=3)
+    ax_p.spines["top"].set_visible(False)
+    ax_p.spines["right"].set_visible(False)
+    ax_p.spines["left"].set_visible(False)
 
 
 def _get_patient_d(sample: str) -> str:
@@ -326,15 +431,24 @@ def draw_panel_E(ax: plt.Axes) -> None:
     """ELISA MDK secretion across 8 conditions with per-replicate points."""
     from scipy.stats import ttest_ind
 
-    df = pd.read_csv(ELISA_CSV)
-    group_order = df["group"].drop_duplicates().tolist()
+    if str(ELISA_SCRIPTS) not in sys.path:
+        sys.path.insert(0, str(ELISA_SCRIPTS))
+    import elisa_table
+
+    df = pd.DataFrame(elisa_table.sample_values(elisa_table.load_table(ELISA_CSV)))
+    df["group"] = df["line"] + " " + df["genotype"] + " " + df["e2"] + "E2"
+    group_order = [
+        f"{ln} {gt} {e}E2"
+        for ln in elisa_table.LINES
+        for gt, e in (("WT", "-"), ("WT", "+"), ("D538G", "-"), ("D538G", "+"))
+    ]
     n = len(group_order)
     colors_list = ["#66C2A5", "#FC8D62", "#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3", "#8DA0CB", "#E78AC3"]
 
     means, sems = [], []
     group_vals: list[np.ndarray] = []
     for i, grp in enumerate(group_order):
-        vals = df.loc[df["group"] == grp, "mdk_pg_ml"].values
+        vals = df.loc[df["group"] == grp, "mdk_norm"].values
         group_vals.append(vals)
         means.append(float(vals.mean()))
         sems.append(float(vals.std(ddof=1) / np.sqrt(len(vals))))
@@ -373,7 +487,7 @@ def draw_panel_E(ax: plt.Axes) -> None:
         ha="right",
         fontsize=7,
     )
-    ax.set_ylabel("MDK (pg/mL)", labelpad=8)
+    ax.set_ylabel(ELISA_YLABEL, labelpad=8)
 
     # Cell-line group headers spanning bars 0-3 (MCF7) and 4-7 (T47D), placed
     # ABOVE the frame (column-group convention) -- the short tick labels consume
@@ -414,7 +528,7 @@ def draw_panel_E(ax: plt.Axes) -> None:
     # measured from the global max bar top so they don't dip near taller bars.
     global_top = max(bar_tops)
     base_offset = tick * 3.5
-    stagger_extra = tick * 3.0
+    stagger_extra = tick * 5.5
     bar_y = [global_top + base_offset + (stagger_extra if i % 2 == 1 else 0) for i, _ in enumerate(pairs)]
 
     def _stars(p: float) -> str:
@@ -572,9 +686,10 @@ def draw_panel_H(ax: plt.Axes) -> None:
         display_genes = list(genes)
         orig_row = list(range(len(genes)))
 
-    _ = ax.imshow(display_norm, aspect="equal", cmap="RdYlBu_r", vmin=-2, vmax=2, rasterized=True)
+    # aspect="auto": cells widen to the panel so 3-4 digit peak scores fit inside them.
+    _ = ax.imshow(display_norm, aspect="auto", cmap="RdYlBu_r", vmin=-2, vmax=2, rasterized=True)
     ax.set_xticks(range(len(cond_cols)))
-    ax.set_xticklabels([c.replace("_", " ") for c in cond_cols], rotation=90, ha="right", fontsize=7)
+    ax.set_xticklabels([c.replace("_", " ") for c in cond_cols], rotation=90, ha="center", fontsize=7)
     ax.set_yticks(range(len(display_genes)))
     ax.set_yticklabels(display_genes, fontsize=8)
     ax.tick_params(axis="y", pad=2)
@@ -585,7 +700,7 @@ def draw_panel_H(ax: plt.Axes) -> None:
         for j in range(len(cond_cols)):
             val = int(data[gi, j])
             tc = "white" if abs(normalized[gi, j]) > 1 else "black"
-            ax.text(j, i_disp, str(val), ha="center", va="center", color=tc)
+            ax.text(j, i_disp, str(val), ha="center", va="center", color=tc, fontsize=8)
 
     # Italic group annotations placed in the left margin, vertically centered
     # within each group (no line — the blank row IS the separator).
@@ -594,201 +709,55 @@ def draw_panel_H(ax: plt.Axes) -> None:
     if 0 < n_bound < len(genes):
         bound_mid = (n_bound - 1) / 2.0
         unbound_mid = n_bound + 1 + (len(genes) - n_bound - 1) / 2.0
-        ax.text(
-            -3.8,
-            bound_mid,
-            "ER binding",
-            ha="right",
-            va="center",
-            fontsize=7.4,
-            fontstyle="italic",
-            rotation=90,
-            clip_on=False,
-        )
-        ax.text(
-            -3.8,
-            unbound_mid,
-            "No binding",
-            ha="right",
-            va="center",
-            fontsize=7.4,
-            fontstyle="italic",
-            rotation=90,
-            clip_on=False,
-        )
-
-
-def draw_panel_I(ax: plt.Axes) -> None:
-    """Patient MDK-secretory trajectory: biopsy to surgery."""
-    df = pd.read_csv(TRAJECTORY_CSV)
-    patient_meta = {
-        "P1": {"color": "#d62728", "marker": "s", "is_prog": True},
-        "P2": {"color": "#1f77b4", "marker": "o", "is_prog": False},
-        "P3": {"color": "#2ca02c", "marker": "o", "is_prog": False},
-        "P5": {"color": "#9467bd", "marker": "o", "is_prog": False},
-        "P6": {"color": "#17becf", "marker": "o", "is_prog": False},
-    }
-
-    endpoints: list[tuple[str, float, dict]] = []
-    for _, row in df.iterrows():
-        p = row["patient"]
-        if p not in patient_meta:
-            continue
-        m = patient_meta[p]
-        prog = m["is_prog"]
-        lw = 2.5 if prog else 1.5
-        ms = 9 if prog else 7
-        alpha = 1.0 if prog else 0.6
-        z = 10 if prog else 5
-
-        ax.plot([0, 1], [row["biopsy_I"], row["surgery_I"]], color=m["color"], linewidth=lw, alpha=alpha, zorder=z)
-        ax.scatter(
-            0,
-            row["biopsy_I"],
-            s=ms**2,
-            color=m["color"],
-            marker=m["marker"],
-            edgecolors=m["color"],
-            facecolors="white",
-            linewidths=1.5,
-            alpha=alpha,
-            zorder=z + 1,
-        )
-        ax.scatter(1, row["surgery_I"], s=ms**2, color=m["color"], marker=m["marker"], alpha=alpha, zorder=z + 1)
-        endpoints.append((p, float(row["surgery_I"]), m))
-
-    endpoints.sort(key=lambda e: e[1])
-    all_vals = list(df["biopsy_I"]) + list(df["surgery_I"])
-    y_range = max(all_vals) - min(all_vals)
-    # 0.12 (was 0.06): the smaller gap left near-coincident endpoints (P2/P5)
-    # visually tight without triggering a nudge; 0.12×range forces a legible gap
-    # between adjacent endpoint labels (with leader lines back to true points).
-    min_sep = max(y_range * 0.12, 0.025)
-    placed_ys: list[float] = []
-    for p, y_orig, meta in endpoints:
-        y = y_orig
-        if placed_ys and y - placed_ys[-1] < min_sep:
-            y = placed_ys[-1] + min_sep
-        placed_ys.append(y)
-        # Draw a thin leader line when the label has been nudged away from
-        # the true endpoint so readers can trace which point the label belongs to.
-        if abs(y - y_orig) > 1e-9:
+        # x in points left of the axes (cells are no longer square, so a data-unit offset would drift).
+        for y_mid, label in ((bound_mid, "ER binding"), (unbound_mid, "No binding")):
             ax.annotate(
-                p,
-                xy=(1.05, y_orig),
-                xytext=(1.05, y),
+                label,
+                xy=(0, y_mid),
+                xycoords=("axes fraction", "data"),
+                xytext=(-46, 0),
+                textcoords="offset points",
+                ha="right",
                 va="center",
-                color=meta["color"],
-                fontweight="bold" if meta["is_prog"] else "normal",
-                alpha=1.0 if meta["is_prog"] else 0.6,
-                fontsize=7,
-                arrowprops=dict(arrowstyle="-", lw=0.4, color="0.6"),
+                fontsize=7.4,
+                fontstyle="italic",
+                rotation=90,
+                annotation_clip=False,
             )
-        else:
-            ax.text(
-                1.05,
-                y,
-                p,
-                va="center",
-                color=meta["color"],
-                fontweight="bold" if meta["is_prog"] else "normal",
-                alpha=1.0 if meta["is_prog"] else 0.6,
-                fontsize=7,
-            )
-
-    mean_delta = float(df["delta_I"].mean())
-    # Paired one-sided Wilcoxon signed-rank: H1 is biopsy < surgery (delta > 0).
-    # n=5 all-positive deltas saturate at p = 1/2^5 = 0.03125 (formally significant).
-    from scipy.stats import wilcoxon
-
-    deltas = df["delta_I"].dropna().values
-    if len(deltas) >= 5:
-        _, wilcoxon_p = wilcoxon(deltas, alternative="greater", zero_method="wilcox")
-        # Single-line annotation: the prior two-line form was misread by the
-        # composite validator as two overlapping x-tick labels. Keep it compact
-        # (full methodological detail lives in the caption) so it does not crowd
-        # the data area or overflow the right edge.
-        annot = f"Δ̄ = +{mean_delta:.3f}; Wilcoxon p = {wilcoxon_p:.3f}"
-    else:
-        annot = f"Δ̄ = +{mean_delta:.3f}"
-
-    max_i = max(all_vals) if all_vals else 1.0
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(["Biopsy", "Surgery"])
-    ax.set_ylabel("Moran's I (MDK–secretory)", labelpad=8)
-    # Extra right margin hosts de-collided endpoint labels; extra top headroom
-    # gives the annotation room above the data.
-    ax.set_xlim(-0.18, 1.55)
-    ax.set_ylim(-0.02, max_i * 1.55)
-
-    # Annotation in upper-LEFT corner so the long "Wilcoxon 1-sided p = ..."
-    # string never extends past the panel's right edge (T17 fix).
-    place_annotation(
-        ax,
-        0.02,
-        0.97,
-        annot,
-        ha="left",
-        va="top",
-        fontsize=7,
-    )
-
-    from matplotlib.lines import Line2D
-
-    legend_elements = [
-        Line2D([0], [0], marker="s", color="#d62728", markersize=8, label="Progressor", linewidth=2),
-        Line2D([0], [0], marker="o", color="gray", markersize=7, label="Responder", linewidth=1.5, alpha=0.6),
-    ]
-    # External-bottom legend matches Fig3 C/E/F treatment so the
-    # Progressor/Responder key never overlaps the trajectory lines.
-    ax.legend(
-        handles=legend_elements,
-        loc="upper center",
-        bbox_to_anchor=(0.5, -0.32),
-        ncol=2,
-        frameon=False,
-        fontsize=8,
-    )
-
-
-def _sig_label_cmp(p: float) -> str:
-    if p <= 0.001:
-        return "***"
-    if p <= 0.01:
-        return "**"
-    if p <= 0.05:
-        return "*"
-    return "n.s."
 
 
 def _citegeist_mdk_morans():
-    """CITEgeist MDK bivariate Moran's I: (mean, sem, per-sample valid df)."""
-    df = pd.read_csv(MORANS_CSV)
-    valid = df.dropna(subset=["morans_I"])
+    """CITEgeist MDK bivariate Moran's I: (mean, sem, per-sample valid df).
+
+    Def C (A12) source (mean I = 0.0606). The retired 0.254 mean from
+    mdk_analysis/outputs/if_analysis/bivariate_morans_results.csv is superseded
+    and deliberately NOT used.
+    """
+    import json
+
+    data = json.loads(MORANS_DEF_C_JSON.read_text())
+    valid = pd.DataFrame([s for s in data["specimens"] if s["status"] == "ok"])[["sample", "I"]].rename(
+        columns={"I": "morans_I"}
+    )
     vals = valid["morans_I"].values
     return float(vals.mean()), float(vals.std(ddof=1) / np.sqrt(len(vals))), valid
 
 
-def _paired_wilcoxon_vs_citegeist(competitor: str, morans: pd.DataFrame, cg_valid: pd.DataFrame):
-    """One-sided paired Wilcoxon (CITEgeist > competitor) on matched specimens."""
-    cg = cg_valid[["sample", "morans_I"]].rename(columns={"morans_I": "I_cg"})
-    comp = morans[(morans["gene"] == "MDK") & (morans["method"] == competitor)][["sample", "I"]].rename(
-        columns={"I": "I_comp"}
-    )
-    merged = cg.merge(comp, on="sample", how="inner").dropna(subset=["I_cg", "I_comp"])
-    n = len(merged)
-    if n < 5:
-        return np.nan, n
-    try:
-        return wilcoxon(merged["I_cg"].values, merged["I_comp"].values, alternative="greater").pvalue, n
-    except ValueError:
-        return np.nan, n
-
-
 def draw_panel_morans_methods(ax: plt.Axes) -> None:
-    """Panel C — MDK bivariate Moran's I by method (CITEgeist 11 / C2L 12 / Tangram 12)."""
-    morans = pd.read_csv(MORANS_COMPARE_CSV)
-    cg_I, cg_sem, cg_valid = _citegeist_mdk_morans()
+    """Panel C — MDK bivariate Moran's I by method (CITEgeist / C2L / Tangram, shared n=10 estimable set; Def C)."""
+    import json
+
+    comp_data = json.loads(MORANS_COMPARATORS_DEF_C_JSON.read_text())
+    shared = comp_data["comparators"]["shared"]
+    morans = pd.DataFrame(
+        [
+            {"gene": "MDK", "method": m, "sample": sid, "I": sp[m]["I"]}
+            for sid, sp in shared.items()
+            for m in sp
+            if isinstance(sp[m], dict) and "I" in sp[m]
+        ]
+    )
+    cg_I, cg_sem, _ = _citegeist_mdk_morans()
     mdk = morans[morans["gene"] == "MDK"]
     stats = mdk.groupby("method")["I"].agg(["mean", "sem"]).reset_index()
 
@@ -815,22 +784,28 @@ def draw_panel_morans_methods(ax: plt.Axes) -> None:
             ax.errorbar(x[i], mv, yerr=sv, fmt="none", color="black", capsize=4, linewidth=1.0)
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
-    ax.set_ylabel("MDK bivariate Moran's I")
+    ax.set_ylabel("MDK bivariate Moran's I", labelpad=8)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    for bar, mv in zip(bars, means):
-        ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.008, f"{mv:.3f}", ha="center", va="bottom")
+    for bar, mv, sv in zip(bars, means, sems):
+        ax.text(bar.get_x() + bar.get_width() / 2, mv + sv + 0.004, f"{mv:.3f}", ha="center", va="bottom")
 
-    y_max = max(means) * 1.20
-    step = max(means) * 0.14
+    _top = max(
+        m + s for m, s in zip(means, sems)
+    )  # clear the tallest error bar (and its value label) with the first bracket
+    y_max = _top * 1.14
+    step = _top * 0.16
     off = 0.0
+    inference = comp_data["comparators"][
+        "inference"
+    ]  # stamped B9: patient-level sign-flip, Holm over the 2 comparators (two-sided)
     for comp in ["cell2location", "tangram"]:
         disp = METHOD_DISPLAY_CMP.get(comp, comp)
         if disp not in labels:
             continue
         ci = labels.index(disp)
-        p, n = _paired_wilcoxon_vs_citegeist(comp, morans, cg_valid)
-        sig = f"n.s. (n={n})" if np.isnan(p) else f"{_sig_label_cmp(p)} (p={p:.4f}, n={n})"
+        inf = inference[comp]
+        sig = f"Holm p = {inf['holm_p']:.2f} ({inf['n_patients']} patients)"
         by = y_max + off
         ax.plot([x[0], x[0], x[ci], x[ci]], [by - 0.005, by, by, by - 0.005], color="black", linewidth=0.8)
         ax.text((x[0] + x[ci]) / 2, by + 0.005, sig, ha="center", va="bottom")
@@ -838,25 +813,323 @@ def draw_panel_morans_methods(ax: plt.Axes) -> None:
     ax.set_ylim(0, y_max + off + step * 0.5)
 
 
-def draw_panel_program_recovery(ax: plt.Axes) -> None:
-    """Panel D — MDK NMF program recovery by method (out of 12)."""
-    failure = pd.read_csv(FAILURE_CSV)
-    prog = failure[failure["analysis"] == "programs_mdk"].copy().sort_values("method")
-    prog = prog[prog["method"].isin(["cell2location", "tangram"])]
-    labels = [METHOD_DISPLAY_CMP.get(m, m) for m in prog["method"]]
-    x = np.arange(len(labels))
-    bar_w = 0.65 / 3
-    cats = [
-        ("Full", prog["full"].tolist(), PROGRAM_COLORS_CMP["full"]),
-        ("Partial", prog["partial"].tolist(), PROGRAM_COLORS_CMP["partial"]),
-        ("Absent", prog["absent"].tolist(), PROGRAM_COLORS_CMP["absent"]),
+# Moran's I robustness (Fig 5C): mean real I beside the two matched-control means, per adjustment form (B22, descriptive).
+# (plain-English label, key of tissue.json::moran_robustness.arms). Forms: D1 = intercept + spot depth; D2 = depth deciles;
+# D4 = depth + tumor content (qp_prop); D5 = depth + RNA per cell (hurdle.covariate_matrix columns 0,2 / 0,1).
+ROBUSTNESS_FORMS = [
+    ("No adjustment", "check11|full_counts_none"),
+    ("Depth", "check11|full_counts_D1"),
+    ("Depth\n(deciles)", "check11|full_counts_D2"),
+    ("Depth +\ntumor content", "check13|full_counts_D4"),
+    ("Depth +\nRNA per cell", "check13|full_counts_D5"),
+    ("15 neighbors", "check15|none_k15"),
+]
+ROBUSTNESS_COLORS = {"real": "#c51b8a", "ctrl_a": "#9e9e9e", "ctrl_b": "#d9d9d9"}
+
+
+def moran_robustness_rows(tissue: dict, forms=None) -> list:
+    """[(label, mean_real, mean_ctrl_a, mean_ctrl_b, n_specimens)] from tissue.json (pure; raises on any gap).
+
+    Checks the B22 provenance (stage, descriptive_only, k_primary == 6) and that every plotted arm has a mean for the real
+    statistic and both matched-control families on all of its specimens. Plots means, never ratios.
+    """
+    mr = tissue["moran_robustness"]
+    if mr.get("stage") != "B22" or mr.get("descriptive_only") is not True or mr.get("k_primary") != 6:
+        raise ValueError(
+            f"moran_robustness provenance is not B22 / descriptive / k=6: { {k: mr.get(k) for k in ('stage', 'descriptive_only', 'k_primary')} }"
+        )
+    rows = []
+    for label, key in forms or ROBUSTNESS_FORMS:
+        arm = mr["arms"][key]
+        vals = [arm.get("mean_real"), arm.get("mean_ctrl_a"), arm.get("mean_ctrl_b")]
+        if any(v is None for v in vals) or arm.get("n_with_controls") != arm.get("n_specimens"):
+            raise ValueError(
+                f"moran_robustness arm {key!r}: missing mean or controls on {arm.get('n_with_controls')}/{arm.get('n_specimens')} specimens"
+            )
+        rows.append((label, float(vals[0]), float(vals[1]), float(vals[2]), int(arm["n_specimens"])))
+    if not rows:
+        raise ValueError("no robustness forms to plot")
+    return rows
+
+
+def draw_panel_moran_robustness(ax: plt.Axes) -> None:
+    """Fig 5C: mean MDK-secretory bivariate Moran's I (real) next to the two matched random-gene control means, by form."""
+    rows = moran_robustness_rows(json.loads(TISSUE_JSON.read_text()))
+    n = {r[4] for r in rows}
+    x = np.arange(len(rows))
+    w = 0.26
+    series = [
+        ("Real", 1, ROBUSTNESS_COLORS["real"]),
+        ("Random gene for MDK", 2, ROBUSTNESS_COLORS["ctrl_a"]),
+        ("Random genes for secretory", 3, ROBUSTNESS_COLORS["ctrl_b"]),
     ]
-    for (cl, vals, c), boff in zip(cats, [-bar_w, 0, bar_w]):
-        ax.bar(x + boff, vals, width=bar_w * 0.9, color=c, edgecolor="black", linewidth=0.6, label=cl)
+    for i, (lab, col, color) in enumerate(series):
+        ax.bar(
+            x + (i - 1) * w,
+            [r[col] for r in rows],
+            width=w,
+            color=color,
+            edgecolor="black",
+            linewidth=0.5,
+            label=lab,
+            zorder=3,
+        )
+    ax.axhline(0, color="black", linewidth=0.6, zorder=2)
     ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.set_ylabel("MDK programs (of 12)")
-    ax.set_yticks(range(0, 13, 2))
+    ax.set_xticklabels([r[0] for r in rows])
+    ax.set_ylabel(f"Mean bivariate Moran's I\n({'/'.join(str(v) for v in sorted(n))} specimens)")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.yaxis.grid(True, linestyle=":", linewidth=0.5, alpha=0.6, zorder=0)
+    place_legend(ax, position="bottom", frameon=False, ncol=3)
+
+
+NCL_TYPE_LABELS = {
+    "B_Cells": "B cells",
+    "CD4_T_Cells": "CD4\nT cells",
+    "CD8_T_Cells": "CD8\nT cells",
+    "Cancer_Cells": "Cancer\ncells",
+    "Endothelial": "Endothelial",
+    "Fibroblasts": "Fibroblasts",
+    "Macrophages": "Macrophages",
+}
+
+
+def mdk_ncl_rows(tissue: dict) -> tuple:
+    """(rows, headline specimen, min_active, n_specimens) from tissue.json::mdk_ncl_celltype_map (pure; raises on any gap).
+
+    Each row: label, sender / receiver median share across specimens, the headline specimen's share, and the number of
+    specimens with at least ``min_active`` active compartments of that type (sender, receiver). Sorted by sender median.
+    """
+    m = tissue["mdk_ncl_celltype_map"]
+    if m.get("stage") != "B18" or m.get("descriptive_only") is not True:
+        raise ValueError("mdk_ncl_celltype_map provenance is not B18 / descriptive")
+    rows = []
+    for e in m["cohort_mdk_ncl"]:
+        if e["cell_type"] not in NCL_TYPE_LABELS:
+            raise KeyError(f"no plain-English label for cell type {e['cell_type']!r}")
+        s, r = e["s"], e["r"]
+        rows.append(
+            {
+                "label": NCL_TYPE_LABELS[e["cell_type"]],
+                "s_med": float(s["median_share_across_specimens"]),
+                "r_med": float(r["median_share_across_specimens"]),
+                "s_p4": float(s["P4-S2_share"]),
+                "r_p4": float(r["P4-S2_share"]),
+                "s_n": int(s["n_specimens_ge30_active"]),
+                "r_n": int(r["n_specimens_ge30_active"]),
+                "n_with": int(s["n_specimens_with_type"]),
+            }
+        )
+    if not rows:
+        raise ValueError("no cell types in mdk_ncl_celltype_map")
+    rows.sort(key=lambda r: -r["s_med"])
+    return rows, m["headline_specimen"], int(m["min_active"]), int(m["n_specimens"])
+
+
+def draw_panel_mdk_ncl_celltypes(ax: plt.Axes) -> None:
+    """Fig 5B: MDK-NCL sender and receiver score share by cell type (median across specimens; P4-S2 marked; B18, descriptive)."""
+    rows, head, min_active, n_spec = mdk_ncl_rows(json.loads(TISSUE_JSON.read_text()))
+    n = len(rows)
+    y = np.arange(n)[::-1]
+    h = 0.36
+    c_s, c_r = "#E07B39", "#5B8DBE"
+    ax.barh(
+        y + h / 2,
+        [r["s_med"] for r in rows],
+        height=h,
+        color=c_s,
+        edgecolor="black",
+        linewidth=0.5,
+        label="Sender",
+        zorder=3,
+    )
+    ax.barh(
+        y - h / 2,
+        [r["r_med"] for r in rows],
+        height=h,
+        color=c_r,
+        edgecolor="black",
+        linewidth=0.5,
+        label="Receiver",
+        zorder=3,
+    )
+    ax.scatter(
+        [r["s_p4"] for r in rows],
+        y + h / 2,
+        marker="D",
+        s=22,
+        color="white",
+        edgecolor="black",
+        linewidth=0.8,
+        zorder=5,
+    )
+    ax.scatter(
+        [r["r_p4"] for r in rows],
+        y - h / 2,
+        marker="D",
+        s=22,
+        color="white",
+        edgecolor="black",
+        linewidth=0.8,
+        zorder=5,
+        label="P4-S2",
+    )
+    ax.set_yticks(y)
+    ax.set_yticklabels([r["label"] for r in rows], fontsize=9)
+    ax.set_xlim(0, 0.95)
+    ax.set_xticks([0, 0.2, 0.4, 0.6])
+    ax.set_xlabel("Share of MDK-NCL score")
+    # specimens with enough active compartments of each type (small-type shares need caution)
+    ax.text(
+        0.9,
+        1.02,
+        f"Specimens with >={min_active}\nactive (of {n_spec}):\nsender / receiver",
+        transform=ax.transAxes,
+        ha="right",
+        va="bottom",
+        fontsize=7,
+    )
+    for yi, r in zip(y, rows):
+        ax.text(
+            0.9, yi, f"{r['s_n']} / {r['r_n']}", transform=ax.get_yaxis_transform(), ha="right", va="center", fontsize=8
+        )
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.xaxis.grid(True, linestyle=":", linewidth=0.5, alpha=0.6, zorder=0)
+    place_legend(ax, position="bottom", frameon=False, ncol=3)
+
+
+SHORT = (
+    lambda sid: sid.replace("HCC22-088-", "")
+    .replace("_1i_rep", "")
+    .replace("_F_rep", "")
+    .replace("_D", "")
+    .replace("_A", "")
+)
+
+
+def moran_control_rows(cp: dict) -> list:
+    """Per-specimen rows from the stamped B17 file (pure): sample, real_I, and p5 / median / p95 of both matched controls.
+
+    Every specimen with status ok is returned (none dropped); the stage must be B17 and descriptive_only.
+    """
+    if cp.get("stage") != "B17" or cp.get("descriptive_only") is not True or cp.get("k") != 6:
+        raise ValueError("control_pairs provenance is not B17 / descriptive / k=6")
+    rows = []
+    for sid, e in cp["per_specimen"].items():
+        if e.get("status") != "ok":
+            continue
+        a, b = e["control_a_random_mdk"], e["control_b_random_secretory"]
+        rows.append(
+            {
+                "sample": sid,
+                "real": float(e["real_I"]),
+                "a": (a["p5"], a["median"], a["p95"], bool(a["real_gt_p95"])),
+                "b": (b["p5"], b["median"], b["p95"], bool(b["real_gt_p95"])),
+            }
+        )
+    if not rows:
+        raise ValueError("no estimable specimens in control_pairs")
+    return rows
+
+
+def draw_panel_moran_controls(ax: plt.Axes) -> None:
+    """Fig 5C: real MDK-secretory Moran's I per specimen (dot) against the 5th-95th percentile range of its 200 matched
+    random-gene controls, for both control families. Every estimable specimen is shown; the counts above p95 are printed.
+    """
+    cp = json.loads((v2_runs.results_dir("B17") / "control_pairs_results.json").read_text())
+    rows = moran_control_rows(cp)
+    n = len(rows)
+    y = np.arange(n)[::-1]
+    off = 0.17
+    for i, r in enumerate(rows):
+        for sign, key, color in ((+1, "a", "#9e9e9e"), (-1, "b", "#c9c9c9")):
+            lo, med, hi, _ = r[key]
+            ax.plot([lo, hi], [y[i] + sign * off] * 2, color=color, linewidth=3.2, solid_capstyle="butt", zorder=2)
+            ax.plot([med], [y[i] + sign * off], marker="|", color="black", markersize=5, zorder=3)
+        ax.scatter(
+            [r["real"]], [y[i]], s=34, color=ROBUSTNESS_COLORS["real"], edgecolor="black", linewidth=0.5, zorder=4
+        )
+    ax.axvline(0, color="black", linewidth=0.5, zorder=1)
+    ax.set_yticks(y)
+    ax.set_yticklabels([SHORT(r["sample"]) for r in rows])
+    ax.set_xlabel("Moran's I (bars: 5th-95th pct)")
+    na, nb = sum(r["a"][3] for r in rows), sum(r["b"][3] for r in rows)
+    mr, ma, mb = (
+        float(np.mean(v)) for v in ([r["real"] for r in rows], [r["a"][1] for r in rows], [r["b"][1] for r in rows])
+    )
+    from matplotlib.lines import Line2D
+
+    handles = [
+        Line2D(
+            [0],
+            [0],
+            marker="o",
+            color="w",
+            markerfacecolor=ROBUSTNESS_COLORS["real"],
+            markeredgecolor="black",
+            markersize=6,
+            label=f"Real (mean {mr:.3f})",
+        ),
+        Line2D([0], [0], color="#9e9e9e", linewidth=3.2, label=f"Random MDK gene: above {na}/{n}"),
+        Line2D([0], [0], color="#c9c9c9", linewidth=3.2, label=f"Random secretory genes: above {nb}/{n}"),
+    ]
+    ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, -0.2), frameon=False, fontsize=7)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
+def program_recovery_rows(pr: dict) -> tuple:
+    """Return (n_specimens, [(method, full, partial, absent), ...]) from the pr2 registry.
+
+    Raises on a missing key, a non-ok (not-estimable/failed) specimen, or counts
+    that do not sum to n_specimens. Order: CITEgeist, cell2location, tangram.
+    """
+    n = pr["n_specimens"]
+    rows = []
+    for m in ("CITEgeist", "cell2location", "tangram"):
+        t = pr["totals"][m]
+        if t["n_not_estimable"] or t["n_failed"] or t["n_specimens_ok"] != n:
+            raise ValueError(f"program recovery: {m} has non-ok specimens")
+        f, p, a = t["full"], t["partial"], t["absent"]
+        if f + p + a != n:
+            raise ValueError(f"program recovery: {m} full+partial+absent != n_specimens={n}")
+        rows.append((m, f, p, a))
+    return n, rows
+
+
+def draw_panel_program_recovery(ax: plt.Axes) -> None:
+    """MDK NMF program recovery by method (stacked specimen counts, of N).
+
+    Rendered as the single panel of Supplementary Figure program_recovery_by_method
+    (generate_supp_program_recovery_by_method.py); no longer a main-figure panel.
+    """
+    pr = json.loads(PROGRAM_RECOVERY_JSON.read_text())
+    if pr.get("_code_dirty") is not False:
+        raise ValueError(f"{PROGRAM_RECOVERY_JSON}: _code_dirty is {pr.get('_code_dirty')!r}")
+    n, rows = program_recovery_rows(pr)
+    labels = [METHOD_DISPLAY_CMP.get(r[0], r[0]) for r in rows]
+    x = np.arange(len(labels))
+    bottom = np.zeros(len(rows))
+    for i, (cl, key) in enumerate([("Full", "full"), ("Partial", "partial"), ("Absent", "absent")]):
+        vals = np.array([r[i + 1] for r in rows], dtype=float)
+        ax.bar(
+            x,
+            vals,
+            bottom=bottom,
+            width=0.65,
+            color=PROGRAM_COLORS_CMP[key],
+            edgecolor="black",
+            linewidth=0.6,
+            label=cl,
+        )
+        bottom += vals
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha="right", rotation_mode="anchor")
+    ax.set_ylabel(f"Specimens (of {n})")
+    ax.set_ylim(0, n)
+    ax.set_yticks(range(0, n + 1, 2))
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     place_legend(ax, position="right", title="Recovery", frameon=False)
@@ -870,11 +1143,10 @@ def panel_specs_for(figure):
     """
     if figure == "spatial":
         return [
-            ("A", draw_panel_A),  # spatial grid
-            ("B", draw_panel_B),  # COMMOT hurdle
-            ("C", draw_panel_morans_methods),  # 3-method Moran's (promoted S9-A; forest detail → Supp S6)
-            ("D", draw_panel_program_recovery),  # NMF program recovery (promoted S9-B)
-            ("E", draw_panel_I),  # trajectory (was D)
+            ("A", draw_panel_A),  # MDK / secretory spatial maps (v2 B5 compartments)
+            ("B", draw_panel_mdk_ncl_celltypes),  # MDK-NCL sender / receiver share by cell type (B18, descriptive)
+            ("C", draw_panel_moran_controls),  # real I per specimen vs matched random-gene controls (B17)
+            # v42: hurdle (draw_panel_B), the 3-method Moran's comparison and the across-forms robustness panel moved to the supplement
         ]
     if figure == "mechanism":
         return [

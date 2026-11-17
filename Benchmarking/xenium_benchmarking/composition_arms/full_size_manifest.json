@@ -1,0 +1,43 @@
+{
+  "_code_commit": "4b6d7927762539520f3ed8b68d41bd6cbda2af28",
+  "_code_dirty": false,
+  "_payload_sha256": "d72a6c31cc33abdcaadfa81154237b6c33bee88777258e42e41daa4aa6bb8084",
+  "_produced_by": "Benchmarking/xenium_benchmarking/gt_rebuild/composition_arms.py",
+  "arms_manifest_sha256": "af44678d57b6819e0847b6cf70af80d0550e37029747c593902947fa143df6ca",
+  "decision_status": "USER DECISION 2026-10-25",
+  "endpoint": "full_size",
+  "fixed_gene_set": null,
+  "fixed_gene_set_status": "PENDING USER DECISION",
+  "label_counts": {
+    "B cells": 416,
+    "Endothelial": 13986,
+    "Epithelial": 22416,
+    "Fibroblasts": 495,
+    "Macrophages": 10381,
+    "T cells": 7156
+  },
+  "n": 54850,
+  "reference_csv": "Benchmarking/xenium_benchmarking/reference_data/GSE156632/processed/rctd/cell_types_with_sample.csv",
+  "reference_sha256": "7744373deb98f442d342491d5dd521c8ca12520eafc399c67a163a9d01e42ed6",
+  "seed_semantics": "full_size has no sampling, so a reference seed is meaningless. The 3 Cell2Location 's0,s1,s2' are 3 repeated UNSEEDED runs (replicate index) on one shared reference export; the arms and the original full-size run are unseeded too, so repeats keep the protocol like-for-like. Other methods have 1 run.",
+  "seeds_by_method": {
+    "CARD": [
+      0
+    ],
+    "Cell2Location": [
+      0,
+      1,
+      2
+    ],
+    "RCTD": [
+      0
+    ],
+    "Seurat": [
+      0
+    ],
+    "Tangram": [
+      0
+    ]
+  },
+  "selection": "all reference cells, no sampling"
+}

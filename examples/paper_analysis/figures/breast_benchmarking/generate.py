@@ -37,6 +37,7 @@ plt.rcParams.update(
 
 BASE_DIR = Path("/path/to/CITEgeist_analysis/benchmarks/xenium_benchmarking")
 RESULTS_DIR = BASE_DIR / "evaluation" / "results_breast"
+SIGMA_STAMP = BASE_DIR / "evaluation" / "breast_sigma_spot" / "gt_gex_sigma.json"
 OUTPUT_DIR = SCRIPT_DIR / "panels"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 COMPOSITE_DIR = SCRIPT_DIR / "composite"
@@ -333,7 +334,10 @@ def panel_c_gex_correlation(gex_data, ax):
     ax.set_xticks(x)
     ax.set_xticklabels(ct_labels, rotation=45, ha="right")
     ax.set_ylabel("Pearson r (log1p GEX)", labelpad=8)
-    ax.set_ylim(0, 0.65)
+    # Headroom derived from the data (bar + SEM). A fixed 0.65 ceiling clipped the
+    # C2L bars (up to r=0.83, +SEM ~0.93) so they ran into the panel title.
+    y_top = max(np.max(np.array(tangram_rs) + np.array(tangram_sem)), np.max(np.array(c2l_rs) + np.array(c2l_sem)))
+    ax.set_ylim(0, float(np.ceil(y_top * 1.04 * 10) / 10))
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     # pad=0.10 pushes legend offset to ~-0.55 to clear 45°-rotated x-tick labels
@@ -382,14 +386,17 @@ def panel_d_gex_rmse(gex_data, ax):
         error_kw=ekw,
     )
 
-    # ── Reference lines: per-gene σ on log1p scale of the breast Xenium GT.
-    # Values precomputed (5 regions × 8 cell types × ≈280 genes, n=11,160
-    # gene-by-celltype-by-region observations) — see commit message.
+    # ── Reference lines: per-gene σ on the log1p scale of the spot-level breast GT that the RMSE is scored
+    # against (prop × total spot GEX; compute_breast_gene_sigma.py, the same definition as the Xenium lines).
+    # Read from the stamped sigma file, never typed here.
     # Above the dashed σ_p90 line, RMSE exceeds the spread of 90% of genes
-    # in the panel; above the solid σ_median line, the error already exceeds
+    # in the panel; above the solid mean line, the error already exceeds
     # the spread of the typical gene.
-    SIGMA_MEAN = 0.314
-    SIGMA_P90 = 0.651
+    with open(SIGMA_STAMP) as _fh:
+        _sg = json.load(_fh)
+    if _sg.get("n_blocks_all_zero") or _sg.get("n_blocks_scored") != 40:
+        raise RuntimeError(f"{SIGMA_STAMP} is not a complete 5-region x 8-type sigma stamp")
+    SIGMA_MEAN, SIGMA_P90 = round(_sg["mean"], 3), round(_sg["p90"], 3)
     xmin, xmax = x.min() - 0.5, x.max() + 0.5
     ax.hlines(
         SIGMA_MEAN,

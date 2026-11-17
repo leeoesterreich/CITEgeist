@@ -8,7 +8,7 @@ exclude = ["repro*", "figures*", "Benchmarking*", "manuscript*", "tests*"]
 
 [project]
 name = "citegeist"
-version = "2.0.1"
+version = "3.0.0"
 description = "Cellular Indexing of Transcriptomes and Epitopes for Guided Exploration of Intrinsic Spatial Trends"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -18,6 +18,7 @@ dependencies = [
     "pandas>=1.3.0",
     "scipy>=1.7.0",
     "scanpy>=1.9.0",
+    "scikit-misc",  # skmisc: scanpy flavor="seurat_v3" gene selection in the default Phase 1 (rna_refined)
     "squidpy>=1.2.0",
     "anndata>=0.8.0",
     "scikit-learn>=1.0.0",

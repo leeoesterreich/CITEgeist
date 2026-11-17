@@ -76,19 +76,33 @@ class AlignedProgram:
     """Meta-analyzed gene loadings (gene_name -> mean loading across samples)."""
 
     sample_signatures: Dict[str, NDArray]
-    """Per-sample W vectors (sample_name -> (n_genes,) array)."""
+    """Per-sample W vectors (sample_name -> (n_genes,) array). If a specimen contributes
+    several programs to this group, this is their mean (identical to the single vector
+    when there is one). Use ``program_signatures`` for the individual programs."""
 
     sample_program_ids: Dict[str, int]
-    """Mapping of sample_name -> original program_id in that sample."""
+    """Mapping of sample_name -> original program_id in that sample. If a specimen has
+    several programs in this group, this holds the id of the first by (cell_type, id); use
+    ``program_keys`` for all. Ids restart at 0 for every cell type, so an id alone does not
+    identify a program."""
 
     embedding: NDArray
     """Position in integrated latent space (n_components,)."""
 
     conservation_score: float
-    """Fraction of samples where this program appears (0-1)."""
+    """Fraction of specimens with at least one program in this group (0-1).
+    Each specimen counts once: n distinct specimens / total specimens, however many
+    of its programs fall in the group."""
 
     top_genes: List[str]
     """Top N genes by consensus loading."""
+
+    program_signatures: Dict[Tuple[str, str, int], NDArray] = field(default_factory=dict)
+    """Every program in the group, keyed by (sample_name, cell_type, original program_id).
+    Program ids restart at 0 for every cell type, so the cell type is part of the key."""
+
+    program_keys: List[Tuple[str, str, int]] = field(default_factory=list)
+    """(sample_name, cell_type, original program_id) of every program in the group, sorted."""
 
     def __repr__(self) -> str:
         return (
@@ -671,9 +685,21 @@ def match_programs_across_samples(
     *,
     similarity_threshold: float = 0.7,
     top_n_genes: int = 20,
+    stratify_by_cell_type: bool = True,
 ) -> List[AlignedProgram]:
     """
     Match programs across samples based on embedding similarity.
+
+    By default (``stratify_by_cell_type=True``) programs are grouped separately within each
+    cell type, so a group never mixes cell types and its ``cell_type`` is its true type.
+    Within each type the grouping is the same average-linkage clustering of cosine distance
+    cut at ``1 - similarity_threshold``; that cut is an absolute similarity, not a cluster
+    count, so the same ``similarity_threshold`` applies unchanged to every type. (The Harmony
+    ``n_clusters`` argument belongs to the embedding step, not to matching, and is unchanged;
+    the embedding Z is still computed once on all programs.) Group ids are numbered
+    consecutively over cell types in sorted order, so they stay unique.
+    ``stratify_by_cell_type=False`` clusters all programs of all cell types together (the
+    behaviour before this option existed; a group's ``cell_type`` is then its modal type).
 
     Args:
         Z: Integrated embedding (n_programs, n_components)
@@ -682,32 +708,48 @@ def match_programs_across_samples(
         all_genes: List of all genes
         similarity_threshold: Minimum cosine similarity to group programs
         top_n_genes: Number of top genes to include
+        stratify_by_cell_type: Group within each cell type (default True); False groups all
+            programs together
 
     Returns:
         List of AlignedProgram objects
     """
     n_samples = len(metadata["sample"].unique())
 
-    # Compute pairwise cosine similarity
-    similarity = cosine_similarity(Z)
+    def _cluster(Z_sub: NDArray) -> NDArray:
+        if len(Z_sub) == 1:
+            return np.zeros(1, dtype=int)
+        # Compute pairwise cosine similarity
+        similarity = cosine_similarity(Z_sub)
 
-    # Convert similarity to distance for clustering
-    distance_matrix = 1 - similarity
-    np.fill_diagonal(distance_matrix, 0)
+        # Convert similarity to distance for clustering
+        distance_matrix = 1 - similarity
+        np.fill_diagonal(distance_matrix, 0)
 
-    # Hierarchical clustering
-    try:
-        clustering = AgglomerativeClustering(
-            n_clusters=None,
-            distance_threshold=1 - similarity_threshold,
-            metric="precomputed",
-            linkage="average",
-        )
-        labels = clustering.fit_predict(distance_matrix)
-    except (ValueError, RuntimeError) as e:
-        logger.warning("Clustering failed: %s. Using fallback method.", e)
-        # Fallback: each program is its own cluster
-        labels = np.arange(len(Z))
+        # Hierarchical clustering
+        try:
+            clustering = AgglomerativeClustering(
+                n_clusters=None,
+                distance_threshold=1 - similarity_threshold,
+                metric="precomputed",
+                linkage="average",
+            )
+            return clustering.fit_predict(distance_matrix)
+        except (ValueError, RuntimeError) as e:
+            logger.warning("Clustering failed: %s. Using fallback method.", e)
+            # Fallback: each program is its own cluster
+            return np.arange(len(Z_sub))
+
+    if stratify_by_cell_type:
+        labels = np.zeros(len(Z), dtype=int)
+        offset = 0
+        cell_types = metadata["cell_type"].to_numpy()
+        for ct in sorted(set(cell_types)):
+            idx = np.where(cell_types == ct)[0]
+            labels[idx] = _cluster(Z[idx]) + offset
+            offset += int(labels[idx].max()) + 1 - offset
+    else:
+        labels = _cluster(Z)
 
     logger.info("Program matching: %s aligned program groups from %s total programs", len(np.unique(labels)), len(Z))
 
@@ -722,27 +764,37 @@ def match_programs_across_samples(
         # Use the most common cell type as the representative
         cell_type = cluster_meta["cell_type"].mode().iloc[0] if len(cluster_meta) > 0 else "Unknown"
 
-        # Collect per-sample signatures
-        sample_signatures = {}
-        sample_program_ids = {}
+        # Collect every program, keyed by (sample, cell_type, program_id); a specimen may contribute
+        # several programs to one group and none may be dropped. Ids restart at 0 per cell type.
+        program_signatures: Dict[Tuple[str, str, int], NDArray] = {}
 
         for _, (_, row) in zip(cluster_indices, cluster_meta.iterrows()):
             sample = row["sample"]
             ct = row["cell_type"]
-            prog_id = row["program_id"]
+            prog_id = int(row["program_id"])
 
             if (sample, ct) in aligned_W:
                 W = aligned_W[(sample, ct)]
                 if prog_id < W.shape[1]:
-                    sample_signatures[sample] = W[:, prog_id]
-                    sample_program_ids[sample] = prog_id
+                    program_signatures[(sample, ct, prog_id)] = W[:, prog_id]
 
-        samples_present = list(sample_signatures.keys())
-
-        if len(samples_present) == 0:
+        if len(program_signatures) == 0:
             continue
 
-        # Compute consensus signature (mean across samples)
+        program_keys = sorted(program_signatures.keys())
+
+        # Per-specimen signature = mean of that specimen's programs in this group
+        sample_signatures: Dict[str, NDArray] = {}
+        sample_program_ids: Dict[str, int] = {}
+        for sample in dict.fromkeys(k[0] for k in program_keys):
+            progs = [k for k in program_keys if k[0] == sample]
+            sample_signatures[sample] = np.mean([program_signatures[k] for k in progs], axis=0)
+            sample_program_ids[sample] = progs[0][2]
+
+        # Each specimen counts once for conservation
+        samples_present = list(sample_signatures.keys())
+
+        # Consensus signature: mean across specimens (each specimen weighted equally)
         sig_matrix = np.column_stack(list(sample_signatures.values()))
         consensus = sig_matrix.mean(axis=1)
 
@@ -766,6 +818,8 @@ def match_programs_across_samples(
                 embedding=mean_embedding,
                 conservation_score=len(samples_present) / n_samples,
                 top_genes=top_genes,
+                program_signatures=program_signatures,
+                program_keys=program_keys,
             )
         )
 
@@ -795,6 +849,11 @@ def compare_bivariate_relationships(
     IMPORTANT: This compares INTRA-sample relationships (computed by Module 4b)
     to assess their persistence INTER-sample (across patients).
 
+    The unit of analysis is the specimen: several programs of one specimen can map to the
+    same aligned group, so each aligned pair is collapsed to one value per specimen (the mean
+    of that specimen's entries). Sample counts, ``min_samples``, ``conservation_score`` and
+    the mean/std/type are all computed over these per-specimen values.
+
     Args:
         bivariate_results: Module 4b results keyed by sample name
         aligned_programs: List of aligned programs with sample mappings
@@ -808,12 +867,16 @@ def compare_bivariate_relationships(
     # Build reverse mapping: (sample, cell_type, program_id) -> aligned_program_id
     program_to_aligned = {}
     for aligned_prog in aligned_programs:
-        for sample, prog_id in aligned_prog.sample_program_ids.items():
-            key = (sample, aligned_prog.cell_type, prog_id)
-            program_to_aligned[key] = aligned_prog.program_id
+        if aligned_prog.program_keys:
+            for key in aligned_prog.program_keys:
+                program_to_aligned[key] = aligned_prog.program_id
+        else:
+            for sample, prog_id in aligned_prog.sample_program_ids.items():
+                key = (sample, aligned_prog.cell_type, prog_id)
+                program_to_aligned[key] = aligned_prog.program_id
 
-    # Collect bivariate I values per aligned program pair
-    relationship_data: Dict[Any, Any] = defaultdict(lambda: {"values": [], "samples": []})
+    # Collect bivariate I values per aligned program pair, grouped by specimen
+    relationship_data: Dict[Any, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
 
     for sample_name, result in bivariate_results.items():
         for pair in result.all_pairs:
@@ -830,18 +893,20 @@ def compare_bivariate_relationships(
             # Use sorted tuple as key to ensure consistency
             pair_key = tuple(sorted([aligned1, aligned2]))
 
-            relationship_data[pair_key]["values"].append(pair.bivariate_morans_i)
-            relationship_data[pair_key]["samples"].append(sample_name)
+            relationship_data[pair_key][sample_name].append(pair.bivariate_morans_i)
 
     # Convert to ConservedRelationship objects
     n_samples = len(bivariate_results)
     conserved_relationships = []
 
-    for (prog1, prog2), data in relationship_data.items():
-        if len(data["samples"]) < min_samples:
+    for (prog1, prog2), by_sample in relationship_data.items():
+        # One value per specimen: the mean of its entries for this aligned pair
+        samples = sorted(by_sample)
+        if len(samples) < min_samples:
             continue
 
-        values = np.array(data["values"])
+        sample_values = [float(np.mean(by_sample[s])) for s in samples]
+        values = np.array(sample_values)
         mean_i = np.mean(values)
         std_i = np.std(values)
 
@@ -857,11 +922,11 @@ def compare_bivariate_relationships(
             ConservedRelationship(
                 program1_id=prog1,
                 program2_id=prog2,
-                samples_with_relationship=data["samples"],
-                bivariate_i_values=data["values"],
+                samples_with_relationship=samples,
+                bivariate_i_values=sample_values,
                 mean_bivariate_i=mean_i,
                 std_bivariate_i=std_i,
-                conservation_score=len(data["samples"]) / n_samples,
+                conservation_score=len(samples) / n_samples,
                 relationship_type=rel_type,
             )
         )
@@ -949,6 +1014,7 @@ def integrate_samples(
     max_iter: int = 20,
     random_state: int = 42,
     build_network: bool = True,
+    stratify_by_cell_type: bool = True,
 ) -> IntegrationResult:
     """
     Main function: integrate programs across multiple samples.
@@ -963,6 +1029,9 @@ def integrate_samples(
         max_iter: Maximum Harmony iterations
         random_state: Random seed
         build_network: Whether to build similarity network
+        stratify_by_cell_type: Group programs within each cell type (default True); a group never
+            mixes cell types. False clusters all cell types together. See
+            ``match_programs_across_samples`` for how ``similarity_threshold`` applies per type.
 
     Returns:
         IntegrationResult with aligned programs, relationships, and network
@@ -990,6 +1059,7 @@ def integrate_samples(
         aligned_W=aligned_W,
         all_genes=all_genes,
         similarity_threshold=similarity_threshold,
+        stratify_by_cell_type=stratify_by_cell_type,
     )
 
     # Step 4: Compare bivariate relationships (if available)
@@ -1026,6 +1096,7 @@ def integrate_samples(
             "n_clusters": n_clusters,
             "theta": theta,
             "similarity_threshold": similarity_threshold,
+            "stratify_by_cell_type": stratify_by_cell_type,
             "pca_variance_explained": harmony_info["pca_variance_explained"],
         },
     )

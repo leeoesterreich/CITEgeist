@@ -14,3 +14,8 @@ recursive-exclude CITEgeist/slurm *
 # out of the built package unless included here.
 include CITEgeist/examples/README.md
 recursive-include CITEgeist/examples *.py *.md
+
+# Benchmarking/ is the paper's reproduction code (a source-repo directory, not part of the
+# pip package); keep it out of the sdist and wheel.
+prune Benchmarking
+recursive-exclude Benchmarking *

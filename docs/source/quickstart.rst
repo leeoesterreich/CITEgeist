@@ -8,13 +8,15 @@ proportions, and single-cell output — see
 
 .. warning::
 
-   **A GPU is required.**
+   **A GPU is optional.**
    :meth:`~CITEgeist.model.citegeist_model.CitegeistModel.run_cell_proportion_model`
-   solves the proportion QP with NVIDIA cuOPT. cuOPT is **not on PyPI and is not
-   included in** ``CITEgeist_env.yml`` — install it separately
+   defaults to ``method="auto"`` (resolves to ``"rna_refined"``), which runs on CPU but
+   needs a ``raw_counts`` GEX layer and per-spot nuclei counts. ``method="qp"`` (the
+   2.0.0 behaviour) solves the proportion QP with NVIDIA cuOPT, which is **not on PyPI
+   and is not included in** ``CITEgeist_env.yml``; install it separately
    (``pip install cuopt-cu12 --extra-index-url https://pypi.nvidia.com``) or use a
-   RAPIDS/NGC container. **There is no CPU fallback**; on a CPU-only machine the
-   proportion solver cannot run. See :doc:`installation`.
+   RAPIDS/NGC container. There is no CPU fallback for ``method="qp"``. See
+   :doc:`installation`.
 
 No external scRNA-seq reference is required — cell-type profiles are built from the
 antibody panel measured on the same slide.
@@ -59,8 +61,8 @@ Minimal example
    }
    model.load_cell_profile_dict(cell_profiles)
 
-   # Spot-level proportions (cuOPT QP — GPU only).
-   global_props, finetuned_props = model.run_cell_proportion_model()
+   # Spot-level proportions (cuOPT QP, GPU only; the default method="auto" runs on CPU).
+   global_props, finetuned_props = model.run_cell_proportion_model(method="qp")
 
    model.append_proportions_to_adata(key="finetuned")
    result_adata = model.get_adata()
@@ -103,7 +105,7 @@ are keyword-only.
 * ``lambda_reg`` — regularization strength on the proportion vector (default ``1``).
 * ``alpha`` — L1/L2 trade-off, ``0`` = L2, ``1`` = L1 (default ``0.5``).
 * ``use_gex_detection`` — GEX-informed detection refinement (default ``True``).
-* ``method`` — ``"qp"``, the only production backend.
+* ``method`` — ``"auto"`` (the default; resolves to ``"rna_refined"``, CPU), ``"marker_share"`` (CPU), or ``"qp"`` (cuOPT, GPU; the 2.0.0 behaviour).
 
 Next steps
 ----------

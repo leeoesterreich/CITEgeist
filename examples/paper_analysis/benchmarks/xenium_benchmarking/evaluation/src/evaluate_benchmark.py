@@ -14,7 +14,7 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -143,44 +143,18 @@ def combine_t_cells_in_df(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def evaluate_region(
+def load_prediction_with_source(
+    pred_dir,
     region_id: int,
-    gt_dir: str,
-    pred_dir: str,
     prefix: str = "Xenium",
-    use_achievable_7: bool = True,
     combine_t_cells: bool = False,
-    evaluated_types: List[str] = None,
-) -> Dict[str, any]:
-    """
-    Evaluate a single region.
+) -> Tuple[pd.DataFrame, Path]:
+    """Load one region's predictions; return (frame, exact file path read).
 
-    Args:
-        region_id: Region identifier
-        gt_dir: Directory containing ground_truth/ folder
-        pred_dir: Directory containing prediction CSVs
-        prefix: Filename prefix
-        use_achievable_7: Collapse GT to achievable-7 types (default True)
-        evaluated_types: Optional list of cell types to evaluate; others become non-evaluated mass
-
-    Returns:
-        Dict with region metrics
+    Read-only: never writes or stages a copy. The returned path lets callers
+    record the sha256 of the file that was actually scored.
     """
-    gt_dir = Path(gt_dir)
     pred_dir = Path(pred_dir)
-
-    # Load ground truth
-    gt_path = gt_dir / "ground_truth" / f"{prefix}_region_{region_id}_prop.csv"
-    if not gt_path.exists():
-        raise FileNotFoundError(f"Ground truth not found: {gt_path}")
-    gt_df = pd.read_csv(gt_path, index_col=0)
-
-    # Collapse GT to achievable-7 if requested
-    if use_achievable_7:
-        gt_df = filter_gt_to_achievable_7(gt_df)
-        logger.info(f"Filtered GT to achievable-7: {list(gt_df.columns)}")
-
-    # Load predictions - try multiple patterns
     pred_path = None
     sample_name = f"{prefix}_region_{region_id}"
 
@@ -204,6 +178,12 @@ def evaluate_region(
     # Pattern 4: Global format at top level
     if pred_path is None:
         candidate = pred_dir / f"{sample_name}_cell_prop_global_results.csv"
+        if candidate.exists():
+            pred_path = candidate
+
+    # Pattern 5: baseline.csv.gz in <sample>/predictions/ (read natively, read-only)
+    if pred_path is None:
+        candidate = pred_dir / sample_name / "predictions" / "baseline.csv.gz"
         if candidate.exists():
             pred_path = candidate
 
@@ -242,6 +222,58 @@ def evaluate_region(
         logger.info("Normalizing predictions to proportions (detected cell counts)")
         numeric_cols = pred_df.select_dtypes(include=[np.number]).columns
         pred_df[numeric_cols] = pred_df[numeric_cols].div(row_sums, axis=0)
+
+    return pred_df, pred_path
+
+
+def load_prediction(
+    pred_dir,
+    region_id: int,
+    prefix: str = "Xenium",
+    combine_t_cells: bool = False,
+) -> pd.DataFrame:
+    """Load one region's predictions (see load_prediction_with_source)."""
+    return load_prediction_with_source(pred_dir, region_id, prefix, combine_t_cells)[0]
+
+
+def evaluate_region(
+    region_id: int,
+    gt_dir: str,
+    pred_dir: str,
+    prefix: str = "Xenium",
+    use_achievable_7: bool = True,
+    combine_t_cells: bool = False,
+    evaluated_types: List[str] = None,
+) -> Dict[str, any]:
+    """
+    Evaluate a single region.
+
+    Args:
+        region_id: Region identifier
+        gt_dir: Directory containing ground_truth/ folder
+        pred_dir: Directory containing prediction CSVs
+        prefix: Filename prefix
+        use_achievable_7: Collapse GT to achievable-7 types (default True)
+        evaluated_types: Optional list of cell types to evaluate; others become non-evaluated mass
+
+    Returns:
+        Dict with region metrics
+    """
+    gt_dir = Path(gt_dir)
+    pred_dir = Path(pred_dir)
+
+    # Load ground truth
+    gt_path = gt_dir / "ground_truth" / f"{prefix}_region_{region_id}_prop.csv"
+    if not gt_path.exists():
+        raise FileNotFoundError(f"Ground truth not found: {gt_path}")
+    gt_df = pd.read_csv(gt_path, index_col=0)
+
+    # Collapse GT to achievable-7 if requested
+    if use_achievable_7:
+        gt_df = filter_gt_to_achievable_7(gt_df)
+        logger.info(f"Filtered GT to achievable-7: {list(gt_df.columns)}")
+
+    pred_df = load_prediction(pred_dir, region_id, prefix, combine_t_cells)
 
     # Align spots
     common_spots = pred_df.index.intersection(gt_df.index)
@@ -391,6 +423,230 @@ def evaluate_all_regions(
         logger.info(f"Results saved to {output_path}")
 
     return results
+
+
+# =============================================================================
+# STRICT CONTRACT (RNA-cluster GT scoring). The legacy path above is untouched.
+# No silent skips: every anomaly either raises or is recorded in a report.
+# =============================================================================
+
+
+class MaskDegenerate(Exception):
+    """The shared spot mask is unusable (too many GT spots lost, or an
+    evaluable type lost all GT variance). Stop and ask the user; never
+    silently exclude."""
+
+
+_GT_CONST_TOL = 1e-12
+
+
+def _read_gt_strict(gt_dir, region_id: int, prefix: str) -> pd.DataFrame:
+    gt_path = Path(gt_dir) / "ground_truth" / f"{prefix}_region_{region_id}_prop.csv"
+    if not gt_path.exists():
+        raise FileNotFoundError(f"Ground truth not found: {gt_path}")
+    gt_df = pd.read_csv(gt_path, index_col=0)
+    if gt_df.index.has_duplicates:
+        raise ValueError(f"Duplicate spot ids in GT: {gt_path}")
+    return gt_df
+
+
+def _is_constant(values) -> bool:
+    v = np.asarray(values, dtype=float)
+    return bool(np.ptp(v) <= _GT_CONST_TOL)
+
+
+def evaluability_table(gt_dir, types: List[str], n_regions: int = 5, prefix: str = "Xenium") -> pd.DataFrame:
+    """Region x type bool: False iff GT is constant on the FULL canonical GT spot set.
+
+    Reads only GT files; call before any prediction is loaded. This is the
+    fixed evaluability rule (it never depends on which methods are scored).
+    """
+    rows = {}
+    for region_id in range(n_regions):
+        gt_df = _read_gt_strict(gt_dir, region_id, prefix)
+        missing = [t for t in types if t not in gt_df.columns]
+        if missing:
+            raise ValueError(f"GT region {region_id} lacks types {missing}")
+        vals = gt_df[list(types)]
+        if vals.isna().any().any():
+            raise ValueError(f"NaN in GT region {region_id}")
+        rows[region_id] = {t: not _is_constant(vals[t].values) for t in types}
+    table = pd.DataFrame.from_dict(rows, orient="index")[list(types)]
+    table.index.name = "region"
+    return table.astype(bool)
+
+
+def common_spot_masks(
+    gt_dir,
+    pred_dirs: Dict[str, str],
+    evaluable: pd.DataFrame,
+    n_regions: int = 5,
+    prefix: str = "Xenium",
+    max_drop_frac: float = 0.01,
+) -> Dict[int, pd.Index]:
+    """Per region, GT spots intersected with every method's spots.
+
+    Raises FileNotFoundError/ValueError on a missing region file or an empty
+    mask, and MaskDegenerate if the mask drops more than max_drop_frac of the
+    GT spots, or if a type evaluable on the full GT is constant on the mask.
+    """
+    if not pred_dirs:
+        raise ValueError("No prediction directories given")
+    masks: Dict[int, pd.Index] = {}
+    for region_id in range(n_regions):
+        gt_df = _read_gt_strict(gt_dir, region_id, prefix)
+        mask = gt_df.index
+        for method, pdir in pred_dirs.items():
+            pred_df = load_prediction(pdir, region_id, prefix)
+            if pred_df.index.has_duplicates:
+                raise ValueError(f"Duplicate spot ids in predictions of {method}, region {region_id}")
+            mask = mask.intersection(pred_df.index)
+            if len(mask) == 0:
+                raise ValueError(
+                    f"No common spots between GT and {method} for region {region_id} "
+                    f"(spot-id format mismatch? GT e.g. {list(gt_df.index[:2])}, "
+                    f"pred e.g. {list(pred_df.index[:2])})"
+                )
+        mask = gt_df.index[gt_df.index.isin(mask)]  # keep GT order
+        n_gt = len(gt_df)
+        dropped = n_gt - len(mask)
+        if dropped / n_gt > max_drop_frac:
+            raise MaskDegenerate(
+                f"Region {region_id}: shared mask drops {dropped}/{n_gt} GT spots "
+                f"(> {max_drop_frac:.1%}). Stop and ask the user."
+            )
+        for t in evaluable.columns:
+            if bool(evaluable.loc[region_id, t]) and _is_constant(gt_df.loc[mask, t].values):
+                raise MaskDegenerate(
+                    f"Region {region_id}: type {t!r} is evaluable on the full GT but has "
+                    f"zero GT variance on the shared mask. Stop and ask the user."
+                )
+        masks[region_id] = mask
+    return masks
+
+
+def _safe_pearson(x, y) -> float:
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def evaluate_strict(
+    gt_dir,
+    pred_dir,
+    types: List[str],
+    masks: Dict[int, pd.Index],
+    evaluable: pd.DataFrame,
+    n_regions: int = 5,
+    prefix: str = "Xenium",
+    combine_t_cells: bool = False,
+) -> Dict[str, any]:
+    """Score one method on the shared masks. Per-type r is the headline metric.
+
+    Per-type r: NaN (excluded) iff GT constant on the full GT; 0.0 if the
+    prediction is constant or the type column is absent (zero-filled);
+    otherwise Pearson r. Per-type mean over evaluable regions, then over types.
+    """
+    types = list(types)
+    regions: List[Dict[str, any]] = []
+    table_rows: List[Dict[str, any]] = []
+    mask_report: Dict[int, Dict[str, int]] = {}
+
+    for region_id in range(n_regions):
+        if region_id not in masks:
+            raise KeyError(f"No mask for region {region_id}")
+        mask = masks[region_id]
+        gt_df = _read_gt_strict(gt_dir, region_id, prefix)
+        pred_df = load_prediction(pred_dir, region_id, prefix, combine_t_cells)
+        if not mask.isin(pred_df.index).all() or not mask.isin(gt_df.index).all():
+            raise ValueError(f"Mask for region {region_id} contains spots absent from GT or predictions")
+        gt = gt_df.loc[mask, types]
+        present = [t for t in types if t in pred_df.columns]
+        pred = pred_df.loc[mask, present].reindex(columns=types, fill_value=0.0)
+        if gt.isna().any().any() or pred.isna().any().any():
+            raise ValueError(f"NaN in GT or predictions for region {region_id}")
+
+        mask_report[region_id] = {
+            "n_gt_spots": int(len(gt_df)),
+            "n_mask_spots": int(len(mask)),
+            "spots_dropped": int(len(gt_df) - len(mask)),
+        }
+
+        m: Dict[str, any] = {"region_id": region_id, "n_spots": int(len(mask)), "cell_types": types}
+        for t in types:
+            g = gt[t].values
+            p = pred[t].values
+            if not bool(evaluable.loc[region_id, t]):
+                r, reason = np.nan, "gt_constant_excluded"
+            elif t not in present:
+                r, reason = 0.0, "missing_type_r0"
+            elif _is_constant(p):
+                r, reason = 0.0, "pred_constant_r0"
+            else:
+                r, reason = _safe_pearson(g, p), "ok"
+            m[f"{t}_pearson_r"] = r
+            m[f"{t}_rmse"] = float(np.sqrt(np.mean((g - p) ** 2)))
+            m[f"{t}_mae"] = float(np.mean(np.abs(g - p)))
+            table_rows.append(
+                {
+                    "region": region_id,
+                    "type": t,
+                    "evaluable": bool(evaluable.loc[region_id, t]),
+                    "r": r,
+                    "reason": reason,
+                }
+            )
+
+        gm, pm = gt.values, pred.values
+        jsd = []
+        for i in range(len(gm)):
+            g_row = gm[i] + 1e-10
+            p_row = pm[i] + 1e-10
+            v = jensenshannon(g_row / g_row.sum(), p_row / p_row.sum())
+            if not np.isnan(v):
+                jsd.append(v)
+        m["mean_jsd"] = float(np.mean(jsd)) if jsd else np.nan
+        m["median_jsd"] = float(np.median(jsd)) if jsd else np.nan
+
+        g_flat, p_flat = gm.flatten(), pm.flatten()
+        if _is_constant(g_flat):
+            raise ValueError(f"Flattened GT is constant in region {region_id}")
+        m["overall_pearson_r"] = 0.0 if _is_constant(p_flat) else _safe_pearson(g_flat, p_flat)
+        m["overall_rmse"] = float(np.sqrt(np.mean((g_flat - p_flat) ** 2)))
+        m["overall_mae"] = float(np.mean(np.abs(g_flat - p_flat)))
+        regions.append(m)
+
+    table = pd.DataFrame(table_rows, columns=["region", "type", "evaluable", "r", "reason"])
+
+    summary: Dict[str, any] = {
+        "n_regions": len(regions),
+        "total_spots": int(sum(m["n_spots"] for m in regions)),
+        "cell_types": types,
+    }
+    per_type_mean_r: Dict[str, float] = {}
+    for t in types:
+        vals = table.loc[table["type"] == t, "r"].dropna().values
+        if len(vals):
+            summary[f"{t}_mean_r"] = float(np.mean(vals))
+            summary[f"{t}_std_r"] = float(np.std(vals))
+            per_type_mean_r[t] = float(np.mean(vals))
+        else:  # constant GT in every region: not scorable, reported not hidden
+            summary[f"{t}_mean_r"] = np.nan
+            summary[f"{t}_std_r"] = np.nan
+    flat = [m["overall_pearson_r"] for m in regions]
+    summary["overall_mean_pearson_r"] = float(np.mean(flat))
+    summary["overall_std_pearson_r"] = float(np.std(flat))
+    jsds = [m["mean_jsd"] for m in regions if not np.isnan(m["mean_jsd"])]
+    if jsds:
+        summary["overall_mean_jsd"] = float(np.mean(jsds))
+    summary["overall_mean_rmse"] = float(np.mean([m["overall_rmse"] for m in regions]))
+    summary["overall_mean_mae"] = float(np.mean([m["overall_mae"] for m in regions]))
+    summary["per_type_mean_r"] = float(np.mean(list(per_type_mean_r.values()))) if per_type_mean_r else np.nan
+    summary["n_types_scored"] = len(per_type_mean_r)
+    summary["n_zero_filled_missing_type"] = int((table["reason"] == "missing_type_r0").sum())
+    summary["n_zero_const_pred"] = int((table["reason"] == "pred_constant_r0").sum())
+
+    return {"summary": summary, "regions": regions, "region_type_table": table, "mask_report": mask_report}
 
 
 def print_summary(results: Dict[str, any]) -> None:

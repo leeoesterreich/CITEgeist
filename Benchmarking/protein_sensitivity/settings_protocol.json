@@ -1,0 +1,102 @@
+{
+  "name": "v40 settings sensitivity + leave-one-region-out (W3, W3b); frozen before any run",
+  "frozen_at_commit": "see git log: chore: freeze v40 settings-sensitivity + LORO protocol (pre-results)",
+  "separate_from": "protocol.json (stress-test protocol; its md5 is unchanged by this file)",
+  "dataset": "xenium",
+  "regions": [0, 1, 2, 3, 4],
+  "n_types": {"primary": 6, "secondary": 7},
+  "metric": "pearson_r (overall per-region proportion Pearson r vs SingleR GT; complementary rmse/mae/jsd are recorded)",
+  "baseline": {
+    "description": "The published Xenium QP call (baseline.run_xenium_qp): CitegeistModel(simulation=True) -> filter_gex(min_counts=25) -> preprocess_gex(target_sum=10000) -> preprocess_antibody -> load_cell_profile_dict(profile) -> run_cell_proportion_model(lambda_laplacian=0.0, nuclei_counts=<label-derived>)",
+    "levels": {
+      "detection_gate_ub": 0.01,
+      "lambda_laplacian": 0.0,
+      "lambda_reg": 1,
+      "use_detection_gating": "on",
+      "use_gex_detection": "on",
+      "markers": "major",
+      "nuclei_source": "label_derived"
+    },
+    "baseline_equals_gate_tolerance": 0.0001,
+    "gate_reference": "results/gate (A11 gate run, unperturbed baseline); per-region baseline r from this sweep must equal it within 1e-4 BEFORE any delta is read"
+  },
+  "settings": {
+    "detection_gate_ub": {"kwarg": "detection_gate_ub", "levels": [0.005, 0.01, 0.02, 0.05]},
+    "lambda_laplacian": {"kwarg": "lambda_laplacian", "levels": [0.0, 0.01, 0.03, 0.1]},
+    "lambda_reg": {"kwarg": "lambda_reg", "levels": [0.5, 1, 2]},
+    "use_detection_gating": {"kwarg": "use_detection_gating", "levels": ["on", "off"]},
+    "use_gex_detection": {"kwarg": "use_gex_detection", "levels": ["on", "off"]},
+    "markers": {
+      "kwarg": null,
+      "levels": ["major", "major_plus_minor"],
+      "note": "major_plus_minor: Minor markers are promoted into Major for that run, because the QP ignores Minor."
+    },
+    "nuclei_source": {
+      "kwarg": "nuclei_counts",
+      "levels": ["label_derived", "all_segmented", "stardist_dapi", "none"],
+      "note": "label_derived = per-spot count of non-Unknown cells (published). all_segmented = per-spot count of ALL mapped cells incl. Unknown (must equal oracle_counts_*.csv). stardist_dapi = precomputed StarDist-DAPI nuclei counts. none = nuclei_counts=None."
+    }
+  },
+  "expected_conditions": {
+    "non_baseline_per_region_per_ntype": 14,
+    "baseline_per_region_per_ntype": 1,
+    "total_per_region_per_ntype": 15,
+    "derivation": "(4-1)+(4-1)+(3-1)+(2-1)+(2-1)+(2-1)+(4-1) = 14 non-baseline levels (the baseline level of each setting is the single baseline condition). Task brief text says '15 non-baseline'; the spec level lists give 14 non-baseline + 1 baseline = 15 conditions. No level was invented to reach 15.",
+    "total_rows_primary_plus_secondary": 150
+  },
+  "stardist_dapi": {
+    "directory": "Benchmarking/xenium_benchmarking/CITEgeist/output/stardist_counts",
+    "files_untracked": true,
+    "regions_covered": [0, 1, 2, 3, 4],
+    "count_column": "nuclei_count_raw",
+    "index_format": "spot_<spot_idx> (identical to cell_to_spot_mapping.csv spot_id)",
+    "sha256": {
+      "stardist_counts_region_0.csv": "bc112ddc2ed17046a170595391ac08e9c4233385afe355726710b845691e9023",
+      "stardist_counts_region_1.csv": "ccb81b0243684044ffa34a831b0560c8cbcc951c6d2b540b97eb50cbc79e42aa",
+      "stardist_counts_region_2.csv": "29e7dfd007b59ab5f968a98371cfdefb76b4b074e1ee006571db30859c7d2597",
+      "stardist_counts_region_3.csv": "25691fbaa0b5c2bec23a7db172b6770a0d59cbfea6ee79a0992817f94dbdb531",
+      "stardist_counts_region_4.csv": "24501a11a7fadf1842421e26690d7a929e9a25ba6c4ed962aee76ae7e49a841e",
+      "oracle_counts_region_0.csv": "885661f0923bba878ecb998aa57ea1b59c8491a61ed6b93c9d0753246d8963bb",
+      "oracle_counts_region_1.csv": "b856b92035bc09cd304fe0c62f27e1da5b57eac99cc630ea567ea297562b26cf",
+      "oracle_counts_region_2.csv": "0d3f6bcb2e40643952e2fccbb115b9bbf60bf96b2092c9fc03c09918ed832223",
+      "oracle_counts_region_3.csv": "a0c955e8cd8c6cfe3b5a143f6d39cb0b32396ff9c2cc60b3b7c5441ddba3d2b0",
+      "oracle_counts_region_4.csv": "398938153bdfac10023ffe5a31aeb5120cae7c698bc615cd1dd2205530c573fa"
+    },
+    "sanity_check": "all_segmented per-spot counts must equal oracle_counts_region_<r>.csv exactly (verified 5/5 regions at freeze)"
+  },
+  "robustness_rule": {
+    "frozen": true,
+    "statement": "A setting level is robust iff |mean over regions of (r_level - r_baseline)| <= 0.02 AND no single region has |r_level - r_baseline| > 0.05",
+    "mean_abs_threshold": 0.02,
+    "region_abs_threshold": 0.05,
+    "reporting": "Every prespecified level is reported with mean delta r, worst-region delta r, and robust yes/no. Known breakers (gating off, Major+Minor) are reported as such. A failed grid cell is reported with its failure status and is never dropped."
+  },
+  "loro_rule": {
+    "frozen": true,
+    "statement": "For each held-out region h and each setting (one-at-a-time, the other settings held at baseline): choose the level maximizing mean r over the OTHER four regions; report r on h for the chosen level next to the baseline r on h. Ties (equal to 1e-12) go to the baseline level. The baseline level of each setting is included as a candidate.",
+    "tie_break": "baseline level",
+    "caveat": "One-at-a-time LORO understates tuning bias from JOINT tuning of several settings; it measures only single-setting selection.",
+    "summary": "Per held-out region: held-out r of selected vs baseline, delta; mean of deltas across held-out regions."
+  },
+  "audit_coverage": {
+    "source": "docs/superpowers/handoffs/2026-10-13-v40-audit-provenance.md (12 changed-after-eval, 13 cannot-determine, 3 before-eval)",
+    "covered_by_levels": {
+      "Major vs Minor markers (changed-after-eval)": "markers",
+      "detection gating (changed-after-eval)": "use_detection_gating",
+      "nuclei_counts source + cellularity correction (changed-after-eval)": "nuclei_source",
+      "detection_gate_ub (changed-after-eval)": "detection_gate_ub",
+      "GEX-informed detection on/off (changed-after-eval)": "use_gex_detection",
+      "lambda_laplacian (cannot-determine)": "lambda_laplacian",
+      "lambda_reg (documented-before-eval)": "lambda_reg"
+    },
+    "not_covered": {
+      "gex_detection_k, gex_detection_min_corr (cannot-determine)": "not in the prespecified level list",
+      "fusion_mode union vs intersection (changed-after-eval with use_gex_detection)": "only on/off of GEX detection is tested",
+      "filter_gex min_counts=25, preprocess_gex target_sum=10000 (cannot-determine)": "not in the prespecified level list",
+      "antibody winsorization 5/95 (before-eval)": "not in the prespecified level list",
+      "profile dictionary composition beyond Minor promotion (changed-after-eval)": "the stress test ablation/type-removal axes address marker availability, not dictionary edits",
+      "SACE settings: single E-step, cells_per_spot, init_method (changed-after-eval / cannot-determine)": "this protocol is QP-proportion only; SACE is not rerun",
+      "5-region Pearson r selection of the above": "see loro_rule: LORO covers only the covered settings"
+    }
+  }
+}

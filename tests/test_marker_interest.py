@@ -508,5 +508,23 @@ class TestMarkerInterestSynthetic:
         )
 
 
+def test_auto_components_gate():
+    """With auto_components=True a noise channel fails the (Ashman-D) GMM gate; a bimodal channel passes."""
+    rng = np.random.default_rng(0)
+    gx, gy = np.meshgrid(np.arange(25), np.arange(24))
+    coords = np.column_stack([gx.ravel(), gy.ravel()]).astype(float)
+    left = coords[:, 0] < 12.5
+    n = len(coords)
+    # ubiquitous high-count channels keep size factors from being dominated by the patterned marker
+    X = np.column_stack([rng.poisson(np.where(left, 60, 2)), rng.poisson(3, n),
+                         rng.poisson(150, n), rng.poisson(120, n)]).astype(float)
+    res = identify_interesting_markers(X, coords, ["bimodal", "noise", "u1", "u2"], auto_components=True, verbose=False)
+    by = {m.name: m for m in res.markers}
+    assert by["bimodal"].n_components >= 2 and by["bimodal"].passed_gmm
+    assert not by["noise"].passed_gmm
+    off = identify_interesting_markers(X, coords, ["bimodal", "noise", "u1", "u2"], verbose=False)
+    assert all(m.n_components is None for m in off.markers)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

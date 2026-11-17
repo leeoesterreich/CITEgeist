@@ -63,16 +63,47 @@ def test_map_antibodies_v2_returns_correct_shape():
     assert len(cell_type_names) == n_types
 
 
-def test_cuopt_proportions_non_negative_and_bounded():
-    """Run CitegeistModel.run_cell_proportion_model on tiny synthetic data."""
+def _make_sim_pair(n_side=6, n_genes=40, seed=0):
+    """Build separate GEX and antibody AnnDatas on a spot grid, as a simulation run supplies them."""
+    rng = np.random.default_rng(seed)
+    n_spots = n_side * n_side
+    spot_names = pd.Index([f"spot_{i:03d}" for i in range(n_spots)])
+    xx, yy = np.meshgrid(np.arange(n_side), np.arange(n_side))
+    coords = np.column_stack([xx.ravel(), yy.ravel()]).astype(float) * 100.0
+
+    marker_names = [f"Marker{i}" for i in range(6)]  # simulation data carries no "-1" suffix
+    ab = rng.poisson(rng.uniform(5, 50, size=(n_spots, len(marker_names)))).astype(np.float32)
+    adata_cite = ad.AnnData(X=ab, obs=pd.DataFrame(index=spot_names.copy()))
+    adata_cite.var_names = pd.Index(marker_names)
+    adata_cite.obsm["spatial"] = coords
+
+    counts = rng.poisson(rng.uniform(0.5, 20, size=(n_spots, n_genes))).astype(np.float32)
+    adata_gex = ad.AnnData(X=counts, obs=pd.DataFrame(index=spot_names.copy()))
+    adata_gex.var_names = pd.Index([f"Gene{i}" for i in range(n_genes)])
+    adata_gex.obsm["spatial"] = coords.copy()
+    return adata_gex, adata_cite, marker_names
+
+
+def test_cuopt_proportions_non_negative_and_bounded(tmp_path):
+    """Run the simulation-mode QP path (CitegeistModel + cuOPT) on tiny synthetic data."""
     from CITEgeist.model.citegeist_model import CitegeistModel
 
-    adata, marker_names = _make_synthetic_adata(n_spots=5)
-    adata.layers["antibody"] = adata.X.copy()
-    adata.layers["counts"] = (adata.X * 10).astype(int)
+    adata_gex, adata_cite, marker_names = _make_sim_pair()
     profiles = _make_profiles(marker_names, n_types=3)
-    model = CitegeistModel(adata, simulation=True)
-    result = model.run_cell_proportion_model(profiles=profiles)
-    prop = result.proportions.values
-    assert np.all(prop >= -1e-6), "Negative proportions"
-    assert np.all(prop.sum(axis=1) <= 1.05), "Proportions sum > 1.05"
+    model = CitegeistModel(
+        sample_name="qp_smoke",
+        output_folder=tmp_path,
+        simulation=True,
+        gene_expression_adata=adata_gex,
+        antibody_capture_adata=adata_cite,
+    )
+    model.preprocess_gex(target_sum=10000)
+    model.preprocess_antibody()
+    model.cell_profile_dict = profiles
+    global_props, _finetuned = model.run_cell_proportion_model(method="qp")
+    prop = global_props.drop(columns=["recon_error"], errors="ignore")
+    assert prop.shape == (adata_cite.n_obs, len(profiles))
+    assert list(prop.columns) == list(profiles)
+    values = prop.to_numpy(dtype=float)
+    assert np.all(values >= -1e-6), "Negative proportions"
+    assert np.all(values.sum(axis=1) <= 1.05), "Proportions sum > 1.05"
